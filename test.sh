@@ -5,8 +5,8 @@ if [[ "x$BUILD" != "xFalse" ]]; then
 
     # Build test environment
     echo -e "\n==============================="
-    echo -e  "|  Building test environment  |"
-    echo -e  "===============================\n"
+    echo -e "|  Building test container    |"
+    echo -e "===============================\n"
 
     if [[ "x$cache" == "xnocache" ]]; then
         docker build --no-cache -f containers/Ubuntu_18.04/Dockerfile ./ -t timeseria_test_container
