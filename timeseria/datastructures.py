@@ -1,4 +1,6 @@
 
+from .time import s_from_dt , dt_from_s
+
 # Setup logging
 import logging
 logger = logging.getLogger(__name__)
@@ -17,9 +19,10 @@ class Point(object):
         for kw in kwargs:
             if HARD_DEBUG: logger.debug('Setting %s to %s', kw, kwargs[kw])
             setattr(self, kw, kwargs[kw])
+        #self.coordinates = kwargs.keys()
     
     def coordinates(self):
-        return self.__dict__
+        return {k:v for k,v in self.__dict__.items() if not k.startswith('_')}
     
     def __repr__(self):
         return '{} with {}'.format(self.__class__.__name__, self.coordinates())
@@ -29,21 +32,23 @@ class Point(object):
 
         
 class TimePoint(Point):
+    
     def __init__(self, **kwargs):
         #if [*kwargs] != ['t']: # This migth speed up a bit but is for Python >= 3.5
         if list(kwargs.keys()) != ['t']:
             raise Exception('A TimePoint requires only a "t" coordinate (got "{}")'.format(kwargs))
         super(TimePoint, self).__init__(**kwargs)
 
-
+    @ property
+    def dt(self):
+        return dt_from_s(self.t)
 
 class DataPoint(Point):
     def __init__(self, **kwargs):
         try:
-            self.data = kwargs.pop('data')
+            self._data = kwargs.pop('data')
         except KeyError:
             raise Exception('A DataPoint requires a special "data" argument (got only "{}")'.format(kwargs))
-
         super(DataPoint, self).__init__(**kwargs)
 
     #def __float__(self):
@@ -52,6 +57,13 @@ class DataPoint(Point):
     #        return float(self.data)
     #    except:
     #        raise TypeError('Cannot convert "{}" to a float number'.format(self.data))
+
+    def __repr__(self):
+        return '{} with {} and data {}'.format(self.__class__.__name__, self.coordinates(), self.data)
+    
+    @property
+    def data(self):
+        return self._data
 
 
 class DataTimePoint(DataPoint, TimePoint):
@@ -94,12 +106,11 @@ class Serie(list):
     
     def __sum__(self, other):
         raise NotImplementedError
-
-    #def plot(self):
-    #    from matplotlib import pyplot
-    #    pyplot.plot(self)
-    #    pyplot.show()
-
+    
+    @property
+    def label(self):
+        #return self.__class__.__name__
+        return 'value'
 
 class PointSerie(Serie):
     __TYPE__ = Point
@@ -128,11 +139,10 @@ class TimePointSerie(PointSerie):
         super(TimePointSerie, self).append(item)
 
 
-
 class DataPointSerie(PointSerie):
     '''A series where each item is guardanteed to carry the same data type'''
 
-    __TYPE__ = DataTimePoint
+    __TYPE__ = DataPoint
 
     # Check data compatibility
     def append(self, item):
@@ -156,12 +166,6 @@ class DataTimePointSerie(DataPointSerie, TimePointSerie):
     '''A series where each item is a DataTimePoint'''
 
     __TYPE__ = DataTimePoint
-
-
-
-
-
-
 
 
 

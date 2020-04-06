@@ -1,7 +1,7 @@
 import unittest
 import os
 from ..datastructures import Point, TimePoint, DataPoint, DataTimePoint
-from ..datastructures import Serie, DataTimePointSerie
+from ..datastructures import Serie, DataPointSerie, TimePointSerie, DataTimePointSerie
 
 
 # Setup logging
@@ -43,6 +43,7 @@ class TestPoints(unittest.TestCase):
             DataPoint(data='hello')
         
         dataPoint = DataPoint(x=1, y=2, data='hello')
+        self.assertEqual(dataPoint.coordinates(), {'x': 1, 'y':2}) 
         self.assertEqual(dataPoint.x,1)
         self.assertEqual(dataPoint.y,2)
         self.assertEqual(dataPoint.data,'hello')
@@ -59,9 +60,11 @@ class TestPoints(unittest.TestCase):
         with self.assertRaises(Exception):
             DataTimePoint(x=1, data='ciao')
         
-        dataTimePoint = DataTimePoint(t=6, data='hello')
+        dataTimePoint = DataTimePoint(t=6, data='hello')        
+        self.assertEqual(dataTimePoint.coordinates(), {'t': 6}) 
         self.assertEqual(dataTimePoint.t,6)
         self.assertEqual(dataTimePoint.data,'hello')
+        
 
 
 class TestSeries(unittest.TestCase):
@@ -100,6 +103,17 @@ class TestSeries(unittest.TestCase):
         self.assertEqual(len(floatSerie), 4)
 
 
+    def test_TimePoinSerie(self):
+        
+        timePointSerie = TimePointSerie()
+        timePointSerie.append(TimePoint(t=60))
+
+
+    def test_DataPoinSerie(self):
+        dataPointSerie = DataPointSerie()
+        dataPointSerie.append(DataPoint(x=60, data='ciao'))
+
+
     def test_DataTimePoinSerie(self):
         
         with self.assertRaises(TypeError):
@@ -131,14 +145,5 @@ class TestSeries(unittest.TestCase):
                                                 DataTimePoint(t=120, data=24.1),
                                                 DataTimePoint(t=240, data=23.1),
                                                 DataTimePoint(t=300, data=22.7))
-        self.assertTrue(len(dataTimePointSerie), 5)                  
-
-
-
-
-
-
-
-
-
+        self.assertTrue(len(dataTimePointSerie), 5)
 
