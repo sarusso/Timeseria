@@ -15,6 +15,9 @@ RUN bash /tmp/Ubuntu_18.04.sh
 COPY requirements/python/requirements.txt /tmp
 RUN pip3 install -r /tmp/requirements.txt
 
+# Install Jupyter
+RUN pip3 install jupyter
+
 # Add code
 #COPY ./ /opt/Timeseria
 
