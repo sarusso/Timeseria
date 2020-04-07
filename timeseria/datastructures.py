@@ -91,6 +91,8 @@ class Serie(list):
 
         for arg in args:
             self.append(arg)
+            
+        self._label = None
 
     def append(self, item):
         if HARD_DEBUG: logger.debug('Checking %s', item)
@@ -109,8 +111,17 @@ class Serie(list):
     
     @property
     def label(self):
-        #return self.__class__.__name__
-        return 'value'
+        if self._label:
+            return self._label
+        else:
+            return None
+
+    @label.setter
+    def label(self, label):
+        self._label=label
+
+
+
 
 class PointSerie(Serie):
     __TYPE__ = Point
@@ -167,6 +178,25 @@ class DataTimePointSerie(DataPointSerie, TimePointSerie):
 
     __TYPE__ = DataTimePoint
 
+    def plot(self, engine='dg'):
+        if engine=='mp':
+            from .plots import matplotlib_plot
+            matplotlib_plot(self)
+        elif engine=='dg':
+            from .plots import dygraphs_plot
+            dygraphs_plot(self)
+        else:
+            raise Exception('Unknowmn plotting engine "{}'.format(engine))
 
+    @property
+    def plot_aggregate_by(self):
+        try:
+            return self._plot_aggregate_by
+        except AttributeError:
+            if len(self)  > 10000:
+                aggregate_by = 10**len(str(int(len(self)/10000.0)))
+            else:
+                aggregate_by = None
+            return aggregate_by
 
 
