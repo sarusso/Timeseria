@@ -21,16 +21,25 @@ class Point(object):
             setattr(self, kw, kwargs[kw])
         #self.coordinates = kwargs.keys()
     
+    @property
     def coordinates(self):
         return {k:v for k,v in self.__dict__.items() if not k.startswith('_')}
     
     def __repr__(self):
-        return '{} with {}'.format(self.__class__.__name__, self.coordinates())
+        return '{} with {}'.format(self.__class__.__name__, self.coordinates)
     
     def __str__(self):
         return self.__repr__()
 
-        
+    def __eq__(self, other):
+        if not self.coordinates == other.coordinates:
+            return False
+        for coordinate in self.coordinates:
+            if getattr(self, coordinate) != getattr(other, coordinate):
+                return False
+        return True
+
+
 class TimePoint(Point):
     
     def __init__(self, **kwargs):
@@ -59,11 +68,19 @@ class DataPoint(Point):
     #        raise TypeError('Cannot convert "{}" to a float number'.format(self.data))
 
     def __repr__(self):
-        return '{} with {} and data {}'.format(self.__class__.__name__, self.coordinates(), self.data)
+        return '{} with {} and data {}'.format(self.__class__.__name__, self.coordinates, self.data)
     
+    
+    def __eq__(self, other):
+        if self._data != other._data:
+            return False
+        return super(DataPoint, self).__eq__(other)
+
     @property
     def data(self):
         return self._data
+    
+
 
 
 class DataTimePoint(DataPoint, TimePoint):
@@ -74,7 +91,6 @@ class DataTimePoint(DataPoint, TimePoint):
 #======================
 #  Series
 #======================
-
 
 class Serie(list):
     '''A list of items coming one after another where every item is guaranteed to be of the same type. Can optionally accept None types.'''
@@ -119,8 +135,6 @@ class Serie(list):
     @title.setter
     def title(self, title):
         self._title=title
-
-
 
 
 class PointSerie(Serie):

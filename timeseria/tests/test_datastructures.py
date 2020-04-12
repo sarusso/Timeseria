@@ -20,6 +20,13 @@ class TestPoints(unittest.TestCase):
         point = Point(h=1, i=2)
         self.assertEqual(point.h,1)
         self.assertEqual(point.i,2)
+        
+        point1 = Point(x=1, y=2)
+        point2 = Point(x=1, y=2)
+        point3 = Point(x=5, z=3)
+
+        self.assertEqual(point1,point1)
+        self.assertNotEqual(point1,point3)
 
 
     def test_TimePoint(self):
@@ -43,10 +50,17 @@ class TestPoints(unittest.TestCase):
             DataPoint(data='hello')
         
         dataPoint = DataPoint(x=1, y=2, data='hello')
-        self.assertEqual(dataPoint.coordinates(), {'x': 1, 'y':2}) 
+        self.assertEqual(dataPoint.coordinates, {'x': 1, 'y':2}) 
         self.assertEqual(dataPoint.x,1)
         self.assertEqual(dataPoint.y,2)
         self.assertEqual(dataPoint.data,'hello')
+        
+        dataPoint1 = DataPoint(x=1, y=2, data='hello')
+        dataPoint2 = DataPoint(x=1, y=2, data='hello')
+        dataPoint3 = DataPoint(x=1, y=2, data='ciao')
+        
+        self.assertEqual(dataPoint1, dataPoint2)
+        self.assertNotEqual(dataPoint1, dataPoint3)
 
 
     def test_TimeDataPoints(self):
@@ -61,7 +75,7 @@ class TestPoints(unittest.TestCase):
             DataTimePoint(x=1, data='ciao')
         
         dataTimePoint = DataTimePoint(t=6, data='hello')        
-        self.assertEqual(dataTimePoint.coordinates(), {'t': 6}) 
+        self.assertEqual(dataTimePoint.coordinates, {'t': 6}) 
         self.assertEqual(dataTimePoint.t,6)
         self.assertEqual(dataTimePoint.data,'hello')
         

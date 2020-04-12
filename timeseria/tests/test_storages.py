@@ -110,9 +110,9 @@ class TestCSVFileStorage(unittest.TestCase):
         storage = CSVFileStorage(TEST_DATA_PATH + '/csv/multi_values_with_labels_dirty.csv', value_separator=';', skip_errors=True)
         dataTimePointSerie = storage.get()        
         self.assertEqual(len(dataTimePointSerie), 3)
-        #self.assertEqual(dataTimePointSerie[0], DataTimePoint(t= 946688400, data={'flow': 1010.0, 'temp': 11.0}))
-        #self.assertEqual(dataTimePointSerie[1], DataTimePoint(t= 946706400, data={'flow': 1100.0, 'temp': 10.7}))
-        #self.assertEqual(dataTimePointSerie[2], DataTimePoint(t= 946713600, data={'flow': 1300.0, 'temp': 10.0}))
+        self.assertEqual(dataTimePointSerie[0], DataTimePoint(t= 946688400, data={'flow': 1010.0, 'temp': 11.0}))
+        self.assertEqual(dataTimePointSerie[1], DataTimePoint(t= 946706400, data={'flow': 1100.0, 'temp': 10.7}))
+        self.assertEqual(dataTimePointSerie[2], DataTimePoint(t= 946713600, data={'flow': 1300.0, 'temp': 10.0}))
 
 
  
