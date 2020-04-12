@@ -12,6 +12,35 @@ HARD_DEBUG = False
 
 
 # Utitlities
+
+def is_numerical(item):
+    if isinstance(item, float):
+        return True
+    if isinstance(item, int):
+        return True
+    return False
+
+
+def get_keys_and_check_data_for_plot(data):
+    if is_numerical(data):
+        keys = []
+    elif isinstance(data, list):
+        keys = []
+        for key,item in enumerate(data): 
+            if not is_numerical(item):
+                raise Exception('Don\'t know how to plot item "{}" of type "{}"'.format(item, item.__class__.__name__))
+            keys.append(key)
+    
+    elif isinstance(data, dict):
+        keys = []
+        for key,item in data.items(): 
+            if not is_numerical(item):
+                raise Exception('Don\'t know how to plot item "{}" of type "{}"'.format(item, item.__class__.__name__))
+            keys.append(key)            
+    else:
+        raise Exception('Don\'t know how to plot data "{}" of type "{}"'.format(data, data.__class__.__name__))
+    return keys
+
 def to_dg_time(dt):
     '''Get Dygraphs time form datetime'''
     return '{}/{:02d}/{:02d} {:02d}:{:02d}:{:02d}'.format(dt.year, dt.month, dt.day, dt.hour, dt.minute,dt.second)
@@ -21,47 +50,124 @@ def to_dg_data(dataTimePointSerie, aggregate_by=0):
     '''{% for timestamp,value in metric_data.items %}{{timestamp}},{{value}}\n{%endfor%}}'''
     
     dg_data=''
-    data_sum = 0
-    data_min = None
-    data_max = None
     first_t  = None
     last_t   = None
-    
+
+    global_min = None
+    global_max = None
+
     for i, dataTimePoint in enumerate(dataTimePointSerie):
+        
+        # Offset
+        i=i+1
+                
+        # Prepare a dict for every piece of data
+        try:
+            keys
+        except UnboundLocalError:
+            # Set keys and support vars
+            keys = get_keys_and_check_data_for_plot(dataTimePoint.data)
+            if not keys:
+                keys = [None]
+            data_sums = [0 for key in keys]
+            data_mins = [None for key in keys]
+            data_maxs = [None for key in keys]
+
         if aggregate_by:
 
             if first_t is None:
                 first_t = dataTimePoint.t
-                
-            # Sum
-            data_sum += dataTimePoint.data
+                  
+            # Define data
+            if keys:
+                datas=[]      
+                for key in keys:
+                    if key is None:
+                        datas.append(dataTimePoint.data)
+                    else:
+                        datas.append(dataTimePoint.data[key])
+
+            else:
+                datas=[dataTimePoint.data]
             
-            # Min
-            if data_min is None:
-                data_min = dataTimePoint.data
-            else:
-                if dataTimePoint.data < data_min:
-                    data_min = dataTimePoint.data
+            for j, data in enumerate(datas):
+                
+                # Sum
+                data_sums[j] += data
+                
+                # Global min
+                if global_min is None:
+                    global_min = data
+                else:
+                    if data < global_min:
+                        global_min = data                
+                
+                # Global max
+                if global_max is None:
+                    global_max = data
+                else:
+                    if data > global_max:
+                        global_max = data
 
-            # Max
-            if data_max is None:
-                data_max = dataTimePoint.data
-            else:
-                if dataTimePoint.data > data_max:
-                    data_max = dataTimePoint.data
+                # Min
+                if data_mins[j] is None:
+                    data_mins[j] = data
+                else:
+                    if data < data_mins[j]:
+                        data_mins[j] = data
+    
+                # Max
+                if data_maxs[j] is None:
+                    data_maxs[j] = data
+                else:
+                    if data > data_maxs[j]:
+                        data_maxs[j] = data
 
+            # Dump aggregated data?
             if (i!=0)  and ((i % aggregate_by)==0):
                 last_t = dataTimePoint.t
                 t = first_t + ((last_t-first_t) /2)
-                dg_data+='{},{};{};{}\\n'.format(to_dg_time(dt_from_s(t)), data_min, data_sum/aggregate_by, data_max)
-                data_sum = 0
-                data_min = None
-                data_max = None
+                data_part=''
+                for i, key in enumerate(keys):
+                    data_part+='{};{};{}'.format( data_mins[i], data_sums[i]/aggregate_by, data_maxs[i])
+                dg_data+='{},{}\\n'.format(to_dg_time(dt_from_s(t)), data_part)
+                data_sums = [0 for key in keys]
+                data_mins = [None for key in keys]
+                data_maxs = [None for key in keys]
+                first_t = None
 
         else:
-            dg_data+='{},{}\\n'.format(to_dg_time(dt_from_s(dataTimePoint.t)), dataTimePoint.data)
+                    
+            # Loop over all the keys, including the "None" key if we have no keys (float data)
+            data_part=''
+            for key in keys:
+                if key is None:
+                    data = dataTimePoint.data
+                else:
+                    data = dataTimePoint.data[key]
 
-    return dg_data
+                data_part += '{},'.format(data)   #dataTimePoint.data
+                
+                # Global min
+                if global_min is None:
+                    global_min = data
+                else:
+                    if data < global_min:
+                        global_min = data                
+                
+                # Global max
+                if global_max is None:
+                    global_max = data
+                else:
+                    if data > global_max:
+                        global_max = data
+                
+            # Remove last comma
+            data_part = data_part[0:-1]
+
+            dg_data+='{},{}\\n'.format(to_dg_time(dt_from_s(dataTimePoint.t)), data_part)
+
+    return global_min, global_max, dg_data
 
 
 
@@ -69,28 +175,29 @@ def dygraphs_plot(serie):
     '''Plot a dataTimePointSeries in Jupyter using Dugraph. Based on the work here: https://www.stefaanlippens.net/jupyter-custom-d3-visualization.html'''
     from IPython.display import display, Javascript, HTML
 
+    if len(serie)==0:
+        raise Exception('Cannot plot empty serie')
+
     # Checks
     if isinstance(serie, DataTimePointSerie):
         pass
     else:
         raise Exception('Don\'t know how to plot an object of type "{}"'.format(serie.__class__.__name__))
 
-    # Set label
-    if serie.label:
-        label = serie.label
+    # Set title
+    if serie.title:
+        title = serie.title
     else:
-        label = 'value'
-    
-    # Set title    
-    title = serie.__class__.__name__
+        title = serie.__class__.__name__
 
     aggregate_by = serie.plot_aggregate_by
-    logger.info('Aggregating by "{}" for plotting'.format(aggregate_by))
+    if aggregate_by:
+        logger.info('Aggregating by "{}" for plotting'.format(aggregate_by))
             
     # Define div name
-    div_uuid = str(uuid.uuid4())
-    graph_div_id  = div_uuid + '_graph'
-    legend_div_id = div_uuid + '_legend'
+    graph_id = 'graph_' + str(uuid.uuid4()).replace('-', '')
+    graph_div_id  = graph_id + '_plotarea'
+    legend_div_id = graph_id + '_legend'
 
 
     # Dygraphs javascript
@@ -149,7 +256,28 @@ function legendFormatter(data) {
 """
     dygraphs_javascript += 'new Dygraph('
     dygraphs_javascript += 'document.getElementById("{}"),'.format(graph_div_id)
-    dygraphs_javascript += '"Timestamp,{}\\n{}",'.format(label, to_dg_data(serie, aggregate_by))
+
+    # Loop over all the keys
+    labels=''
+    keys = get_keys_and_check_data_for_plot(serie[0].data)
+    if keys:
+        for key in keys:
+            labels += '{},'.format(key)
+        # Remove last comma
+        labels = labels[0:-1]
+    else:
+        labels='value'
+
+    global_min, global_max, dg_data = to_dg_data(serie, aggregate_by)
+    if global_max != global_min:
+        plot_min = str(global_min-((global_max-global_min)*0.1))
+        plot_max = str(global_max+((global_max-global_min)*0.1))
+    else:
+        # Case where there is a straight line
+        plot_min = str(global_min*0.99)
+        plot_max = str(global_max*1.01)
+
+    dygraphs_javascript += '"Timestamp,{}\\n{}",'.format(labels, dg_data)
     dygraphs_javascript += """{\
 drawGrid: true,
 drawPoints:true,
@@ -161,6 +289,7 @@ fillGraph: false,
 fillAlpha: 0.5,
 colorValue: 0.5,
 showRangeSelector: true,
+//rangeSelectorHeight: 30,
 hideOverlayOnMouseOut: true,
 interactionModel: Dygraph.defaultInteractionModel,
 includeZero: false,
@@ -168,27 +297,32 @@ showRoller: false,
 legend: 'always',
 legendFormatter: legendFormatter,
 labelsDiv: '"""+legend_div_id+"""',
+valueRange: ["""+plot_min+""", """+plot_max+"""],
+zoomCallback: function() {
+    this.updateOptions({zoomRange: ["""+plot_min+""", """+plot_max+"""]});
+},
 animatedZooms: true,"""
     if aggregate_by:
         dygraphs_javascript += 'customBars: true'        
     dygraphs_javascript += '})'
      
      
-    rendering_javascript = '''
-require.undef('timseriaplot'); // Helps to reload in Jupyter
-define('timseriaplot', ['dgenv'], function (Dygraph) {
+    rendering_javascript = """
+require.undef('"""+graph_id+"""'); // Helps to reload in Jupyter
+define('"""+graph_id+"""', ['dgenv'], function (Dygraph) {
+
     function draw(div_id) {
-    ''' + dygraphs_javascript +'''
+    """ + dygraphs_javascript +"""
     }
     return draw;
 });
-'''
+"""
 
     STATIC_DATA_PATH = '/'.join(os.path.realpath(__file__).split('/')[0:-1]) + '/static/'
 
     # Require Dygraphs Javascript library
     # https://raw.githubusercontent.com/sarusso/Timeseria/develop/timeseria/static/js/dygraph-2.1.0.min
-    display(Javascript("require.config({paths: {dgenv: '//cdnjs.cloudflare.com/ajax/libs/dygraph/2.1.0/dygraph.min'}});"))
+    display(Javascript("require.config({paths: {dgenv: 'https://cdnjs.cloudflare.com/ajax/libs/dygraph/2.1.0/dygraph.min'}});"))
     # TODO: load it locally, maybe with something like:    
     #with open(STATIC_DATA_PATH+'js/dygraph-2.1.0.min.js') as dy_js_file:
     #    display(Javascript(dy_js_file.read()))
@@ -199,14 +333,14 @@ define('timseriaplot', ['dgenv'], function (Dygraph) {
     
     # Load Dygraphs Javascript and html code    
     display(Javascript(rendering_javascript))
-    display(HTML('<div style="height:45px; margin-left:0px"><div id="{}" style="width:100%"></div></div>'.format(legend_div_id)))
+    display(HTML('<div style="height:20px; margin-left:0px"><div id="{}" style="width:100%"></div></div>'.format(legend_div_id)))
     display(HTML('<div id="{}" style="width:100%; margin-right:0px"></div>'.format(graph_div_id)))
 
     # Render the graph (this is the "entrypoint")
     display(Javascript("""
         (function(element){
-            require(['timseriaplot'], function(timseriaplot) {
-                timseriaplot(element.get(0), '%s');
+            require(['"""+graph_id+"""'], function("""+graph_id+""") {
+                """+graph_id+"""(element.get(0), '%s');
             });
         })(element);
     """ % (graph_div_id)))

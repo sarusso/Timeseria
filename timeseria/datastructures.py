@@ -92,7 +92,7 @@ class Serie(list):
         for arg in args:
             self.append(arg)
             
-        self._label = None
+        self._title = None
 
     def append(self, item):
         if HARD_DEBUG: logger.debug('Checking %s', item)
@@ -110,15 +110,15 @@ class Serie(list):
         raise NotImplementedError
     
     @property
-    def label(self):
-        if self._label:
-            return self._label
+    def title(self):
+        if self._title:
+            return self._title
         else:
             return None
 
-    @label.setter
-    def label(self, label):
-        self._label=label
+    @title.setter
+    def title(self, title):
+        self._title=title
 
 
 
