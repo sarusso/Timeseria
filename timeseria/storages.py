@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 
 HARD_DEBUG = False
 
+POSSIBLE_TIMESTAMP_COLUMNS = ['timestamp', 'epoch']
 NO_DATA_PLACEHOLDERS = ['na', 'nan', 'null', 'nd', 'undef']
 
 class FloatConversionError(Exception):
@@ -187,10 +188,12 @@ class CSVFileStorage(object):
                         # TODO: improve this auto-detect: try different column names and formats.
                         #       Maybe, fix position as the first element for the timestamp.
                         if column_labels:
-                            if 'timestamp' in column_labels:
-                                time_column_index = column_labels.index('timestamp')
-                                self.time_column = 'timestamp'
-                            else:
+                            for posssible_time_column_name in POSSIBLE_TIMESTAMP_COLUMNS:
+                                if posssible_time_column_name in column_labels:
+                                    time_column_index = column_labels.index(posssible_time_column_name)
+                                    self.time_column = posssible_time_column_name
+                                    break                                
+                            if time_column_index is None:
                                 raise Exception('Cannot auto-detect timestamp column') 
                         else:
                             time_column_index = 0
