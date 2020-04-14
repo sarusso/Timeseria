@@ -283,7 +283,7 @@ class TimeSpan(object):
                 try:
                     groups   =  regex.match(string).groups()
                 except AttributeError:
-                    raise InputException('Cannot parse string representation for the TimeSlotSpan, unknown  format ("{}")'.format(string))
+                    raise InputException('Cannot parse string representation for the TimeSlotSpan, unknown  format ("{}")'.format(string)) from None
 
                 setattr(self, self.mapping_table[groups[1]], int(groups[0]))
 

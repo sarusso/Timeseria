@@ -9,6 +9,83 @@ HARD_DEBUG = False
 
 
 #======================
+#  Generic Serie
+#======================
+
+class Serie(list):
+    '''A list of items coming one after another where every item is guaranteed to be of the same type and in an order or succession.'''
+
+    # 5,6,7 are integer succession. 5.3, 5.4, 5.5 are too in a succesisons. 5,6,8 are not in a succession. 
+    # a group or a number of related or similar things, events, etc., arranged or occurring in temporal, spatial, or other order or succession; sequence.
+
+    # By default the type is not defined
+    __TYPE__ = None
+    
+    def __init__(self, *args, **kwargs):
+
+        #if 'accept_None' in kwargs and kwargs['accept_None']:
+        #    self.accept_None = True
+        #else:
+        #    self.accept_None = False
+
+        for arg in args:
+            self.append(arg)
+            
+        self._title = None
+
+    def append(self, item):
+        if HARD_DEBUG: logger.debug('Checking %s', item)
+        
+        # Set type if not already done
+        if not self.__TYPE__:
+            self.__TYPE__ = type(item)
+
+        # Check type
+        if not isinstance(item, self.__TYPE__):
+            raise TypeError('Got incompatible type "{}", can only accept "{}"'.format(item.__class__.__name__, self.__TYPE__.__name__))
+        
+        # Check order or succession
+        try:
+            try:
+                if not item.__succedes__(self[-1]):
+                    raise ValueError('Not in succession ("{}" vs "{}")'.format(item,self[-1])) from None                    
+            except IndexError:
+                raise
+            except AttributeError: # TODO: just implement >  in the slot? or another operator?
+                try:
+                    if not item > self[-1]:
+                        raise ValueError('Not in order ("{}" vs "{}")'.format(item,self[-1])) from None
+                except TypeError:
+                    raise TypeError('Object of class "{}" does not implement a "__gt__" or a "__succedes__" method, cannot append it to a Serie (which is ordered)'.format(item.__class__.__name__)) from None
+        except IndexError:
+            pass
+        
+        # Append
+        super(Serie, self).append(item)
+            
+    def extend(self, orher):
+        raise NotImplementedError
+
+    def merge(self, orher):
+        raise NotImplementedError
+    
+    def __sum__(self, other):
+        raise NotImplementedError
+    
+    @property
+    def title(self):
+        if self._title:
+            return self._title
+        else:
+            return None
+
+    @title.setter
+    def title(self, title):
+        self._title=title
+
+
+
+#======================
 #  Points
 #======================
 
@@ -45,12 +122,19 @@ class TimePoint(Point):
     def __init__(self, **kwargs):
         #if [*kwargs] != ['t']: # This migth speed up a bit but is for Python >= 3.5
         if list(kwargs.keys()) != ['t']:
-            raise Exception('A TimePoint requires only a "t" coordinate (got "{}")'.format(kwargs))
+            raise Exception('A TimePoint accepts only, and requires, a "t" coordinate (got "{}")'.format(kwargs))
         super(TimePoint, self).__init__(**kwargs)
+
+    def __gt__(self, other):
+        if self.t > other.t:
+            return True
+        else:
+            return False
 
     @ property
     def dt(self):
         return dt_from_s(self.t)
+
 
 class DataPoint(Point):
     def __init__(self, **kwargs):
@@ -60,15 +144,8 @@ class DataPoint(Point):
             raise Exception('A DataPoint requires a special "data" argument (got only "{}")'.format(kwargs))
         super(DataPoint, self).__init__(**kwargs)
 
-    #def __float__(self):
-    #    logger.debug('Called __float__ on {}'.format(self))
-    #    try:
-    #        return float(self.data)
-    #    except:
-    #        raise TypeError('Cannot convert "{}" to a float number'.format(self.data))
-
     def __repr__(self):
-        return '{} with {} and data {}'.format(self.__class__.__name__, self.coordinates, self.data)
+        return '{} with {} and data "{}"'.format(self.__class__.__name__, self.coordinates, self.data)
     
     
     def __eq__(self, other):
@@ -79,8 +156,6 @@ class DataPoint(Point):
     @property
     def data(self):
         return self._data
-    
-
 
 
 class DataTimePoint(DataPoint, TimePoint):
@@ -89,60 +164,15 @@ class DataTimePoint(DataPoint, TimePoint):
 
 
 #======================
-#  Series
+#  Point Series
 #======================
-
-class Serie(list):
-    '''A list of items coming one after another where every item is guaranteed to be of the same type. Can optionally accept None types.'''
-
-    # By default we actually accept everything
-    __TYPE__ = object
-    
-    def __init__(self, *args, **kwargs):
-
-        if 'accept_None' in kwargs and kwargs['accept_None']:
-            self.accept_None = True
-        else:
-            self.accept_None = False
-
-        for arg in args:
-            self.append(arg)
-            
-        self._title = None
-
-    def append(self, item):
-        if HARD_DEBUG: logger.debug('Checking %s', item)
-        if not isinstance(item, self.__TYPE__):
-            if self.accept_None and item is None:
-                pass
-            else:
-                raise TypeError('Got incompatible type "{}", can only accept "{}"'.format(item.__class__.__name__, self.__TYPE__.__name__))
-        super(Serie, self).append(item)
-            
-    def extend(self, orher):
-        raise NotImplementedError
-    
-    def __sum__(self, other):
-        raise NotImplementedError
-    
-    @property
-    def title(self):
-        if self._title:
-            return self._title
-        else:
-            return None
-
-    @title.setter
-    def title(self, title):
-        self._title=title
-
 
 class PointSerie(Serie):
     __TYPE__ = Point
 
 
 class TimePointSerie(PointSerie):
-    '''A series where each item is guardanteed to be orderd'''
+    '''A series of TimePoints where each item is guaranteed to be ordered'''
 
     __TYPE__ = TimePoint
 
@@ -165,21 +195,26 @@ class TimePointSerie(PointSerie):
 
 
 class DataPointSerie(PointSerie):
-    '''A series where each item is guardanteed to carry the same data type'''
+    '''A series of DataPoints where each item is guaranteed to carry the same data type'''
 
     __TYPE__ = DataPoint
 
     # Check data compatibility
     def append(self, item):
         try:
-            if HARD_DEBUG: logger.debug('Checking data compatibility: %s (accept_None=%s)', item.data, self.accept_None)
-            if item.data is None and self.accept_None:
-                pass
-            else:
-                if not type(self.item_data_reference) == type(item.data):
-                    raise TypeError('{} vs {}'.format(self.item_data_reference.__class__.__name__, item.data.__class__.__name__))
-                # TODO: if data is dict or list, check also len, key names and data types (excluding None if accept_None is set)
-                
+            if HARD_DEBUG: logger.debug('Checking data compatibility: %s ', item.data)
+            #if item.data is None and self.accept_None:
+            #    pass
+            #else:
+            if not type(self.item_data_reference) == type(item.data):
+                raise TypeError('Got different data: {} vs {}'.format(self.item_data_reference.__class__.__name__, item.data.__class__.__name__))
+            if isinstance(self.item_data_reference, list):
+                if len(self.item_data_reference) != len(item.data):
+                    raise ValueError('Got different data lengths: {} vs {}'.format(len(self.item_data_reference), len(item.data)))
+            if isinstance(self.item_data_reference, dict):
+                if set(self.item_data_reference.keys()) != set(item.data.keys()):
+                    raise ValueError('Got different data keys: {} vs {}'.format(self.item_data_reference.keys(), item.data.keys()))
+            
         except AttributeError:
             if HARD_DEBUG: logger.debug('Setting data reference: %s', item.data)
             self.item_data_reference = item.data
@@ -188,7 +223,7 @@ class DataPointSerie(PointSerie):
 
 
 class DataTimePointSerie(DataPointSerie, TimePointSerie):
-    '''A series where each item is a DataTimePoint'''
+    '''A series of DataTimePoint where each item is guaranteed to carry the same data type and to be ordered'''
 
     __TYPE__ = DataTimePoint
 
@@ -213,4 +248,156 @@ class DataTimePointSerie(DataPointSerie, TimePointSerie):
                 aggregate_by = None
             return aggregate_by
 
+
+
+
+#======================
+#  Slots
+#======================
+
+class Slot(object):
+    def __init__(self, start, end):
+        if not isinstance(start, Point):
+            raise TypeError('Slot start must be a Point object (got "{}")'.format(start.__class__.__name__))
+        if not isinstance(end, Point):
+            raise TypeError('Slot end must be a Point object (got "{}")'.format(end.__class__.__name__))
+        if set(start.coordinates.keys()) != set(end.coordinates.keys()):
+            raise ValueError('Slot start and end dimensions must be the same (got "{}" vs "{}")'.format(set(start.coordinates.keys()), set(end.coordinates.keys())))
+        if start == end:
+            raise ValueError('{} start and end must not be the same (got start="{}", end="{}")'.format(self.__class__.__name__, start,end))
+                
+        self.start = start
+        self.end   = end
+
+    def __repr__(self):
+        return '{} with start="{}" and end="{}"'.format(self.__class__.__name__, self.start, self.end)
+    
+    def __str__(self):
+        return self.__repr__()
+
+    def __eq__(self, other):
+        if not self.start == other.start:
+            return False
+        if not self.end == other.end:
+            return False
+        return True
+
+
+class TimeSlot(Slot):
+    
+    def __init__(self, start, end): 
+        if not isinstance(start, TimePoint):
+            raise TypeError('{} start must be a TimePoint object (got "{}")'.format(self.__class__.__name__, start.__class__.__name__))
+        if not isinstance(end, TimePoint):
+            raise TypeError('{} end must be a TimePoint object (got "{}")'.format(self.__class__.__name__, end.__class__.__name__))
+        if start == end:
+            raise ValueError('{} start and end must not be the same (got start="{}", end="{}")'.format(self.__class__.__name__, start,end))
+            
+        # Note: here we do not call the parent init, as it will result in performing again a number of checks already carried out in the TimePoint.
+        # TODO: not nice, skip the check instead.
+        self.start = start
+        self.end   = end        
+
+
+    def __succedes__(self, other):
+        if other.end.t != self.start.t:
+            return False
+        else:
+            return True
+
+class DataSlot(Slot):
+    def __init__(self, **kwargs):
+        try:
+            self._data = kwargs.pop('data')
+        except KeyError:
+            raise Exception('A DataSlot requires a special "data" argument (got only "{}")'.format(kwargs))
+        super(DataSlot, self).__init__(**kwargs)
+
+    def __repr__(self):
+        return '{} with start="{}" and end="{}"'.format(self.__class__.__name__, self.start, self.end)
+
+    def __eq__(self, other):
+        if self._data != other._data:
+            return False
+        return super(DataSlot, self).__eq__(other)
+
+    @property
+    def data(self):
+        return self._data
+    
+
+
+
+class DataTimeSlot(DataSlot, TimeSlot):
+    pass
+
+
+
+#======================
+#  Slot Series
+#======================
+
+class SlotSerie(Serie):
+    __TYPE__ = Slot
+
+
+class TimeSlotSerie(SlotSerie):
+    '''A series of TimeSlots where each item is guaranteed to be ordered'''
+
+    __TYPE__ = TimeSlot
+
+
+class DataSlotSerie(SlotSerie):
+    '''A series of DataSlots where each item is guaranteed to carry the same data type'''
+
+    __TYPE__ = DataSlot
+
+    # Check data compatibility
+    def append(self, item):
+        try:
+            if HARD_DEBUG: logger.debug('Checking data compatibility: %s', item.data)
+            #if item.data is None and self.accept_None:
+            #    pass
+            #else:
+            if not type(self.item_data_reference) == type(item.data):
+                raise TypeError('Got different data: {} vs {}'.format(self.item_data_reference.__class__.__name__, item.data.__class__.__name__))
+            if isinstance(self.item_data_reference, list):
+                if len(self.item_data_reference) != len(item.data):
+                    raise ValueError('Got different data lengths: {} vs {}'.format(len(self.item_data_reference), len(item.data)))
+            if isinstance(self.item_data_reference, dict):
+                if set(self.item_data_reference.keys()) != set(item.data.keys()):
+                    raise ValueError('Got different data keys: {} vs {}'.format(self.item_data_reference.keys(), item.data.keys()))
+
+        except AttributeError:
+            if HARD_DEBUG: logger.debug('Setting data reference: %s', item.data)
+            self.item_data_reference = item.data
+            
+        super(DataSlotSerie, self).append(item)
+
+
+class DataTimeSlotSerie(DataSlotSerie, TimeSlotSerie):
+    '''A series of DataTimeSlots where each item is guaranteed to carry the same data type and to be ordered'''
+
+    __TYPE__ = DataTimeSlot
+
+    def plot(self, engine='dg'):
+        if engine=='mp':
+            from .plots import matplotlib_plot
+            matplotlib_plot(self)
+        elif engine=='dg':
+            from .plots import dygraphs_plot
+            dygraphs_plot(self)
+        else:
+            raise Exception('Unknowmn plotting engine "{}'.format(engine))
+
+    @property
+    def plot_aggregate_by(self):
+        try:
+            return self._plot_aggregate_by
+        except AttributeError:
+            if len(self)  > 10000:
+                aggregate_by = 10**len(str(int(len(self)/10000.0)))
+            else:
+                aggregate_by = None
+            return aggregate_by
 
