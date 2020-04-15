@@ -269,7 +269,10 @@ class TestSlots(unittest.TestCase):
         self.assertFalse(timeSlot1.__succedes__(timeSlot2))
         self.assertFalse(timeSlot3.__succedes__(timeSlot1))
         
-        # TODO: duration & timespan..?
+        # Duration
+        self.assertEqual(timeSlot1.duration,1)
+        
+        
  
  
     def test_DataSlot(self):

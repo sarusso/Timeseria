@@ -304,6 +304,11 @@ class TimeSlot(Slot):
             return False
         else:
             return True
+        
+    @property
+    def duration(self):
+        return (self.end.t - self.start.t)
+
 
 class DataSlot(Slot):
     def __init__(self, **kwargs):
