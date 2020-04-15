@@ -129,7 +129,8 @@ def to_dg_data(dataTimePointSerie, aggregate_by=0):
                 t = first_t + ((last_t-first_t) /2)
                 data_part=''
                 for i, key in enumerate(keys):
-                    data_part+='{};{};{}'.format( data_mins[i], data_sums[i]/aggregate_by, data_maxs[i])
+                    data_part+='{};{};{},'.format( data_mins[i], data_sums[i]/aggregate_by, data_maxs[i])
+                data_part=data_part[0:-1]
                 dg_data+='{},{}\\n'.format(to_dg_time(dt_from_s(t)), data_part)
                 data_sums = [0 for key in keys]
                 data_mins = [None for key in keys]
@@ -262,7 +263,13 @@ function legendFormatter(data) {
     keys = get_keys_and_check_data_for_plot(serie[0].data)
     if keys:
         for key in keys:
-            labels += '{},'.format(key)
+            if isinstance(key, int):
+                if len(keys) == 1:
+                    labels='value,'
+                else:    
+                    labels += 'value {},'.format(key+1)
+            else:
+                labels += '{},'.format(key)
         # Remove last comma
         labels = labels[0:-1]
     else:
@@ -305,8 +312,7 @@ animatedZooms: true,"""
     if aggregate_by:
         dygraphs_javascript += 'customBars: true'        
     dygraphs_javascript += '})'
-     
-     
+
     rendering_javascript = """
 require.undef('"""+graph_id+"""'); // Helps to reload in Jupyter
 define('"""+graph_id+"""', ['dgenv'], function (Dygraph) {
