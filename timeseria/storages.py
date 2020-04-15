@@ -1,6 +1,6 @@
 import csv
 import re
-from .common import detect_encoding
+from .utilities import detect_encoding
 from .datastructures import DataTimePoint, DataTimePointSerie, DataPointSerie, TimePointSerie, TimePoint, DataPoint
 from .time import s_from_dt, dt_from_str
 import datetime
