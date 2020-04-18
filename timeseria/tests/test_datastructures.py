@@ -154,6 +154,14 @@ class TestPoints(unittest.TestCase):
         self.assertEqual(dataTimePoint.data,'hello')
         
 
+    def test_casting(self):
+        dataTimePoint = DataTimePoint(t=6, data='hello')
+        casted_dataTimePoint1 = TimePoint(dataTimePoint)
+        self.assertEqual(casted_dataTimePoint1.t, 6) 
+        casted_dataTimePoint2 = TimePoint(5)
+        self.assertEqual(casted_dataTimePoint2.t, 5) 
+
+
 
 class TestPointSeries(unittest.TestCase):
 

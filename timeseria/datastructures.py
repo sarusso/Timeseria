@@ -82,6 +82,11 @@ class Serie(list):
     def title(self, title):
         self._title=title
 
+    def __repr__(self):
+        return '{} of #{} elements'.format(self.__class__.__name__, len(self))
+    
+    def __str__(self):
+        return self.__repr__()
 
 
 #======================
@@ -118,16 +123,29 @@ class Point(object):
 
 class TimePoint(Point):
     
-    def __init__(self, **kwargs):
-        
-        # Handle time zone
+    def __init__(self, *args, **kwargs):
+
+        # Handle time zone if any
         tz = kwargs.pop('tz', None)
         if tz:
             self._tz = timezonize(tz)
         
-        #if [*kwargs] != ['t']: # This migth speed up a bit but is for Python >= 3.5
-        if list(kwargs.keys()) != ['t']:
-            raise Exception('A TimePoint accepts only, and requires, a "t" coordinate (got "{}")'.format(kwargs))
+        # Cast or create
+        if args:
+            if isinstance(args[0], TimePoint):
+                kwargs['t'] = args[0].t
+                self._tz    = args[0].tz
+            elif isinstance(args[0], int) or isinstance(args[0], float):
+                kwargs['t'] = args[0]
+            else:
+                raise Exception('A TimePoint can be casted only from an int, float or by an object extending the TimePoint class itself (got "{}")'.format(args[0]))
+ 
+        else:
+            #if [*kwargs] != ['t']: # This migth speed up a bit but is for Python >= 3.5
+            if list(kwargs.keys()) != ['t']:
+                raise Exception('A TimePoint accepts only, and requires, a "t" coordinate (got "{}")'.format(kwargs))
+            
+        # Call parent init
         super(TimePoint, self).__init__(**kwargs)
 
     def __gt__(self, other):
@@ -147,6 +165,9 @@ class TimePoint(Point):
     def dt(self):
         return dt_from_s(self.t, tz=self.tz)
 
+    def __repr__(self):
+        return '{} @ t={} ({})'.format(self.__class__.__name__, self.t, self.dt)
+    
 
 class DataPoint(Point):
     def __init__(self, **kwargs):
@@ -234,6 +255,7 @@ class TimePointSerie(PointSerie):
     def tz(self, value):
         self._tz = timezonize(value) 
 
+
 class DataPointSerie(PointSerie):
     '''A series of DataPoints where each item is guaranteed to carry the same data type'''
 
@@ -279,7 +301,7 @@ class DataTimePointSerie(DataPointSerie, TimePointSerie):
             from .plots import dygraphs_plot
             dygraphs_plot(self, aggregate_by=aggregate_by)
         else:
-            raise Exception('Unknowmn plotting engine "{}'.format(engine))
+            raise Exception('Unknown plotting engine "{}'.format(engine))
 
     @property
     def plot_aggregate_by(self):
@@ -292,7 +314,9 @@ class DataTimePointSerie(DataPointSerie, TimePointSerie):
                 aggregate_by = None
             return aggregate_by
 
-
+    def __repr__(self):
+        return '{} of #{} {}s, from {} to {}'.format(self.__class__.__name__, len(self), self.__TYPE__.__name__, TimePoint(self[0]), TimePoint(self[-1]))
+    
 
 
 #======================
@@ -341,7 +365,6 @@ class TimeSlot(Slot):
         # TODO: not nice, skip the check instead.
         self.start = start
         self.end   = end        
-
 
     def __succedes__(self, other):
         if other.end.t != self.start.t:
@@ -473,3 +496,6 @@ class DataTimeSlotSerie(DataSlotSerie, TimeSlotSerie):
                 aggregate_by = None
             return aggregate_by
 
+    def __repr__(self):
+        return '{} of #{} {}s, from {} to {}'.format(self.__class__.__name__, len(self), self.__TYPE__.__name__, TimePoint(self[0].start), TimePoint(self[-1].end))
+    
