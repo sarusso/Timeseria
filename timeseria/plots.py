@@ -2,16 +2,17 @@ import os
 import uuid
 import datetime
 from .time import dt_from_s
-from .datastructures import DataTimePointSerie
+from .datastructures import DataTimePointSerie, DataTimeSlotSerie
 
 # Setup logging
 import logging
 logger = logging.getLogger(__name__)
 
-HARD_DEBUG = False
+''' Note: the code in this module is spaghetti-code, and there are no tests. A major refactoring is required.'''
 
-
-# Utitlities
+#=================
+#   Utilities
+#=================
 
 def is_numerical(item):
     if isinstance(item, float):
@@ -41,12 +42,13 @@ def get_keys_and_check_data_for_plot(data):
         raise Exception('Don\'t know how to plot data "{}" of type "{}"'.format(data, data.__class__.__name__))
     return keys
 
+
 def to_dg_time(dt):
     '''Get Dygraphs time form datetime'''
     return '{}/{:02d}/{:02d} {:02d}:{:02d}:{:02d}'.format(dt.year, dt.month, dt.day, dt.hour, dt.minute,dt.second)
 
 
-def to_dg_data(dataTimePointSerie, aggregate_by=0):
+def to_dg_data(serie, aggregate_by=0):
     '''{% for timestamp,value in metric_data.items %}{{timestamp}},{{value}}\n{%endfor%}}'''
     
     dg_data=''
@@ -56,7 +58,7 @@ def to_dg_data(dataTimePointSerie, aggregate_by=0):
     global_min = None
     global_max = None
 
-    for i, dataTimePoint in enumerate(dataTimePointSerie):
+    for i, item in enumerate(serie):
         
         # Offset
         i=i+1
@@ -66,7 +68,7 @@ def to_dg_data(dataTimePointSerie, aggregate_by=0):
             keys
         except UnboundLocalError:
             # Set keys and support vars
-            keys = get_keys_and_check_data_for_plot(dataTimePoint.data)
+            keys = get_keys_and_check_data_for_plot(item.data)
             if not keys:
                 keys = [None]
             data_sums = [0 for key in keys]
@@ -76,19 +78,27 @@ def to_dg_data(dataTimePointSerie, aggregate_by=0):
         if aggregate_by:
 
             if first_t is None:
-                first_t = dataTimePoint.t
+                if isinstance(serie, DataTimePointSerie):
+                    first_t = item.t
+                elif isinstance(serie, DataTimeSlotSerie):
+                    first_t = item.start.t
+                
                   
             # Define data
+            data_loss_index = None
             if keys:
                 datas=[]      
-                for key in keys:
+                for j, key in enumerate(keys):
+                    if data_loss_index is None:
+                        if key == 'data_loss':
+                            data_loss_index = j
                     if key is None:
-                        datas.append(dataTimePoint.data)
+                        datas.append(item.data)
                     else:
-                        datas.append(dataTimePoint.data[key])
+                        datas.append(item.data[key])
 
             else:
-                datas=[dataTimePoint.data]
+                datas=[item.data]
             
             for j, data in enumerate(datas):
                 
@@ -96,18 +106,19 @@ def to_dg_data(dataTimePointSerie, aggregate_by=0):
                 data_sums[j] += data
                 
                 # Global min
-                if global_min is None:
-                    global_min = data
-                else:
-                    if data < global_min:
-                        global_min = data                
-                
-                # Global max
-                if global_max is None:
-                    global_max = data
-                else:
-                    if data > global_max:
+                if j != data_loss_index:
+                    if global_min is None:
+                        global_min = data
+                    else:
+                        if data < global_min:
+                            global_min = data                
+                    
+                    # Global max
+                    if global_max is None:
                         global_max = data
+                    else:
+                        if data > global_max:
+                            global_max = data
 
                 # Min
                 if data_mins[j] is None:
@@ -125,11 +136,18 @@ def to_dg_data(dataTimePointSerie, aggregate_by=0):
 
             # Dump aggregated data?
             if (i!=0)  and ((i % aggregate_by)==0):
-                last_t = dataTimePoint.t
+                if isinstance(serie, DataTimePointSerie):
+                    last_t = item.t
+                elif isinstance(serie, DataTimeSlotSerie):
+                    last_t = item.end.t
                 t = first_t + ((last_t-first_t) /2)
                 data_part=''
                 for i, key in enumerate(keys):
-                    data_part+='{};{};{},'.format( data_mins[i], data_sums[i]/aggregate_by, data_maxs[i])
+                    avg = data_sums[i]/aggregate_by
+                    if key == 'data_loss':
+                        data_part+='{};{};{},'.format(0, avg, avg)                    
+                    else:
+                        data_part+='{};{};{},'.format( data_mins[i], avg, data_maxs[i])
                 data_part=data_part[0:-1]
                 dg_data+='{},{}\\n'.format(to_dg_time(dt_from_s(t)), data_part)
                 data_sums = [0 for key in keys]
@@ -143,36 +161,45 @@ def to_dg_data(dataTimePointSerie, aggregate_by=0):
             data_part=''
             for key in keys:
                 if key is None:
-                    data = dataTimePoint.data
+                    data = item.data
                 else:
-                    data = dataTimePoint.data[key]
+                    data = item.data[key]
 
-                data_part += '{},'.format(data)   #dataTimePoint.data
-                
-                # Global min
-                if global_min is None:
-                    global_min = data
-                else:
-                    if data < global_min:
-                        global_min = data                
-                
-                # Global max
-                if global_max is None:
-                    global_max = data
-                else:
-                    if data > global_max:
+                data_part += '{},'.format(data)   #item.data
+
+                if key != 'data_loss':         
+                    # Global min
+                    if global_min is None:
+                        global_min = data
+                    else:
+                        if data < global_min:
+                            global_min = data                
+                    
+                    # Global max
+                    if global_max is None:
                         global_max = data
+                    else:
+                        if data > global_max:
+                            global_max = data
                 
             # Remove last comma
             data_part = data_part[0:-1]
 
-            dg_data+='{},{}\\n'.format(to_dg_time(dt_from_s(dataTimePoint.t)), data_part)
+            if isinstance(serie, DataTimePointSerie):
+                t = item.t
+            elif isinstance(serie, DataTimeSlotSerie):
+                t = item.start.t
+
+            dg_data+='{},{}\\n'.format(to_dg_time(dt_from_s(t)), data_part)
 
     return global_min, global_max, dg_data
 
 
+#=================
+#  Dygraphs plot
+#=================
 
-def dygraphs_plot(serie):
+def dygraphs_plot(serie, aggregate_by):
     '''Plot a dataTimePointSeries in Jupyter using Dugraph. Based on the work here: https://www.stefaanlippens.net/jupyter-custom-d3-visualization.html'''
     from IPython.display import display, Javascript, HTML
 
@@ -181,7 +208,17 @@ def dygraphs_plot(serie):
 
     # Checks
     if isinstance(serie, DataTimePointSerie):
-        pass
+        stepPlot_value   = 'false'
+        drawPoints_value = 'true'
+        legend_pre = ''
+    elif isinstance(serie, DataTimeSlotSerie):
+        stepPlot_value   = 'true'
+        drawPoints_value = 'false'
+        if serie.plot_aggregate_by:
+            legend_pre = 'Slot of {}x{} starting at '.format(serie.plot_aggregate_by, serie.timeSpan)
+        else:
+            legend_pre = 'Slot of {} starting at '.format(serie.timeSpan)
+
     else:
         raise Exception('Don\'t know how to plot an object of type "{}"'.format(serie.__class__.__name__))
 
@@ -191,7 +228,6 @@ def dygraphs_plot(serie):
     else:
         title = serie.__class__.__name__
 
-    aggregate_by = serie.plot_aggregate_by
     if aggregate_by:
         logger.info('Aggregating by "{}" for plotting'.format(aggregate_by))
             
@@ -231,7 +267,7 @@ function legendFormatter(data) {
         return html;
       }
 
-      html = data.xHTML + ':';
+      html = '""" + legend_pre + """' + data.xHTML + ':';
       for (var i = 0; i < data.series.length; i++) {  
         var series = data.series[i];
         // Skip not visible series
@@ -287,11 +323,11 @@ function legendFormatter(data) {
     dygraphs_javascript += '"Timestamp,{}\\n{}",'.format(labels, dg_data)
     dygraphs_javascript += """{\
 drawGrid: true,
-drawPoints:true,
+drawPoints:"""+drawPoints_value+""",
 strokeWidth: 1.5,
 pointSize:2.0,
 highlightCircleSize:4,
-stepPlot: false,
+stepPlot: """+stepPlot_value+""",
 fillGraph: false,
 fillAlpha: 0.5,
 colorValue: 0.5,
@@ -308,7 +344,47 @@ valueRange: ["""+plot_min+""", """+plot_max+"""],
 zoomCallback: function() {
     this.updateOptions({zoomRange: ["""+plot_min+""", """+plot_max+"""]});
 },
+axes: {
+  /*y: {
+    // set axis-related properties here
+    drawGrid: false,
+    independentTicks: true
+  },*/
+  y2: {
+    drawGrid: false,
+    drawAxis: false,
+    axisLabelWidth:0,
+    independentTicks: true,
+    valueRange: [0,1],
+    //customBars: false, // Does not work?
+  }
+},
 animatedZooms: true,"""
+
+    if isinstance(serie, DataTimeSlotSerie):
+        if serie.plot_aggregate_by:
+            rgba_value       = 'rgba(255,128,128,1)' # For the legend
+            fill_alpha_value = 0.31                  # For the area
+        else:
+            rgba_value       = 'rgba(255,128,128,1)' # For the legend
+            fill_alpha_value = 0.5                   # For the area
+        dygraphs_javascript += """series: {
+       'data_loss': {
+         //customBars: false, // Does not work?
+         axis: 'y2',
+         drawPoints: false,
+         strokeWidth: 0,
+         highlightCircleSize:0,
+         fillGraph: true,
+         fillAlpha: """+str(fill_alpha_value)+""",            // This alpha is used for the area
+         //color: 'rgba(255,0,0,0.6)' // This alpha is used for the legend 
+         color: '"""+rgba_value+"""'
+       },
+     },
+"""
+    if isinstance(serie, DataTimeSlotSerie) and len(serie[0].data.keys()) <=2:
+        dygraphs_javascript += """colors: ['rgb(0,128,128)'],""" # Force "original" Dygraph color.
+
     if aggregate_by:
         dygraphs_javascript += 'customBars: true'        
     dygraphs_javascript += '})'
@@ -352,6 +428,9 @@ define('"""+graph_id+"""', ['dgenv'], function (Dygraph) {
     """ % (graph_div_id)))
 
 
+#=================
+# Matplotlib plot
+#=================
 
 def matplotlib_plot(serie):
     def as_vectors(self):
