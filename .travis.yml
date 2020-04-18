@@ -1,0 +1,22 @@
+#sudo: required
+language: python
+cache: pip
+#services:
+#  - docker
+python:
+  - "3.5"
+  - "3.6"
+env:
+  global:
+    - LOGLEVEL=ERROR
+  #matrix:
+  #  - TF_VERSION="1.15.*"
+
+# Command to install dependencies
+install: "pip install -r requirements/python/requirements.txt"
+
+#install:
+#  - ./oss_scripts/oss_pip_install.sh
+
+# Command to run tests
+script: python -m unittest discover
