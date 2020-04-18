@@ -118,9 +118,6 @@ class TestSlotter(unittest.TestCase):
         dataTimePointSerie = CSVFileStorage(TEST_DATA_PATH + '/csv/humitemp_short.csv').get()
         self.assertEqual(Slotter._detect_dataPoints_validity(dataTimePointSerie), 61)
         
-        dataTimePointSerie = CSVFileStorage(TEST_DATA_PATH + '/csv/humitemp_long.csv').get()
-        self.assertEqual(Slotter._detect_dataPoints_validity(dataTimePointSerie), 61)
-
         dataTimePointSerie = CSVFileStorage(TEST_DATA_PATH + '/csv/shampoo_sales.csv', time_column = 'Month', time_format = '%y-%m').get()
         self.assertEqual(Slotter._detect_dataPoints_validity(dataTimePointSerie), 2678400)
         # TODO: 2678400/60/60/24 = 31 --> detect month? same for day, week, year?
