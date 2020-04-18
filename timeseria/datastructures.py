@@ -1,5 +1,4 @@
-
-from .time import s_from_dt , dt_from_s
+from .time import s_from_dt , dt_from_s, UTC, timezonize
 
 # Setup logging
 import logging
@@ -120,6 +119,12 @@ class Point(object):
 class TimePoint(Point):
     
     def __init__(self, **kwargs):
+        
+        # Handle time zone
+        tz = kwargs.pop('tz', None)
+        if tz:
+            self._tz = timezonize(tz)
+        
         #if [*kwargs] != ['t']: # This migth speed up a bit but is for Python >= 3.5
         if list(kwargs.keys()) != ['t']:
             raise Exception('A TimePoint accepts only, and requires, a "t" coordinate (got "{}")'.format(kwargs))
@@ -131,9 +136,16 @@ class TimePoint(Point):
         else:
             return False
 
+    @property
+    def tz(self):
+        try:
+            return self._tz
+        except AttributeError:
+            return UTC
+
     @ property
     def dt(self):
-        return dt_from_s(self.t)
+        return dt_from_s(self.t, tz=self.tz)
 
 
 class DataPoint(Point):
@@ -147,7 +159,6 @@ class DataPoint(Point):
     def __repr__(self):
         return '{} with {} and data "{}"'.format(self.__class__.__name__, self.coordinates, self.data)
     
-    
     def __eq__(self, other):
         if self._data != other._data:
             return False
@@ -159,8 +170,10 @@ class DataPoint(Point):
 
 
 class DataTimePoint(DataPoint, TimePoint):
-    pass
-
+    
+    def __repr__(self):
+        return '{} @ t={} ({}) with data={}'.format(self.__class__.__name__, self.t, self.dt, self.data)
+    
 
 
 #======================
@@ -175,6 +188,14 @@ class TimePointSerie(PointSerie):
     '''A series of TimePoints where each item is guaranteed to be ordered'''
 
     __TYPE__ = TimePoint
+
+    def __init__(self, *args, **kwargs):
+
+        tz = kwargs.pop('tz', None)
+        if tz:
+            self._tz = timezonize(tz)
+
+        super(TimePointSerie, self).__init__(*args, **kwargs)
 
     # Check time ordering
     def append(self, item):
@@ -193,6 +214,25 @@ class TimePointSerie(PointSerie):
        
         super(TimePointSerie, self).append(item)
 
+    @property
+    def tz(self):
+        try:
+            return self._tz
+        except AttributeError:
+            
+            # Detect time zone on the fly
+            detected_tz = None
+            for item in self:
+                if not detected_tz:
+                    detected_tz = item.tz
+                else:
+                    if item.tz != detected_tz:
+                        return UTC
+            return detected_tz
+    
+    @tz.setter
+    def tz(self, value):
+        self._tz = timezonize(value) 
 
 class DataPointSerie(PointSerie):
     '''A series of DataPoints where each item is guaranteed to carry the same data type'''
@@ -227,13 +267,17 @@ class DataTimePointSerie(DataPointSerie, TimePointSerie):
 
     __TYPE__ = DataTimePoint
 
-    def plot(self, engine='dg'):
+    def plot(self, engine='dg', **kwargs):
+        if 'aggregate_by' in kwargs:
+            aggregate_by =  kwargs.pop('aggregate_by')
+        else:
+            aggregate_by = self.plot_aggregate_by
         if engine=='mp':
             from .plots import matplotlib_plot
             matplotlib_plot(self)
         elif engine=='dg':
             from .plots import dygraphs_plot
-            dygraphs_plot(self)
+            dygraphs_plot(self, aggregate_by=aggregate_by)
         else:
             raise Exception('Unknowmn plotting engine "{}'.format(engine))
 
@@ -308,6 +352,11 @@ class TimeSlot(Slot):
     @property
     def duration(self):
         return (self.end.t - self.start.t)
+    
+    #@property
+    #def t(self):
+    #    #return (self.start.t + (self.end.t - self.start.t))
+    #    return self.start.t
 
 
 class DataSlot(Slot):
@@ -316,6 +365,12 @@ class DataSlot(Slot):
             self._data = kwargs.pop('data')
         except KeyError:
             raise Exception('A DataSlot requires a special "data" argument (got only "{}")'.format(kwargs))
+
+        # Coverage. TODO: understand if we want it, if  we want it here like this.
+        coverage = kwargs.pop('coverage', None)
+        if coverage:
+            self._coverage=coverage
+
         super(DataSlot, self).__init__(**kwargs)
 
     def __repr__(self):
@@ -329,12 +384,20 @@ class DataSlot(Slot):
     @property
     def data(self):
         return self._data
-    
 
+    @property
+    def coverage(self):
+        try:
+            return self._coverage
+        except AttributeError:
+            return None
 
 
 class DataTimeSlot(DataSlot, TimeSlot):
-    pass
+    
+    def __repr__(self):
+        return '{} @ t=[{},{}] ([{},{}]) with data={} and coverage={}'.format(self.__class__.__name__, self.start.t, self.end.t, self.start.dt, self.end.dt, self.data, self.coverage)
+    
 
 
 
@@ -385,13 +448,17 @@ class DataTimeSlotSerie(DataSlotSerie, TimeSlotSerie):
 
     __TYPE__ = DataTimeSlot
 
-    def plot(self, engine='dg'):
+    def plot(self, engine='dg', **kwargs):
+        if 'aggregate_by' in kwargs:
+            aggregate_by =  kwargs.pop('aggregate_by')
+        else:
+            aggregate_by = self.plot_aggregate_by
         if engine=='mp':
             from .plots import matplotlib_plot
             matplotlib_plot(self)
         elif engine=='dg':
             from .plots import dygraphs_plot
-            dygraphs_plot(self)
+            dygraphs_plot(self, aggregate_by=aggregate_by)
         else:
             raise Exception('Unknowmn plotting engine "{}'.format(engine))
 

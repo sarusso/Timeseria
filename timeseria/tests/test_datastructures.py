@@ -6,7 +6,7 @@ from ..datastructures import Slot, TimeSlot, DataSlot, DataTimeSlot
 from ..datastructures import Serie
 from ..datastructures import DataPointSerie, TimePointSerie, DataTimePointSerie
 from ..datastructures import DataSlotSerie, TimeSlotSerie, DataTimeSlotSerie
-
+from ..time import UTC
 
 # Setup logging
 import logging
@@ -102,6 +102,17 @@ class TestPoints(unittest.TestCase):
         
         timePoint = TimePoint(t=5)
         self.assertEqual(timePoint.t,5)
+        
+        # Test for UTC time zone
+        self.assertEqual(timePoint.tz, UTC)
+        self.assertEqual(type(timePoint.tz), type(UTC))
+        self.assertEqual(str(timePoint.dt), '1970-01-01 00:00:05+00:00')
+
+        # Test for Europe/Rome time zone
+        timePoint = TimePoint(t=1569897900, tz='Europe/Rome')
+        self.assertEqual(str(timePoint.tz), 'Europe/Rome')
+        self.assertEqual(str(type(timePoint.tz)), "<class 'pytz.tzfile.Europe/Rome'>")
+        self.assertEqual(str(timePoint.dt), '2019-10-01 04:45:00+02:00')
 
 
     def test_DataPoints(self):
@@ -151,6 +162,47 @@ class TestPointSeries(unittest.TestCase):
         
         timePointSerie = TimePointSerie()
         timePointSerie.append(TimePoint(t=60))
+        
+        
+        # Test for UTC time zone (autodetect)
+        timePointSerie = TimePointSerie()
+        timePointSerie.append(TimePoint(t=5))         
+        self.assertEqual(timePointSerie.tz, UTC)
+        self.assertEqual(type(timePointSerie.tz), type(UTC))
+        timePointSerie.append(TimePoint(t=10)) 
+        self.assertEqual(timePointSerie.tz, UTC)
+        self.assertEqual(type(timePointSerie.tz), type(UTC))
+        timePointSerie.append(TimePoint(t=15, tz='Europe/Rome'))
+        self.assertEqual(timePointSerie.tz, UTC)
+        self.assertEqual(type(timePointSerie.tz), type(UTC))
+
+        # Change  tz
+        timePointSerie.tz = 'Europe/Rome'
+        self.assertEqual(str(timePointSerie.tz), 'Europe/Rome')
+        self.assertEqual(str(type(timePointSerie.tz)), "<class 'pytz.tzfile.Europe/Rome'>")
+        
+        # Test for Europe/Rome time zone (set)
+        timePointSerie = TimePointSerie(tz = 'Europe/Rome')
+        self.assertEqual(str(timePointSerie.tz), 'Europe/Rome')
+        self.assertEqual(str(type(timePointSerie.tz)), "<class 'pytz.tzfile.Europe/Rome'>")
+        timePointSerie.append(TimePoint(t=5))
+        self.assertEqual(str(timePointSerie.tz), 'Europe/Rome')
+        self.assertEqual(str(type(timePointSerie.tz)), "<class 'pytz.tzfile.Europe/Rome'>")        
+         
+        # Test for Europe/Rome time zone  (autodetect)
+        timePointSerie = TimePointSerie()
+        timePointSerie.append(TimePoint(t=1569897900, tz='Europe/Rome')) 
+        self.assertEqual(str(timePointSerie.tz), 'Europe/Rome')
+        self.assertEqual(str(type(timePointSerie.tz)), "<class 'pytz.tzfile.Europe/Rome'>")
+        timePointSerie.append(TimePoint(t=1569897910, tz='Europe/Rome')) 
+        self.assertEqual(str(timePointSerie.tz), 'Europe/Rome')
+        self.assertEqual(str(type(timePointSerie.tz)), "<class 'pytz.tzfile.Europe/Rome'>")
+        timePointSerie.append(TimePoint(t=1569897920))
+        self.assertEqual(timePointSerie.tz, UTC)
+        self.assertEqual(type(timePointSerie.tz), type(UTC))
+        timePointSerie.tz = 'Europe/Rome'
+        self.assertEqual(str(timePointSerie.tz), 'Europe/Rome')
+        self.assertEqual(str(type(timePointSerie.tz)), "<class 'pytz.tzfile.Europe/Rome'>")         
 
 
     def test_DataPointSerie(self):
