@@ -2,6 +2,7 @@ import os
 import chardet
 from chardet.universaldetector import UniversalDetector
 from .time import dt_from_s
+from .exceptions import InputException
 
 # Setup logging
 import logging
@@ -36,5 +37,169 @@ def detect_encoding(filename, streaming=False):
 
 
 
+def compute_coverage(dataTimePointSerie, from_t, to_t, trustme=False, validity=None, validity_placement='center'):
+    '''Compute the data coverage of a dataTimePointSerie based on the dataTimePoints validity'''
+    
+    # TODO: The following should be implemented when computing averages as well.. put it in common?
+    center = 1
+    left   = 2
+    right  = 3
+    
+    if validity_placement == 'center':
+        validity_placement=center
+    elif validity_placement == 'left':
+        validity_placement=left
+    elif validity_placement == 'right':
+        validity_placement=right
+    else:
+        raise ValueError('Unknown value "{}" for validity_placement'.format(validity_placement))
+    
+    # Sanity checks
+    if not trustme:
+        if dataTimePointSerie is None:
+            raise InputException('You must provide dataTimePointSerie, got None')
+            
+        if from_t is None or to_t is None:
+            raise ValueError('Missing from_t or to_t')
 
+
+    # Support vars
+    prev_dataPoint_valid_to_t = None
+    empty_dataTimePointSerie = True
+    missing_coverage = None
+    next_processed = False
+
+    logger.debug('Called compute_coverage from {} to {}'.format(from_t, to_t))
+
+
+    #===========================
+    #  START cycle over points
+    #===========================
+    
+    for this_dataTimePoint in dataTimePointSerie:
+        
+        
+        # Compute this_dataTimePoint validity boundaries
+        if validity:
+            if validity_placement==center:
+                this_dataTimePoint_valid_from_t = this_dataTimePoint.t - (validity/2)
+                this_dataTimePoint_valid_to_t   = this_dataTimePoint.t + (validity/2)
+            else:
+                raise NotImplementedError('Validity placements other than "center" are not yet supported')
+        
+        else:
+            this_dataTimePoint_valid_from_t = this_dataTimePoint.t
+            this_dataTimePoint_valid_to_t   = this_dataTimePoint.t
+        
+        # Hard debug
+        #logger.debug('HARD DEBUG %s %s %s', this_dataTimePoint.Point_part, this_dataTimePoint.validity_region.start, this_dataTimePoint.validity_region.end)
+        
+        # If no start point has been set, just use the first one in the data
+        #if start_Point is None:
+        #    start_Point = dataTimePointSerie.Point_part
+        # TODO: add support also for dynamically setting the end_Point to allow empty start_Point/end_Point input        
+        
+        #=====================
+        #  BEFORE START
+        #=====================
+        
+        # Are we before the start_Point? 
+        if this_dataTimePoint.t < from_t:
+            
+            # Just set the previous Point valid until
+            prev_dataPoint_valid_to_t = this_dataTimePoint_valid_to_t
+
+            # If prev point too far, skip it
+            if prev_dataPoint_valid_to_t <= from_t:
+                prev_dataPoint_valid_to_t = None
+
+            continue
+
+
+        #=====================
+        #  After end
+        #=====================
+        # Are we after the end_Point? In this case, we can treat it as if we are in the middle-
+        elif this_dataTimePoint.t >= to_t:
+
+            if not next_processed: 
+                next_processed = True
+                
+                # If "next" point too far, skip it:
+                if this_dataTimePoint_valid_from_t > to_t:
+                    continue
+            else:
+                continue
+
+
+        #=====================
+        #  In the middle
+        #=====================
+        
+        # Otherwise, we are in the middle?
+        else:
+            # Normal operation mode
+            pass
+
+        # Okay, now we have all the values we need:
+        # 1) prev_dataPoint_valid_until
+        # 2) this_dataTimePoint_valid_from
+        
+        # Also, if we are here it also means that we have valid data
+        if empty_dataTimePointSerie:
+            empty_dataTimePointSerie = False
+
+        # Compute coverage
+        # TODO: and idea could also to initialize Spans and sum them
+        if prev_dataPoint_valid_to_t is None:
+            value = this_dataTimePoint_valid_from_t - from_t
+            
+        else:
+            value = this_dataTimePoint_valid_from_t - prev_dataPoint_valid_to_t
+            
+        # If for whatever reason the validity regions overlap we don't want to end up in
+        # invalidating the coverage calculation by summing negative numbers
+        if value > 0:
+            if missing_coverage is None:
+                missing_coverage = value
+            else:
+                missing_coverage = missing_coverage + value
+
+        # Update previous dataPoint Validity:
+        prev_dataPoint_valid_to_t = this_dataTimePoint_valid_to_t
+        
+    #=========================
+    #  END cycle over points
+    #=========================
+
+    # Compute the coverage until the end point
+    if prev_dataPoint_valid_to_t is not None:
+        if to_t > prev_dataPoint_valid_to_t:
+            if missing_coverage is not None:
+                missing_coverage += (to_t - prev_dataPoint_valid_to_t)
+            else:
+                missing_coverage = (to_t - prev_dataPoint_valid_to_t)
+    
+    # Convert missing_coverage_s_is in percentage
+        
+    if empty_dataTimePointSerie:
+        coverage = 0.0 # Return zero coverage if empty
+    
+    elif missing_coverage is not None :
+        coverage = 1.0 - float(missing_coverage) / ( to_t - from_t) 
+        
+        # Fix boundaries # TODO: understand better this part
+        if coverage < 0:
+            coverage = 0.0
+            #raise ConsistencyException('Got Negative coverage!! {}'.format(coverage))
+        if coverage > 1:
+            coverage = 1.0
+            #raise ConsistencyException('Got >1 coverage!! {}'.format(coverage))
+    
+    else:
+        coverage = 1.0
+        
+    # Return
+    logger.debug('compute_coverage: Returning %s (%s percent)', coverage, coverage*100.0)
+    return coverage
 
