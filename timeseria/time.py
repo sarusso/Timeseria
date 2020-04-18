@@ -2,6 +2,12 @@ import datetime, calendar, pytz
 from dateutil.tz import tzoffset
 from .exceptions import InputException, ConsistencyException
 
+# Setup logging
+import logging
+logger = logging.getLogger(__name__)
+
+UTC = pytz.UTC
+
 def timezonize(timezone):
     '''Convert a string representation of a timezone to its pytz object or do nothing if the argument is already a pytz timezone'''
     
@@ -151,7 +157,13 @@ def dt_from_str(string, timezone=None):
     # 5) YYYY-MM-DDThh:mm:ss (without the trailing Z, and assume it on UTC)
 
     # Split and parse standard part
-    date, time = string.split('T')
+    if 'T' in string:
+        date, time = string.split('T')
+    elif ' ' in string:
+        date, time = string.split(' ')
+    else:
+        raise ValueError('Cannot find andy date/time separator (lookign for "T" or " " in "{}"'.format(string))
+        
     
     if time.endswith('Z'):
         # UTC
@@ -424,6 +436,19 @@ class TimeSpan(object):
 
         # Handle logical time 
         elif self.type == self.LOGICAL:
+            
+            
+            # Get TimeSlotSpan duration in seconds
+            timeSpan_s = self.duration_s(time_dt)
+            
+            logger.debug(timeSpan_s)
+            
+            #time_rounded_s
+            
+            
+            
+            
+            
             raise NotImplementedError('Logical not yet implemented')
 
         # Handle other cases (Consistency error)
@@ -472,26 +497,27 @@ class TimeSpan(object):
  
         return time_shifted_dt      
 
-    def duration_s(self, start_time_dt=None):
+    def duration_s(self, start_dt=None):
         '''Get the duration of the interval in seconds'''
         if self.is_composite():
             raise InputException('Sorry, only simple time intervals are supported by this operation')
 
-        if self.type == 'Logical' and not start_time_dt:
+        if self.type == 'Logical' and not start_dt:
             raise InputException('With a logical TimeSlotSpan you can ask for duration only if you provide the starting point')
         
         if self.type == 'Logical':
-            raise NotImplementedError('Computing the duration in seconds using a give start_time_dt is not yet supported')
+            raise NotImplementedError('Computing the duration in seconds using a given start_time_dt is not yet supported')
 
-        # Hours, Minutes, Seconds
-        if self.hours:
-            timeSpan_s = self.hours * 60 * 60
-        if self.minutes:
-            timeSpan_s = self.minutes * 60
-        if self.seconds:
-            timeSpan_s = self.seconds
-        if self.microseconds:
-            timeSpan_s = 1/1000000.0 * self.microseconds
+        else:
+            # Hours, Minutes, Seconds
+            if self.hours:
+                timeSpan_s = self.hours * 60 * 60
+            if self.minutes:
+                timeSpan_s = self.minutes * 60
+            if self.seconds:
+                timeSpan_s = self.seconds
+            if self.microseconds:
+                timeSpan_s = 1/1000000.0 * self.microseconds
                
         return timeSpan_s
         

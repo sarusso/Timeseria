@@ -4,7 +4,7 @@ from ..exceptions import InputException
 from ..time import dt, TimeSpan, correct_dt_dst, timezonize, s_from_dt, dt_to_str, dt_from_str, change_tz
 
 
-class test_time(unittest.TestCase):
+class TestTime(unittest.TestCase):
 
     def setUp(self):       
         pass
@@ -139,24 +139,24 @@ class test_time(unittest.TestCase):
             _ = TimeSpan('15q')
 
         # String init
-        timeSlotSpan1 = TimeSpan('15m')
-        self.assertEqual(timeSlotSpan1.string, '15m')
+        timeSpan1 = TimeSpan('15m')
+        self.assertEqual(timeSpan1.string, '15m')
 
-        timeSlotSpan2 = TimeSpan('15m_30s_3u')
-        self.assertEqual(timeSlotSpan2.string, '15m_30s_3u')
+        timeSpan2 = TimeSpan('15m_30s_3u')
+        self.assertEqual(timeSpan2.string, '15m_30s_3u')
         
-        timeSlotSpan3 = TimeSpan(days=1)
+        timeSpan3 = TimeSpan(days=1)
         
         # Sum with other TimeSpan objects
-        self.assertEqual((timeSlotSpan1+timeSlotSpan2+timeSlotSpan3).string, '1D_30m_30s_3u')
+        self.assertEqual((timeSpan1+timeSpan2+timeSpan3).string, '1D_30m_30s_3u')
 
         # Sum with datetime (also on DST change)
-        timeSlotSpan = TimeSpan('1h')
+        timeSpan = TimeSpan('1h')
         dateTime1 = dt(2015,10,25,0,15,0, tzinfo='Europe/Rome')
-        dateTime2 = dateTime1 + timeSlotSpan
-        dateTime3 = dateTime2 + timeSlotSpan
-        dateTime4 = dateTime3 + timeSlotSpan
-        dateTime5 = dateTime4 + timeSlotSpan
+        dateTime2 = dateTime1 + timeSpan
+        dateTime3 = dateTime2 + timeSpan
+        dateTime4 = dateTime3 + timeSpan
+        dateTime5 = dateTime4 + timeSpan
 
         self.assertEqual(str(dateTime1), '2015-10-25 00:15:00+02:00')
         self.assertEqual(str(dateTime2), '2015-10-25 01:15:00+02:00')
@@ -167,102 +167,107 @@ class test_time(unittest.TestCase):
 
     def test_dt_math(self):
 
-        # Test that complex timeSlotSpans are not handable
-        timeSlotSpan = TimeSpan('1D_3h_5m')
+        # Test that complex timeSpans are not handable
+        timeSpan = TimeSpan('1D_3h_5m')
         dateTime = dt(2015,1,1,16,37,14, tzinfo='Europe/Rome')
         
         with self.assertRaises(InputException):
-            _ = timeSlotSpan.floor_dt(dateTime)
+            _ = timeSpan.floor_dt(dateTime)
 
 
         # Test in ceil/floor/round normal conditions (hours)
-        timeSlotSpan = TimeSpan('1h')
+        timeSpan = TimeSpan('1h')
         dateTime = dt(2015,1,1,16,37,14, tzinfo='Europe/Rome')
-        self.assertEqual(timeSlotSpan.floor_dt(dateTime), dt(2015,1,1,16,0,0, tzinfo='Europe/Rome'))
-        self.assertEqual(timeSlotSpan.ceil_dt(dateTime), dt(2015,1,1,17,0,0, tzinfo='Europe/Rome'))
+        self.assertEqual(timeSpan.floor_dt(dateTime), dt(2015,1,1,16,0,0, tzinfo='Europe/Rome'))
+        self.assertEqual(timeSpan.ceil_dt(dateTime), dt(2015,1,1,17,0,0, tzinfo='Europe/Rome'))
 
          
         # Test in ceil/floor/round normal conditions (minutes)
-        timeSlotSpan = TimeSpan('15m')
+        timeSpan = TimeSpan('15m')
         dateTime = dt(2015,1,1,16,37,14, tzinfo='Europe/Rome')
-        self.assertEqual(timeSlotSpan.floor_dt(dateTime), dt(2015,1,1,16,30,0, tzinfo='Europe/Rome'))
-        self.assertEqual(timeSlotSpan.ceil_dt(dateTime), dt(2015,1,1,16,45,0, tzinfo='Europe/Rome'))
+        self.assertEqual(timeSpan.floor_dt(dateTime), dt(2015,1,1,16,30,0, tzinfo='Europe/Rome'))
+        self.assertEqual(timeSpan.ceil_dt(dateTime), dt(2015,1,1,16,45,0, tzinfo='Europe/Rome'))
 
 
         # Test ceil/floor/round in normal conditions (seconds)
-        timeSlotSpan = TimeSpan('30s')
+        timeSpan = TimeSpan('30s')
         dateTime = dt(2015,1,1,16,37,14, tzinfo='Europe/Rome') 
-        self.assertEqual(timeSlotSpan.floor_dt(dateTime), dt(2015,1,1,16,37,0, tzinfo='Europe/Rome'))
-        self.assertEqual(timeSlotSpan.ceil_dt(dateTime), dt(2015,1,1,16,37,30, tzinfo='Europe/Rome'))
+        self.assertEqual(timeSpan.floor_dt(dateTime), dt(2015,1,1,16,37,0, tzinfo='Europe/Rome'))
+        self.assertEqual(timeSpan.ceil_dt(dateTime), dt(2015,1,1,16,37,30, tzinfo='Europe/Rome'))
 
    
         # Test ceil/floor/round across 1970-1-1 (minutes) 
-        timeSlotSpan = TimeSpan('5m')
+        timeSpan = TimeSpan('5m')
         dateTime1 = dt(1969,12,31,23,57,29, tzinfo='UTC') # epoch = -3601
         dateTime2 = dt(1969,12,31,23,59,59, tzinfo='UTC') # epoch = -3601       
-        self.assertEqual(timeSlotSpan.floor_dt(dateTime1), dt(1969,12,31,23,55,0, tzinfo='UTC'))
-        self.assertEqual(timeSlotSpan.ceil_dt(dateTime1), dt(1970,1,1,0,0, tzinfo='UTC'))
-        self.assertEqual(timeSlotSpan.round_dt(dateTime1), dt(1969,12,31,23,55,0, tzinfo='UTC'))
-        self.assertEqual(timeSlotSpan.round_dt(dateTime2), dt(1970,1,1,0,0, tzinfo='UTC'))
+        self.assertEqual(timeSpan.floor_dt(dateTime1), dt(1969,12,31,23,55,0, tzinfo='UTC'))
+        self.assertEqual(timeSpan.ceil_dt(dateTime1), dt(1970,1,1,0,0, tzinfo='UTC'))
+        self.assertEqual(timeSpan.round_dt(dateTime1), dt(1969,12,31,23,55,0, tzinfo='UTC'))
+        self.assertEqual(timeSpan.round_dt(dateTime2), dt(1970,1,1,0,0, tzinfo='UTC'))
 
 
         # Test ceil/floor/round (3 hours-test)
-        timeSlotSpan = TimeSpan('3h')
+        timeSpan = TimeSpan('3h')
         dateTime = dt(1969,12,31,22,0,1, tzinfo='Europe/Rome') # negative epoch
         
         # TODO: test fails!! fix me!        
-        #self.assertEqual(timeSlotSpan.floor_dt(dateTime1), dt(1969,12,31,21,0,0, tzinfo='Europe/Rome'))
-        #self.assertEqual(timeSlotSpan.ceil_dt(dateTime1), dt(1970,1,1,0,0, tzinfo='Europe/Rome'))
+        #self.assertEqual(timeSpan.floor_dt(dateTime1), dt(1969,12,31,21,0,0, tzinfo='Europe/Rome'))
+        #self.assertEqual(timeSpan.ceil_dt(dateTime1), dt(1970,1,1,0,0, tzinfo='Europe/Rome'))
 
 
         # Test ceil/floor/round across 1970-1-1 (together with the 2 hours-test, TODO: decouple) 
-        timeSlotSpan = TimeSpan('2h')
+        timeSpan = TimeSpan('2h')
         dateTime1 = dt(1969,12,31,22,59,59, tzinfo='Europe/Rome') # negative epoch
         dateTime2 = dt(1969,12,31,23,0,1, tzinfo='Europe/Rome') # negative epoch  
-        self.assertEqual(timeSlotSpan.floor_dt(dateTime1), dt(1969,12,31,22,0,0, tzinfo='Europe/Rome'))
-        self.assertEqual(timeSlotSpan.ceil_dt(dateTime1), dt(1970,1,1,0,0, tzinfo='Europe/Rome'))
-        self.assertEqual(timeSlotSpan.round_dt(dateTime1), dt(1969,12,31,22,0, tzinfo='Europe/Rome'))
-        self.assertEqual(timeSlotSpan.round_dt(dateTime2), dt(1970,1,1,0,0, tzinfo='Europe/Rome'))
+        self.assertEqual(timeSpan.floor_dt(dateTime1), dt(1969,12,31,22,0,0, tzinfo='Europe/Rome'))
+        self.assertEqual(timeSpan.ceil_dt(dateTime1), dt(1970,1,1,0,0, tzinfo='Europe/Rome'))
+        self.assertEqual(timeSpan.round_dt(dateTime1), dt(1969,12,31,22,0, tzinfo='Europe/Rome'))
+        self.assertEqual(timeSpan.round_dt(dateTime2), dt(1970,1,1,0,0, tzinfo='Europe/Rome'))
 
         # Test ceil/floor/round across DST change (hours)
-        timeSlotSpan = TimeSpan('1h')
+        timeSpan = TimeSpan('1h')
         
         dateTime1 = dt(2015,10,25,0,15,0, tzinfo='Europe/Rome')
-        dateTime2 = dateTime1 + timeSlotSpan    # 2015-10-25 01:15:00+02:00    
-        dateTime3 = dateTime2 + timeSlotSpan    # 2015-10-25 02:15:00+02:00
-        dateTime4 = dateTime3 + timeSlotSpan    # 2015-10-25 02:15:00+01:00
+        dateTime2 = dateTime1 + timeSpan    # 2015-10-25 01:15:00+02:00    
+        dateTime3 = dateTime2 + timeSpan    # 2015-10-25 02:15:00+02:00
+        dateTime4 = dateTime3 + timeSpan    # 2015-10-25 02:15:00+01:00
 
         dateTime1_rounded = dt(2015,10,25,0,0,0, tzinfo='Europe/Rome')
-        dateTime2_rounded = dateTime1_rounded + timeSlotSpan        
-        dateTime3_rounded = dateTime2_rounded + timeSlotSpan
-        dateTime4_rounded = dateTime3_rounded + timeSlotSpan
-        dateTime5_rounded = dateTime4_rounded + timeSlotSpan
+        dateTime2_rounded = dateTime1_rounded + timeSpan        
+        dateTime3_rounded = dateTime2_rounded + timeSpan
+        dateTime4_rounded = dateTime3_rounded + timeSpan
+        dateTime5_rounded = dateTime4_rounded + timeSpan
                
-        self.assertEqual(timeSlotSpan.floor_dt(dateTime2), dateTime2_rounded)
-        self.assertEqual(timeSlotSpan.ceil_dt(dateTime2), dateTime3_rounded)
+        self.assertEqual(timeSpan.floor_dt(dateTime2), dateTime2_rounded)
+        self.assertEqual(timeSpan.ceil_dt(dateTime2), dateTime3_rounded)
           
-        self.assertEqual(timeSlotSpan.floor_dt(dateTime3), dateTime3_rounded)
-        self.assertEqual(timeSlotSpan.ceil_dt(dateTime3), dateTime4_rounded)
+        self.assertEqual(timeSpan.floor_dt(dateTime3), dateTime3_rounded)
+        self.assertEqual(timeSpan.ceil_dt(dateTime3), dateTime4_rounded)
         
-        self.assertEqual(timeSlotSpan.floor_dt(dateTime4), dateTime4_rounded)
-        self.assertEqual(timeSlotSpan.ceil_dt(dateTime4), dateTime5_rounded)
+        self.assertEqual(timeSpan.floor_dt(dateTime4), dateTime4_rounded)
+        self.assertEqual(timeSpan.ceil_dt(dateTime4), dateTime5_rounded)
 
 
+        # Test ceil/floor/round with a logical timespan
+        #timeSpan = TimeSpan('1D')
+        
+        #dateTime1 = dt(2015,10,25,0,15,0, tzinfo='Europe/Rome')
+        #dateTime1_floor = dt(2015,10,25,0,0,0, tzinfo='Europe/Rome')
 
     def test_shift_dt(self):
         
         # TODO
         pass
         
-        #timeSlotSpan = TimeSpan('15m')
+        #timeSpan = TimeSpan('15m')
         #dateTime = dt(2015,1,1,16,37,14, tzinfo='Europe/Rome')
         #dateTime_rounded = dt(2015,1,1,16,0,0, tzinfo='Europe/Rome')
         
-        #print shift_dt(dateTime, timeSlotSpan, 4)
-        #print shift_dt(dateTime, timeSlotSpan, -2)
+        #print shift_dt(dateTime, timeSpan, 4)
+        #print shift_dt(dateTime, timeSpan, -2)
 
-        #print shift_dt(dateTime_rounded, timeSlotSpan, 4)
-        #print shift_dt(dateTime_rounded, timeSlotSpan, -2)
+        #print shift_dt(dateTime_rounded, timeSpan, 4)
+        #print shift_dt(dateTime_rounded, timeSpan, -2)
 
         # Test shift across DST change
 
