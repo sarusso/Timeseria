@@ -4,3 +4,6 @@ class InputException(Exception):
 
 class ConsistencyException(Exception):
     pass
+
+class NotTrainedError(Exception):
+    pass
