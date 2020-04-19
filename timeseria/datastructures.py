@@ -465,12 +465,13 @@ class DataSlotSerie(SlotSerie):
             
         super(DataSlotSerie, self).append(item)
     
-    @property
     def data_keys(self):
         if len(self) == 0:
             return None
         else:
-            return set(self[0].data.keys())
+            keys = set(self[0].data.keys())
+            keys.remove('data_loss')
+            return keys
 
 
 class DataTimeSlotSerie(DataSlotSerie, TimeSlotSerie):
