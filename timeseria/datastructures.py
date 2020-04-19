@@ -497,5 +497,8 @@ class DataTimeSlotSerie(DataSlotSerie, TimeSlotSerie):
             return aggregate_by
 
     def __repr__(self):
-        return '{} of #{} {}s, from {} to {}'.format(self.__class__.__name__, len(self), self.__TYPE__.__name__, TimePoint(self[0].start), TimePoint(self[-1].end))
-    
+        try:
+            return '{} of #{} {} {}s, from {} to {}'.format(self.__class__.__name__, len(self), self.timeSpan, self.__TYPE__.__name__, TimePoint(self[0].start), TimePoint(self[-1].end))
+        except:
+            return '{} of #{} {}s, from {} to {}'.format(self.__class__.__name__, len(self), self.__TYPE__.__name__, TimePoint(self[0].start), TimePoint(self[-1].end))
+            

@@ -214,8 +214,8 @@ def dygraphs_plot(serie, aggregate_by):
     elif isinstance(serie, DataTimeSlotSerie):
         stepPlot_value   = 'true'
         drawPoints_value = 'false'
-        if serie.plot_aggregate_by:
-            legend_pre = 'Slot of {}x{} starting at '.format(serie.plot_aggregate_by, serie.timeSpan)
+        if aggregate_by:
+            legend_pre = 'Slot of {}x{} starting at '.format(aggregate_by, serie.timeSpan)
         else:
             legend_pre = 'Slot of {} starting at '.format(serie.timeSpan)
 
@@ -226,7 +226,12 @@ def dygraphs_plot(serie, aggregate_by):
     if serie.title:
         title = serie.title
     else:
-        title = serie.__class__.__name__
+        if isinstance(serie, DataTimePointSerie):
+            title = serie.__class__.__name__
+        elif isinstance(serie, DataTimeSlotSerie):
+            title = '{} of {} Slots '.format(serie.__class__.__name__, serie.timeSpan)
+        else:
+            title = serie.__class__.__name__
 
     if aggregate_by:
         logger.info('Aggregating by "{}" for plotting'.format(aggregate_by))
@@ -362,7 +367,7 @@ axes: {
 animatedZooms: true,"""
 
     if isinstance(serie, DataTimeSlotSerie):
-        if serie.plot_aggregate_by:
+        if aggregate_by:
             rgba_value       = 'rgba(255,128,128,1)' # For the legend
             fill_alpha_value = 0.31                  # For the area
         else:
