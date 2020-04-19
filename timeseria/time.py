@@ -22,11 +22,12 @@ def timezonize(timezone):
         timezone = pytz.timezone(timezone)
     return timezone
 
-
 def now_s():
     '''Return the current time in epoch seconds'''
     return calendar.timegm(now_dt().utctimetuple())
 
+def now_t():
+    return now_s()
 
 def now_dt(tzinfo='UTC'):
     '''Return the current time in datetime format'''
@@ -332,10 +333,28 @@ class TimeSpan(object):
             return self.shift_dt(other, times=1)
         else:
             raise NotImplementedError
-
-    
+   
     def __radd__(self, other):
         return self.__add__(other)
+
+    def __eq__(self, other): 
+        if self.years != other.years:
+            return False
+        if self.months != other.months:
+            return False
+        if self.weeks != other.weeks:
+            return False
+        if self.days != other.days:
+            return False
+        if self.hours != other.hours:
+            return False
+        if self.minutes != other.minutes:
+            return False
+        if self.seconds != other.seconds:
+            return False
+        if self.microseconds != other.microseconds:
+            return False
+        return True
 
     @property
     def string(self):
