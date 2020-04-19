@@ -146,7 +146,7 @@ class PeriodicAverageReconstructor(TrainableModel):
                 if dataTimeSlot.data_loss >= data_loss_threshold:
                     periodicity_index = self.get_periodicity_index(i, dataTimeSlot.start, dataTimeSlotSerie)
                     dataTimeSlot.data[key] = self.data['averages'][periodicity_index]
-                    dataTimeSlot._data_reconstructed = dataTimeSlot.data_loss
+                    dataTimeSlot._data_reconstructed = 1 #dataTimeSlot.data_loss
                 else:
                     dataTimeSlot._data_reconstructed = 0
                 if remove_data_loss:
