@@ -92,13 +92,12 @@ class Slotter(object):
                 avgs[key] += dataTimePoint.data[key]
         
         slot_data = {key:avgs[key]/len(dataTimePointSerie) for key in keys}
-        slot_data['data_loss'] = ((1-slot_coverage))
 
         # Create the DataTimeSlot
         dataTimeSlot = DataTimeSlot(start = TimePoint(t=start_t, tz=timezone),
                                     end   = TimePoint(t=end_t, tz=timezone),
                                     data  = slot_data,
-                                    coverage=slot_coverage)
+                                    coverage = slot_coverage)
         
         return dataTimeSlot
 

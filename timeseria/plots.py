@@ -48,7 +48,7 @@ def to_dg_time(dt):
     return '{}/{:02d}/{:02d} {:02d}:{:02d}:{:02d}'.format(dt.year, dt.month, dt.day, dt.hour, dt.minute,dt.second)
 
 
-def to_dg_data(serie, aggregate_by=0):
+def to_dg_data(serie, aggregate_by=0, plot_data_loss=False, plot_data_reconstructed=False):
     '''{% for timestamp,value in metric_data.items %}{{timestamp}},{{value}}\n{%endfor%}}'''
     
     dg_data=''
@@ -85,13 +85,9 @@ def to_dg_data(serie, aggregate_by=0):
                 
                   
             # Define data
-            data_loss_index = None
             if keys:
                 datas=[]      
                 for j, key in enumerate(keys):
-                    if data_loss_index is None:
-                        if key == 'data_loss':
-                            data_loss_index = j
                     if key is None:
                         datas.append(item.data)
                     else:
@@ -106,19 +102,18 @@ def to_dg_data(serie, aggregate_by=0):
                 data_sums[j] += data
                 
                 # Global min
-                if j != data_loss_index:
-                    if global_min is None:
-                        global_min = data
-                    else:
-                        if data < global_min:
-                            global_min = data                
-                    
-                    # Global max
-                    if global_max is None:
+                if global_min is None:
+                    global_min = data
+                else:
+                    if data < global_min:
+                        global_min = data                
+                
+                # Global max
+                if global_max is None:
+                    global_max = data
+                else:
+                    if data > global_max:
                         global_max = data
-                    else:
-                        if data > global_max:
-                            global_max = data
 
                 # Min
                 if data_mins[j] is None:
@@ -144,10 +139,10 @@ def to_dg_data(serie, aggregate_by=0):
                 data_part=''
                 for i, key in enumerate(keys):
                     avg = data_sums[i]/aggregate_by
-                    if key == 'data_loss':
-                        data_part+='{};{};{},'.format(0, avg, avg)                    
-                    else:
-                        data_part+='{};{};{},'.format( data_mins[i], avg, data_maxs[i])
+                    #if key == 'data_loss':
+                    #    data_part+='{};{};{},'.format(0, avg, avg)                    
+                    #else:
+                    data_part+='{};{};{},'.format( data_mins[i], avg, data_maxs[i])
                 data_part=data_part[0:-1]
                 dg_data+='{},{}\\n'.format(to_dg_time(dt_from_s(t)), data_part)
                 data_sums = [0 for key in keys]
@@ -167,20 +162,19 @@ def to_dg_data(serie, aggregate_by=0):
 
                 data_part += '{},'.format(data)   #item.data
 
-                if key != 'data_loss':         
-                    # Global min
-                    if global_min is None:
-                        global_min = data
-                    else:
-                        if data < global_min:
-                            global_min = data                
-                    
-                    # Global max
-                    if global_max is None:
+                # Global min
+                if global_min is None:
+                    global_min = data
+                else:
+                    if data < global_min:
+                        global_min = data                
+                
+                # Global max
+                if global_max is None:
+                    global_max = data
+                else:
+                    if data > global_max:
                         global_max = data
-                    else:
-                        if data > global_max:
-                            global_max = data
                 
             # Remove last comma
             data_part = data_part[0:-1]
@@ -189,6 +183,10 @@ def to_dg_data(serie, aggregate_by=0):
                 t = item.t
             elif isinstance(serie, DataTimeSlotSerie):
                 t = item.start.t
+                if plot_data_loss:
+                    data_part+=',{}'.format(item.data_loss)
+                elif plot_data_reconstructed:
+                    data_part+=',{}'.format(item.data_reconstructed)
 
             dg_data+='{},{}\\n'.format(to_dg_time(dt_from_s(t)), data_part)
 
@@ -212,6 +210,8 @@ def dygraphs_plot(serie, aggregate_by):
         drawPoints_value = 'true'
         legend_pre = ''
     elif isinstance(serie, DataTimeSlotSerie):
+        if aggregate_by:
+            raise NotImplementedError('Plotting slots with a plot-level aggregation is not yet supported')
         stepPlot_value   = 'true'
         drawPoints_value = 'false'
         if aggregate_by:
@@ -316,7 +316,16 @@ function legendFormatter(data) {
     else:
         labels='value'
 
-    global_min, global_max, dg_data = to_dg_data(serie, aggregate_by)
+    data_reconstructed_indexes = False
+    data_loss_indexes          = False
+    if isinstance(serie, DataTimeSlotSerie):
+        # Do we have data reconstructed or losses indexes?
+        if serie[0].data_reconstructed is not None:
+            data_reconstructed_indexes = True
+        elif serie[0].data_loss is not None:
+            data_loss_indexes = True
+
+    global_min, global_max, dg_data = to_dg_data(serie, aggregate_by, plot_data_loss=data_loss_indexes, plot_data_reconstructed=data_reconstructed_indexes)
     if global_max != global_min:
         plot_min = str(global_min-((global_max-global_min)*0.1))
         plot_max = str(global_max+((global_max-global_min)*0.1))
@@ -324,6 +333,11 @@ function legendFormatter(data) {
         # Case where there is a straight line
         plot_min = str(global_min*0.99)
         plot_max = str(global_max*1.01)
+
+    if data_reconstructed_indexes:
+        labels+=',data_reconstructed'
+    elif data_loss_indexes:
+        labels+=',data_loss'
 
     dygraphs_javascript += '"Timestamp,{}\\n{}",'.format(labels, dg_data)
     dygraphs_javascript += """{\
@@ -368,25 +382,43 @@ animatedZooms: true,"""
 
     if isinstance(serie, DataTimeSlotSerie):
         if aggregate_by:
-            rgba_value       = 'rgba(255,128,128,1)' # For the legend
+            rgba_value_red   = 'rgba(255,128,128,1)' # For the legend
+            rgba_value_orange = 'rgba(255,169,128,1)' # For the legend
             fill_alpha_value = 0.31                  # For the area
         else:
-            rgba_value       = 'rgba(255,128,128,1)' # For the legend
-            fill_alpha_value = 0.5                   # For the area
-        dygraphs_javascript += """series: {
-       'data_loss': {
-         //customBars: false, // Does not work?
-         axis: 'y2',
-         drawPoints: false,
-         strokeWidth: 0,
-         highlightCircleSize:0,
-         fillGraph: true,
-         fillAlpha: """+str(fill_alpha_value)+""",            // This alpha is used for the area
-         //color: 'rgba(255,0,0,0.6)' // This alpha is used for the legend 
-         color: '"""+rgba_value+"""'
-       },
-     },
-"""
+            rgba_value_red    = 'rgba(255,128,128,1)' # For the legend
+            rgba_value_orange = 'rgba(255,179,128,1)' # For the legend
+            fill_alpha_value  = 0.5                   # For the area
+        
+        if data_reconstructed_indexes:
+            dygraphs_javascript += """series: {
+           'data_reconstructed': {
+             //customBars: false, // Does not work?
+             axis: 'y2',
+             drawPoints: false,
+             strokeWidth: 0,
+             highlightCircleSize:0,
+             fillGraph: true,
+             fillAlpha: """+str(fill_alpha_value)+""",            // This alpha is used for the area
+             color: '"""+rgba_value_orange+"""'
+           },
+         },
+    """
+        elif data_loss_indexes:
+            dygraphs_javascript += """series: {
+           'data_loss': {
+             //customBars: false, // Does not work?
+             axis: 'y2',
+             drawPoints: false,
+             strokeWidth: 0,
+             highlightCircleSize:0,
+             fillGraph: true,
+             fillAlpha: """+str(fill_alpha_value)+""",            // This alpha is used for the area
+             //color: 'rgba(255,0,0,0.6)' // This alpha is used for the legend 
+             color: '"""+rgba_value_red+"""'
+           },
+         },
+    """
     if isinstance(serie, DataTimeSlotSerie) and len(serie[0].data.keys()) <=2:
         dygraphs_javascript += """colors: ['rgb(0,128,128)'],""" # Force "original" Dygraph color.
 

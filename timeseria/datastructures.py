@@ -389,9 +389,8 @@ class DataSlot(Slot):
         except KeyError:
             raise Exception('A DataSlot requires a special "data" argument (got only "{}")'.format(kwargs))
 
-        # Coverage. TODO: understand if we want it, if  we want it here like this.
         coverage = kwargs.pop('coverage', None)
-        if coverage:
+        if coverage is not None:
             self._coverage=coverage
 
         super(DataSlot, self).__init__(**kwargs)
@@ -412,6 +411,21 @@ class DataSlot(Slot):
     def coverage(self):
         try:
             return self._coverage
+        except AttributeError:
+            return None
+    
+    @property
+    def data_loss(self):
+        try:
+            return 1-self._coverage
+        except AttributeError:
+            return None
+
+
+    @property
+    def data_reconstructed(self):
+        try:
+            return self._data_reconstructed
         except AttributeError:
             return None
 
@@ -470,7 +484,6 @@ class DataSlotSerie(SlotSerie):
             return None
         else:
             keys = set(self[0].data.keys())
-            keys.remove('data_loss')
             return keys
 
 
@@ -495,14 +508,15 @@ class DataTimeSlotSerie(DataSlotSerie, TimeSlotSerie):
 
     @property
     def plot_aggregate_by(self):
-        try:
-            return self._plot_aggregate_by
-        except AttributeError:
-            if len(self)  > 10000:
-                aggregate_by = 10**len(str(int(len(self)/10000.0)))
-            else:
-                aggregate_by = None
-            return aggregate_by
+        return None
+        #try:
+        #    return self._plot_aggregate_by
+        #except AttributeError:
+        #    if len(self)  > 10000:
+        #        aggregate_by = 10**len(str(int(len(self)/10000.0)))
+        #    else:
+        #        aggregate_by = None
+        #    return aggregate_by
 
     def __repr__(self):
         try:

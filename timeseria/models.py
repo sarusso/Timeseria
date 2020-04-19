@@ -120,7 +120,7 @@ class PeriodicAverageReconstructor(TrainableModel):
             sums   = {}
             totals = {}
             for i, dataTimeSlot in enumerate(dataTimeSlotSerie):
-                if dataTimeSlot.data['data_loss'] < data_loss_threshold:
+                if dataTimeSlot.data_loss < data_loss_threshold:
                     periodicity_index = self.get_periodicity_index(i, dataTimeSlot.start, dataTimeSlotSerie)
                     if not periodicity_index in sums:
                         sums[periodicity_index] = dataTimeSlot.data[key]
@@ -143,11 +143,15 @@ class PeriodicAverageReconstructor(TrainableModel):
 
         for key in dataTimeSlotSerie.data_keys():
             for i, dataTimeSlot in enumerate(dataTimeSlotSerie):
-                if dataTimeSlot.data['data_loss'] >= data_loss_threshold:
+                if dataTimeSlot.data_loss >= data_loss_threshold:
                     periodicity_index = self.get_periodicity_index(i, dataTimeSlot.start, dataTimeSlotSerie)
                     dataTimeSlot.data[key] = self.data['averages'][periodicity_index]
+                    dataTimeSlot._data_reconstructed = dataTimeSlot.data_loss
+                else:
+                    dataTimeSlot._data_reconstructed = 0
                 if remove_data_loss:
-                    dataTimeSlot.data['data_loss'] = 0
+                    # TOOD: move to None if we allow data_losses (coverages) to None?
+                    dataTimeSlot._coverage = 1
         
         return dataTimeSlotSerie
         

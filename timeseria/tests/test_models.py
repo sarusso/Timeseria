@@ -89,13 +89,14 @@ class TestReconstructors(unittest.TestCase):
         periodicAverageReconstructor = PeriodicAverageReconstructor()
 
         # Train
+
         evaluation = periodicAverageReconstructor.train(dataTimeSlotSerie)
         self.assertAlmostEqual(evaluation['rmse'], 1.0499504255337846)
         dataTimeSlotSerie_reconstructed = periodicAverageReconstructor.apply(dataTimeSlotSerie, data_loss_threshold=0.3)
 
         self.assertEqual(len(dataTimeSlotSerie), len(dataTimeSlotSerie_reconstructed))
         for i in range(len(dataTimeSlotSerie)):
-            if dataTimeSlotSerie[i].data['data_loss'] > 0.3:
+            if dataTimeSlotSerie[i].data_loss > 0.3:
                 self.assertNotEqual(dataTimeSlotSerie_reconstructed[i].data, dataTimeSlotSerie[i].data, 'at position {}'.format(i))
         
 
