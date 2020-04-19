@@ -1,7 +1,10 @@
 import os
 import chardet
 from chardet.universaldetector import UniversalDetector
+from numpy import fft
+from scipy.signal import find_peaks
 from .time import dt_from_s
+from .datastructures import DataTimeSlotSerie
 from .exceptions import InputException
 
 # Setup logging
@@ -203,3 +206,68 @@ def compute_coverage(dataTimePointSerie, from_t, to_t, trustme=False, validity=N
     logger.debug('compute_coverage: Returning %s (%s percent)', coverage, coverage*100.0)
     return coverage
 
+
+
+def get_periodicity(dataTimeSlotSerie):
+
+    if not isinstance(dataTimeSlotSerie, DataTimeSlotSerie):
+        raise TypeError('DataTimeSlotSerie is required (got"{}")'.format(dataTimeSlotSerie.__class__.__name__))
+
+    if not dataTimeSlotSerie:
+        raise ValueError('A non-empty DataTimeSlotSerie is required')
+        
+    # TODO: fix me, data_loss must not belong as key
+    data_keys = dataTimeSlotSerie.data_keys
+    data_keys.remove('data_loss')
+    
+    if len(data_keys) > 1:
+        raise NotImplementedError()
+
+    for key in data_keys:
+        
+        # Get data as a vector
+        y = [item.data[key] for item in dataTimeSlotSerie]
+
+        # Compute FFT (Fast Fourier Transform)
+        yf = fft.fft(y)
+
+        # Remove specular data        
+        len_yf = len(yf)
+        middle_point=round(len_yf/2)
+        yf = yf[0:middle_point]
+        
+        # To absolute values
+        yf = [abs(f) for f in yf]
+            
+        # Find FFT peaks
+        peak_indexes, _ = find_peaks(yf, height=None)
+        peaks = []
+        for i in peak_indexes:
+            peaks.append([i, yf[i]])
+        
+        # Sort by peaks intensity and compute actual frequency in base units
+        # TODO: round peak frequencies to integers and/or neighbours first 
+        peaks = sorted(peaks, key=lambda t: t[1])
+        peaks.reverse()
+        max_peak_frequency = None
+        for i, peak in enumerate(peaks):
+            peak_frequency = (len(y) / peak[0])
+            if not max_peak_frequency:
+                max_peak_frequency = peak_frequency
+            logger.debug('Peak index \t#%s,\t value=%s, freq=%s', peak[0], int(peak[1]), peak_frequency)
+            if i>10:
+                break
+        
+        # Round max peak and return
+        return int(round(max_peak_frequency))
+    
+    
+    
+
+
+
+
+
+
+
+ 

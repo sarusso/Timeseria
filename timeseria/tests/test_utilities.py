@@ -1,9 +1,11 @@
 import unittest
 import os
 from ..exceptions import InputException
-from ..utilities import detect_encoding, compute_coverage
+from ..utilities import detect_encoding, compute_coverage, get_periodicity
 from ..datastructures import DataTimePointSerie, DataTimePoint
 from ..time import dt, s_from_dt, TimeSpan
+from ..storages import CSVFileStorage
+from ..operators import Slotter
 
 # Setup logging
 import logging
@@ -138,10 +140,29 @@ class TestComputeCoverage(unittest.TestCase):
         coverage = compute_coverage(dataTimePointSerie  = self.dataTimePointSerie6,
                                     from_t = from_t, to_t = to_t, validity=900)         
         self.assertAlmostEqual(coverage, (0.5))
- 
 
-    def tearDown(self):
-        pass
+
+
+class TestGetPeriodicity(unittest.TestCase):
+
+    def test_get_periodicity(self):
+        
+        univariate_dataTimePointSerie = CSVFileStorage(TEST_DATA_PATH + '/csv/temperature.csv').get()
+        
+        univariate_1h_dataTimeSlotSerie = Slotter('1h').process(univariate_dataTimePointSerie)
+        
+        perdiodicity = get_periodicity(univariate_1h_dataTimeSlotSerie)
+
+        self.assertEqual(perdiodicity, 24)
+
+
+
+
+
+
+
+
+
 
 
 

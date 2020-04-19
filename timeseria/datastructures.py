@@ -464,6 +464,13 @@ class DataSlotSerie(SlotSerie):
             self.item_data_reference = item.data
             
         super(DataSlotSerie, self).append(item)
+    
+    @property
+    def data_keys(self):
+        if len(self) == 0:
+            return None
+        else:
+            return set(self[0].data.keys())
 
 
 class DataTimeSlotSerie(DataSlotSerie, TimeSlotSerie):
