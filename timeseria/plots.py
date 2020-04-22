@@ -1,7 +1,7 @@
 import os
 import uuid
 import datetime
-from .time import dt_from_s
+from .time import dt_from_s, TimeSpan
 from .datastructures import DataTimePointSerie, DataTimeSlotSerie
 
 # Setup logging
@@ -210,14 +210,18 @@ def dygraphs_plot(serie, aggregate_by):
         drawPoints_value = 'true'
         legend_pre = ''
     elif isinstance(serie, DataTimeSlotSerie):
-        if aggregate_by:
+        if isinstance(serie.slot_span, TimeSpan):
+            serie_span_string = str(serie.slot_span)
+        else:
+            serie_span_string = str(serie.slot_span).split('.')[0]+'s'
+        if aggregate_by: 
             raise NotImplementedError('Plotting slots with a plot-level aggregation is not yet supported')
         stepPlot_value   = 'true'
         drawPoints_value = 'false'
         if aggregate_by:
-            legend_pre = 'Slot of {}x{} starting at '.format(aggregate_by, serie.timeSpan)
+            legend_pre = 'Slot of {}x{} starting at '.format(aggregate_by, serie_span_string)
         else:
-            legend_pre = 'Slot of {} starting at '.format(serie.timeSpan)
+            legend_pre = 'Slot of {} starting at '.format(serie_span_string)
 
     else:
         raise Exception('Don\'t know how to plot an object of type "{}"'.format(serie.__class__.__name__))
@@ -229,7 +233,7 @@ def dygraphs_plot(serie, aggregate_by):
         if isinstance(serie, DataTimePointSerie):
             title = serie.__class__.__name__
         elif isinstance(serie, DataTimeSlotSerie):
-            title = '{} of {} Slots '.format(serie.__class__.__name__, serie.timeSpan)
+            title = '{} of {} Slots '.format(serie.__class__.__name__, serie_span_string)
         else:
             title = serie.__class__.__name__
 

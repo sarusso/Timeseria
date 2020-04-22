@@ -4,8 +4,8 @@ import os
 from ..datastructures import Point, TimePoint, DataPoint, DataTimePoint
 from ..datastructures import Slot, TimeSlot, DataSlot, DataTimeSlot
 from ..datastructures import Serie
-from ..datastructures import DataPointSerie, TimePointSerie, DataTimePointSerie
-from ..datastructures import DataSlotSerie, TimeSlotSerie, DataTimeSlotSerie
+from ..datastructures import PointSerie, DataPointSerie, TimePointSerie, DataTimePointSerie
+from ..datastructures import SlotSerie, DataSlotSerie, TimeSlotSerie, DataTimeSlotSerie
 from ..time import UTC
 
 # Setup logging
@@ -304,6 +304,12 @@ class TestSlots(unittest.TestCase):
         
         self.assertEqual(slot1,slot2)
         self.assertNotEqual(slot1,slot3)
+        
+        # Span
+        slot = Slot(start=Point(x=1.5), end=Point(x=4.7)) 
+        self.assertEqual(slot.span, 3.2)
+        slot._span = 'hello'
+        self.assertEqual(slot.span, 'hello')
 
   
     def test_TimeSlot(self):
@@ -331,10 +337,14 @@ class TestSlots(unittest.TestCase):
         
         # Duration
         self.assertEqual(timeSlot1.duration,1)
+
+        # Time zone
+        with self.assertRaises(ValueError):
+            # ValueError: TimeSlot start and end must have the same time zone (got start.tz="Europe/Rome", end.tz="UTC")
+            TimeSlot(start=TimePoint(t=0, tz='Europe/Rome'), end=TimePoint(t=60))
+        TimeSlot(start=TimePoint(t=0, tz='Europe/Rome'), end=TimePoint(t=60, tz='Europe/Rome'))
         
-        
- 
- 
+
     def test_DataSlot(self):
         
         with self.assertRaises(Exception):
@@ -358,6 +368,7 @@ class TestSlots(unittest.TestCase):
         dataSlot_with_coverage = DataSlot(start=Point(x=1), end=Point(x=2), data='hello', coverage=0.98)
         self.assertEqual(dataSlot_with_coverage.coverage, 0.98)
         self.assertEqual(dataSlot_with_coverage.coverage + dataSlot_with_coverage.data_loss, 1) # Workaround 0.020000000000000018 != 0.2
+
 
     def test_DataTimeSlots(self):
 
@@ -384,8 +395,27 @@ class TestSlots(unittest.TestCase):
         self.assertNotEqual(dataTimeSlot1, dataTimeSlot3)
 
 
+
 class TestSlotSeries(unittest.TestCase):
- 
+
+    def test_SlotSerie(self):
+
+        with self.assertRaises(ValueError):
+            # ValueError: Slot start and end dimensions must be the same (got "{'x'}" vs "{'t'}")
+            SlotSerie(Slot(start=Point(x=0), end=Point(t=10)))
+            
+        slotSerie =  SlotSerie(Slot(start=Point(x=0), end=Point(x=10)))
+        
+        with self.assertRaises(ValueError):
+            # Cannot add items with different spans (I have "10.0" and you tried to add "11.0")
+            slotSerie.append(Slot(start=Point(x=10), end=Point(x=21)))
+        slotSerie.append(Slot(start=Point(x=10), end=Point(x=20)))
+        
+        # The span is more used as a type..
+        slotSerie =  SlotSerie(Slot(start=Point(x=0), end=Point(x=10), span='10-ish'))
+        slotSerie.append(Slot(start=Point(x=10), end=Point(x=21), span='10-ish'))
+
+
     def test_TimeSlotSerie(self):
          
         timeSlotSerie = TimeSlotSerie()
@@ -402,17 +432,25 @@ class TestSlotSeries(unittest.TestCase):
         self.assertEqual(timeSlotSerie[0].end.t,60)
         self.assertEqual(timeSlotSerie[1].start.t,60)
         self.assertEqual(timeSlotSerie[1].end.t,120) 
+        
+        # Test time zone
+        timeSlotSerie = TimeSlotSerie()
+        timeSlotSerie.append(TimeSlot(start=TimePoint(t=0, tz='Europe/Rome'), end=TimePoint(t=60, tz='Europe/Rome')))
+        with self.assertRaises(ValueError):
+            timeSlotSerie.append(TimeSlot(start=TimePoint(t=60), end=TimePoint(t=210)))
+        timeSlotSerie.append(TimeSlot(start=TimePoint(t=60, tz='Europe/Rome'), end=TimePoint(t=120, tz='Europe/Rome')))
 
+        # Test span
+        self.assertEqual(timeSlotSerie.slot_span, 60)
+        
  
     def test_DataSlotSerie(self):
-        pass
-        # TODO: either implement the "__suceedes__" for unidimensional DataSlots or remove it completely.
-        #dataSlotSerie = DataSlotSerie()
-        #dataSlotSerie.append(DataSlot(start=Point(x=1), end=Point(x=2), data='hello'))
-        #dataSlotSerie.append(DataSlot(start=Point(x=1), end=Point(x=2), data='hola'))
-        #self.assertEqual(dataSlotSerie[0].start.x,1)
-        #self.assertEqual(dataSlotSerie[0].end.x,2)
-        #self.assertEqual(dataSlotSerie[0].data,'hello')
+        dataSlotSerie = DataSlotSerie()
+        dataSlotSerie.append(DataSlot(start=Point(x=1), end=Point(x=2), data='hello'))
+        dataSlotSerie.append(DataSlot(start=Point(x=2), end=Point(x=3), data='hola'))
+        self.assertEqual(dataSlotSerie[0].start.x,1)
+        self.assertEqual(dataSlotSerie[0].end.x,2)
+        self.assertEqual(dataSlotSerie[0].data,'hello')
 
  
     def test_DataTimeSlotSerie(self):
@@ -442,7 +480,6 @@ class TestSlotSeries(unittest.TestCase):
                                                  
         dataTimeSlotSerie.append(DataTimeSlot(start=TimePoint(t=240), end=TimePoint(t=300), data=22.7))
         self.assertTrue(len(dataTimeSlotSerie), 4)
-        return
 
         # Try to append a different data type
         dataTimeSlotSerie = DataTimeSlotSerie(DataTimeSlot(start=TimePoint(t=60), end=TimePoint(t=120), data=23.8))
@@ -458,6 +495,11 @@ class TestSlotSeries(unittest.TestCase):
         dataTimeSlotSerie = DataTimeSlotSerie(DataTimeSlot(start=TimePoint(t=60), end=TimePoint(t=120), data={'a':56, 'b':67}))
         with self.assertRaises(ValueError):
             dataTimeSlotSerie.append(DataTimeSlot(start=TimePoint(t=120), end=TimePoint(t=180), data={'a':56, 'c':67}))            
+
+
+
+
+
 
 
 

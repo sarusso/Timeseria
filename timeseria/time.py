@@ -337,7 +337,9 @@ class TimeSpan(object):
     def __radd__(self, other):
         return self.__add__(other)
 
-    def __eq__(self, other): 
+    def __eq__(self, other):
+        if type(self) != type(other):
+            return False
         if self.years != other.years:
             return False
         if self.months != other.months:

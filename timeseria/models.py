@@ -102,7 +102,7 @@ class PeriodicAverageReconstructor(TrainableModel):
     def get_periodicity_index(self, i, TimePoint, dataTimeSlotSerie):
 
         # Handle specific cases
-        if dataTimeSlotSerie.timeSpan == TimeSpan('1h'):
+        if dataTimeSlotSerie.slot_span == TimeSpan('1h') or dataTimeSlotSerie.slot_span==3600:
             return str(TimePoint.dt.hour)
         else:
             return str(i % 24)
@@ -114,7 +114,7 @@ class PeriodicAverageReconstructor(TrainableModel):
         
         # Detect periodicity
         periodicity =  get_periodicity(dataTimeSlotSerie)
-        logger.info('Detected periodicity: %sx %s', periodicity, dataTimeSlotSerie.timeSpan)
+        logger.info('Detected periodicity: %sx %s', periodicity, dataTimeSlotSerie.slot_span)
         
         for key in dataTimeSlotSerie.data_keys():
             sums   = {}

@@ -27,11 +27,20 @@ def almostequal(one, two):
 
 class Slotter(object):
     
-    def __init__(self, timeSpan):
-        
-        # Check vand set alid timeSpacn
-        if not isinstance(timeSpan, TimeSpan):
-            timeSpan = TimeSpan(timeSpan)
+    def __init__(self, span):
+        if isinstance(span, TimeSpan):
+            timeSpan = span
+        elif isinstance(span, int):
+            timeSpan = TimeSpan(seconds=span)
+        elif isinstance(span, float):
+            if int(str(span).split('.')[1]) != 0:
+                raise ValueError('Cannot process decimal seconds yet')
+            timeSpan = TimeSpan(seconds=span)
+        elif  isinstance(span, str):
+            timeSpan = TimeSpan(span)
+        else:
+            raise ValueError('Unknown span type "{}"'.format(span.__class__.__name__))
+
         self.timeSpan = timeSpan
 
     @classmethod
@@ -96,6 +105,7 @@ class Slotter(object):
         # Create the DataTimeSlot
         dataTimeSlot = DataTimeSlot(start = TimePoint(t=start_t, tz=timezone),
                                     end   = TimePoint(t=end_t, tz=timezone),
+                                    span  = self.timeSpan,
                                     data  = slot_data,
                                     coverage = slot_coverage)
         
@@ -150,7 +160,7 @@ class Slotter(object):
         # Automatically detect validity if not set
         if validity is None:
             validity = self._detect_dataPoints_validity(dataTimePointSerie)
-            logger.info('Auto-detected dataTimePoints validity: %s s', validity)
+            logger.info('Auto-detected dataTimePoints validity: %ss', validity)
         
 
         
@@ -309,9 +319,6 @@ class Slotter(object):
             # TODO: Implement it. Sure?
 
         logger.debug('Aggregation process ended, processed {} DataTimePoints.'.format(count))
- 
-        dataTimeSlotSerie.timeSpan = self.timeSpan
- 
         return dataTimeSlotSerie
 
 
