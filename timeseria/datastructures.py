@@ -563,7 +563,7 @@ class DataTimeSlotSerie(DataSlotSerie, TimeSlotSerie):
             matplotlib_plot(self)
         elif engine=='dg':
             from .plots import dygraphs_plot
-            dygraphs_plot(self, aggregate_by=aggregate_by)
+            dygraphs_plot(self, aggregate_by=aggregate_by, **kwargs)
         else:
             raise Exception('Unknowmn plotting engine "{}'.format(engine))
 

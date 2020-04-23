@@ -1,7 +1,7 @@
 import os
 import uuid
 import datetime
-from .time import dt_from_s, TimeSpan
+from .time import dt_from_s, TimeSpan, dt_to_str, utckfake_s_from_dt
 from .datastructures import DataTimePointSerie, DataTimeSlotSerie
 
 # Setup logging
@@ -42,10 +42,12 @@ def get_keys_and_check_data_for_plot(data):
         raise Exception('Don\'t know how to plot data "{}" of type "{}"'.format(data, data.__class__.__name__))
     return keys
 
-
+from timeseria.time import s_from_dt
 def to_dg_time(dt):
     '''Get Dygraphs time form datetime'''
-    return '{}/{:02d}/{:02d} {:02d}:{:02d}:{:02d}'.format(dt.year, dt.month, dt.day, dt.hour, dt.minute,dt.second)
+    #return '{}{:02d}-{:02d}T{:02d}:{:02d}:{:02d}+00:00'.format(dt.year, dt.month, dt.day, dt.hour, dt.minute,dt.second)
+    #return s_from_dt(dt)*1000
+    return 'new Date(Date.UTC({}, {}, {}, {}, {}, {}))'.format(dt.year, dt.month-1, dt.day, dt.hour, dt.minute,dt.second)
 
 
 def to_dg_data(serie, aggregate_by=0, plot_data_loss=False, plot_data_reconstructed=False):
@@ -142,9 +144,9 @@ def to_dg_data(serie, aggregate_by=0, plot_data_loss=False, plot_data_reconstruc
                     #if key == 'data_loss':
                     #    data_part+='{};{};{},'.format(0, avg, avg)                    
                     #else:
-                    data_part+='{};{};{},'.format( data_mins[i], avg, data_maxs[i])
+                    data_part+='[{},{},{}],'.format( data_mins[i], avg, data_maxs[i])
                 data_part=data_part[0:-1]
-                dg_data+='{},{}\\n'.format(to_dg_time(dt_from_s(t)), data_part)
+                dg_data+='[{},{}],'.format(to_dg_time(dt_from_s(t, tz=item.tz)), data_part)
                 data_sums = [0 for key in keys]
                 data_mins = [None for key in keys]
                 data_maxs = [None for key in keys]
@@ -188,16 +190,19 @@ def to_dg_data(serie, aggregate_by=0, plot_data_loss=False, plot_data_reconstruc
                 elif plot_data_reconstructed:
                     data_part+=',{}'.format(item.data_reconstructed)
 
-            dg_data+='{},{}\\n'.format(to_dg_time(dt_from_s(t)), data_part)
+            dg_data+='[{},{}],'.format(to_dg_time(dt_from_s(t, tz=item.tz)), data_part)
 
-    return global_min, global_max, dg_data
+    if dg_data.endswith(','):
+        dg_data = dg_data[0:-1]
+
+    return global_min, global_max, '['+dg_data+']'
 
 
 #=================
 #  Dygraphs plot
 #=================
 
-def dygraphs_plot(serie, aggregate_by):
+def dygraphs_plot(serie, aggregate_by, log_js=False):
     '''Plot a dataTimePointSeries in Jupyter using Dugraph. Based on the work here: https://www.stefaanlippens.net/jupyter-custom-d3-visualization.html'''
     from IPython.display import display, Javascript, HTML
 
@@ -342,9 +347,14 @@ function legendFormatter(data) {
         labels+=',data_reconstructed'
     elif data_loss_indexes:
         labels+=',data_loss'
+        
+    labels_list = ['Timestamp'] + labels.split(',')
 
-    dygraphs_javascript += '"Timestamp,{}\\n{}",'.format(labels, dg_data)
+    #dygraphs_javascript += '"Timestamp,{}\\n{}",'.format(labels, dg_data)
+    dygraphs_javascript += '{},'.format(dg_data)
+
     dygraphs_javascript += """{\
+labels: """+str(labels_list)+""",
 drawGrid: true,
 drawPoints:"""+drawPoints_value+""",
 strokeWidth: 1.5,
@@ -361,6 +371,7 @@ interactionModel: Dygraph.defaultInteractionModel,
 includeZero: false,
 showRoller: false,
 legend: 'always',
+labelsUTC: true,
 legendFormatter: legendFormatter,
 labelsDiv: '"""+legend_div_id+"""',
 valueRange: ["""+plot_min+""", """+plot_max+"""],
@@ -380,7 +391,11 @@ axes: {
     independentTicks: true,
     valueRange: [0,1],
     //customBars: false, // Does not work?
-  }
+  }/*,
+  x : {
+                    valueFormatter: Dygraph.dateString_,
+                    valueParser: function(x) { return new Date(x); },
+ }*/
 },
 animatedZooms: true,"""
 
@@ -423,12 +438,39 @@ animatedZooms: true,"""
            },
          },
     """
-    if isinstance(serie, DataTimeSlotSerie) and len(serie[0].data.keys()) <=2:
+    if isinstance(serie, DataTimeSlotSerie) and len(serie[0].data.keys()) <=1:
         dygraphs_javascript += """colors: ['rgb(0,128,128)'],""" # Force "original" Dygraph color.
-
+    try:
+        if serie.mark:
+            if not isinstance(serie.mark, (list, tuple)):
+                raise TypeError('Serie mark must be a list or tuple')
+            if not len(serie.mark) == 2:
+                raise ValueError('Serie mark must be a list or tuple of two elements')
+            if not isinstance(serie.mark[0], datetime.datetime):
+                raise TypeError('Serie marks must be datetime objects')
+            if not isinstance(serie.mark[1], datetime.datetime):
+                raise TypeError('Serie marks must be datetime objects')
+            
+            # Convert the mark to fake epoch milliseconds
+            mark_start = utckfake_s_from_dt(serie.mark[0])*1000
+            mark_end   = utckfake_s_from_dt(serie.mark[1])*1000
+            # Add js code
+            dygraphs_javascript  += 'underlayCallback: function(canvas, area, g) {'
+            dygraphs_javascript += 'var bottom_left = g.toDomCoords({}, -20);'.format(mark_start)
+            dygraphs_javascript += 'var top_right = g.toDomCoords({}, +20);'.format(mark_end)
+            dygraphs_javascript += 'var left = bottom_left[0];'
+            dygraphs_javascript += 'var right = top_right[0];'
+            dygraphs_javascript += 'canvas.fillStyle = "rgba(255, 255, 102, .5)";'
+            dygraphs_javascript += 'canvas.fillRect(left, area.y, right - left, area.h);'
+            dygraphs_javascript += '}'
+    except AttributeError:
+        pass
     if aggregate_by:
         dygraphs_javascript += 'customBars: true'        
     dygraphs_javascript += '})'
+    
+    if log_js:
+        logger.info(dygraphs_javascript)
 
     rendering_javascript = """
 require.undef('"""+graph_id+"""'); // Helps to reload in Jupyter

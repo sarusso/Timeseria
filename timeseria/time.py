@@ -214,6 +214,16 @@ def dt_to_str(dt):
     return dt.isoformat()
 
 
+def utckfake_s_from_dt(dt):
+    dt_str = dt_to_str(dt)
+    if '+' in dt_str:
+        return s_from_dt(dt_from_str(dt_str.split('+')[0]+'+00:00'))
+    elif '-' in dt_str:
+        return s_from_dt(dt_from_str(dt_str.split('-')[0]+'+00:00'))
+    else:
+        raise ValueError('Cannot convert to fake UTC epoch a datetime without a timezone')
+
+
 class dt_range(object):
 
     def __init__(self, from_dt, to_dt, timeSlotSpan):
