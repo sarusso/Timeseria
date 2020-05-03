@@ -211,7 +211,7 @@ def compute_coverage(dataTimePointSerie, from_t, to_t, trustme=False, validity=N
 def get_periodicity(dataTimeSlotSerie):
 
     if not isinstance(dataTimeSlotSerie, DataTimeSlotSerie):
-        raise TypeError('DataTimeSlotSerie is required (got "{}")'.format(dataTimeSlotSerie.__class__.__name__))
+        raise TypeError('DataTimeSlotSerie is required (got"{}")'.format(dataTimeSlotSerie.__class__.__name__))
 
     if not dataTimeSlotSerie:
         raise ValueError('A non-empty DataTimeSlotSerie is required')
