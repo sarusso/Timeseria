@@ -3,7 +3,7 @@ import os
 import tempfile
 from ..datastructures import DataTimeSlotSerie, DataTimeSlot, TimePoint
 from ..models import Model, TrainableModel
-from ..models import PeriodicAverageReconstructor
+from ..models import PeriodicAverageReconstructor, PeriodicAverageForecaster
 from ..exceptions import NotTrainedError
 from ..storages import CSVFileStorage
 from ..operators import Slotter
@@ -83,29 +83,53 @@ class TestReconstructors(unittest.TestCase):
         
         # Get test data        
         dataTimePointSerie = CSVFileStorage(TEST_DATA_PATH + '/csv/temperature.csv').get()
-        dataTimeSlotSerie = Slotter('1h').process(dataTimePointSerie)
+        dataTimeSlotSerie = Slotter(60*60*24).process(dataTimePointSerie)
         
         # Instantiate
         periodicAverageReconstructor = PeriodicAverageReconstructor()
 
         # Train
-
         evaluation = periodicAverageReconstructor.train(dataTimeSlotSerie)
-        self.assertAlmostEqual(evaluation['rmse'], 1.0499504255337846)
+        self.assertAlmostEqual(evaluation['rmse'], 0.15155635144666973)
         dataTimeSlotSerie_reconstructed = periodicAverageReconstructor.apply(dataTimeSlotSerie, data_loss_threshold=0.3)
 
         self.assertEqual(len(dataTimeSlotSerie), len(dataTimeSlotSerie_reconstructed))
         for i in range(len(dataTimeSlotSerie)):
-            if dataTimeSlotSerie[i].data_loss > 0.3:
-                self.assertNotEqual(dataTimeSlotSerie_reconstructed[i].data, dataTimeSlotSerie[i].data, 'at position {}'.format(i))
+            #print('------------------------------------------')
+            #print(dataTimeSlotSerie[i], dataTimeSlotSerie[i].data_loss)
+            #print(dataTimeSlotSerie_reconstructed[i], dataTimeSlotSerie_reconstructed[i].data_reconstructed)
+            #print('------------------------------------------')
+
+            if dataTimeSlotSerie[i].data_loss >= 0.3:
+                if (dataTimeSlotSerie[i-1].data_loss < 0.3) and (dataTimeSlotSerie[i+1].data_loss < 0.3):
+                    # You need at least two "missing" slots in succession for the reconstructor to kick in. 
+                    pass
+                else:
+                    self.assertNotEqual(dataTimeSlotSerie_reconstructed[i].data, dataTimeSlotSerie[i].data, 'at position {}'.format(i))
         
 
 
+class TestForecasters(unittest.TestCase):
 
+    def setUp(self):
+        
+        # Create a test dataTimeSlotSeries
+        from math import sin
+        self.sine_dataTimeSlotSerie = DataTimeSlotSerie()
+        for i in range(1000):
+            self.sine_dataTimeSlotSerie.append(DataTimeSlot(start=TimePoint(i*60), end=TimePoint((i+1)*60), data={'value':sin(i/10.0)}))
 
+    def test_PeriodicAverageForecaster(self):
+                 
+        forecaster = PeriodicAverageForecaster()
+        
+        evaluation = forecaster.train(self.sine_dataTimeSlotSerie, periodicity=63)
+        
+        self.assertTrue('rmse' in evaluation)
+        
+        self.assertEqual(forecaster.data['periodicity'], 63)
 
-
-
+        forecaster.apply(self.sine_dataTimeSlotSerie, n=3)
 
 
 
