@@ -202,7 +202,7 @@ def to_dg_data(serie, aggregate_by=0, plot_data_loss=False, plot_data_reconstruc
 #  Dygraphs plot
 #=================
 
-def dygraphs_plot(serie, aggregate_by, log_js=False):
+def dygraphs_plot(serie, aggregate_by, log_js=False, show_data_loss=True, show_data_reconstructed=True, show_data_forecasted=True):
     '''Plot a dataTimePointSeries in Jupyter using Dugraph. Based on the work here: https://www.stefaanlippens.net/jupyter-custom-d3-visualization.html'''
     from IPython.display import display, Javascript, HTML
 
@@ -243,13 +243,35 @@ def dygraphs_plot(serie, aggregate_by, log_js=False):
             title = serie.__class__.__name__
 
     if aggregate_by:
-        logger.info('Aggregating by "{}" for plotting'.format(aggregate_by))
+        logger.info('Aggregating by "{}" for improved plotting'.format(aggregate_by))
             
     # Define div name
     graph_id = 'graph_' + str(uuid.uuid4()).replace('-', '')
     graph_div_id  = graph_id + '_plotarea'
     legend_div_id = graph_id + '_legend'
 
+    # Mark to use?
+    try:
+        if show_data_forecasted and serie.mark:
+            if not isinstance(serie.mark, (list, tuple)):
+                raise TypeError('Serie mark must be a list or tuple')
+            if not len(serie.mark) == 2:
+                raise ValueError('Serie mark must be a list or tuple of two elements')
+            if not isinstance(serie.mark[0], datetime.datetime):
+                raise TypeError('Serie marks must be datetime objects')
+            if not isinstance(serie.mark[1], datetime.datetime):
+                raise TypeError('Serie marks must be datetime objects')
+            logger.info('Found data forecast mark and showing it')
+            show_data_reconstructed=False
+            show_data_loss=False
+            serie_mark=True
+            serie_mark_html = ' &nbsp; (forecast highlighted in <span style="background:rgba(255, 255, 102, .6);">yellow</span>)'
+        else:
+            serie_mark=False
+            serie_mark_html=''
+    except AttributeError:
+        serie_mark=False
+        serie_mark_html = ''
 
     # Dygraphs javascript
     dygraphs_javascript = """
@@ -278,6 +300,7 @@ function legendFormatter(data) {
           // Remove last comma and space
           html = html.substring(0, html.length - 2);
         }
+        html += '"""+serie_mark_html +"""'
         return html;
       }
 
@@ -302,6 +325,7 @@ function legendFormatter(data) {
       }
       // Remove last comma and space
       html = html.substring(0, html.length - 2);
+      html += '"""+serie_mark_html +"""'
       return html;
     };
 """
@@ -331,10 +355,22 @@ function legendFormatter(data) {
         # Do we have data reconstructed or losses indexes?
         if serie[0].data_reconstructed is not None:
             data_reconstructed_indexes = True
-        elif serie[0].data_loss is not None:
+        if serie[0].data_loss is not None:
             data_loss_indexes = True
 
-    global_min, global_max, dg_data = to_dg_data(serie, aggregate_by, plot_data_loss=data_loss_indexes, plot_data_reconstructed=data_reconstructed_indexes)
+    plot_data_reconstructed = False
+    plot_data_loss = False
+    if show_data_reconstructed and data_reconstructed_indexes:
+        logger.info('Found data reconstruction index and showing it')
+        labels+=',data_reconstructed'
+        plot_data_reconstructed = True
+    elif show_data_loss and data_loss_indexes:
+        labels+=',data_loss'
+        plot_data_loss = True
+        
+    labels_list = ['Timestamp'] + labels.split(',')
+
+    global_min, global_max, dg_data = to_dg_data(serie, aggregate_by, plot_data_loss=plot_data_loss, plot_data_reconstructed=plot_data_reconstructed)
     if global_max != global_min:
         plot_min = str(global_min-((global_max-global_min)*0.1))
         plot_max = str(global_max+((global_max-global_min)*0.1))
@@ -342,13 +378,6 @@ function legendFormatter(data) {
         # Case where there is a straight line
         plot_min = str(global_min*0.99)
         plot_max = str(global_max*1.01)
-
-    if data_reconstructed_indexes:
-        labels+=',data_reconstructed'
-    elif data_loss_indexes:
-        labels+=',data_loss'
-        
-    labels_list = ['Timestamp'] + labels.split(',')
 
     #dygraphs_javascript += '"Timestamp,{}\\n{}",'.format(labels, dg_data)
     dygraphs_javascript += '{},'.format(dg_data)
@@ -409,7 +438,7 @@ animatedZooms: true,"""
             rgba_value_orange = 'rgba(255,179,128,1)' # For the legend
             fill_alpha_value  = 0.5                   # For the area
         
-        if data_reconstructed_indexes:
+        if show_data_reconstructed and data_reconstructed_indexes:
             dygraphs_javascript += """series: {
            'data_reconstructed': {
              //customBars: false, // Does not work?
@@ -423,7 +452,7 @@ animatedZooms: true,"""
            },
          },
     """
-        elif data_loss_indexes:
+        elif show_data_loss and data_loss_indexes:
             dygraphs_javascript += """series: {
            'data_loss': {
              //customBars: false, // Does not work?
@@ -440,31 +469,21 @@ animatedZooms: true,"""
     """
     if isinstance(serie, DataTimeSlotSerie) and len(serie[0].data.keys()) <=1:
         dygraphs_javascript += """colors: ['rgb(0,128,128)'],""" # Force "original" Dygraph color.
-    try:
-        if serie.mark:
-            if not isinstance(serie.mark, (list, tuple)):
-                raise TypeError('Serie mark must be a list or tuple')
-            if not len(serie.mark) == 2:
-                raise ValueError('Serie mark must be a list or tuple of two elements')
-            if not isinstance(serie.mark[0], datetime.datetime):
-                raise TypeError('Serie marks must be datetime objects')
-            if not isinstance(serie.mark[1], datetime.datetime):
-                raise TypeError('Serie marks must be datetime objects')
-            
-            # Convert the mark to fake epoch milliseconds
-            mark_start = utckfake_s_from_dt(serie.mark[0])*1000
-            mark_end   = utckfake_s_from_dt(serie.mark[1])*1000
-            # Add js code
-            dygraphs_javascript  += 'underlayCallback: function(canvas, area, g) {'
-            dygraphs_javascript += 'var bottom_left = g.toDomCoords({}, -20);'.format(mark_start)
-            dygraphs_javascript += 'var top_right = g.toDomCoords({}, +20);'.format(mark_end)
-            dygraphs_javascript += 'var left = bottom_left[0];'
-            dygraphs_javascript += 'var right = top_right[0];'
-            dygraphs_javascript += 'canvas.fillStyle = "rgba(255, 255, 102, .5)";'
-            dygraphs_javascript += 'canvas.fillRect(left, area.y, right - left, area.h);'
-            dygraphs_javascript += '}'
-    except AttributeError:
-        pass
+
+    if serie_mark:            
+        # Convert the mark to fake epoch milliseconds
+        mark_start = utckfake_s_from_dt(serie.mark[0])*1000
+        mark_end   = utckfake_s_from_dt(serie.mark[1])*1000
+        # Add js code
+        dygraphs_javascript  += 'underlayCallback: function(canvas, area, g) {'
+        dygraphs_javascript += 'var bottom_left = g.toDomCoords({}, -20);'.format(mark_start)
+        dygraphs_javascript += 'var top_right = g.toDomCoords({}, +20);'.format(mark_end)
+        dygraphs_javascript += 'var left = bottom_left[0];'
+        dygraphs_javascript += 'var right = top_right[0];'
+        dygraphs_javascript += 'canvas.fillStyle = "rgba(255, 255, 102, .5)";'
+        dygraphs_javascript += 'canvas.fillRect(left, area.y, right - left, area.h);'
+        dygraphs_javascript += '}'
+
     if aggregate_by:
         dygraphs_javascript += 'customBars: true'        
     dygraphs_javascript += '})'
