@@ -164,6 +164,19 @@ class TestTime(unittest.TestCase):
         self.assertEqual(str(dateTime4), '2015-10-25 02:15:00+01:00')
         self.assertEqual(str(dateTime5), '2015-10-25 03:15:00+01:00')
 
+        # Test duration
+        self.assertEqual(TimeSpan('15m').duration, 900)
+        self.assertEqual(TimeSpan('1h').duration, 3600)
+
+        with self.assertRaises(Exception):
+            TimeSpan('15D').duration
+
+        # Test type
+        self.assertEqual(TimeSpan('15m').type, TimeSpan.PHYSICAL)
+        self.assertEqual(TimeSpan('1h').type, TimeSpan.PHYSICAL)
+        self.assertEqual(TimeSpan('1D').type, TimeSpan.LOGICAL)
+        self.assertEqual(TimeSpan('1M').type, TimeSpan.LOGICAL)
+
 
     def test_dt_math(self):
 
