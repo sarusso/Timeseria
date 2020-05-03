@@ -28,6 +28,7 @@ def almostequal(one, two):
 class Slotter(object):
     
     def __init__(self, span):
+        self.span=span
         if isinstance(span, TimeSpan):
             timeSpan = span
         elif isinstance(span, int):
@@ -38,6 +39,7 @@ class Slotter(object):
             timeSpan = TimeSpan(seconds=span)
         elif  isinstance(span, str):
             timeSpan = TimeSpan(span)
+            self.span=timeSpan
         else:
             raise ValueError('Unknown span type "{}"'.format(span.__class__.__name__))
 
@@ -105,7 +107,7 @@ class Slotter(object):
         # Create the DataTimeSlot
         dataTimeSlot = DataTimeSlot(start = TimePoint(t=start_t, tz=timezone),
                                     end   = TimePoint(t=end_t, tz=timezone),
-                                    span  = self.timeSpan,
+                                    span  = self.span,
                                     data  = slot_data,
                                     coverage = slot_coverage)
         
@@ -318,7 +320,8 @@ class Slotter(object):
             # 2) Handle missing slots until the requested end (end_dt)
             # TODO: Implement it. Sure?
 
-        logger.debug('Aggregation process ended, processed {} DataTimePoints.'.format(count))
+        logger.info('Slotted %s DataTimePoints in %s DataTimeSlots', count, len(dataTimeSlotSerie))
+
         return dataTimeSlotSerie
 
 
