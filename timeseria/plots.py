@@ -186,8 +186,12 @@ def to_dg_data(serie, aggregate_by=0, plot_data_loss=False, plot_data_reconstruc
             elif isinstance(serie, DataTimeSlotSerie):
                 t = item.start.t
                 if plot_data_loss:
+                    if item.data_loss is None:
+                        raise ValueError('I tried to plot the data_loss but i got a None value for {}'.format(item))
                     data_part+=',{}'.format(item.data_loss)
                 elif plot_data_reconstructed:
+                    if item.data_reconstructed is None:
+                        raise ValueError('I tried to plot the data_reconstructed but i got a None value for {}'.format(item))
                     data_part+=',{}'.format(item.data_reconstructed)
 
             dg_data+='[{},{}],'.format(to_dg_time(dt_from_s(t, tz=item.tz)), data_part)
@@ -381,6 +385,8 @@ function legendFormatter(data) {
 
     #dygraphs_javascript += '"Timestamp,{}\\n{}",'.format(labels, dg_data)
     dygraphs_javascript += '{},'.format(dg_data)
+
+#dateWindow: [0,"""+str(utckfake_s_from_dt(serie[-1].end.dt)*1000)+"""],
 
     dygraphs_javascript += """{\
 labels: """+str(labels_list)+""",
