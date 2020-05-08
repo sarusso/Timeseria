@@ -472,7 +472,7 @@ class DataSlot(Slot):
 class DataTimeSlot(DataSlot, TimeSlot):
     
     def __repr__(self):
-        return '{} @ t=[{},{}] ([{},{}]) with data={}'.format(self.__class__.__name__, self.start.t, self.end.t, self.start.dt, self.end.dt, self.data)
+        return '{} @ t=[{},{}] ([{},{}]) with data={} and coverage={}'.format(self.__class__.__name__, self.start.t, self.end.t, self.start.dt, self.end.dt, self.data, self.coverage)
     
 
 
