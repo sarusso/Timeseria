@@ -4,7 +4,6 @@ from chardet.universaldetector import UniversalDetector
 from numpy import fft
 from scipy.signal import find_peaks
 from .time import dt_from_s
-from .datastructures import DataTimeSlotSerie
 from .exceptions import InputException
 
 # Setup logging
@@ -207,9 +206,29 @@ def compute_coverage(dataTimePointSerie, from_t, to_t, trustme=False, validity=N
     return coverage
 
 
+#==============================
+# Floating point comparisons
+#==============================
+def is_close(a, b, rel_tol=1e-09, abs_tol=0.0):
+    return abs(a-b) <= max(rel_tol * max(abs(a), abs(b)), abs_tol)
+
+def is_almost_equal(one, two):
+    if 0.95 < (one / two) <= 1.05:
+        return True
+    else:
+        return False 
+
+
+
+#==============================
+# Periodicity
+#==============================
 
 def get_periodicity(dataTimeSlotSerie):
-
+    
+    # Import here or you will end up with cyclic imports
+    from .datastructures import DataTimeSlotSerie
+    
     if not isinstance(dataTimeSlotSerie, DataTimeSlotSerie):
         raise TypeError('DataTimeSlotSerie is required (got"{}")'.format(dataTimeSlotSerie.__class__.__name__))
 

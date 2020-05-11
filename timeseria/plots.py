@@ -47,7 +47,10 @@ def to_dg_time(dt):
     '''Get Dygraphs time form datetime'''
     #return '{}{:02d}-{:02d}T{:02d}:{:02d}:{:02d}+00:00'.format(dt.year, dt.month, dt.day, dt.hour, dt.minute,dt.second)
     #return s_from_dt(dt)*1000
-    return 'new Date(Date.UTC({}, {}, {}, {}, {}, {}))'.format(dt.year, dt.month-1, dt.day, dt.hour, dt.minute,dt.second)
+    if dt.microsecond:
+        return 'new Date(Date.UTC({}, {}, {}, {}, {}, {}, {}))'.format(dt.year, dt.month-1, dt.day, dt.hour, dt.minute, dt.second, dt.microsecond/1000)
+    else:
+        return 'new Date(Date.UTC({}, {}, {}, {}, {}, {}))'.format(dt.year, dt.month-1, dt.day, dt.hour, dt.minute, dt.second)
 
 
 def to_dg_data(serie, aggregate_by=0, plot_data_loss=False, plot_data_reconstructed=False):

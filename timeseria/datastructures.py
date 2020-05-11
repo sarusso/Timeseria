@@ -1,8 +1,11 @@
 from .time import s_from_dt , dt_from_s, UTC, timezonize
+from .utilities import is_close
 
 # Setup logging
 import logging
 logger = logging.getLogger(__name__)
+
+
 
 HARD_DEBUG = False
 
@@ -404,6 +407,9 @@ class TimeSlot(Slot):
     # Overwrite parent succedes, this has better performance as it checks for only one dimension
     def __succedes__(self, other):
         if other.end.t != self.start.t:
+            # Take into account floating point rounding errors
+            if is_close(other.end.t, self.start.t):
+                return True
             return False
         else:
             return True
@@ -490,7 +496,15 @@ class SlotSerie(Serie):
         # and if they have the same span, which we test here instead as the __succedes__ is more general.
         try:
             if self.slot_span != item.span:
-                raise ValueError('Cannot add items with different spans (I have "{}" and you tried to add "{}")'.format(self.slot_span, item.span))
+                # Try for floatign point precision errors
+                abort = False
+                try:
+                    if not  is_close(self.slot_span, item.span):
+                        abort = True
+                except (TypeError, ValueError):
+                    abort = True
+                if abort:
+                    raise ValueError('Cannot add items with different spans (I have "{}" and you tried to add "{}")'.format(self.slot_span, item.span))
         except AttributeError:
             self.slot_span = item.span
 
