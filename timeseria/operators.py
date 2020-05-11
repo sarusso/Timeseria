@@ -20,6 +20,9 @@ def almostequal(one, two):
         return False 
 
 
+class Operator(object):
+    pass
+
 
 #======================
 #  Slotter
@@ -323,6 +326,64 @@ class Slotter(object):
         logger.info('Slotted %s DataTimePoints in %s DataTimeSlots', count, len(dataTimeSlotSerie))
 
         return dataTimeSlotSerie
+
+
+
+#======================
+#  Derivative
+#======================
+
+
+class Derivative(Operator):
+    
+    @classmethod
+    def apply(cls, dataTimeSlotSeries, inplace=False, incremental=False):
+        
+        if not inplace:
+            derivative_dataTimeSlotSerie = DataTimeSlotSerie()
+
+        data_keys = dataTimeSlotSeries.data_keys()
+        for i, dataTimeSlot in enumerate(dataTimeSlotSeries):
+
+            if not inplace:
+                data = {}
+            
+            for key in data_keys:
+                
+                # Compute the derivative
+                if i == 0:
+                    # Right derivative for the first item
+                    der = dataTimeSlotSeries[i+1].data[key] - dataTimeSlotSeries[i].data[key]
+                    if incremental:
+                        der = der/2       
+                elif i == len(dataTimeSlotSeries)-1:
+                    # Left derivative for the last item
+                    der = dataTimeSlotSeries[i].data[key] - dataTimeSlotSeries[i-1].data[key]
+                    if incremental:
+                        der = der/2
+                else:
+                    # Both left and right derivative for the items in the middle
+                    der =  ((dataTimeSlotSeries[i+1].data[key] - dataTimeSlotSeries[i].data[key]) + (dataTimeSlotSeries[i].data[key] - dataTimeSlotSeries[i-1].data[key])) /2
+                
+                # Add data
+                if not inplace:
+                    data['{}_der'.format(key)] = der
+                else:
+                    dataTimeSlot.data['{}_der'.format(key)] = der
+            
+            # Create the slot
+            if not inplace:       
+                derivative_dataTimeSlotSerie.append(DataTimeSlot(start = dataTimeSlot.start,
+                                                                 end   = dataTimeSlot.end,
+                                                                 data  = data))
+
+        if not inplace:
+            return derivative_dataTimeSlotSerie
+
+
+
+
+
 
 
 

@@ -1,6 +1,6 @@
 import unittest
 import os
-from ..datastructures import Point, TimePoint, DataPoint, DataTimePoint
+from ..datastructures import Point, TimePoint, DataPoint, DataTimePoint, DataTimeSlotSerie, DataTimeSlot
 from ..datastructures import Serie, DataPointSerie, TimePointSerie, DataTimePointSerie
 from ..storages import CSVFileStorage
 from ..operators import Slotter
@@ -228,6 +228,62 @@ class TestSlotter(unittest.TestCase):
 # 
 #         for item in dataTimeSlotSerie:
 #             print('{} - data={}'.format(item, item.data, item.coverage))
+
+
+
+class TestDerivative(unittest.TestCase):
+
+
+    def test_apply(self):
+
+        # Test data        
+        dataTimeSlotSerie = DataTimeSlotSerie()
+        dataTimeSlotSerie.append(DataTimeSlot(start=TimePoint(0), end=TimePoint(60), data={'value':10}))
+        dataTimeSlotSerie.append(DataTimeSlot(start=TimePoint(60), end=TimePoint(120), data={'value':12}))
+        dataTimeSlotSerie.append(DataTimeSlot(start=TimePoint(120), end=TimePoint(180), data={'value':15}))
+        dataTimeSlotSerie.append(DataTimeSlot(start=TimePoint(180), end=TimePoint(240), data={'value':16}))
+ 
+        from timeseria.operators import Derivative
+        
+        # Test standard
+        derivative_dataTimeSlotSerie = Derivative.apply(dataTimeSlotSerie)
+        self.assertEqual(len(derivative_dataTimeSlotSerie), 4)
+        self.assertEqual(derivative_dataTimeSlotSerie[0].data['value_der'],2.0)
+        self.assertEqual(derivative_dataTimeSlotSerie[1].data['value_der'],2.5)
+        self.assertEqual(derivative_dataTimeSlotSerie[2].data['value_der'],2.0)
+        self.assertEqual(derivative_dataTimeSlotSerie[3].data['value_der'],1.0)
+
+        # Test in-place and incremental behavior
+        Derivative.apply(dataTimeSlotSerie, inplace=True, incremental=True)
+        self.assertEqual(len(dataTimeSlotSerie), 4)
+        self.assertEqual(dataTimeSlotSerie[0].data['value'],10)
+        self.assertEqual(dataTimeSlotSerie[0].data['value_der'],1.0)
+        self.assertEqual(dataTimeSlotSerie[1].data['value'],12)
+        self.assertEqual(dataTimeSlotSerie[1].data['value_der'],2.5)
+        self.assertEqual(dataTimeSlotSerie[2].data['value'],15)
+        self.assertEqual(dataTimeSlotSerie[2].data['value_der'],2.0)
+        self.assertEqual(dataTimeSlotSerie[3].data['value'],16)
+        self.assertEqual(dataTimeSlotSerie[3].data['value_der'],0.5)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

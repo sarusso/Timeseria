@@ -544,8 +544,11 @@ class DataSlotSerie(SlotSerie):
         if len(self) == 0:
             return None
         else:
-            keys = set(self[0].data.keys())
-            return keys
+            # TODO: can we optimize here? Computing them once and then serving them does not work if someone changes data keys...
+            try:
+                return list(self[0].data.keys())
+            except AttributeError:
+                return list(range(len(self[0].data)))
 
 
 class DataTimeSlotSerie(DataSlotSerie, TimeSlotSerie):
