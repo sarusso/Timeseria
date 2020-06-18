@@ -39,8 +39,8 @@ def detect_encoding(filename, streaming=False):
 
 
 
-def compute_coverage(dataTimePointSerie, from_t, to_t, trustme=False, validity=None, validity_placement='center'):
-    '''Compute the data coverage of a dataTimePointSerie based on the dataTimePoints validity'''
+def compute_coverage(data_time_point_series, from_t, to_t, trustme=False, validity=None, validity_placement='center'):
+    '''Compute the data coverage of a data_time_point_series based on the data_time_points validity'''
     
     # TODO: The following should be implemented when computing averages as well.. put it in common?
     center = 1
@@ -58,8 +58,8 @@ def compute_coverage(dataTimePointSerie, from_t, to_t, trustme=False, validity=N
     
     # Sanity checks
     if not trustme:
-        if dataTimePointSerie is None:
-            raise InputException('You must provide dataTimePointSerie, got None')
+        if data_time_point_series is None:
+            raise InputException('You must provide data_time_point_series, got None')
             
         if from_t is None or to_t is None:
             raise ValueError('Missing from_t or to_t')
@@ -67,7 +67,7 @@ def compute_coverage(dataTimePointSerie, from_t, to_t, trustme=False, validity=N
 
     # Support vars
     prev_dataPoint_valid_to_t = None
-    empty_dataTimePointSerie = True
+    empty_data_time_point_series = True
     missing_coverage = None
     next_processed = False
 
@@ -78,27 +78,27 @@ def compute_coverage(dataTimePointSerie, from_t, to_t, trustme=False, validity=N
     #  START cycle over points
     #===========================
     
-    for this_dataTimePoint in dataTimePointSerie:
+    for this_data_time_point in data_time_point_series:
         
         
-        # Compute this_dataTimePoint validity boundaries
+        # Compute this_data_time_point validity boundaries
         if validity:
             if validity_placement==center:
-                this_dataTimePoint_valid_from_t = this_dataTimePoint.t - (validity/2)
-                this_dataTimePoint_valid_to_t   = this_dataTimePoint.t + (validity/2)
+                this_data_time_point_valid_from_t = this_data_time_point.t - (validity/2)
+                this_data_time_point_valid_to_t   = this_data_time_point.t + (validity/2)
             else:
                 raise NotImplementedError('Validity placements other than "center" are not yet supported')
         
         else:
-            this_dataTimePoint_valid_from_t = this_dataTimePoint.t
-            this_dataTimePoint_valid_to_t   = this_dataTimePoint.t
+            this_data_time_point_valid_from_t = this_data_time_point.t
+            this_data_time_point_valid_to_t   = this_data_time_point.t
         
         # Hard debug
-        #logger.debug('HARD DEBUG %s %s %s', this_dataTimePoint.Point_part, this_dataTimePoint.validity_region.start, this_dataTimePoint.validity_region.end)
+        #logger.debug('HARD DEBUG %s %s %s', this_data_time_point.Point_part, this_data_time_point.validity_region.start, this_data_time_point.validity_region.end)
         
         # If no start point has been set, just use the first one in the data
         #if start_Point is None:
-        #    start_Point = dataTimePointSerie.Point_part
+        #    start_Point = data_time_point_series.Point_part
         # TODO: add support also for dynamically setting the end_Point to allow empty start_Point/end_Point input        
         
         #=====================
@@ -106,10 +106,10 @@ def compute_coverage(dataTimePointSerie, from_t, to_t, trustme=False, validity=N
         #=====================
         
         # Are we before the start_Point? 
-        if this_dataTimePoint.t < from_t:
+        if this_data_time_point.t < from_t:
             
             # Just set the previous Point valid until
-            prev_dataPoint_valid_to_t = this_dataTimePoint_valid_to_t
+            prev_dataPoint_valid_to_t = this_data_time_point_valid_to_t
 
             # If prev point too far, skip it
             if prev_dataPoint_valid_to_t <= from_t:
@@ -122,13 +122,13 @@ def compute_coverage(dataTimePointSerie, from_t, to_t, trustme=False, validity=N
         #  After end
         #=====================
         # Are we after the end_Point? In this case, we can treat it as if we are in the middle-
-        elif this_dataTimePoint.t >= to_t:
+        elif this_data_time_point.t >= to_t:
 
             if not next_processed: 
                 next_processed = True
                 
                 # If "next" point too far, skip it:
-                if this_dataTimePoint_valid_from_t > to_t:
+                if this_data_time_point_valid_from_t > to_t:
                     continue
             else:
                 continue
@@ -145,19 +145,19 @@ def compute_coverage(dataTimePointSerie, from_t, to_t, trustme=False, validity=N
 
         # Okay, now we have all the values we need:
         # 1) prev_dataPoint_valid_until
-        # 2) this_dataTimePoint_valid_from
+        # 2) this_data_time_point_valid_from
         
         # Also, if we are here it also means that we have valid data
-        if empty_dataTimePointSerie:
-            empty_dataTimePointSerie = False
+        if empty_data_time_point_series:
+            empty_data_time_point_series = False
 
         # Compute coverage
         # TODO: and idea could also to initialize Spans and sum them
         if prev_dataPoint_valid_to_t is None:
-            value = this_dataTimePoint_valid_from_t - from_t
+            value = this_data_time_point_valid_from_t - from_t
             
         else:
-            value = this_dataTimePoint_valid_from_t - prev_dataPoint_valid_to_t
+            value = this_data_time_point_valid_from_t - prev_dataPoint_valid_to_t
             
         # If for whatever reason the validity regions overlap we don't want to end up in
         # invalidating the coverage calculation by summing negative numbers
@@ -168,7 +168,7 @@ def compute_coverage(dataTimePointSerie, from_t, to_t, trustme=False, validity=N
                 missing_coverage = missing_coverage + value
 
         # Update previous dataPoint Validity:
-        prev_dataPoint_valid_to_t = this_dataTimePoint_valid_to_t
+        prev_dataPoint_valid_to_t = this_data_time_point_valid_to_t
         
     #=========================
     #  END cycle over points
@@ -184,7 +184,7 @@ def compute_coverage(dataTimePointSerie, from_t, to_t, trustme=False, validity=N
     
     # Convert missing_coverage_s_is in percentage
         
-    if empty_dataTimePointSerie:
+    if empty_data_time_point_series:
         coverage = 0.0 # Return zero coverage if empty
     
     elif missing_coverage is not None :
@@ -224,19 +224,19 @@ def is_almost_equal(one, two):
 # Periodicity
 #==============================
 
-def get_periodicity(dataTimeSlotSerie):
+def get_periodicity(data_time_slot_series):
     
     # Import here or you will end up with cyclic imports
-    from .datastructures import DataTimeSlotSerie
+    from .datastructures import DataTimeSlotSeries
     
-    if not isinstance(dataTimeSlotSerie, DataTimeSlotSerie):
-        raise TypeError('DataTimeSlotSerie is required (got"{}")'.format(dataTimeSlotSerie.__class__.__name__))
+    if not isinstance(data_time_slot_series, DataTimeSlotSeries):
+        raise TypeError('DataTimeSlotSeries is required (got"{}")'.format(data_time_slot_series.__class__.__name__))
 
-    if not dataTimeSlotSerie:
-        raise ValueError('A non-empty DataTimeSlotSerie is required')
+    if not data_time_slot_series:
+        raise ValueError('A non-empty DataTimeSlotSeries is required')
         
     # TODO: fix me, data_loss must not belong as key
-    data_keys = dataTimeSlotSerie.data_keys()
+    data_keys = data_time_slot_series.data_keys()
     
     if len(data_keys) > 1:
         raise NotImplementedError()
@@ -244,7 +244,7 @@ def get_periodicity(dataTimeSlotSerie):
     for key in data_keys:
         
         # Get data as a vector
-        y = [item.data[key] for item in dataTimeSlotSerie]
+        y = [item.data[key] for item in data_time_slot_series]
 
         # Compute FFT (Fast Fourier Transform)
         yf = fft.fft(y)
