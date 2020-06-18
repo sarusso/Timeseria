@@ -11,10 +11,10 @@ HARD_DEBUG = False
 
 
 #======================
-#  Generic Serie
+#  Generic Series
 #======================
 
-class Serie(list):
+class Series(list):
     '''A list of items coming one after another where every item is guaranteed to be of the same type and in an order or succession.'''
 
     # 5,6,7 are integer succession. 5.3, 5.4, 5.5 are too in a succesisons. 5,6,8 are not in a succession. 
@@ -58,12 +58,12 @@ class Serie(list):
                     if not item > self[-1]:
                         raise ValueError('Not in order ("{}" vs "{}")'.format(item,self[-1])) from None
                 except TypeError:
-                    raise TypeError('Object of class "{}" does not implement a "__gt__" or a "__succedes__" method, cannot append it to a Serie (which is ordered)'.format(item.__class__.__name__)) from None
+                    raise TypeError('Object of class "{}" does not implement a "__gt__" or a "__succedes__" method, cannot append it to a Series (which is ordered)'.format(item.__class__.__name__)) from None
         except IndexError:
             pass
         
         # Append
-        super(Serie, self).append(item)
+        super(Series, self).append(item)
             
     def extend(self, orher):
         raise NotImplementedError
@@ -205,11 +205,11 @@ class DataTimePoint(DataPoint, TimePoint):
 #  Point Series
 #======================
 
-class PointSerie(Serie):
+class PointSeries(Series):
     __TYPE__ = Point
 
 
-class TimePointSerie(PointSerie):
+class TimePointSeries(PointSeries):
     '''A series of TimePoints where each item is guaranteed to be ordered'''
 
     __TYPE__ = TimePoint
@@ -220,7 +220,7 @@ class TimePointSerie(PointSerie):
         if tz:
             self._tz = timezonize(tz)
 
-        super(TimePointSerie, self).__init__(*args, **kwargs)
+        super(TimePointSeries, self).__init__(*args, **kwargs)
 
     # Check time ordering
     def append(self, item):
@@ -237,7 +237,7 @@ class TimePointSerie(PointSerie):
         except AttributeError:
             self.prev_t = item.t
        
-        super(TimePointSerie, self).append(item)
+        super(TimePointSeries, self).append(item)
 
     @property
     def tz(self):
@@ -260,7 +260,7 @@ class TimePointSerie(PointSerie):
         self._tz = timezonize(value) 
 
 
-class DataPointSerie(PointSerie):
+class DataPointSeries(PointSeries):
     '''A series of DataPoints where each item is guaranteed to carry the same data type'''
 
     __TYPE__ = DataPoint
@@ -285,10 +285,10 @@ class DataPointSerie(PointSerie):
             if HARD_DEBUG: logger.debug('Setting data reference: %s', item.data)
             self.item_data_reference = item.data
             
-        super(DataPointSerie, self).append(item)
+        super(DataPointSeries, self).append(item)
 
 
-class DataTimePointSerie(DataPointSerie, TimePointSerie):
+class DataTimePointSeries(DataPointSeries, TimePointSeries):
     '''A series of DataTimePoint where each item is guaranteed to carry the same data type and to be ordered'''
 
     __TYPE__ = DataTimePoint
@@ -487,7 +487,7 @@ class DataTimeSlot(DataSlot, TimeSlot):
 #  Slot Series
 #======================
 
-class SlotSerie(Serie):
+class SlotSeries(Series):
     __TYPE__ = Slot
 
     def append(self, item):
@@ -509,11 +509,11 @@ class SlotSerie(Serie):
             self.slot_span = item.span
 
         # Call parent append
-        super(SlotSerie, self).append(item)
+        super(SlotSeries, self).append(item)
 
 
 
-class TimeSlotSerie(SlotSerie):
+class TimeSlotSeries(SlotSeries):
     '''A series of TimeSlots where each item is guaranteed to be ordered'''
 
     __TYPE__ = TimeSlot
@@ -526,10 +526,10 @@ class TimeSlotSerie(SlotSerie):
                 raise ValueError('Cannot add items on different time zones (I have "{}" and you tried to add "{}")'.format(self.tz, item.start.tz))
         except AttributeError:
             self.tz = item.tz
-        super(TimeSlotSerie, self).append(item)
+        super(TimeSlotSeries, self).append(item)
 
 
-class DataSlotSerie(SlotSerie):
+class DataSlotSeries(SlotSeries):
     '''A series of DataSlots where each item is guaranteed to carry the same data type'''
 
     __TYPE__ = DataSlot
@@ -552,7 +552,7 @@ class DataSlotSerie(SlotSerie):
             # TODO: uniform self.tz, self.slot_span, self.item_data_reference
             self.item_data_reference = item.data
         
-        super(DataSlotSerie, self).append(item)
+        super(DataSlotSeries, self).append(item)
     
     def data_keys(self):
         if len(self) == 0:
@@ -565,7 +565,7 @@ class DataSlotSerie(SlotSerie):
                 return list(range(len(self[0].data)))
 
 
-class DataTimeSlotSerie(DataSlotSerie, TimeSlotSerie):
+class DataTimeSlotSeries(DataSlotSeries, TimeSlotSeries):
     '''A series of DataTimeSlots where each item is guaranteed to carry the same data type and to be ordered'''
 
     __TYPE__ = DataTimeSlot

@@ -1,7 +1,7 @@
 import csv
 import re
 from .utilities import detect_encoding
-from .datastructures import DataTimePoint, DataTimePointSerie, DataPointSerie, TimePointSerie, TimePoint, DataPoint
+from .datastructures import DataTimePoint, DataTimePointSeries, DataPointSeries, TimePointSeries, TimePoint, DataPoint
 from .time import s_from_dt, dt_from_str
 import datetime
 from collections import OrderedDict
@@ -114,7 +114,7 @@ class CSVFileStorage(object):
         if not self.encoding:
             self.encofing = detect_encoding(self.filename_with_path, streaming=False)
 
-        dataTimePointSerie = DataTimePointSerie()
+        data_time_pointSeries = DataTimePointSeries()
 
         # TODO: evaluate rU vs newline='\n'
         with open(self.filename_with_path, 'r', encoding=self.encoding) as csv_file:
@@ -369,9 +369,9 @@ class CSVFileStorage(object):
                 logger.debug('Set data to "%s"', data)
 
                 # Append to the series
-                dataTimePointSerie.append(DataTimePoint(t=t, data=data))
+                data_time_pointSeries.append(DataTimePoint(t=t, data=data))
                     
-        return dataTimePointSerie
+        return data_time_pointSeries
 
 
 

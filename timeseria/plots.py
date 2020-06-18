@@ -2,7 +2,7 @@ import os
 import uuid
 import datetime
 from .time import dt_from_s, TimeSpan, dt_to_str, utckfake_s_from_dt
-from .datastructures import DataTimePointSerie, DataTimeSlotSerie
+from .datastructures import DataTimePointSeries, DataTimeSlotSeries
 
 # Setup logging
 import logging
@@ -83,9 +83,9 @@ def to_dg_data(serie, aggregate_by=0, plot_data_loss=False, plot_data_reconstruc
         if aggregate_by:
 
             if first_t is None:
-                if isinstance(serie, DataTimePointSerie):
+                if isinstance(serie, DataTimePointSeries):
                     first_t = item.t
-                elif isinstance(serie, DataTimeSlotSerie):
+                elif isinstance(serie, DataTimeSlotSeries):
                     first_t = item.start.t
                 
                   
@@ -136,9 +136,9 @@ def to_dg_data(serie, aggregate_by=0, plot_data_loss=False, plot_data_reconstruc
 
             # Dump aggregated data?
             if (i!=0)  and ((i % aggregate_by)==0):
-                if isinstance(serie, DataTimePointSerie):
+                if isinstance(serie, DataTimePointSeries):
                     last_t = item.t
-                elif isinstance(serie, DataTimeSlotSerie):
+                elif isinstance(serie, DataTimeSlotSeries):
                     last_t = item.end.t
                 t = first_t + ((last_t-first_t) /2)
                 data_part=''
@@ -184,9 +184,9 @@ def to_dg_data(serie, aggregate_by=0, plot_data_loss=False, plot_data_reconstruc
             # Remove last comma
             data_part = data_part[0:-1]
 
-            if isinstance(serie, DataTimePointSerie):
+            if isinstance(serie, DataTimePointSeries):
                 t = item.t
-            elif isinstance(serie, DataTimeSlotSerie):
+            elif isinstance(serie, DataTimeSlotSeries):
                 t = item.start.t
                 if plot_data_loss:
                     if item.data_loss is None:
@@ -210,18 +210,18 @@ def to_dg_data(serie, aggregate_by=0, plot_data_loss=False, plot_data_reconstruc
 #=================
 
 def dygraphs_plot(serie, aggregate_by, log_js=False, show_data_loss=True, show_data_reconstructed=True, show_data_forecasted=True):
-    '''Plot a dataTimePointSeries in Jupyter using Dugraph. Based on the work here: https://www.stefaanlippens.net/jupyter-custom-d3-visualization.html'''
+    '''Plot a data_time_pointSeries in Jupyter using Dugraph. Based on the work here: https://www.stefaanlippens.net/jupyter-custom-d3-visualization.html'''
     from IPython.display import display, Javascript, HTML
 
     if len(serie)==0:
         raise Exception('Cannot plot empty serie')
 
     # Checks
-    if isinstance(serie, DataTimePointSerie):
+    if isinstance(serie, DataTimePointSeries):
         stepPlot_value   = 'false'
         drawPoints_value = 'true'
         legend_pre = ''
-    elif isinstance(serie, DataTimeSlotSerie):
+    elif isinstance(serie, DataTimeSlotSeries):
         if isinstance(serie.slot_span, TimeSpan):
             serie_span_string = str(serie.slot_span)
         else:
@@ -242,9 +242,9 @@ def dygraphs_plot(serie, aggregate_by, log_js=False, show_data_loss=True, show_d
     if serie.title:
         title = serie.title
     else:
-        if isinstance(serie, DataTimePointSerie):
+        if isinstance(serie, DataTimePointSeries):
             title = serie.__class__.__name__
-        elif isinstance(serie, DataTimeSlotSerie):
+        elif isinstance(serie, DataTimeSlotSeries):
             title = '{} of {} Slots '.format(serie.__class__.__name__, serie_span_string)
         else:
             title = serie.__class__.__name__
@@ -261,13 +261,13 @@ def dygraphs_plot(serie, aggregate_by, log_js=False, show_data_loss=True, show_d
     try:
         if show_data_forecasted and serie.mark:
             if not isinstance(serie.mark, (list, tuple)):
-                raise TypeError('Serie mark must be a list or tuple')
+                raise TypeError('Series mark must be a list or tuple')
             if not len(serie.mark) == 2:
-                raise ValueError('Serie mark must be a list or tuple of two elements')
+                raise ValueError('Series mark must be a list or tuple of two elements')
             if not isinstance(serie.mark[0], datetime.datetime):
-                raise TypeError('Serie marks must be datetime objects')
+                raise TypeError('Series marks must be datetime objects')
             if not isinstance(serie.mark[1], datetime.datetime):
-                raise TypeError('Serie marks must be datetime objects')
+                raise TypeError('Series marks must be datetime objects')
             logger.info('Found data forecast mark and showing it')
             show_data_reconstructed=False
             show_data_loss=False
@@ -358,7 +358,7 @@ function legendFormatter(data) {
 
     data_reconstructed_indexes = False
     data_loss_indexes          = False
-    if isinstance(serie, DataTimeSlotSerie):
+    if isinstance(serie, DataTimeSlotSeries):
         # Do we have data reconstructed or losses indexes?
         if serie[0].data_reconstructed is not None:
             data_reconstructed_indexes = True
@@ -437,7 +437,7 @@ axes: {
 },
 animatedZooms: true,"""
 
-    if isinstance(serie, DataTimeSlotSerie):
+    if isinstance(serie, DataTimeSlotSeries):
         if aggregate_by:
             rgba_value_red   = 'rgba(255,128,128,1)' # For the legend
             rgba_value_orange = 'rgba(255,169,128,1)' # For the legend
@@ -476,7 +476,7 @@ animatedZooms: true,"""
            },
          },
     """
-    if isinstance(serie, DataTimeSlotSerie) and len(serie[0].data.keys()) <=1:
+    if isinstance(serie, DataTimeSlotSeries) and len(serie[0].data.keys()) <=1:
         dygraphs_javascript += """colors: ['rgb(0,128,128)'],""" # Force "original" Dygraph color.
 
     if serie_mark:            

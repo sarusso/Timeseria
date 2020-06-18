@@ -5,5 +5,5 @@ class InputException(Exception):
 class ConsistencyException(Exception):
     pass
 
-class NotTrainedError(Exception):
+class NotFittedError(Exception):
     pass
