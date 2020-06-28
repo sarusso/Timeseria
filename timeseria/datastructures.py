@@ -98,20 +98,19 @@ class Series(list):
 
 class Point(object):
 
-    def __init__(self, **kwargs):
-        if not kwargs:
+    def __init__(self, *args):
+        if not args:
             raise Exception('A Point requires at least one coordinate, got none.')
-        for kw in kwargs:
-            if HARD_DEBUG: logger.debug('Setting %s to %s', kw, kwargs[kw])
-            setattr(self, kw, kwargs[kw])
-        #self.coordinates = kwargs.keys()
-    
-    @property
-    def coordinates(self):
-        return {k:v for k,v in self.__dict__.items() if not k.startswith('_')}
-    
+        self.coordinates = []
+        for arg in args:
+            try:
+                float(arg)
+            except:
+                raise Exception('Got non-numerical argument: "{}"'.format(arg))
+            self.coordinates.append(arg)
+
     def __repr__(self):
-        return '{} with {}'.format(self.__class__.__name__, self.coordinates)
+        return '{} @ {}'.format(self.__class__.__name__, self.coordinates)
     
     def __str__(self):
         return self.__repr__()
@@ -119,10 +118,13 @@ class Point(object):
     def __eq__(self, other):
         if not self.coordinates == other.coordinates:
             return False
-        for coordinate in self.coordinates:
-            if getattr(self, coordinate) != getattr(other, coordinate):
+        for i in range(0, len(self.coordinates)):
+            if self.coordinates[i] != other.coordinates[i]:
                 return False
         return True
+    
+    def __getitem__(self,index):
+        return self.coordinates[index]
 
 
 class TimePoint(Point):
@@ -137,10 +139,10 @@ class TimePoint(Point):
         # Cast or create
         if args:
             if isinstance(args[0], TimePoint):
-                kwargs['t'] = args[0].t
-                self._tz    = args[0].tz
+                t   = args[0].t
+                self._tz = args[0].tz
             elif isinstance(args[0], int) or isinstance(args[0], float):
-                kwargs['t'] = args[0]
+                t = args[0]
             else:
                 raise Exception('A TimePoint can be casted only from an int, float or by an object extending the TimePoint class itself (got "{}")'.format(args[0]))
  
@@ -148,10 +150,15 @@ class TimePoint(Point):
             #if [*kwargs] != ['t']: # This migth speed up a bit but is for Python >= 3.5
             if list(kwargs.keys()) != ['t']:
                 raise Exception('A TimePoint accepts only, and requires, a "t" coordinate (got "{}")'.format(kwargs))
+            t = kwargs['t']
             
         # Call parent init
-        super(TimePoint, self).__init__(**kwargs)
+        super(TimePoint, self).__init__(t)
 
+    @property
+    def t(self):
+        return self.coordinates[0]
+    
     def __gt__(self, other):
         if self.t > other.t:
             return True
@@ -174,15 +181,15 @@ class TimePoint(Point):
     
 
 class DataPoint(Point):
-    def __init__(self, **kwargs):
+    def __init__(self, *args, **kwargs):
         try:
             self._data = kwargs.pop('data')
         except KeyError:
             raise Exception('A DataPoint requires a special "data" argument (got only "{}")'.format(kwargs))
-        super(DataPoint, self).__init__(**kwargs)
+        super(DataPoint, self).__init__(*args, **kwargs)
 
     def __repr__(self):
-        return '{} with {} and data "{}"'.format(self.__class__.__name__, self.coordinates, self.data)
+        return '{} @ {} with data "{}"'.format(self.__class__.__name__, self.coordinates, self.data)
     
     def __eq__(self, other):
         if self._data != other._data:
@@ -341,8 +348,8 @@ class Slot(object):
             raise TypeError('Slot end must be a Point object (got "{}")'.format(end.__class__.__name__))
         
         # TODO: remove the following check, or make it optional (i.e. not used by TimeSlots)?
-        if set(start.coordinates.keys()) != set(end.coordinates.keys()):
-            raise ValueError('Slot start and end dimensions must be the same (got "{}" vs "{}")'.format(set(start.coordinates.keys()), set(end.coordinates.keys())))
+        if len(start.coordinates) != len(end.coordinates):
+            raise ValueError('Slot start and end dimensions must be the same (got "{}" vs "{}")'.format(start.coordinates, end.coordinates))
         if start == end:
             raise ValueError('{} start and end must not be the same (got start="{}", end="{}")'.format(self.__class__.__name__, start,end))
 
@@ -354,7 +361,7 @@ class Slot(object):
 
 
     def __repr__(self):
-        return '{} with start="{}" and end="{}"'.format(self.__class__.__name__, self.start, self.end)
+        return '{} @ [{},{}]'.format(self.__class__.__name__, self.start.coordinates, self.end.coordinates)
     
     def __str__(self):
         return self.__repr__()
@@ -382,8 +389,8 @@ class Slot(object):
     @classmethod
     def _compute_span(cls, start, end):
         span_values = []
-        for key in start.coordinates:
-            span_values.append(end.coordinates[key] - start.coordinates[key])
+        for i in range(len(start.coordinates)):
+            span_values.append(end.coordinates[i] - start.coordinates[i])
         return sum(span_values)/len(span_values)
         
 

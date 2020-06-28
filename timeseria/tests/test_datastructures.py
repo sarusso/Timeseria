@@ -76,17 +76,17 @@ class TestPoints(unittest.TestCase):
 
     def test_Point(self):
         
-        point = Point(x=1, y=2)
-        self.assertEqual(point.x,1)
-        self.assertEqual(point.y,2)
-
-        point = Point(h=1, i=2)
-        self.assertEqual(point.h,1)
-        self.assertEqual(point.i,2)
+        point = Point(1, 2)
+        self.assertEqual(point.coordinates[0],1)
+        self.assertEqual(point.coordinates[1],2)
         
-        point_1 = Point(x=1, y=2)
-        point_2 = Point(x=1, y=2)
-        point_3 = Point(x=5, z=3)
+        # Access by index
+        self.assertEqual(point[0],1)
+        self.assertEqual(point[1],2)
+
+        point_1 = Point(1, 2)
+        point_2 = Point(1, 2)
+        point_3 = Point(5, 3)
 
         self.assertEqual(point_1,point_2)
         self.assertNotEqual(point_1,point_3)
@@ -94,14 +94,19 @@ class TestPoints(unittest.TestCase):
 
     def test_TimePoint(self):
         
-        with self.assertRaises(Exception):
-            TimePoint(x=1)
+        # Wrong init/casting
 
         with self.assertRaises(Exception):
-            TimePoint(t=2, x=7)
+            TimePoint()
         
+        with self.assertRaises(Exception):
+            TimePoint('hi')
+
+        # Standard init
         time_point = TimePoint(t=5)
         self.assertEqual(time_point.t,5)
+        
+        # Cast from ini/float
         
         # Test for UTC time zone
         self.assertEqual(time_point.tz, UTC)
@@ -118,26 +123,23 @@ class TestPoints(unittest.TestCase):
     def test_DataPoint(self):
         
         with self.assertRaises(Exception):
-            DataPoint(x=1)
-
-        with self.assertRaises(Exception):
             DataPoint(data='hello')
         
-        data_point = DataPoint(x=1, y=2, data='hello')
-        self.assertEqual(data_point.coordinates, {'x': 1, 'y':2}) 
-        self.assertEqual(data_point.x,1)
-        self.assertEqual(data_point.y,2)
+        data_point = DataPoint(1, 2, data='hello')
+        self.assertEqual(data_point.coordinates, [1,2]) 
+        self.assertEqual(data_point.coordinates[0], 1)
+        self.assertEqual(data_point.coordinates[1], 2)
         self.assertEqual(data_point.data,'hello')
         
-        data_point_1 = DataPoint(x=1, y=2, data='hello')
-        data_point_2 = DataPoint(x=1, y=2, data='hello')
-        data_point_3 = DataPoint(x=1, y=2, data='hola')
+        data_point_1 = DataPoint(1, 2, data='hello')
+        data_point_2 = DataPoint(1, 2, data='hello')
+        data_point_3 = DataPoint(1, 2, data='hola')
         
         self.assertEqual(data_point_1, data_point_2)
         self.assertNotEqual(data_point_1, data_point_3)
 
 
-    def test_TimeDataPoint(self):
+    def test_DataTimePoint(self):
         
         with self.assertRaises(Exception):
             DataTimePoint(x=1)
@@ -149,7 +151,7 @@ class TestPoints(unittest.TestCase):
             DataTimePoint(x=1, data='hello')
         
         data_time_point = DataTimePoint(t=6, data='hello')        
-        self.assertEqual(data_time_point.coordinates, {'t': 6}) 
+        self.assertEqual(data_time_point.coordinates, [6]) 
         self.assertEqual(data_time_point.t,6)
         self.assertEqual(data_time_point.data,'hello')
         
@@ -285,28 +287,28 @@ class TestSlots(unittest.TestCase):
         with self.assertRaises(TypeError):
             Slot(start=1, end=2) 
 
-        # A slot needs a start and and end with he same coordinates
+        # A slot needs a start and and end with the same dimension
         with self.assertRaises(ValueError):
-            Slot(start=Point(x=1), end=Point(y=2))        
+            Slot(start=Point(1), end=Point(2,4))        
 
         # No zero-duration allowed:
         with self.assertRaises(ValueError):
-            Slot(start=Point(x=1), end=Point(x=1))
+            Slot(start=Point(1), end=Point(1))
 
 
-        slot = Slot(start=Point(x=1), end=Point(x=2)) 
-        self.assertEqual(slot.start,Point(x=1))
-        self.assertEqual(slot.end,Point(x=2))
+        slot = Slot(start=Point(1), end=Point(2)) 
+        self.assertEqual(slot.start,Point(1))
+        self.assertEqual(slot.end,Point(2))
         
-        slot_1 = Slot(start=Point(x=1), end=Point(x=2))
-        slot_2 = Slot(start=Point(x=1), end=Point(x=2))
-        slot_3 = Slot(start=Point(x=1), end=Point(x=3))
+        slot_1 = Slot(start=Point(1), end=Point(2))
+        slot_2 = Slot(start=Point(1), end=Point(2))
+        slot_3 = Slot(start=Point(1), end=Point(3))
         
         self.assertEqual(slot_1,slot_2)
         self.assertNotEqual(slot_1,slot_3)
         
         # Span
-        slot = Slot(start=Point(x=1.5), end=Point(x=4.7)) 
+        slot = Slot(start=Point(1.5), end=Point(4.7)) 
         self.assertEqual(slot.span, 3.2)
         slot._span = 'hello'
         self.assertEqual(slot.span, 'hello')
@@ -353,19 +355,19 @@ class TestSlots(unittest.TestCase):
         with self.assertRaises(TypeError):
             DataSlot(data='hello')
 
-        data_slot = DataSlot(start=Point(x=1), end=Point(x=2), data='hello')
-        self.assertEqual(data_slot.start.x,1)
-        self.assertEqual(data_slot.end.x,2)
+        data_slot = DataSlot(start=Point(1), end=Point(2), data='hello')
+        self.assertEqual(data_slot.start.coordinates[0],1)
+        self.assertEqual(data_slot.end.coordinates[0],2)
         self.assertEqual(data_slot.data,'hello')
 
-        data_slot_1 = DataSlot(start=Point(x=1), end=Point(x=2), data='hello')
-        data_slot_2 = DataSlot(start=Point(x=1), end=Point(x=2), data='hello')
-        data_slot_3 = DataSlot(start=Point(x=1), end=Point(x=2), data='hola')
+        data_slot_1 = DataSlot(start=Point(1), end=Point(2), data='hello')
+        data_slot_2 = DataSlot(start=Point(1), end=Point(2), data='hello')
+        data_slot_3 = DataSlot(start=Point(1), end=Point(2), data='hola')
 
         self.assertEqual(data_slot_1, data_slot_2)
         self.assertNotEqual(data_slot_1, data_slot_3)
 
-        data_slot_with_coverage = DataSlot(start=Point(x=1), end=Point(x=2), data='hello', coverage=0.98)
+        data_slot_with_coverage = DataSlot(start=Point(1), end=Point(2), data='hello', coverage=0.98)
         self.assertEqual(data_slot_with_coverage.coverage, 0.98)
         self.assertEqual(data_slot_with_coverage.coverage + data_slot_with_coverage.data_loss, 1) # Workaround 0.020000000000000018 != 0.2
 
@@ -401,19 +403,19 @@ class TestSlotSeries(unittest.TestCase):
     def test_SlotSeries(self):
 
         with self.assertRaises(ValueError):
-            # ValueError: Slot start and end dimensions must be the same (got "{'x'}" vs "{'t'}")
-            SlotSeries(Slot(start=Point(x=0), end=Point(t=10)))
+            # ValueError: Slot start and end dimensions must have the same dimension
+            SlotSeries(Slot(start=Point(0), end=Point(10,20)))
             
-        slot_series =  SlotSeries(Slot(start=Point(x=0), end=Point(x=10)))
+        slot_series =  SlotSeries(Slot(start=Point(0), end=Point(10)))
         
         with self.assertRaises(ValueError):
             # Cannot add items with different spans (I have "10.0" and you tried to add "11.0")
-            slot_series.append(Slot(start=Point(x=10), end=Point(x=21)))
-        slot_series.append(Slot(start=Point(x=10), end=Point(x=20)))
+            slot_series.append(Slot(start=Point(10), end=Point(21)))
+        slot_series.append(Slot(start=Point(10), end=Point(20)))
         
         # The span is more used as a type..
-        slot_series =  SlotSeries(Slot(start=Point(x=0), end=Point(x=10), span='10-ish'))
-        slot_series.append(Slot(start=Point(x=10), end=Point(x=21), span='10-ish'))
+        slot_series =  SlotSeries(Slot(start=Point(0), end=Point(10), span='10-ish'))
+        slot_series.append(Slot(start=Point(10), end=Point(21), span='10-ish'))
 
 
     def test_TimeSlotSeries(self):
@@ -446,10 +448,10 @@ class TestSlotSeries(unittest.TestCase):
  
     def test_DataSlotSeries(self):
         data_slot_series = DataSlotSeries()
-        data_slot_series.append(DataSlot(start=Point(x=1), end=Point(x=2), data='hello'))
-        data_slot_series.append(DataSlot(start=Point(x=2), end=Point(x=3), data='hola'))
-        self.assertEqual(data_slot_series[0].start.x,1)
-        self.assertEqual(data_slot_series[0].end.x,2)
+        data_slot_series.append(DataSlot(start=Point(1), end=Point(2), data='hello'))
+        data_slot_series.append(DataSlot(start=Point(2), end=Point(3), data='hola'))
+        self.assertEqual(data_slot_series[0].start.coordinates[0],1)
+        self.assertEqual(data_slot_series[0].end.coordinates[0],2)
         self.assertEqual(data_slot_series[0].data,'hello')
 
  
