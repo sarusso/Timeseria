@@ -171,6 +171,9 @@ class TimePoint(Point):
             return self._tz
         except AttributeError:
             return UTC
+    
+    def change_timezone(self, new_timezone):
+        self._tz = timezonize(new_timezone)
 
     @ property
     def dt(self):
@@ -265,6 +268,11 @@ class TimePointSeries(PointSeries):
     @tz.setter
     def tz(self, value):
         self._tz = timezonize(value) 
+
+    def change_timezone(self, new_timezone):
+        for time_point in self:
+            time_point.change_timezone(new_timezone)
+        self.tz = time_point.tz
 
 
 class DataPointSeries(PointSeries):
@@ -425,6 +433,11 @@ class TimeSlot(Slot):
     def duration(self):
         return (self.end.t - self.start.t)
     
+    def change_timezone(self, new_timezone):
+        self.start.change_timezone(new_timezone)
+        self.end.change_timezone(new_timezone)
+        self.tz = self.start.tz
+    
     #@property
     #def t(self):
     #    #return (self.start.t + (self.end.t - self.start.t))
@@ -534,6 +547,11 @@ class TimeSlotSeries(SlotSeries):
         except AttributeError:
             self.tz = item.tz
         super(TimeSlotSeries, self).append(item)
+        
+    def change_timezone(self, new_timezone):
+        for time_slot in self:
+            time_slot.change_timezone(new_timezone)
+        self.tz = time_slot.tz
 
 
 class DataSlotSeries(SlotSeries):

@@ -499,10 +499,17 @@ class TestSlotSeries(unittest.TestCase):
             data_time_slot_series.append(DataTimeSlot(start=TimePoint(t=120), end=TimePoint(t=180), data={'a':56, 'c':67}))            
 
 
+    def test_cannge_timezone_DataTimeSlotSeries(self):
+        from ..time import timezonize
+        data_time_slot_series_UTC =  DataTimeSlotSeries(DataTimeSlot(start=TimePoint(t=60),  end=TimePoint(t=120), data=23.8),
+                                                        DataTimeSlot(start=TimePoint(t=120), end=TimePoint(t=180), data=24.1),
+                                                        DataTimeSlot(start=TimePoint(t=180), end=TimePoint(t=240), data=23.1))
 
-
-
-
+        data_time_slot_series_UTC.change_timezone('Europe/Rome')
+        self.assertEqual(data_time_slot_series_UTC.tz, timezonize('Europe/Rome'))
+        self.assertEqual(data_time_slot_series_UTC[0].tz, timezonize('Europe/Rome'))
+        self.assertEqual(data_time_slot_series_UTC[0].start.tz, timezonize('Europe/Rome'))
+        self.assertEqual(data_time_slot_series_UTC[0].end.tz, timezonize('Europe/Rome'))
 
 
 

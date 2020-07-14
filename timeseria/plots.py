@@ -311,7 +311,7 @@ function legendFormatter(data) {
         return html;
       }
 
-      html = '""" + legend_pre + """' + data.xHTML + ':';
+      html = '""" + legend_pre + """' + data.xHTML + ' (""" + str(serie.tz)+ """):';
       for (var i = 0; i < data.series.length; i++) {  
         var series = data.series[i];
         // Skip not visible series
