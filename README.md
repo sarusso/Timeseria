@@ -3,15 +3,21 @@
 
 # Timeseria
 
-Time series done right
+A time serie processing library. Includes modules for data cleaning, resampling and reconstrution, as well as forecasting models and generic analysis tools.
 
-# Testing ![](https://api.travis-ci.org/sarusso/Timeseria.svg?branch=develop) 
+![Time series reconstruction](docs/reconstructed.png?raw=true "Time series reconstruction")
+
+![Time series forecating](docs/forecasted.png?raw=true "Time series forecating")
+
+
+
+# Testing ![](https://api.travis-ci.org/sarusso/Timeseria.svg?branch=master) 
 
 Every commit on the Timeseria codebase is automatically tested with Travis-CI. [Check status on Travis](https://travis-ci.org/sarusso/Timeseria/).
 
 
 # Licensing
-Luna is licensed under the Apache License, Version 2.0. See [LICENSE](https://raw.githubusercontent.com/sarusso/Timeseria/master/LICENSE) for the full license text.
+Timeseria is licensed under the Apache License, Version 2.0. See [LICENSE](https://raw.githubusercontent.com/sarusso/Timeseria/master/LICENSE) for the full license text.
 
 
 
