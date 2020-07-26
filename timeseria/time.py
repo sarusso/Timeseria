@@ -324,6 +324,9 @@ class TimeSpan(object):
     # Operations..
     def __add__(self, other):
         
+        # TODO: This has to stay here or a circular import will start. Maybe refactor this?
+        from .datastructures import TimePoint
+        
         if isinstance(other, self.__class__):
             
             return TimeSpan(years        = self.years + other.years,
@@ -341,8 +344,14 @@ class TimeSpan(object):
                 raise InputException('Timezone of the datetime to sum with is required')
 
             return self.shift_dt(other, times=1)
+        
+        
+        elif isinstance(other, TimePoint):
+            return TimePoint(dt=self.shift_dt(other.dt, times=1))
+            
+        
         else:
-            raise NotImplementedError
+            raise NotImplementedError('Adding TimeSpans on top of objects other than datetimes is not yet supported')
    
     def __radd__(self, other):
         return self.__add__(other)

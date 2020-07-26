@@ -1,4 +1,4 @@
-from .time import s_from_dt , dt_from_s, UTC, timezonize
+from .time import s_from_dt , dt_from_s, UTC, timezonize, TimeSpan
 from .utilities import is_close
 
 # Setup logging
@@ -101,17 +101,28 @@ class Point(object):
     def __init__(self, *args):
         if not args:
             raise Exception('A Point requires at least one coordinate, got none.')
-        self.coordinates = []
+
+        # Validate
         for arg in args:
             try:
                 float(arg)
             except:
                 raise Exception('Got non-numerical argument: "{}"'.format(arg))
-            self.coordinates.append(arg)
+
+        # Store (as tuple)
+        self.coordinates = tuple(args)
+
+    @property
+    def __coordinates_repr__(self):
+        #return ','.join(str(coordinate) for coordinate in self.coordinates)
+        if len(self.coordinates)==1:
+            return str(self.coordinates[0])
+        else:
+            return str(self.coordinates)
 
     def __repr__(self):
-        return '{} @ {}'.format(self.__class__.__name__, self.coordinates)
-    
+        return '{} @ {}'.format(self.__class__.__name__, self.__coordinates_repr__)
+
     def __str__(self):
         return self.__repr__()
 
@@ -131,26 +142,49 @@ class TimePoint(Point):
     
     def __init__(self, *args, **kwargs):
 
-        # Handle time zone if any
+        # Handle time zone if any (removing it from kwargs)
         tz = kwargs.pop('tz', None)
         if tz:
             self._tz = timezonize(tz)
-        
-        # Cast or create
-        if args:
+
+        # Do we have to handle kwargs?
+        if kwargs:
+            if 't' in kwargs:
+                
+                # Ok, will create the point in the standard way, just used the "t" kwarg to set the time coordinate 
+                t = kwargs['t']
+            
+            elif 'dt' in kwargs:
+                
+                # Ok, will convert the datetime to epoch and then create the point in the standard way
+                t = s_from_dt(kwargs['dt'])
+                
+                # If we do not have a time zone, can we use the one from the dt used to initialize this TimePoint?
+                try:
+                    self._tz
+                except AttributeError:
+                    if kwargs['dt'].tzinfo:
+                        
+                        #Do not set it if it is UTC, it is the default
+                        if kwargs['dt'].tzinfo == UTC:
+                            pass
+                        else:
+                            self._tz = kwargs['dt'].tzinfo
+                            #raise NotImplementedError('Not yet tz from dt ("{}")'.format(kwargs['dt']))
+                
+            #else:
+            #    raise Exception('Don\'t know how to handle all kwargs (got "{}")'.format(kwargs))
+
+        # Cast or create in the standard way
+        elif args:
+            if len(args) > 1:
+                raise Exception('Don\'t know how to handle all args (got "{}")'.format(args))
+            
             if isinstance(args[0], TimePoint):
                 t   = args[0].t
                 self._tz = args[0].tz
-            elif isinstance(args[0], int) or isinstance(args[0], float):
-                t = args[0]
             else:
-                raise Exception('A TimePoint can be casted only from an int, float or by an object extending the TimePoint class itself (got "{}")'.format(args[0]))
- 
-        else:
-            #if [*kwargs] != ['t']: # This migth speed up a bit but is for Python >= 3.5
-            if list(kwargs.keys()) != ['t']:
-                raise Exception('A TimePoint accepts only, and requires, a "t" coordinate (got "{}")'.format(kwargs))
-            t = kwargs['t']
+                t = args[0]
             
         # Call parent init
         super(TimePoint, self).__init__(t)
@@ -180,7 +214,8 @@ class TimePoint(Point):
         return dt_from_s(self.t, tz=self.tz)
 
     def __repr__(self):
-        return '{} @ t={} ({})'.format(self.__class__.__name__, self.t, self.dt)
+        return '{} @ {} ({})'.format(self.__class__.__name__, self.t, self.dt)
+        # return '{} @ t={} ({})'.format(self.__class__.__name__, self.t, self.dt)
     
 
 class DataPoint(Point):
@@ -192,7 +227,7 @@ class DataPoint(Point):
         super(DataPoint, self).__init__(*args, **kwargs)
 
     def __repr__(self):
-        return '{} @ {} with data "{}"'.format(self.__class__.__name__, self.coordinates, self.data)
+        return '{} with data "{}"'.format(super(DataPoint, self).__repr__(), self.data)
     
     def __eq__(self, other):
         if self._data != other._data:
@@ -205,10 +240,9 @@ class DataPoint(Point):
 
 
 class DataTimePoint(DataPoint, TimePoint):
-    
-    def __repr__(self):
-        return '{} @ t={} ({}) with data={}'.format(self.__class__.__name__, self.t, self.dt, self.data)
-    
+    pass
+
+    # NOTE: the __repr__ used is from the DataPoint above, which in turn uses the TimePoint one.
 
 
 #======================
@@ -344,14 +378,44 @@ class DataTimePointSeries(DataPointSeries, TimePointSeries):
 #  Slots
 #======================
 
+class Span(object):
+    
+    def __init__(self, value):
+        self.value = value
+        
+    def __repr__(self):   
+        return 'Span of {}'.format(self.value)
+
+    def __add__(self, other):
+        if not isinstance(other, Point):
+            raise Exception('Can add Spans only on Points')
+
+        # TODO: implement checks for n-dimensional points
+        return other.__class__(other.coordinates[0] + self.value)
+    
+    def __radd__(self, other):
+        return self.__add__(other)
+    
+    def __eq__(self,other):
+        if self is other:
+            return True
+        else:
+            return self.value == other.value
+            
+
 class Slot(object):
     
     __POINT_TYPE__ = Point
     
-    def __init__(self, start, end, span=None):
+    def __init__(self, start, end=None, span=None):
+        
         
         if not isinstance(start, self.__POINT_TYPE__):
             raise TypeError('Slot start must be a Point object (got "{}")'.format(start.__class__.__name__))
+        if end is None and span is not None:
+            if len(start.coordinates)>1:
+                raise Exception('Sorry, setting a start and a span only works in unidimensional spaces')
+            end = start + span
         if not isinstance(end, self.__POINT_TYPE__):
             raise TypeError('Slot end must be a Point object (got "{}")'.format(end.__class__.__name__))
         
@@ -367,9 +431,8 @@ class Slot(object):
         if span is not None:
             self._span = span
 
-
     def __repr__(self):
-        return '{} @ [{},{}]'.format(self.__class__.__name__, self.start.coordinates, self.end.coordinates)
+        return '{} @ [{},{}]'.format(self.__class__.__name__, self.start.__coordinates_repr__, self.end.__coordinates_repr__)
     
     def __str__(self):
         return self.__repr__()
@@ -387,28 +450,57 @@ class Slot(object):
         else:
             return True
 
+    @classmethod
+    def _compute_length(cls, start, end):
+        values = []
+        for i in range(len(start.coordinates)):
+            values.append(end.coordinates[i] - start.coordinates[i])
+        
+        return sum(values)/len(values)
+            
+    @property
+    def length(self):
+        try:
+            self._length
+        except AttributeError:
+            self._length = self._compute_length(self.start, self.end)
+        return self._length
+
+    #@property
+    #def span(self):
+    #    class Span(object):
+    #        
+    #        def __init__(self, length):
+    #            self.length=length
+    #            
+    #        def __repr__(self):
+    #            return 'Span of {} '.format(self.length)
+    #    try:
+    #        return str(self._span)
+    #    except AttributeError:
+    #        return Span(self.length)
+
     @property
     def span(self):
         try:
             return self._span
         except AttributeError:
-            return self._compute_span(self.start, self.end)
+            if len(self.start.coordinates) == 1:
+                return Span(self.end.coordinates[0] - self.start.coordinates[0])
+            else:
+                values = []
+                for i in range(len(self.start.coordinates)):
+                    values.append(self.end.coordinates[i] - self.start.coordinates[i])
+                
+                return Span(values)
 
-    @classmethod
-    def _compute_span(cls, start, end):
-        span_values = []
-        for i in range(len(start.coordinates)):
-            span_values.append(end.coordinates[i] - start.coordinates[i])
-        return sum(span_values)/len(span_values)
-        
 
 class TimeSlot(Slot):
 
     __POINT_TYPE__ = TimePoint
 
    
-    def __init__(self, start, end, span=None):
-
+    def __init__(self, start, end=None, span=None):
         try:
             if start.tz != end.tz:
                 raise ValueError('{} start and end must have the same time zone (got start.tz="{}", end.tz="{}")'.format(self.__class__.__name__, start.tz, end.tz))
@@ -417,7 +509,7 @@ class TimeSlot(Slot):
             pass
         else:    
             self.tz = start.tz
-        super(TimeSlot, self).__init__(start, end, span)
+        super(TimeSlot, self).__init__(start=start, end=end, span=span)
 
     # Overwrite parent succedes, this has better performance as it checks for only one dimension
     def __succedes__(self, other):
@@ -498,8 +590,16 @@ class DataSlot(Slot):
 class DataTimeSlot(DataSlot, TimeSlot):
     
     def __repr__(self):
-        return '{} @ t=[{},{}] ([{},{}]) with data={} and coverage={}'.format(self.__class__.__name__, self.start.t, self.end.t, self.start.dt, self.end.dt, self.data, self.coverage)
-    
+        #if self.coverage is not None:
+        #    return '{} @ t=[{},{}] ([{},{}]) with data={} and coverage={}'.format(self.__class__.__name__, self.start.t, self.end.t, self.start.dt, self.end.dt, self.data, self.coverage)
+        #else:
+        #    return '{} @ t=[{},{}] ([{},{}]) with data={}'.format(self.__class__.__name__, self.start.t, self.end.t, self.start.dt, self.end.dt, self.data)
+
+        if self.coverage is not None:
+            return '{} @ [{},{}] ([{},{}]) with data={} and coverage={}'.format(self.__class__.__name__, self.start.t, self.end.t, self.start.dt, self.end.dt, self.data, self.coverage)
+        else:
+            return '{} @ [{},{}] ([{},{}]) with data={}'.format(self.__class__.__name__, self.start.t, self.end.t, self.start.dt, self.end.dt, self.data)
+        
 
 
 
@@ -622,8 +722,9 @@ class DataTimeSlotSeries(DataSlotSeries, TimeSlotSeries):
         #    return aggregate_by
 
     def __repr__(self):
-        try:
-            return '{} of #{} {} {}s, from {} to {}'.format(self.__class__.__name__, len(self), self.timeSpan, self.__TYPE__.__name__, TimePoint(self[0].start), TimePoint(self[-1].end))
-        except:
-            return '{} of #{} {}s, from {} to {}'.format(self.__class__.__name__, len(self), self.__TYPE__.__name__, TimePoint(self[0].start), TimePoint(self[-1].end))
-            
+        if isinstance(self.slot_span, TimeSpan):
+            slot_span_str = str(self.slot_span)
+        else:
+            slot_span_str = str(self.slot_span) + 's' 
+        return '{} of #{} {}s of {}, from slot starting at {} to slot ending at {}'.format(self.__class__.__name__, len(self), self.__TYPE__.__name__, slot_span_str, TimePoint(self[0].start), TimePoint(self[-1].end))
+

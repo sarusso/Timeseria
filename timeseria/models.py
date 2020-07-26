@@ -44,7 +44,9 @@ def get_periodicity_index(time_point, slot_span, periodicity, dst_affected=False
         slot_span_duration = slot_span.duration
 
     else:
-        slot_span_duration = slot_span
+        if isinstance(slot_span.value, list):
+            raise NotImplementedError('Sorry, periodicty in multi-dimensional spaces are not defined')
+        slot_span_duration = slot_span.value
 
     # Compute periodicity index
     if not dst_affected:
@@ -559,16 +561,16 @@ class Forecaster(ParametricModel):
             for _ in range(n):
                 
                 # Compute start/end for the slot to be forecasted
-                if (isinstance(forecast_data_time_slot_series.slot_span, float) or isinstance(forecast_data_time_slot_series.slot_span, int)):
-                    this_slot_start_t = forecast_data_time_slot_series[-1].start.t + forecast_data_time_slot_series.slot_span
-                    this_slot_end_t   = this_slot_start_t + forecast_data_time_slot_series.slot_span
-                    this_slot_start_dt = dt_from_s(this_slot_start_t, tz=forecast_data_time_slot_series.tz)
-                    this_slot_end_dt = dt_from_s(this_slot_end_t, tz=forecast_data_time_slot_series.tz )
-                elif isinstance(forecast_data_time_slot_series.slot_span, TimeSpan):
+                if isinstance(forecast_data_time_slot_series.slot_span, TimeSpan):
                     this_slot_start_dt = forecast_data_time_slot_series[-1].start.dt + forecast_data_time_slot_series.slot_span
                     this_slot_end_dt   =  this_slot_start_dt + forecast_data_time_slot_series.slot_span
                     this_slot_start_t  = s_from_dt(this_slot_start_dt) 
                     this_slot_end_t    = s_from_dt(this_slot_end_dt)
+                else:
+                    this_slot_start_t = forecast_data_time_slot_series[-1].start.t + forecast_data_time_slot_series.slot_span.value
+                    this_slot_end_t   = this_slot_start_t + forecast_data_time_slot_series.slot_span.value
+                    this_slot_start_dt = dt_from_s(this_slot_start_t, tz=forecast_data_time_slot_series.tz)
+                    this_slot_end_dt = dt_from_s(this_slot_end_t, tz=forecast_data_time_slot_series.tz )                    
 
                 # Set time zone
                 tz = forecast_data_time_slot_series[-1].start.tz

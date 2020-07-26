@@ -165,7 +165,7 @@ class Slotter(Transformation):
         # Automatically detect validity if not set
         if validity is None:
             validity = self._detect_dataPoints_validity(data_time_pointSeries)
-            logger.info('Auto-detected data_time_points validity: %ss', validity)
+            logger.info('Auto-detected points validity: %ss', validity)
         
 
         

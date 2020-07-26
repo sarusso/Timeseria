@@ -1,12 +1,14 @@
 import unittest
+import datetime
 import os
 
 from ..datastructures import Point, TimePoint, DataPoint, DataTimePoint
 from ..datastructures import Slot, TimeSlot, DataSlot, DataTimeSlot
 from ..datastructures import Series
+from ..datastructures import Span
 from ..datastructures import PointSeries, DataPointSeries, TimePointSeries, DataTimePointSeries
 from ..datastructures import SlotSeries, DataSlotSeries, TimeSlotSeries, DataTimeSlotSeries
-from ..time import UTC
+from ..time import UTC, TimeSpan, dt
 
 # Setup logging
 import logging
@@ -76,7 +78,7 @@ class TestPoints(unittest.TestCase):
 
     def test_Point(self):
         
-        point = Point(1, 2)
+        point = Point(1, 2)        
         self.assertEqual(point.coordinates[0],1)
         self.assertEqual(point.coordinates[1],2)
         
@@ -102,22 +104,47 @@ class TestPoints(unittest.TestCase):
         with self.assertRaises(Exception):
             TimePoint('hi')
 
-        # Standard init
-        time_point = TimePoint(t=5)
+        # Standard init (init/float)
+        time_point = TimePoint(5)
+        self.assertEqual(time_point.coordinates,(5,))
+        self.assertEqual(time_point.coordinates[0],5)
         self.assertEqual(time_point.t,5)
         
-        # Cast from ini/float
+        # Init using "t"
+        time_point_init_t = TimePoint(t=5)
+        self.assertEqual(time_point, time_point_init_t)
         
-        # Test for UTC time zone
+        # Init using naive "dt" (only in case someone uses without using timesera dt utility, i.e. from external timestamps) 
+        time_point_init_dt = TimePoint(dt=datetime.datetime(1970,1,1,0,0,5))
+        self.assertEqual(time_point_init_dt, time_point)
+        self.assertEqual(str(time_point_init_dt.tz), 'UTC')
+
+        # Init using "dt" with UTC timezone (timesera dt utility always add the UTC timezone)
+        time_point_init_dt = TimePoint(dt=dt(1970,1,1,0,0,5))
+        self.assertEqual(time_point_init_dt, time_point) 
+        self.assertEqual(str(time_point_init_dt.tz), 'UTC')
+
+        # Init using "dt" with Europe/Rome timezone (note that we create the dt at 1 AM and not at midnight for this test to pass) 
+        time_point_init_dt = TimePoint(dt=dt(1970,1,1,1,0,5, tz='Europe/Rome'))
+        self.assertEqual(time_point_init_dt, time_point_init_dt)         
+        
+        # Test standard with UTC time zone
         self.assertEqual(time_point.tz, UTC)
         self.assertEqual(type(time_point.tz), type(UTC))
         self.assertEqual(str(time_point.dt), '1970-01-01 00:00:05+00:00')
 
-        # Test for Europe/Rome time zone
+        # Test standard with Europe/Rome time zone
         time_point = TimePoint(t=1569897900, tz='Europe/Rome')
         self.assertEqual(str(time_point.tz), 'Europe/Rome')
         self.assertEqual(str(type(time_point.tz)), "<class 'pytz.tzfile.Europe/Rome'>")
         self.assertEqual(str(time_point.dt), '2019-10-01 04:45:00+02:00')
+
+        # Cast from object extending the TimePoint
+        class ExtendedTimePoint(TimePoint):
+            pass
+        extended_time_point = ExtendedTimePoint(10)
+        time_point_catsted = TimePoint(extended_time_point)
+        self.assertEqual(time_point_catsted.coordinates,(10,))
 
 
     def test_DataPoint(self):
@@ -126,7 +153,8 @@ class TestPoints(unittest.TestCase):
             DataPoint(data='hello')
         
         data_point = DataPoint(1, 2, data='hello')
-        self.assertEqual(data_point.coordinates, [1,2]) 
+
+        self.assertEqual(data_point.coordinates, (1,2)) 
         self.assertEqual(data_point.coordinates[0], 1)
         self.assertEqual(data_point.coordinates[1], 2)
         self.assertEqual(data_point.data,'hello')
@@ -149,9 +177,10 @@ class TestPoints(unittest.TestCase):
 
         with self.assertRaises(Exception):
             DataTimePoint(x=1, data='hello')
-        
-        data_time_point = DataTimePoint(t=6, data='hello')        
-        self.assertEqual(data_time_point.coordinates, [6]) 
+
+        data_time_point = DataTimePoint(t=6, data='hello')
+
+        self.assertEqual(data_time_point.coordinates, (6,)) 
         self.assertEqual(data_time_point.t,6)
         self.assertEqual(data_time_point.data,'hello')
         
@@ -272,6 +301,13 @@ class TestPointSeries(unittest.TestCase):
 
 
 
+class TestSpan(unittest.TestCase):
+
+    def test_Span(self):      
+        #print(Span([1,2]))     
+        self.assertEqual( (Point(1) + Span(5)).coordinates[0], 6) 
+        self.assertEqual( (TimePoint(1) + Span(5)).coordinates[0], 6) 
+
 
 class TestSlots(unittest.TestCase):
 
@@ -295,7 +331,11 @@ class TestSlots(unittest.TestCase):
         with self.assertRaises(ValueError):
             Slot(start=Point(1), end=Point(1))
 
-
+        #print('\n')
+        #print(Slot(start=Point(5), end=Point(7)))
+        #print(Slot(start=Point(1,2), end=Point(3,5)).length)
+        #print('\n')
+        
         slot = Slot(start=Point(1), end=Point(2)) 
         self.assertEqual(slot.start,Point(1))
         self.assertEqual(slot.end,Point(2))
@@ -307,11 +347,14 @@ class TestSlots(unittest.TestCase):
         self.assertEqual(slot_1,slot_2)
         self.assertNotEqual(slot_1,slot_3)
         
-        # Span
+        # Length
         slot = Slot(start=Point(1.5), end=Point(4.7)) 
-        self.assertEqual(slot.span, 3.2)
-        slot._span = 'hello'
-        self.assertEqual(slot.span, 'hello')
+        self.assertEqual(slot.length, 3.2)
+
+        # Slot using span
+        slot = Slot(start=Point(1.5), span=Span(3.2)) 
+        self.assertEqual(slot.length, 3.2)
+
 
   
     def test_TimeSlot(self):
@@ -345,7 +388,11 @@ class TestSlots(unittest.TestCase):
             # ValueError: TimeSlot start and end must have the same time zone (got start.tz="Europe/Rome", end.tz="UTC")
             TimeSlot(start=TimePoint(t=0, tz='Europe/Rome'), end=TimePoint(t=60))
         TimeSlot(start=TimePoint(t=0, tz='Europe/Rome'), end=TimePoint(t=60, tz='Europe/Rome'))
-        
+
+        # Slot using span
+        time_slot = TimeSlot(start=TimePoint(0), span=Span(3600)) 
+        self.assertEqual(time_slot.length, 3600)      
+          
 
     def test_DataSlot(self):
         
@@ -443,7 +490,7 @@ class TestSlotSeries(unittest.TestCase):
         time_slot_series.append(TimeSlot(start=TimePoint(t=60, tz='Europe/Rome'), end=TimePoint(t=120, tz='Europe/Rome')))
 
         # Test span
-        self.assertEqual(time_slot_series.slot_span, 60)
+        self.assertEqual(time_slot_series.slot_span, Span(60.0))
         
  
     def test_DataSlotSeries(self):
@@ -498,7 +545,11 @@ class TestSlotSeries(unittest.TestCase):
         with self.assertRaises(ValueError):
             data_time_slot_series.append(DataTimeSlot(start=TimePoint(t=120), end=TimePoint(t=180), data={'a':56, 'c':67}))            
 
-
+        # Test slot_span
+        self.assertEqual(data_time_slot_series.slot_span, Span(60.0))
+        self.assertEqual(DataTimeSlotSeries(DataTimeSlot(start=TimePoint(t=60), end=TimePoint(t=120), data=23.8, span=TimeSpan('60s'))).slot_span, TimeSpan('60s'))
+        
+        
     def test_cannge_timezone_DataTimeSlotSeries(self):
         from ..time import timezonize
         data_time_slot_series_UTC =  DataTimeSlotSeries(DataTimeSlot(start=TimePoint(t=60),  end=TimePoint(t=120), data=23.8),
@@ -510,6 +561,7 @@ class TestSlotSeries(unittest.TestCase):
         self.assertEqual(data_time_slot_series_UTC[0].tz, timezonize('Europe/Rome'))
         self.assertEqual(data_time_slot_series_UTC[0].start.tz, timezonize('Europe/Rome'))
         self.assertEqual(data_time_slot_series_UTC[0].end.tz, timezonize('Europe/Rome'))
+        
 
 
 

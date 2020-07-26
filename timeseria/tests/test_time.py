@@ -176,6 +176,12 @@ class TestTime(unittest.TestCase):
         self.assertEqual(TimeSpan('1h').type, TimeSpan.PHYSICAL)
         self.assertEqual(TimeSpan('1D').type, TimeSpan.LOGICAL)
         self.assertEqual(TimeSpan('1M').type, TimeSpan.LOGICAL)
+        
+        # Test sum with TimePoint
+        time_span = TimeSpan('1h')
+        from ..datastructures import TimePoint
+        time_point = TimePoint(60)
+        self.assertEqual((time_point+time_span).t, 3660)
 
 
     def test_dt_math(self):
