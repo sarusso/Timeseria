@@ -1,6 +1,7 @@
-from .time import TimeUnit, dt_from_s, s_from_dt
+from .time import dt_from_s, s_from_dt
 from .datastructures import DataTimeSlot, DataTimeSlotSeries, TimePoint, DataTimePointSeries
 from .utilities import compute_coverage, is_almost_equal, is_close
+from .units import TimeUnit
 
 # Setup logging
 import logging

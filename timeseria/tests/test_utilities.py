@@ -3,9 +3,10 @@ import os
 from ..exceptions import InputException
 from ..utilities import detect_encoding, compute_coverage, get_periodicity
 from ..datastructures import DataTimePointSeries, DataTimePoint
-from ..time import dt, s_from_dt, TimeUnit
+from ..time import dt, s_from_dt
 from ..storages import CSVFileStorage
 from ..transformations import Slotter
+from ..units import TimeUnit
 
 # Setup logging
 import logging

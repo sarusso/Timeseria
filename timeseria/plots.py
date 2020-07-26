@@ -1,8 +1,9 @@
 import os
 import uuid
 import datetime
-from .time import dt_from_s, TimeUnit, dt_to_str, utckfake_s_from_dt
+from .time import dt_from_s, dt_to_str, utckfake_s_from_dt
 from .datastructures import DataTimePointSeries, DataTimeSlotSeries
+from .units import TimeUnit
 
 # Setup logging
 import logging

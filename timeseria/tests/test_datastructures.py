@@ -8,7 +8,8 @@ from ..datastructures import Series
 from ..datastructures import Unit
 from ..datastructures import PointSeries, DataPointSeries, TimePointSeries, DataTimePointSeries
 from ..datastructures import SlotSeries, DataSlotSeries, TimeSlotSeries, DataTimeSlotSeries
-from ..time import UTC, TimeUnit, dt
+from ..time import UTC, dt
+from ..units import Unit, TimeUnit
 
 # Setup logging
 import logging

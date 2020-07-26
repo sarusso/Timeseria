@@ -5,9 +5,10 @@ import copy
 from .datastructures import DataTimeSlotSeries, DataTimeSlot, TimePoint
 from .exceptions import NotFittedError
 from .utilities import get_periodicity
-from .time import now_t, TimeUnit, dt_from_s, s_from_dt
+from .time import now_t, dt_from_s, s_from_dt
 from datetime import timedelta
 from sklearn.metrics import mean_squared_error
+from .units import TimeUnit
 
 # Setup logging
 import logging

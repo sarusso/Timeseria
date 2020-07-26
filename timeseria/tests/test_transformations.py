@@ -5,8 +5,9 @@ from ..datastructures import Series, DataPointSeries, TimePointSeries, DataTimeP
 from ..storages import CSVFileStorage
 #from ..operators import diff, min, slot, Slotter,
 from ..transformations import Slotter
-from ..time import TimeUnit, dt, s_from_dt, dt_from_s, dt_from_str
+from ..time import dt, s_from_dt, dt_from_s, dt_from_str
 from ..exceptions import InputException
+from ..units import TimeUnit
 
 # Setup logging
 import logging

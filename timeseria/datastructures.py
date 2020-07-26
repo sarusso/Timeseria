@@ -1,10 +1,10 @@
-from .time import s_from_dt , dt_from_s, UTC, timezonize, TimeUnit
+from .time import s_from_dt , dt_from_s, UTC, timezonize
+from .units import Unit, TimeUnit
 from .utilities import is_close
 
 # Setup logging
 import logging
 logger = logging.getLogger(__name__)
-
 
 
 HARD_DEBUG = False
@@ -377,32 +377,6 @@ class DataTimePointSeries(DataPointSeries, TimePointSeries):
 #======================
 #  Slots
 #======================
-
-class Unit(object):
-    
-    def __init__(self, value):
-        # TODO: Add support for creating from string repr of list/float?
-        self.value = value
-        
-    def __repr__(self):   
-        return str(self.value)
-
-    def __add__(self, other):
-        if not isinstance(other, Point):
-            raise Exception('Can add Units only on Points')
-
-        # TODO: implement checks for n-dimensional points
-        return other.__class__(other.coordinates[0] + self.value)
-    
-    def __radd__(self, other):
-        return self.__add__(other)
-    
-    def __eq__(self,other):
-        if self is other:
-            return True
-        else:
-            return self.value == other.value
-            
 
 class Slot(object):
     
