@@ -281,7 +281,7 @@ class TimeUnit(object):
             if end and not start:
                 raise InputException('You provided the end but not the start')
                    
-        # Set the TimeSlotUnit in seconds
+        # Set the TimeUnit in seconds
         if start and end:
             seconds = s_from_dt((end-start).dt)
 
@@ -306,7 +306,7 @@ class TimeUnit(object):
                 try:
                     groups   =  regex.match(string).groups()
                 except AttributeError:
-                    raise InputException('Cannot parse string representation for the TimeSlotUnit, unknown  format ("{}")'.format(string)) from None
+                    raise InputException('Cannot parse string representation for the TimeUnit, unknown  format ("{}")'.format(string)) from None
 
                 setattr(self, self.mapping_table[groups[1]], int(groups[0]))
 
@@ -314,7 +314,7 @@ class TimeUnit(object):
                      
             # If nothing set, raise error
             if not self.years and not self.weeks and not self.months and not self.days and not self.hours and not self.minutes and not self.seconds and not self.microseconds:
-                raise InputException('Detected zero-length TimeSlotUnit!')
+                raise InputException('Detected zero-length TimeUnit!')
  
 
     # Representation..
@@ -403,7 +403,7 @@ class TimeUnit(object):
 
     @property
     def type(self):
-        '''Returns the type of the TimeSlotUnit.
+        '''Returns the type of the TimeUnit.
          - Physical if hours, minutes, seconds, micorseconds
          - Logical if Years, Months, Days, Weeks
         The difference? Years, Months, Days, Weeks have different lengths depending on the starting date.
@@ -429,7 +429,7 @@ class TimeUnit(object):
             return False        
 
     def round_dt(self, time_dt, how = None):
-        '''Round a datetime according to this TimeSlotUnit. Only simple time intervals are supported in this operation'''
+        '''Round a datetime according to this TimeUnit. Only simple time intervals are supported in this operation'''
 
         if self.is_composite():
             raise InputException('Sorry, only simple time intervals are supported by the rebase operation')
@@ -445,7 +445,7 @@ class TimeUnit(object):
         # Handle physical time 
         if self.type == self.PHYSICAL:
             
-            # Get TimeSlotUnit duration in seconds
+            # Get TimeUnit duration in seconds
             time_unit_s = self.duration_s(time_dt)
 
             # Apply modular math (including timezone time translation trick if required (multiple hours))
@@ -478,7 +478,7 @@ class TimeUnit(object):
         elif self.type == self.LOGICAL:
             
             
-            # Get TimeSlotUnit duration in seconds
+            # Get TimeUnit duration in seconds
             time_unit_s = self.duration_s(time_dt)
             
             logger.debug(time_unit_s)
@@ -499,19 +499,19 @@ class TimeUnit(object):
 
 
     def floor_dt(self, time_dt):
-        '''Floor a datetime according to this TimeSlotUnit. Only simple time intervals are supported in this operation'''       
+        '''Floor a datetime according to this TimeUnit. Only simple time intervals are supported in this operation'''       
         return self.round_dt(time_dt, how='floor')
      
     def ceil_dt(self, time_dt):
-        '''Ceil a datetime according to this TimeSlotUnit. Only simple time intervals are supported in this operation'''        
+        '''Ceil a datetime according to this TimeUnit. Only simple time intervals are supported in this operation'''        
         return self.round_dt(time_dt, how='ceil')
 
     def rebase_dt(self, time_dt):
-        '''Rebase a given datetime to this TimeSlotUnit. Only simple time intervals are supported in this operation'''
+        '''Rebase a given datetime to this TimeUnit. Only simple time intervals are supported in this operation'''
         return self.round_dt(time_dt, how='floor')
               
     def shift_dt(self, time_dt, times=0):
-        '''Shift a given datetime of n times of this TimeSlotUnit. Only simple time intervals are supported in this operation'''
+        '''Shift a given datetime of n times of this TimeUnit. Only simple time intervals are supported in this operation'''
         if self.is_composite():
             raise InputException('Sorry, only simple time intervals are supported byt he rebase operation')
  
@@ -521,7 +521,7 @@ class TimeUnit(object):
         # Handle physical time TimeSlot
         if self.type == self.PHYSICAL:
             
-            # Get TimeSlotUnit duration in seconds
+            # Get TimeUnit duration in seconds
             time_unit_s = self.duration_s(time_dt)
 
             time_shifted_s = time_s + ( time_unit_s * times )
@@ -543,7 +543,7 @@ class TimeUnit(object):
             raise InputException('Sorry, only simple time intervals are supported by this operation')
 
         if self.type == 'Logical' and not start_dt:
-            raise InputException('With a logical TimeSlotUnit you can ask for duration only if you provide the starting point')
+            raise InputException('With a logical TimeUnit you can ask for duration only if you provide the starting point')
         
         if self.type == 'Logical':
             raise NotImplementedError('Computing the duration in seconds using a given start_time_dt is not yet supported')

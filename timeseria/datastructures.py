@@ -381,10 +381,11 @@ class DataTimePointSeries(DataPointSeries, TimePointSeries):
 class Unit(object):
     
     def __init__(self, value):
+        # TODO: Add support for creating from string repr of list/float?
         self.value = value
         
     def __repr__(self):   
-        return 'Unit of {}'.format(self.value)
+        return str(self.value)
 
     def __add__(self, other):
         if not isinstance(other, Point):
@@ -465,20 +466,6 @@ class Slot(object):
         except AttributeError:
             self._length = self._compute_length(self.start, self.end)
         return self._length
-
-    #@property
-    #def unit(self):
-    #    class Unit(object):
-    #        
-    #        def __init__(self, length):
-    #            self.length=length
-    #            
-    #        def __repr__(self):
-    #            return 'Unit of {} '.format(self.length)
-    #    try:
-    #        return str(self._unit)
-    #    except AttributeError:
-    #        return Unit(self.length)
 
     @property
     def unit(self):
