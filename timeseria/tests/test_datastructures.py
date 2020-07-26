@@ -5,10 +5,10 @@ import os
 from ..datastructures import Point, TimePoint, DataPoint, DataTimePoint
 from ..datastructures import Slot, TimeSlot, DataSlot, DataTimeSlot
 from ..datastructures import Series
-from ..datastructures import Span
+from ..datastructures import Unit
 from ..datastructures import PointSeries, DataPointSeries, TimePointSeries, DataTimePointSeries
 from ..datastructures import SlotSeries, DataSlotSeries, TimeSlotSeries, DataTimeSlotSeries
-from ..time import UTC, TimeSpan, dt
+from ..time import UTC, TimeUnit, dt
 
 # Setup logging
 import logging
@@ -301,12 +301,12 @@ class TestPointSeries(unittest.TestCase):
 
 
 
-class TestSpan(unittest.TestCase):
+class TestUnit(unittest.TestCase):
 
-    def test_Span(self):      
-        #print(Span([1,2]))     
-        self.assertEqual( (Point(1) + Span(5)).coordinates[0], 6) 
-        self.assertEqual( (TimePoint(1) + Span(5)).coordinates[0], 6) 
+    def test_Unit(self):      
+        #print(Unit([1,2]))     
+        self.assertEqual( (Point(1) + Unit(5)).coordinates[0], 6) 
+        self.assertEqual( (TimePoint(1) + Unit(5)).coordinates[0], 6) 
 
 
 class TestSlots(unittest.TestCase):
@@ -351,8 +351,8 @@ class TestSlots(unittest.TestCase):
         slot = Slot(start=Point(1.5), end=Point(4.7)) 
         self.assertEqual(slot.length, 3.2)
 
-        # Slot using span
-        slot = Slot(start=Point(1.5), span=Span(3.2)) 
+        # Slot using unit
+        slot = Slot(start=Point(1.5), unit=Unit(3.2)) 
         self.assertEqual(slot.length, 3.2)
 
 
@@ -389,8 +389,8 @@ class TestSlots(unittest.TestCase):
             TimeSlot(start=TimePoint(t=0, tz='Europe/Rome'), end=TimePoint(t=60))
         TimeSlot(start=TimePoint(t=0, tz='Europe/Rome'), end=TimePoint(t=60, tz='Europe/Rome'))
 
-        # Slot using span
-        time_slot = TimeSlot(start=TimePoint(0), span=Span(3600)) 
+        # Slot using unit
+        time_slot = TimeSlot(start=TimePoint(0), unit=Unit(3600)) 
         self.assertEqual(time_slot.length, 3600)      
           
 
@@ -456,13 +456,13 @@ class TestSlotSeries(unittest.TestCase):
         slot_series =  SlotSeries(Slot(start=Point(0), end=Point(10)))
         
         with self.assertRaises(ValueError):
-            # Cannot add items with different spans (I have "10.0" and you tried to add "11.0")
+            # Cannot add items with different units (I have "10.0" and you tried to add "11.0")
             slot_series.append(Slot(start=Point(10), end=Point(21)))
         slot_series.append(Slot(start=Point(10), end=Point(20)))
         
-        # The span is more used as a type..
-        slot_series =  SlotSeries(Slot(start=Point(0), end=Point(10), span='10-ish'))
-        slot_series.append(Slot(start=Point(10), end=Point(21), span='10-ish'))
+        # The unit is more used as a type..
+        slot_series =  SlotSeries(Slot(start=Point(0), end=Point(10), unit='10-ish'))
+        slot_series.append(Slot(start=Point(10), end=Point(21), unit='10-ish'))
 
 
     def test_TimeSlotSeries(self):
@@ -489,8 +489,8 @@ class TestSlotSeries(unittest.TestCase):
             time_slot_series.append(TimeSlot(start=TimePoint(t=60), end=TimePoint(t=210)))
         time_slot_series.append(TimeSlot(start=TimePoint(t=60, tz='Europe/Rome'), end=TimePoint(t=120, tz='Europe/Rome')))
 
-        # Test span
-        self.assertEqual(time_slot_series.slot_span, Span(60.0))
+        # Test unit
+        self.assertEqual(time_slot_series.slot_unit, Unit(60.0))
         
  
     def test_DataSlotSeries(self):
@@ -545,9 +545,9 @@ class TestSlotSeries(unittest.TestCase):
         with self.assertRaises(ValueError):
             data_time_slot_series.append(DataTimeSlot(start=TimePoint(t=120), end=TimePoint(t=180), data={'a':56, 'c':67}))            
 
-        # Test slot_span
-        self.assertEqual(data_time_slot_series.slot_span, Span(60.0))
-        self.assertEqual(DataTimeSlotSeries(DataTimeSlot(start=TimePoint(t=60), end=TimePoint(t=120), data=23.8, span=TimeSpan('60s'))).slot_span, TimeSpan('60s'))
+        # Test slot_unit
+        self.assertEqual(data_time_slot_series.slot_unit, Unit(60.0))
+        self.assertEqual(DataTimeSlotSeries(DataTimeSlot(start=TimePoint(t=60), end=TimePoint(t=120), data=23.8, unit=TimeUnit('60s'))).slot_unit, TimeUnit('60s'))
         
         
     def test_cannge_timezone_DataTimeSlotSeries(self):

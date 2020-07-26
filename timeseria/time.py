@@ -226,11 +226,11 @@ def utckfake_s_from_dt(dt):
 
 class dt_range(object):
 
-    def __init__(self, from_dt, to_dt, timeSlotSpan):
+    def __init__(self, from_dt, to_dt, timeSlotUnit):
 
         self.from_dt      = from_dt
         self.to_dt        = to_dt
-        self.timeSlotSpan = timeSlotSpan
+        self.timeSlotUnit = timeSlotUnit
 
     def __iter__(self):
         self.current_dt = self.from_dt
@@ -243,12 +243,12 @@ class dt_range(object):
             raise StopIteration
         else:
             prev_current_dt = self.current_dt
-            self.current_dt = self.current_dt + self.timeSlotSpan
+            self.current_dt = self.current_dt + self.timeSlotUnit
             return prev_current_dt
 
 
-class TimeSpan(object):
-    ''' A time span is a duration. It can be physical (hours, minutes..),
+class TimeUnit(object):
+    ''' A time unit is a duration. It can be physical (hours, minutes..),
     logical (months, for example) or defined from a start to an end'''
     
     LOGICAL  = 'Logical'
@@ -281,7 +281,7 @@ class TimeSpan(object):
             if end and not start:
                 raise InputException('You provided the end but not the start')
                    
-        # Set the TimeSlotSpan in seconds
+        # Set the TimeSlotUnit in seconds
         if start and end:
             seconds = s_from_dt((end-start).dt)
 
@@ -306,7 +306,7 @@ class TimeSpan(object):
                 try:
                     groups   =  regex.match(string).groups()
                 except AttributeError:
-                    raise InputException('Cannot parse string representation for the TimeSlotSpan, unknown  format ("{}")'.format(string)) from None
+                    raise InputException('Cannot parse string representation for the TimeSlotUnit, unknown  format ("{}")'.format(string)) from None
 
                 setattr(self, self.mapping_table[groups[1]], int(groups[0]))
 
@@ -314,7 +314,7 @@ class TimeSpan(object):
                      
             # If nothing set, raise error
             if not self.years and not self.weeks and not self.months and not self.days and not self.hours and not self.minutes and not self.seconds and not self.microseconds:
-                raise InputException('Detected zero-length TimeSlotSpan!')
+                raise InputException('Detected zero-length TimeSlotUnit!')
  
 
     # Representation..
@@ -329,7 +329,7 @@ class TimeSpan(object):
         
         if isinstance(other, self.__class__):
             
-            return TimeSpan(years        = self.years + other.years,
+            return TimeUnit(years        = self.years + other.years,
                             months       = self.months + other.months,
                             weeks        = self.weeks + other.weeks,
                             days         = self.days + other.days,
@@ -351,7 +351,7 @@ class TimeSpan(object):
             
         
         else:
-            raise NotImplementedError('Adding TimeSpans on top of objects other than datetimes is not yet supported')
+            raise NotImplementedError('Adding TimeUnits on top of objects other than datetimes is not yet supported')
    
     def __radd__(self, other):
         return self.__add__(other)
@@ -403,7 +403,7 @@ class TimeSpan(object):
 
     @property
     def type(self):
-        '''Returns the type of the TimeSlotSpan.
+        '''Returns the type of the TimeSlotUnit.
          - Physical if hours, minutes, seconds, micorseconds
          - Logical if Years, Months, Days, Weeks
         The difference? Years, Months, Days, Weeks have different lengths depending on the starting date.
@@ -429,7 +429,7 @@ class TimeSpan(object):
             return False        
 
     def round_dt(self, time_dt, how = None):
-        '''Round a datetime according to this TimeSlotSpan. Only simple time intervals are supported in this operation'''
+        '''Round a datetime according to this TimeSlotUnit. Only simple time intervals are supported in this operation'''
 
         if self.is_composite():
             raise InputException('Sorry, only simple time intervals are supported by the rebase operation')
@@ -445,18 +445,18 @@ class TimeSpan(object):
         # Handle physical time 
         if self.type == self.PHYSICAL:
             
-            # Get TimeSlotSpan duration in seconds
-            timeSpan_s = self.duration_s(time_dt)
+            # Get TimeSlotUnit duration in seconds
+            time_unit_s = self.duration_s(time_dt)
 
             # Apply modular math (including timezone time translation trick if required (multiple hours))
             # TODO: check for correctness, the time shift should be always done...
             
             if self.hours > 1 or self.minutes > 60:
-                time_floor_s = ( (time_s - tz_offset_s) - ( (time_s - tz_offset_s) % timeSpan_s) ) + tz_offset_s
+                time_floor_s = ( (time_s - tz_offset_s) - ( (time_s - tz_offset_s) % time_unit_s) ) + tz_offset_s
             else:
-                time_floor_s = time_s - (time_s % timeSpan_s)
+                time_floor_s = time_s - (time_s % time_unit_s)
                 
-            time_ceil_s   = time_floor_s + timeSpan_s
+            time_ceil_s   = time_floor_s + time_unit_s
             
             if how == 'floor':
                 time_rounded_s = time_floor_s
@@ -478,10 +478,10 @@ class TimeSpan(object):
         elif self.type == self.LOGICAL:
             
             
-            # Get TimeSlotSpan duration in seconds
-            timeSpan_s = self.duration_s(time_dt)
+            # Get TimeSlotUnit duration in seconds
+            time_unit_s = self.duration_s(time_dt)
             
-            logger.debug(timeSpan_s)
+            logger.debug(time_unit_s)
             
             #time_rounded_s
             
@@ -499,19 +499,19 @@ class TimeSpan(object):
 
 
     def floor_dt(self, time_dt):
-        '''Floor a datetime according to this TimeSlotSpan. Only simple time intervals are supported in this operation'''       
+        '''Floor a datetime according to this TimeSlotUnit. Only simple time intervals are supported in this operation'''       
         return self.round_dt(time_dt, how='floor')
      
     def ceil_dt(self, time_dt):
-        '''Ceil a datetime according to this TimeSlotSpan. Only simple time intervals are supported in this operation'''        
+        '''Ceil a datetime according to this TimeSlotUnit. Only simple time intervals are supported in this operation'''        
         return self.round_dt(time_dt, how='ceil')
 
     def rebase_dt(self, time_dt):
-        '''Rebase a given datetime to this TimeSlotSpan. Only simple time intervals are supported in this operation'''
+        '''Rebase a given datetime to this TimeSlotUnit. Only simple time intervals are supported in this operation'''
         return self.round_dt(time_dt, how='floor')
               
     def shift_dt(self, time_dt, times=0):
-        '''Shift a given datetime of n times of this TimeSlotSpan. Only simple time intervals are supported in this operation'''
+        '''Shift a given datetime of n times of this TimeSlotUnit. Only simple time intervals are supported in this operation'''
         if self.is_composite():
             raise InputException('Sorry, only simple time intervals are supported byt he rebase operation')
  
@@ -521,10 +521,10 @@ class TimeSpan(object):
         # Handle physical time TimeSlot
         if self.type == self.PHYSICAL:
             
-            # Get TimeSlotSpan duration in seconds
-            timeSpan_s = self.duration_s(time_dt)
+            # Get TimeSlotUnit duration in seconds
+            time_unit_s = self.duration_s(time_dt)
 
-            time_shifted_s = time_s + ( timeSpan_s * times )
+            time_shifted_s = time_s + ( time_unit_s * times )
             time_shifted_dt = dt_from_s(time_shifted_s, tz=time_dt.tzinfo)
 
         # Handle logical time TimeSlot
@@ -543,7 +543,7 @@ class TimeSpan(object):
             raise InputException('Sorry, only simple time intervals are supported by this operation')
 
         if self.type == 'Logical' and not start_dt:
-            raise InputException('With a logical TimeSlotSpan you can ask for duration only if you provide the starting point')
+            raise InputException('With a logical TimeSlotUnit you can ask for duration only if you provide the starting point')
         
         if self.type == 'Logical':
             raise NotImplementedError('Computing the duration in seconds using a given start_time_dt is not yet supported')
@@ -551,20 +551,20 @@ class TimeSpan(object):
         else:
             # Hours, Minutes, Seconds
             if self.hours:
-                timeSpan_s = self.hours * 60 * 60
+                time_unit_s = self.hours * 60 * 60
             if self.minutes:
-                timeSpan_s = self.minutes * 60
+                time_unit_s = self.minutes * 60
             if self.seconds:
-                timeSpan_s = self.seconds
+                time_unit_s = self.seconds
             if self.microseconds:
-                timeSpan_s = 1/1000000.0 * self.microseconds
+                time_unit_s = 1/1000000.0 * self.microseconds
                
-        return timeSpan_s
+        return time_unit_s
         
     @property
     def duration(self):
         if self.type == 'Logical':
-            raise InputException('Sorry, the duration of a LOGICAL time span is not defined. use duration_s() providing the starting point.')
+            raise InputException('Sorry, the duration of a LOGICAL time unit is not defined. use duration_s() providing the starting point.')
         return self.duration_s()
 
 

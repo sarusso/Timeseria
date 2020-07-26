@@ -1,4 +1,4 @@
-from .time import TimeSpan, dt_from_s, s_from_dt
+from .time import TimeUnit, dt_from_s, s_from_dt
 from .datastructures import DataTimeSlot, DataTimeSlotSeries, TimePoint, DataTimePointSeries
 from .utilities import compute_coverage, is_almost_equal, is_close
 
@@ -100,7 +100,7 @@ class Derivative(Operator):
                     # Both left and right derivative for the items in the middle
                     der =  ((data_time_slot_series[i+1].data[key] - data_time_slot_series[i].data[key]) + (data_time_slot_series[i].data[key] - data_time_slot_series[i-1].data[key])) /2
                     
-                der = der / (data_time_slot_series.slot_span)
+                der = der / (data_time_slot_series.slot_unit)
 
                 # Add data
                 if not inplace:
@@ -128,27 +128,27 @@ class Merge(Operator):
 
     def __call__(self, *args):
         
-        slot_span = None
+        slot_unit = None
         for i, arg in enumerate(args):
             if not isinstance(arg, DataTimeSlotSeries):
                 raise TypeError('Argument #{} is not of type DataTimeSlotSeries, got "{}"'.format(i, arg.__class__.__name__))
-            if slot_span is None:
-                slot_span = arg.slot_span
+            if slot_unit is None:
+                slot_unit = arg.slot_unit
             else:
-                if arg.slot_span != slot_span:
+                if arg.slot_unit != slot_unit:
                     abort = True
                     try:
                         # Handle floating point precision issues 
-                        if is_close(arg.slot_span, slot_span):
+                        if is_close(arg.slot_unit, slot_unit):
                             abort = False
                     except (ValueError,TypeError):
                         pass
                     if abort:
-                        raise ValueError('DataTimeSlotSeries have different spans, cannot merge')
+                        raise ValueError('DataTimeSlotSeries have different units, cannot merge')
         
         length = len(args[0])
         n_args = len(args)
-        result_data_time_slot_series = DataTimeSlotSeries(span=slot_span)
+        result_data_time_slot_series = DataTimeSlotSeries(unit=slot_unit)
         import copy
         
         for i in range(length):

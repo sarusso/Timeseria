@@ -5,7 +5,7 @@ from ..datastructures import Series, DataPointSeries, TimePointSeries, DataTimeP
 from ..storages import CSVFileStorage
 #from ..operators import diff, min, slot, Slotter,
 from ..transformations import Slotter
-from ..time import TimeSpan, dt, s_from_dt, dt_from_s, dt_from_str
+from ..time import TimeUnit, dt, s_from_dt, dt_from_s, dt_from_str
 from ..exceptions import InputException
 
 # Setup logging
@@ -69,7 +69,7 @@ class TestSlotter(unittest.TestCase):
         # Time series from 2019,10,1,1,0,0 to 2019,10,1,6,0,0 (Europe/Rome)
         from_dt  = dt(2019,10,1,1,0,0, tzinfo='Europe/Rome')
         to_dt    = dt(2019,10,1,6,0,0, tzinfo='Europe/Rome')
-        time_span = TimeSpan('15m') 
+        time_unit = TimeUnit('15m') 
         self.data_time_point_series_6 = DataTimePointSeries()
         slider_dt = from_dt
         count = 0
@@ -79,7 +79,7 @@ class TestSlotter(unittest.TestCase):
                                               data = {'temperature': 154+count},
                                               tz   = 'Europe/Rome')
                 self.data_time_point_series_6.append(data_time_point)
-            slider_dt = slider_dt + time_span
+            slider_dt = slider_dt + time_unit
             count += 1
 
         # The following time series has point with validity=1h
@@ -87,7 +87,7 @@ class TestSlotter(unittest.TestCase):
         # Time series from 2019,10,24,0,0,0 to 2019,10,31,0,0,0 (Europe/Rome), DST off -> 2 AM repeated
         from_dt   = dt(2019,10,24,0,0,0, tzinfo='Europe/Rome')
         to_dt     = dt(2019,10,31,0,0,0, tzinfo='Europe/Rome')
-        time_span = TimeSpan('1h') 
+        time_unit = TimeUnit('1h') 
         self.data_time_point_series_7 = DataTimePointSeries()
         slider_dt = from_dt
         count = 0
@@ -97,17 +97,17 @@ class TestSlotter(unittest.TestCase):
                                                 data = {'temperature': 154+count},
                                                 tz   = 'Europe/Rome')
                 self.data_time_point_series_7.append(data_time_point)
-            slider_dt = slider_dt + time_span
+            slider_dt = slider_dt + time_unit
             count += 1
 
 
-    def test_span_to_TimeSpan(self):
+    def test_unit_to_TimeUnit(self):
         
-        Slotter._span_to_TimeSpan('1h')
-        Slotter._span_to_TimeSpan(TimeSpan('1h'))
+        Slotter._unit_to_TimeUnit('1h')
+        Slotter._unit_to_TimeUnit(TimeUnit('1h'))
         
         with self.assertRaises(InputException):
-            Slotter._span_to_TimeSpan('NO')
+            Slotter._unit_to_TimeUnit('NO')
         
         
 
@@ -130,7 +130,7 @@ class TestSlotter(unittest.TestCase):
     def test_slot(self):
         
         # Time series from 16:58:00 to 17:32:00 (Europe/Rome), no from/to, extremes excluded (default)
-        data_time_slot_series = Slotter(span=600).process(self.data_time_point_series_1)
+        data_time_slot_series = Slotter(unit=600).process(self.data_time_point_series_1)
 
         # operators.slot()
         # operations.slot .merge .min .max .sum .aggreate

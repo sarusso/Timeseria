@@ -1,4 +1,4 @@
-from .time import s_from_dt , dt_from_s, UTC, timezonize, TimeSpan
+from .time import s_from_dt , dt_from_s, UTC, timezonize, TimeUnit
 from .utilities import is_close
 
 # Setup logging
@@ -378,17 +378,17 @@ class DataTimePointSeries(DataPointSeries, TimePointSeries):
 #  Slots
 #======================
 
-class Span(object):
+class Unit(object):
     
     def __init__(self, value):
         self.value = value
         
     def __repr__(self):   
-        return 'Span of {}'.format(self.value)
+        return 'Unit of {}'.format(self.value)
 
     def __add__(self, other):
         if not isinstance(other, Point):
-            raise Exception('Can add Spans only on Points')
+            raise Exception('Can add Units only on Points')
 
         # TODO: implement checks for n-dimensional points
         return other.__class__(other.coordinates[0] + self.value)
@@ -407,15 +407,15 @@ class Slot(object):
     
     __POINT_TYPE__ = Point
     
-    def __init__(self, start, end=None, span=None):
+    def __init__(self, start, end=None, unit=None):
         
         
         if not isinstance(start, self.__POINT_TYPE__):
             raise TypeError('Slot start must be a Point object (got "{}")'.format(start.__class__.__name__))
-        if end is None and span is not None:
+        if end is None and unit is not None:
             if len(start.coordinates)>1:
-                raise Exception('Sorry, setting a start and a span only works in unidimensional spaces')
-            end = start + span
+                raise Exception('Sorry, setting a start and a unit only works in unidimensional spaces')
+            end = start + unit
         if not isinstance(end, self.__POINT_TYPE__):
             raise TypeError('Slot end must be a Point object (got "{}")'.format(end.__class__.__name__))
         
@@ -428,8 +428,8 @@ class Slot(object):
         self.start = start
         self.end   = end
         
-        if span is not None:
-            self._span = span
+        if unit is not None:
+            self._unit = unit
 
     def __repr__(self):
         return '{} @ [{},{}]'.format(self.__class__.__name__, self.start.__coordinates_repr__, self.end.__coordinates_repr__)
@@ -467,32 +467,32 @@ class Slot(object):
         return self._length
 
     #@property
-    #def span(self):
-    #    class Span(object):
+    #def unit(self):
+    #    class Unit(object):
     #        
     #        def __init__(self, length):
     #            self.length=length
     #            
     #        def __repr__(self):
-    #            return 'Span of {} '.format(self.length)
+    #            return 'Unit of {} '.format(self.length)
     #    try:
-    #        return str(self._span)
+    #        return str(self._unit)
     #    except AttributeError:
-    #        return Span(self.length)
+    #        return Unit(self.length)
 
     @property
-    def span(self):
+    def unit(self):
         try:
-            return self._span
+            return self._unit
         except AttributeError:
             if len(self.start.coordinates) == 1:
-                return Span(self.end.coordinates[0] - self.start.coordinates[0])
+                return Unit(self.end.coordinates[0] - self.start.coordinates[0])
             else:
                 values = []
                 for i in range(len(self.start.coordinates)):
                     values.append(self.end.coordinates[i] - self.start.coordinates[i])
                 
-                return Span(values)
+                return Unit(values)
 
 
 class TimeSlot(Slot):
@@ -500,7 +500,7 @@ class TimeSlot(Slot):
     __POINT_TYPE__ = TimePoint
 
    
-    def __init__(self, start, end=None, span=None):
+    def __init__(self, start, end=None, unit=None):
         try:
             if start.tz != end.tz:
                 raise ValueError('{} start and end must have the same time zone (got start.tz="{}", end.tz="{}")'.format(self.__class__.__name__, start.tz, end.tz))
@@ -509,7 +509,7 @@ class TimeSlot(Slot):
             pass
         else:    
             self.tz = start.tz
-        super(TimeSlot, self).__init__(start=start, end=end, span=span)
+        super(TimeSlot, self).__init__(start=start, end=end, unit=unit)
 
     # Overwrite parent succedes, this has better performance as it checks for only one dimension
     def __succedes__(self, other):
@@ -613,20 +613,20 @@ class SlotSeries(Series):
     def append(self, item):
         
         # Slots can belong to the same series if they are in succession (tested with the __succedes__ method)
-        # and if they have the same span, which we test here instead as the __succedes__ is more general.
+        # and if they have the same unit, which we test here instead as the __succedes__ is more general.
         try:
-            if self.slot_span != item.span:
+            if self.slot_unit != item.unit:
                 # Try for floatign point precision errors
                 abort = False
                 try:
-                    if not  is_close(self.slot_span, item.span):
+                    if not  is_close(self.slot_unit, item.unit):
                         abort = True
                 except (TypeError, ValueError):
                     abort = True
                 if abort:
-                    raise ValueError('Cannot add items with different spans (I have "{}" and you tried to add "{}")'.format(self.slot_span, item.span))
+                    raise ValueError('Cannot add items with different units (I have "{}" and you tried to add "{}")'.format(self.slot_unit, item.unit))
         except AttributeError:
-            self.slot_span = item.span
+            self.slot_unit = item.unit
 
         # Call parent append
         super(SlotSeries, self).append(item)
@@ -674,7 +674,7 @@ class DataSlotSeries(SlotSeries):
                     raise ValueError('Got different data keys: {} vs {}'.format(self.item_data_reference.keys(), item.data.keys()))
 
         except AttributeError:
-            # TODO: uniform self.tz, self.slot_span, self.item_data_reference
+            # TODO: uniform self.tz, self.slot_unit, self.item_data_reference
             self.item_data_reference = item.data
         
         super(DataSlotSeries, self).append(item)
@@ -722,9 +722,9 @@ class DataTimeSlotSeries(DataSlotSeries, TimeSlotSeries):
         #    return aggregate_by
 
     def __repr__(self):
-        if isinstance(self.slot_span, TimeSpan):
-            slot_span_str = str(self.slot_span)
+        if isinstance(self.slot_unit, TimeUnit):
+            slot_unit_str = str(self.slot_unit)
         else:
-            slot_span_str = str(self.slot_span) + 's' 
-        return '{} of #{} {}s of {}, from slot starting at {} to slot ending at {}'.format(self.__class__.__name__, len(self), self.__TYPE__.__name__, slot_span_str, TimePoint(self[0].start), TimePoint(self[-1].end))
+            slot_unit_str = str(self.slot_unit) + 's' 
+        return '{} of #{} {}s of {}, from slot starting at {} to slot ending at {}'.format(self.__class__.__name__, len(self), self.__TYPE__.__name__, slot_unit_str, TimePoint(self[0].start), TimePoint(self[-1].end))
 

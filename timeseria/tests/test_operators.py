@@ -5,7 +5,7 @@ from ..datastructures import Series, DataPointSeries, TimePointSeries, DataTimeP
 from ..storages import CSVFileStorage
 #from ..operators import diff, min, slot, Slotter,
 from ..operators import diff, min, derivative 
-from ..time import TimeSpan, dt, s_from_dt, dt_from_s, dt_from_str
+from ..time import TimeUnit, dt, s_from_dt, dt_from_s, dt_from_str
 from ..exceptions import InputException
 
 # Setup logging

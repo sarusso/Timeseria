@@ -1,4 +1,4 @@
-from .time import TimeSpan, dt_from_s, s_from_dt
+from .time import TimeUnit, dt_from_s, s_from_dt
 from .datastructures import DataTimeSlot, DataTimeSlotSeries, TimePoint, DataTimePointSeries
 from .utilities import compute_coverage, is_almost_equal, is_close
 
@@ -29,25 +29,25 @@ class Transformation(object):
 
 class Slotter(Transformation):
 
-    def __init__(self, span):
-        self.time_span = self._span_to_TimeSpan(span)
+    def __init__(self, unit):
+        self.time_unit = self._unit_to_TimeUnit(unit)
 
     @classmethod
-    def _span_to_TimeSpan(cls, span):
-        if isinstance(span, TimeSpan):
-            time_span = span
-        elif isinstance(span, int):
-            time_span = TimeSpan(seconds=span)
-        elif isinstance(span, float):
-            if int(str(span).split('.')[1]) != 0:
+    def _unit_to_TimeUnit(cls, unit):
+        if isinstance(unit, TimeUnit):
+            time_unit = unit
+        elif isinstance(unit, int):
+            time_unit = TimeUnit(seconds=unit)
+        elif isinstance(unit, float):
+            if int(str(unit).split('.')[1]) != 0:
                 raise ValueError('Cannot process decimal seconds yet')
-            time_span = TimeSpan(seconds=span)
-        elif isinstance(span, str):
-            time_span = TimeSpan(span)
-            span = time_span
+            time_unit = TimeUnit(seconds=unit)
+        elif isinstance(unit, str):
+            time_unit = TimeUnit(unit)
+            unit = time_unit
         else:
-            raise ValueError('Unknown span type "{}"'.format(span.__class__.__name__))
-        return time_span
+            raise ValueError('Unknown unit type "{}"'.format(unit.__class__.__name__))
+        return time_unit
 
     @classmethod
     def _detect_dataPoints_validity(cls, data_time_pointSeries):
@@ -87,7 +87,7 @@ class Slotter(Transformation):
         return(most_common_diff)
 
 
-    def _compute_slot(self, data_time_pointSeries, span, start_t, end_t, validity, timezone):
+    def _compute_slot(self, data_time_pointSeries, unit, start_t, end_t, validity, timezone):
 
         # Compute coverage
         slot_coverage = compute_coverage(data_time_pointSeries,
@@ -111,7 +111,7 @@ class Slotter(Transformation):
         # Create the DataTimeSlot
         data_time_slot = DataTimeSlot(start = TimePoint(t=start_t, tz=timezone),
                                     end   = TimePoint(t=end_t, tz=timezone),
-                                    span  = span,
+                                    unit  = unit,
                                     data  = slot_data,
                                     coverage = slot_coverage)
         
@@ -140,27 +140,27 @@ class Slotter(Transformation):
         if from_t is None:
             from_t = data_time_pointSeries[0].t
             from_dt = dt_from_s(from_t)
-            # Is the point already rounded to the time span or do we have to round it ourselves?
-            if not from_dt == self.time_span.round_dt(from_dt):
-                from_dt = self.time_span.round_dt(from_dt, how=from_rounding_method)
+            # Is the point already rounded to the time unit or do we have to round it ourselves?
+            if not from_dt == self.time_unit.round_dt(from_dt):
+                from_dt = self.time_unit.round_dt(from_dt, how=from_rounding_method)
                 from_t  = s_from_dt(from_dt)
         else:
             from_dt = dt_from_s(from_t)
-            if from_dt != self.time_span.round_dt(from_dt):
-                raise ValueError('Sorry, provided from_t is not consistent with the self.time_span of "{}" (Got "{}")'.format(self.time_span, from_t))
+            if from_dt != self.time_unit.round_dt(from_dt):
+                raise ValueError('Sorry, provided from_t is not consistent with the self.time_unit of "{}" (Got "{}")'.format(self.time_unit, from_t))
 
         # Set "to" if not set, otherwise check for consistency # TODO: move to streaming
         if to_t is None:
             to_t = data_time_pointSeries[-1].t
             to_dt = dt_from_s(to_t)
-            # Is the point already rounded to the time span or do we have to round it ourselves?
-            if not to_dt == self.time_span.round_dt(to_dt):
-                to_dt = self.time_span.round_dt(to_dt, how=to_rounding_method)
+            # Is the point already rounded to the time unit or do we have to round it ourselves?
+            if not to_dt == self.time_unit.round_dt(to_dt):
+                to_dt = self.time_unit.round_dt(to_dt, how=to_rounding_method)
                 to_t  = s_from_dt(to_dt)
         else:
             to_dt = dt_from_s(to_t)
-            if to_dt != self.time_span.round_dt(to_dt):
-                raise ValueError('Sorry, provided to_t is not consistent with the self.time_span of "{}" (Got "{}")'.format(self.time_span, to_t))
+            if to_dt != self.time_unit.round_dt(to_dt):
+                raise ValueError('Sorry, provided to_t is not consistent with the self.time_unit of "{}" (Got "{}")'.format(self.time_unit, to_t))
         
         # Automatically detect validity if not set
         if validity is None:
@@ -201,7 +201,7 @@ class Slotter(Transformation):
             
             # Set start_dt if not already done TODO: implement it correctly
             #if not from_dt:
-            #    from_dt = self.time_span.timeInterval.round_dt(data_time_point.dt) if rounded else data_time_point.dt
+            #    from_dt = self.time_unit.timeInterval.round_dt(data_time_point.dt) if rounded else data_time_point.dt
             
             # Pretend there was a slot before if we are at the beginning. TOOD: improve me.
             if not slot_end_t:   
@@ -254,7 +254,7 @@ class Slotter(Transformation):
                         
                         # Compute slot...
                         dataTimeslot = self._compute_slot(working_serie,
-                                                          span     = self.time_span,
+                                                          unit     = self.time_unit,
                                                           start_t  = slot_start_t,
                                                           end_t    = slot_end_t,
                                                           validity = validity,
@@ -266,7 +266,7 @@ class Slotter(Transformation):
 
                     # Create a new slot. This is where all the "conventional" time logic kicks-in, and where the time zone is required.
                     slot_start_t = slot_end_t
-                    slot_end_t   = s_from_dt(dt_from_s(slot_start_t, tz=timezone) + self.time_span)
+                    slot_end_t   = s_from_dt(dt_from_s(slot_start_t, tz=timezone) + self.time_unit)
                     
                     # Create a new working_serie as part of the "create a new slot" procedure
                     working_serie = DataTimePointSeries()
@@ -285,7 +285,7 @@ class Slotter(Transformation):
                         
                         # Compute slot...
                         dataTimeslot = self._compute_slot(working_serie,
-                                                          span     = self.time_span, 
+                                                          unit     = self.time_unit, 
                                                           start_t  = slot_start_t,
                                                           end_t    = slot_end_t,
                                                           validity = validity,
@@ -314,7 +314,7 @@ class Slotter(Transformation):
       
                 # Compute slot...
                 dataTimeslot = self._compute_slot(working_serie,
-                                                  span     = self.time_span, 
+                                                  unit     = self.time_unit, 
                                                   start_t  = slot_start_t,
                                                   end_t    = slot_end_t,
                                                   validity = validity,

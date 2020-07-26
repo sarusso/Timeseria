@@ -3,7 +3,7 @@ import os
 from ..exceptions import InputException
 from ..utilities import detect_encoding, compute_coverage, get_periodicity
 from ..datastructures import DataTimePointSeries, DataTimePoint
-from ..time import dt, s_from_dt, TimeSpan
+from ..time import dt, s_from_dt, TimeUnit
 from ..storages import CSVFileStorage
 from ..transformations import Slotter
 
@@ -76,7 +76,7 @@ class TestComputeCoverage(unittest.TestCase):
         # Time series from 2019,10,1,1,0,0 to 2019,10,1,6,0,0 (Europe/Rome)
         from_dt  = dt(2019,10,1,1,0,0, tzinfo='Europe/Rome')
         to_dt    = dt(2019,10,1,6,0,0, tzinfo='Europe/Rome')
-        time_span = TimeSpan('15m') 
+        time_unit = TimeUnit('15m') 
         self.data_time_point_series_6 = DataTimePointSeries()
         slider_dt = from_dt
         count = 0
@@ -85,7 +85,7 @@ class TestComputeCoverage(unittest.TestCase):
                 data_time_point = DataTimePoint(t    = s_from_dt(slider_dt),
                                                 data = {'temperature': 154+count})
                 self.data_time_point_series_6.append(data_time_point)
-            slider_dt = slider_dt + time_span
+            slider_dt = slider_dt + time_unit
             count += 1
  
 
