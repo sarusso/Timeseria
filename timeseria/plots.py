@@ -477,7 +477,7 @@ animatedZooms: true,"""
            },
          },
     """
-    if isinstance(serie, DataTimeSlotSeries) and len(serie[0].data.keys()) <=1:
+    if isinstance(serie, DataTimeSlotSeries) and len(serie[0].data) <=1:
         dygraphs_javascript += """colors: ['rgb(0,128,128)'],""" # Force "original" Dygraph color.
 
     if serie_mark:            
