@@ -546,10 +546,30 @@ class TestSlotSeries(unittest.TestCase):
         with self.assertRaises(ValueError):
             data_time_slot_series.append(DataTimeSlot(start=TimePoint(t=120), end=TimePoint(t=180), data={'a':56, 'c':67}))            
 
-        # Test slot_unit
+        # Test with units
         self.assertEqual(data_time_slot_series.slot_unit, Unit(60.0))
         self.assertEqual(DataTimeSlotSeries(DataTimeSlot(start=TimePoint(t=60), end=TimePoint(t=120), data=23.8, unit=TimeUnit('60s'))).slot_unit, TimeUnit('60s'))
         
+        data_time_slot_series = DataTimeSlotSeries()
+        prev_t    = 1595862221
+        for _ in range (0, 10):
+            t    = prev_t + 60
+            data_time_slot_series.append(DataTimeSlot(start=TimePoint(t=t), unit=TimeUnit('60s'), data=[5]))    
+            prev_t    = t
+        self.assertEqual(len(data_time_slot_series),10)
+        self.assertEqual(data_time_slot_series[0].unit,TimeUnit('60s'))
+        self.assertNotEqual(data_time_slot_series[0].unit, Unit(60))
+
+        # NotImplementedError: Shifting of Logical intervals not yet implemented
+        #data_time_slot_series = DataTimeSlotSeries()
+        #prev_t    = 1595862221
+        #for _ in range (0, 10):
+        #    t    = prev_t + 60
+        #    data_time_slot_series.append(DataTimeSlot(start=TimePoint(t=t), unit=TimeUnit('1D'), data=[5]))    
+        #    prev_t    = t
+        #self.assertEqual(len(data_time_slot_series),10)
+        #self.assertEqual(data_time_slot_series[0].unit,TimeUnit('1D'))
+
         
     def test_cannge_timezone_DataTimeSlotSeries(self):
         from ..time import timezonize
@@ -565,5 +585,6 @@ class TestSlotSeries(unittest.TestCase):
         
 
 
+    
 
 

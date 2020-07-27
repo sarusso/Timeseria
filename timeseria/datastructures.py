@@ -466,8 +466,12 @@ class TimeSlot(Slot):
             if start.tz != end.tz:
                 raise ValueError('{} start and end must have the same time zone (got start.tz="{}", end.tz="{}")'.format(self.__class__.__name__, start.tz, end.tz))
         except AttributeError:
-            # If we don't have a time zone, we don't have TimePoints, the parent will make the Slot creation fail with a TypeError
-            pass
+            if end is None:
+                # We are using the Unit, use the start
+                self.tz = start.tz
+            else:
+                # If we don't have a time zone, we don't have TimePoints, the parent will make the Slot creation fail with a TypeError
+                pass
         else:    
             self.tz = start.tz
         super(TimeSlot, self).__init__(start=start, end=end, unit=unit)

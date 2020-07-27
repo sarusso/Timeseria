@@ -62,9 +62,12 @@ class TimeUnit(object):
 
         if not trustme:
 
+            if string and not isinstance(string, str):
+                raise InputException('TimeUnits must be initialized with a string or explicitly setting years, months, days, hours etc. (Got "{}")'.format(string.__class__.__name__))
+
             # String OR explicit OR start/end
             if string and (years or months or days or hours or minutes or seconds or microseconds) and ((start is not None) or (end is not None)):
-                raise InputException('Choose between string init and explicit setting of years,months, days, hours etc.')
+                raise InputException('Choose between string init and explicit setting of years, months, days, hours etc.')
     
             # Check that both start and end are set if one is set
             if start and not end:

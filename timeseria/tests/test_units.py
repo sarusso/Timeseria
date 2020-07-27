@@ -11,6 +11,9 @@ class TestUnits(unittest.TestCase):
 
 
     def test_TimeUnit(self):
+
+        with self.assertRaises(InputException):
+            _ = TimeUnit(60)
         
         # TODO: I had to comment out this test, find out why..
         # Complex time intervals are not supported
