@@ -152,7 +152,7 @@ def compute_coverage(data_time_point_series, from_t, to_t, trustme=False, validi
             empty_data_time_point_series = False
 
         # Compute coverage
-        # TODO: and idea could also to initialize Spans and sum them
+        # TODO: and idea could also to initialize Units and sum them
         if prev_dataPoint_valid_to_t is None:
             value = this_data_time_point_valid_from_t - from_t
             

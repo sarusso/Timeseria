@@ -1,8 +1,9 @@
 import os
 import uuid
 import datetime
-from .time import dt_from_s, TimeSpan, dt_to_str, utckfake_s_from_dt
+from .time import dt_from_s, dt_to_str, utckfake_s_from_dt
 from .datastructures import DataTimePointSeries, DataTimeSlotSeries
+from .units import TimeUnit
 
 # Setup logging
 import logging
@@ -222,18 +223,18 @@ def dygraphs_plot(serie, aggregate_by, log_js=False, show_data_loss=True, show_d
         drawPoints_value = 'true'
         legend_pre = ''
     elif isinstance(serie, DataTimeSlotSeries):
-        if isinstance(serie.slot_span, TimeSpan):
-            serie_span_string = str(serie.slot_span)
+        if isinstance(serie.slot_unit, TimeUnit):
+            serie_unit_string = str(serie.slot_unit)
         else:
-            serie_span_string = str(serie.slot_span).split('.')[0]+'s'
+            serie_unit_string = str(serie.slot_unit).split('.')[0]+'s'
         if aggregate_by: 
             raise NotImplementedError('Plotting slots with a plot-level aggregation is not yet supported')
         stepPlot_value   = 'true'
         drawPoints_value = 'false'
         if aggregate_by:
-            legend_pre = 'Slot of {}x{} starting at '.format(aggregate_by, serie_span_string)
+            legend_pre = 'Slot of {}x{} starting at '.format(aggregate_by, serie_unit_string)
         else:
-            legend_pre = 'Slot of {} starting at '.format(serie_span_string)
+            legend_pre = 'Slot of {} starting at '.format(serie_unit_string)
 
     else:
         raise Exception('Don\'t know how to plot an object of type "{}"'.format(serie.__class__.__name__))
@@ -245,7 +246,7 @@ def dygraphs_plot(serie, aggregate_by, log_js=False, show_data_loss=True, show_d
         if isinstance(serie, DataTimePointSeries):
             title = serie.__class__.__name__
         elif isinstance(serie, DataTimeSlotSeries):
-            title = '{} of {} Slots '.format(serie.__class__.__name__, serie_span_string)
+            title = '{} of {} Slots '.format(serie.__class__.__name__, serie_unit_string)
         else:
             title = serie.__class__.__name__
 
@@ -272,7 +273,7 @@ def dygraphs_plot(serie, aggregate_by, log_js=False, show_data_loss=True, show_d
             show_data_reconstructed=False
             show_data_loss=False
             serie_mark=True
-            serie_mark_html = ' &nbsp; (forecast highlighted in <span style="background:rgba(255, 255, 102, .6);">yellow</span>)'
+            serie_mark_html = ' &nbsp; (forecast highlighted in <unit style="background:rgba(255, 255, 102, .6);">yellow</unit>)'
         else:
             serie_mark=False
             serie_mark_html=''
@@ -303,7 +304,7 @@ function legendFormatter(data) {
           if (!series.isVisible) continue;
 
           if (html !== '') html += sepLines ? '<br/>' : ' ';
-          html += "<span style='margin-left:15px; font-weight: bold; color: " + series.color + ";'>" + series.dashHTML + " " + series.labelHTML + "</span>, ";
+          html += "<unit style='margin-left:15px; font-weight: bold; color: " + series.color + ";'>" + series.dashHTML + " " + series.labelHTML + "</unit>, ";
           // Remove last comma and space
           html = html.substring(0, html.length - 2);
         }
@@ -328,7 +329,7 @@ function legendFormatter(data) {
         }
         console.log(decoration)*/
         //decoration = ' style="background-color: #fcf8b0"'
-        html += "<span" + decoration + "> <b><span style='color: " + series.color + ";'>" + series.labelHTML + "</span></b>:&#160;" + series.yHTML + "</span>, ";
+        html += "<unit" + decoration + "> <b><unit style='color: " + series.color + ";'>" + series.labelHTML + "</unit></b>:&#160;" + series.yHTML + "</unit>, ";
       }
       // Remove last comma and space
       html = html.substring(0, html.length - 2);
