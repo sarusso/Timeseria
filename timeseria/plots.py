@@ -54,7 +54,7 @@ def to_dg_time(dt):
         return 'new Date(Date.UTC({}, {}, {}, {}, {}, {}))'.format(dt.year, dt.month-1, dt.day, dt.hour, dt.minute, dt.second)
 
 
-def to_dg_data(serie, aggregate_by=0, plot_data_loss=False, plot_data_reconstructed=False):
+def to_dg_data(serie, aggregate_by=0, plot_data_loss=False, plot_data_reconstructed=False, serie_mark=None):
     '''{% for timestamp,value in metric_data.items %}{{timestamp}},{{value}}\n{%endfor%}}'''
     
     dg_data=''
@@ -63,6 +63,10 @@ def to_dg_data(serie, aggregate_by=0, plot_data_loss=False, plot_data_reconstruc
 
     global_min = None
     global_max = None
+    
+    if serie_mark:
+        serie_mark_start_t = s_from_dt(serie.mark[0])
+        serie_mark_end_t = s_from_dt(serie.mark[1])
 
     for i, item in enumerate(serie):
         
@@ -80,6 +84,7 @@ def to_dg_data(serie, aggregate_by=0, plot_data_loss=False, plot_data_reconstruc
             data_sums = [0 for key in keys]
             data_mins = [None for key in keys]
             data_maxs = [None for key in keys]
+            data_loss = None
 
         if aggregate_by:
 
@@ -134,6 +139,13 @@ def to_dg_data(serie, aggregate_by=0, plot_data_loss=False, plot_data_reconstruc
                 else:
                     if data > data_maxs[j]:
                         data_maxs[j] = data
+            
+            if isinstance(serie, DataTimeSlotSeries):
+                # Data loss
+                if item.data_loss is not None:
+                    if data_loss is None:
+                        data_loss = 0
+                    data_loss += item.data_loss 
 
             # Dump aggregated data?
             if (i!=0)  and ((i % aggregate_by)==0):
@@ -145,17 +157,53 @@ def to_dg_data(serie, aggregate_by=0, plot_data_loss=False, plot_data_reconstruc
                 data_part=''
                 for i, key in enumerate(keys):
                     avg = data_sums[i]/aggregate_by
-                    #if key == 'data_loss':
-                    #    data_part+='{};{};{},'.format(0, avg, avg)                    
-                    #else:
                     data_part+='[{},{},{}],'.format( data_mins[i], avg, data_maxs[i])
+                #if isinstance(serie, DataTimeSlotSeries):
+                #    # Add data loss
+                #    data_part+='[0,{0},{0}],'.format(data_loss/aggregate_by)
+                
+                # Do we have a mark?
+                if serie_mark:
+ 
+                    if item.start.t >= serie_mark_start_t and item.end.t < serie_mark_end_t:
+                        if isinstance(serie, DataTimeSlotSeries):
+                            # Add null data loss
+                            data_part+=','
+                        data_part+='[0,1,1],'
+                        
+                    else:
+                        if isinstance(serie, DataTimeSlotSeries):
+                            # Add data loss
+                            if data_loss is not None:
+                                data_part+='[0,{0},{0}],'.format(data_loss/aggregate_by)
+                            else:
+                                data_part+=','
+                        # Add null data loss
+                        data_part+=','
+                else:
+                    if isinstance(serie, DataTimeSlotSeries):
+                        # Add data loss
+                        if data_loss is not None:
+                            data_part+='[0,{0},{0}],'.format(data_loss/aggregate_by)
+                        else:
+                            data_part+=','
+                            
+                    
+                
+                # Remove last comma
                 data_part=data_part[0:-1]
                 dg_data+='[{},{}],'.format(to_dg_time(dt_from_s(t, tz=item.tz)), data_part)
+                
+                # Reset averages
                 data_sums = [0 for key in keys]
                 data_mins = [None for key in keys]
                 data_maxs = [None for key in keys]
+                data_loss = None
                 first_t = None
 
+        #====================
+        #  No aggregation
+        #====================
         else:
                     
             # Loop over all the keys, including the "None" key if we have no keys (float data)
@@ -182,21 +230,55 @@ def to_dg_data(serie, aggregate_by=0, plot_data_loss=False, plot_data_reconstruc
                     if data > global_max:
                         global_max = data
                 
-            # Remove last comma
-            data_part = data_part[0:-1]
 
             if isinstance(serie, DataTimePointSeries):
                 t = item.t
             elif isinstance(serie, DataTimeSlotSeries):
                 t = item.start.t
-                if plot_data_loss:
-                    if item.data_loss is None:
-                        raise ValueError('I tried to plot the data_loss but i got a None value for {}'.format(item))
-                    data_part+=',{}'.format(item.data_loss)
-                elif plot_data_reconstructed:
-                    if item.data_reconstructed is None:
-                        raise ValueError('I tried to plot the data_reconstructed but i got a None value for {}'.format(item))
-                    data_part+=',{}'.format(item.data_reconstructed)
+                #if plot_data_loss:
+                #    if item.data_loss is None:
+                #        raise ValueError('I tried to plot the data_loss but i got a None value for {}'.format(item))
+                #    data_part+=',{}'.format(item.data_loss)
+                #elif plot_data_reconstructed:
+                #    if item.data_reconstructed is None:
+                #        raise ValueError('I tried to plot the data_reconstructed but i got a None value for {}'.format(item))
+                #    data_part+=',{}'.format(item.data_reconstructed)
+
+
+                # Do we have a mark?
+                if serie_mark:
+ 
+                    if item.start.t >= serie_mark_start_t and item.end.t < serie_mark_end_t:
+                        if isinstance(serie, DataTimeSlotSeries):
+                            # Add data loss
+                            if item.data_loss is None:
+                                data_part+=','
+                            else:
+                                data_part+='{},'.format(item.data_loss)
+                        data_part+='1,'
+                        
+                    else:
+                        if isinstance(serie, DataTimeSlotSeries):
+                            # Add null data loss
+                            if item.data_loss is None:
+                                data_part+=','
+                            else:
+                                data_part+='{},'.format(item.data_loss)
+                        
+                        data_part+='0,'
+                else:
+                    if isinstance(serie, DataTimeSlotSeries):
+                        # Add null data loss
+                        if item.data_loss is None:
+                            data_part+=','
+                        else:
+                            data_part+='{},'.format(item.data_loss)
+                    
+                
+            # Remove last comma
+            data_part = data_part[0:-1]
+
+
 
             dg_data+='[{},{}],'.format(to_dg_time(dt_from_s(t, tz=item.tz)), data_part)
 
@@ -210,10 +292,13 @@ def to_dg_data(serie, aggregate_by=0, plot_data_loss=False, plot_data_reconstruc
 #  Dygraphs plot
 #=================
 
-def dygraphs_plot(serie, aggregate_by, log_js=False, show_data_loss=True, show_data_reconstructed=True, show_data_forecasted=True):
+def dygraphs_plot(serie, aggregate_by, log_js=False, show_data_loss=True, show_data_forecasted=True):
     '''Plot a data_time_pointSeries in Jupyter using Dugraph. Based on the work here: https://www.stefaanlippens.net/jupyter-custom-d3-visualization.html'''
     from IPython.display import display, Javascript, HTML
-
+    
+    # Force disable of plotting reconstructed data
+    show_data_reconstructed=False
+    
     if len(serie)==0:
         raise Exception('Cannot plot empty serie')
 
@@ -221,18 +306,22 @@ def dygraphs_plot(serie, aggregate_by, log_js=False, show_data_loss=True, show_d
     if isinstance(serie, DataTimePointSeries):
         stepPlot_value   = 'false'
         drawPoints_value = 'true'
-        legend_pre = ''
+        if aggregate_by:
+            legend_pre = 'Point (aggregated by {}) at '.format(aggregate_by)
+        else:
+            legend_pre = 'Point at '
     elif isinstance(serie, DataTimeSlotSeries):
         if isinstance(serie.slot_unit, TimeUnit):
             serie_unit_string = str(serie.slot_unit)
         else:
-            serie_unit_string = str(serie.slot_unit).split('.')[0]+'s'
-        if aggregate_by: 
-            raise NotImplementedError('Plotting slots with a plot-level aggregation is not yet supported')
+            serie_unit_string = str(serie.slot_unit) #.split('.')[0]+'s'
+        #if aggregate_by: 
+        #    raise NotImplementedError('Plotting slots with a plot-level aggregation is not yet supported')
         stepPlot_value   = 'true'
         drawPoints_value = 'false'
         if aggregate_by:
-            legend_pre = 'Slot of {}x{} starting at '.format(aggregate_by, serie_unit_string)
+            # TODO: "Slot of {} unit" ?
+            legend_pre = 'Slot of {}x{} (aggregated) starting at '.format(aggregate_by, serie_unit_string)
         else:
             legend_pre = 'Slot of {} starting at '.format(serie_unit_string)
 
@@ -244,9 +333,19 @@ def dygraphs_plot(serie, aggregate_by, log_js=False, show_data_loss=True, show_d
         title = serie.title
     else:
         if isinstance(serie, DataTimePointSeries):
-            title = serie.__class__.__name__
+            if aggregate_by:
+                title = 'Time series of #{} points, aggregated by {}'.format(len(serie), aggregate_by)
+            else:
+                title = 'Time series of #{} points'.format(len(serie))
+             
         elif isinstance(serie, DataTimeSlotSeries):
-            title = '{} of {} Slots '.format(serie.__class__.__name__, serie_unit_string)
+            if aggregate_by:
+                # TODO: "slots of unit" ?
+                title = 'Time series of #{} slots of {}, aggregated by {}'.format(len(serie), serie_unit_string, aggregate_by)
+            else:
+                # TODO: "slots of unit" ?
+                title = 'Time series of #{} slots of {}'.format(len(serie), serie_unit_string)
+                
         else:
             title = serie.__class__.__name__
 
@@ -271,7 +370,7 @@ def dygraphs_plot(serie, aggregate_by, log_js=False, show_data_loss=True, show_d
                 raise TypeError('Series marks must be datetime objects')
             logger.info('Found data forecast mark and showing it')
             show_data_reconstructed=False
-            show_data_loss=False
+            #show_data_loss=False
             serie_mark=True
             serie_mark_html = ' &nbsp; (forecast highlighted in <unit style="background:rgba(255, 255, 102, .6);">yellow</unit>)'
         else:
@@ -302,6 +401,10 @@ function legendFormatter(data) {
           var series = data.series[i];
           // Skip not visible series
           if (!series.isVisible) continue;
+          
+          // Also skip Timeseria-specific series
+          if (series.label=='data_mark') continue;
+          
 
           if (html !== '') html += sepLines ? '<br/>' : ' ';
           html += "<unit style='margin-left:15px; font-weight: bold; color: " + series.color + ";'>" + series.dashHTML + " " + series.labelHTML + "</unit>, ";
@@ -315,8 +418,13 @@ function legendFormatter(data) {
       html = '""" + legend_pre + """' + data.xHTML + ' (""" + str(serie.tz)+ """):';
       for (var i = 0; i < data.series.length; i++) {  
         var series = data.series[i];
+        
         // Skip not visible series
         if (!series.isVisible) continue;
+        
+        // Also skip Timeseria-specific series
+        if (series.label=='data_mark') continue;
+        
         if (sepLines) html += '<br>';
         //var decoration = series.isHighlighted ? ' class="highlight"' : '';
         var decoration = series.isHighlighted ? ' style="background-color: #000000"' : '';
@@ -375,10 +483,13 @@ function legendFormatter(data) {
     elif show_data_loss and data_loss_indexes:
         labels+=',data_loss'
         plot_data_loss = True
+    if serie_mark:
+        labels+=',data_mark'
+    
         
     labels_list = ['Timestamp'] + labels.split(',')
 
-    global_min, global_max, dg_data = to_dg_data(serie, aggregate_by, plot_data_loss=plot_data_loss, plot_data_reconstructed=plot_data_reconstructed)
+    global_min, global_max, dg_data = to_dg_data(serie, aggregate_by, plot_data_loss=plot_data_loss, plot_data_reconstructed=plot_data_reconstructed, serie_mark=serie_mark)
     if global_max != global_min:
         plot_min = str(global_min-((global_max-global_min)*0.1))
         plot_max = str(global_max+((global_max-global_min)*0.1))
@@ -397,7 +508,7 @@ labels: """+str(labels_list)+""",
 drawGrid: true,
 drawPoints:"""+drawPoints_value+""",
 strokeWidth: 1.5,
-pointSize:2.0,
+pointSize:1.5,
 highlightCircleSize:4,
 stepPlot: """+stepPlot_value+""",
 fillGraph: false,
@@ -440,13 +551,17 @@ animatedZooms: true,"""
 
     if isinstance(serie, DataTimeSlotSeries):
         if aggregate_by:
-            rgba_value_red   = 'rgba(255,128,128,1)' # For the legend
+            rgba_value_red    = 'rgba(255,128,128,1)' # For the legend
+            rgba_value_gray   = 'rgba(240,240,240,1)' # For the legend
             rgba_value_orange = 'rgba(255,169,128,1)' # For the legend
-            fill_alpha_value = 0.31                  # For the area
+            fill_alpha_value  = 0.31                  # For the area
         else:
             rgba_value_red    = 'rgba(255,128,128,1)' # For the legend
+            rgba_value_gray   = 'rgba(240,240,240,1)' # For the legend
             rgba_value_orange = 'rgba(255,179,128,1)' # For the legend
             fill_alpha_value  = 0.5                   # For the area
+            
+        rgba_value_yellow = 'rgba(255, 255, 102, 1)'
         
         if show_data_reconstructed and data_reconstructed_indexes:
             dygraphs_javascript += """series: {
@@ -475,12 +590,24 @@ animatedZooms: true,"""
              //color: 'rgba(255,0,0,0.6)' // This alpha is used for the legend 
              color: '"""+rgba_value_red+"""'
            },
+           'data_mark': {
+             //customBars: false, // Does not work?
+             axis: 'y2',
+             drawPoints: false,
+             strokeWidth: 0,
+             highlightCircleSize:0,
+             fillGraph: true,
+             fillAlpha: """+str(fill_alpha_value)+""",            // This alpha is used for the area
+             //color: 'rgba(122,122,122,0.6)' // This alpha is used for the legend 
+             color: '"""+rgba_value_yellow+"""'
+           }
          },
     """
     if isinstance(serie, DataTimeSlotSeries) and len(serie[0].data) <=1:
         dygraphs_javascript += """colors: ['rgb(0,128,128)'],""" # Force "original" Dygraph color.
 
-    if serie_mark:            
+    # Plotting series mark is disabled for now as we use the data_mark series instead
+    if serie_mark and False:            
         # Convert the mark to fake epoch milliseconds
         mark_start = utckfake_s_from_dt(serie.mark[0])*1000
         mark_end   = utckfake_s_from_dt(serie.mark[1])*1000

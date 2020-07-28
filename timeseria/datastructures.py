@@ -9,6 +9,7 @@ logger = logging.getLogger(__name__)
 
 HARD_DEBUG = False
 
+AGGREGATE_THRESHOLD = 10000
 
 #======================
 #  Generic Series
@@ -343,16 +344,23 @@ class DataTimePointSeries(DataPointSeries, TimePointSeries):
     __TYPE__ = DataTimePoint
 
     def plot(self, engine='dg', **kwargs):
-        if 'aggregate_by' in kwargs:
-            aggregate_by =  kwargs.pop('aggregate_by')
+        if 'aggregate' in kwargs:
+            if kwargs['aggregate'] is False:
+                aggregate_by = None
+            else:
+                aggregate_by = self.plot_aggregate_by
+            kwargs.pop('aggregate')
         else:
-            aggregate_by = self.plot_aggregate_by
+            if 'aggregate_by' in kwargs:
+                aggregate_by =  kwargs.pop('aggregate_by')
+            else:
+                aggregate_by = self.plot_aggregate_by
         if engine=='mp':
             from .plots import matplotlib_plot
             matplotlib_plot(self)
         elif engine=='dg':
             from .plots import dygraphs_plot
-            dygraphs_plot(self, aggregate_by=aggregate_by)
+            dygraphs_plot(self, aggregate_by=aggregate_by, **kwargs)
         else:
             raise Exception('Unknown plotting engine "{}'.format(engine))
 
@@ -361,17 +369,17 @@ class DataTimePointSeries(DataPointSeries, TimePointSeries):
         try:
             return self._plot_aggregate_by
         except AttributeError:
-            if len(self)  > 10000:
-                aggregate_by = 10**len(str(int(len(self)/10000.0)))
+            if len(self)  > AGGREGATE_THRESHOLD:
+                aggregate_by = 10**len(str(int(len(self)/float(AGGREGATE_THRESHOLD))))
             else:
                 aggregate_by = None
             return aggregate_by
 
     def __repr__(self):
         if len(self):
-            return '{} of #{} {}s, from {} to {}'.format(self.__class__.__name__, len(self), self.__TYPE__.__name__, TimePoint(self[0]), TimePoint(self[-1]))
+            return 'Time series of #{} points, from point @ {} ({}) to point @ {} ({})'.format(len(self), self[0].t, self[0].dt, self[-1].t, self[-1].dt)
         else:
-            return '{} of #0 {}s'.format(self.__class__.__name__, self.__TYPE__.__name__)
+            return 'Time series of #0 points'
 
 
 #======================
@@ -567,7 +575,6 @@ class DataTimeSlot(DataSlot, TimeSlot):
         
 
 
-
 #======================
 #  Slot Series
 #======================
@@ -595,7 +602,6 @@ class SlotSeries(Series):
 
         # Call parent append
         super(SlotSeries, self).append(item)
-
 
 
 class TimeSlotSeries(SlotSeries):
@@ -661,10 +667,17 @@ class DataTimeSlotSeries(DataSlotSeries, TimeSlotSeries):
     __TYPE__ = DataTimeSlot
 
     def plot(self, engine='dg', **kwargs):
-        if 'aggregate_by' in kwargs:
-            aggregate_by =  kwargs.pop('aggregate_by')
+        if 'aggregate' in kwargs:
+            if kwargs['aggregate'] is False:
+                aggregate_by = None
+            else:
+                aggregate_by = self.plot_aggregate_by
+            kwargs.pop('aggregate')
         else:
-            aggregate_by = self.plot_aggregate_by
+            if 'aggregate_by' in kwargs:
+                aggregate_by =  kwargs.pop('aggregate_by')
+            else:
+                aggregate_by = self.plot_aggregate_by
         if engine=='mp':
             from .plots import matplotlib_plot
             matplotlib_plot(self)
@@ -672,24 +685,33 @@ class DataTimeSlotSeries(DataSlotSeries, TimeSlotSeries):
             from .plots import dygraphs_plot
             dygraphs_plot(self, aggregate_by=aggregate_by, **kwargs)
         else:
-            raise Exception('Unknowmn plotting engine "{}'.format(engine))
+            raise Exception('Unknown plotting engine "{}'.format(engine))
 
     @property
     def plot_aggregate_by(self):
-        return None
-        #try:
-        #    return self._plot_aggregate_by
-        #except AttributeError:
-        #    if len(self)  > 10000:
-        #        aggregate_by = 10**len(str(int(len(self)/10000.0)))
-        #    else:
-        #        aggregate_by = None
-        #    return aggregate_by
+        # By default do not aggregate
+        #return None
+        
+        # Aggregate if more than AGGREGATE_THRESHOLD slots
+        try:
+            return self._plot_aggregate_by
+        except AttributeError:
+            if len(self)  > AGGREGATE_THRESHOLD:
+                aggregate_by = 10**len(str(int(len(self)/float(AGGREGATE_THRESHOLD))))
+            else:
+                aggregate_by = None
+            return aggregate_by
 
     def __repr__(self):
-        if isinstance(self.slot_unit, TimeUnit):
-            slot_unit_str = str(self.slot_unit)
+        if len(self):
+            if isinstance(self.slot_unit, TimeUnit):
+                slot_unit_str = str(self.slot_unit)
+            else:
+                slot_unit_str = str(self.slot_unit)# + 's' 
+            # TODO: "slots of unit" ?
+            return 'Time series of #{} slots of {}, from slot starting @ {} ({}) to slot ending @ {} ({})'.format(len(self), slot_unit_str, self[0].start.t, self[0].end.dt, self[-1].end.t, self[-1].end.dt)            
         else:
-            slot_unit_str = str(self.slot_unit) + 's' 
-        return '{} of #{} {}s of {}, from slot starting at {} to slot ending at {}'.format(self.__class__.__name__, len(self), self.__TYPE__.__name__, slot_unit_str, TimePoint(self[0].start), TimePoint(self[-1].end))
-
+            return 'Time series of #0 slots'
+    
+    
+    

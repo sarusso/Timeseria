@@ -83,7 +83,7 @@ class TestReconstructors(unittest.TestCase):
         
         # Get test data        
         data_time_point_series = CSVFileStorage(TEST_DATA_PATH + '/csv/temperature.csv').get()
-        data_time_slot_series = Slotter(60*60).process(data_time_point_series)
+        data_time_slot_series = Slotter('3600s').process(data_time_point_series)
         
         # Instantiate
         periodic_average_reconstructor = PeriodicAverageReconstructor()

@@ -670,7 +670,7 @@ class PeriodicAverageForecaster(Forecaster):
         forecasted_data_time_slot = DataTimeSlot(start = this_slot_start_timePoint,
                                                end   = this_slot_end_timePoint,
                                                unit  = forecast_data_time_slot_series[-1].unit,
-                                               coverage = 0,
+                                               coverage = None,
                                                data  = {key: self.data['averages'][periodicity_index] + (offset*1.0)})
 
         return forecasted_data_time_slot

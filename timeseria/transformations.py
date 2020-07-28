@@ -31,7 +31,11 @@ class Transformation(object):
 class Slotter(Transformation):
 
     def __init__(self, unit):
-        self.time_unit = self._unit_to_TimeUnit(unit)
+        if isinstance(unit, str) or isinstance(unit, TimeUnit):
+            self.time_unit = self._unit_to_TimeUnit(unit)
+        else:
+            raise NotImplementedError('Sorry, only TimeUnit objects or their string representation are supported by the Slotter for now')
+            
 
     @classmethod
     def _unit_to_TimeUnit(cls, unit):
