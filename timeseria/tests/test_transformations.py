@@ -131,7 +131,7 @@ class TestSlotter(unittest.TestCase):
     def test_slot(self):
         
         # Time series from 16:58:00 to 17:32:00 (Europe/Rome), no from/to, extremes excluded (default)
-        data_time_slot_series = Slotter(unit=600).process(self.data_time_point_series_1)
+        data_time_slot_series = Slotter('600s').process(self.data_time_point_series_1)
 
         # operators.slot()
         # operations.slot .merge .min .max .sum .aggreate
