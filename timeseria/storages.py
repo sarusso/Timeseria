@@ -194,7 +194,8 @@ class CSVFileStorage(object):
                                     self.time_column = posssible_time_column_name
                                     break                                
                             if time_column_index is None:
-                                raise Exception('Cannot auto-detect timestamp column') 
+                                #raise Exception('Cannot auto-detect timestamp column') 
+                                time_column_index = 0
                         else:
                             time_column_index = 0
                         # TODO: Try to convert to timestamp here?
@@ -280,10 +281,10 @@ class CSVFileStorage(object):
                             #t = s_from_dt(dt)
                 except Exception as e:
                     if self.skip_errors:
-                        logger.debug('Cannot parse timestamp "%s" in line #%s, skipping the line.', e, line_number)
+                        logger.debug('Cannot parse timestamp "%s" (%s) in line #%s, skipping the line.', timestamp, e, line_number)
                         continue
                     else:
-                        raise Exception('Cannot parse timestamp "{}" in line #%{}, aborting. Set "skip_errors=True" to drop them instead.'.format(e, line_number)) from None
+                        raise Exception('Cannot parse timestamp "{}" ({}) in line #%{}, aborting. Set "skip_errors=True" to drop them instead.'.format(timestamp, e, line_number)) from None
 
                 #====================
                 #  Data part

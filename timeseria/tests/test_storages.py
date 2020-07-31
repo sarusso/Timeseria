@@ -163,3 +163,13 @@ class TestCSVFileStorage(unittest.TestCase):
         self.assertEqual(data_time_point_series[0].t, 1583280000)
         self.assertEqual(data_time_point_series[-1].t, 1583298000)
 
+
+
+        # Test only date column and without meaningful timestamp label
+        storage = CSVFileStorage(TEST_DATA_PATH + '/csv/only_date_no_meaningful_timestamp_label.csv',
+                                 time_format = '%Y-%m-%d')
+
+        data_time_point_series = storage.get()
+        self.assertEqual(len(data_time_point_series), 95)
+        self.assertEqual(data_time_point_series[0].t, 1197244800)
+        self.assertEqual(data_time_point_series[-1].t, 1205798400)
