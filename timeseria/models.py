@@ -9,6 +9,7 @@ from .time import now_t, dt_from_s, s_from_dt
 from datetime import timedelta
 from sklearn.metrics import mean_squared_error
 from .units import TimeUnit
+from pandas import DataFrame
 
 # Setup logging
 import logging
@@ -453,7 +454,11 @@ class Forecaster(ParametricModel):
         
         # Set evaluation_score steps if we have to
         if steps_set == 'auto':
-            steps_set = [1, self.data['periodicity']]
+            try:
+                steps_set = [1, self.data['periodicity']]
+            except KeyError:
+                steps_set = [1, 3]
+                
 
         # Support var
         evaluation_score = {}
@@ -581,11 +586,23 @@ class Forecaster(ParametricModel):
                 this_slot_end_timePoint = TimePoint(this_slot_end_t, tz=tz)
 
                 # Call model forecasting logic
-                forecasted_data_time_slot = self._forecast(forecast_data_time_slot_series, data_time_slot_series.slot_unit, key, this_slot_start_timePoint, this_slot_end_timePoint, first_call)
+                forecast_model_results = self._forecast(forecast_data_time_slot_series, data_time_slot_series.slot_unit, key, this_slot_start_timePoint, this_slot_end_timePoint, first_call, n=n)
 
-                # Add the forecast to the forecasts time series
-                forecast_data_time_slot_series.append(forecasted_data_time_slot)
+                if isinstance(forecast_model_results, list):
+                    for forecasted_data_time_slot in forecast_model_results:
+                    
+                        # Add the forecast to the forecasts time series
+                        forecast_data_time_slot_series.append(forecasted_data_time_slot)
+                    
+                    # We are done
+                    break
                 
+                else:
+                
+                    # Add the forecast to the forecasts time series
+                    forecasted_data_time_slot = forecast_model_results
+                    forecast_data_time_slot_series.append(forecasted_data_time_slot)
+                    
                 # Set fist call to false if this was the first call
                 if first_call:
                     first_call = False 
@@ -641,7 +658,7 @@ class PeriodicAverageForecaster(Forecaster):
         logger.info('Model evaluation score: "{}"'.format(self.data['evaluation_score']))
 
 
-    def _forecast(self, forecast_data_time_slot_series, slot_unit, key, this_slot_start_timePoint, this_slot_end_timePoint, first_call) : #, data_time_slot_series, key, from_index, to_index):
+    def _forecast(self, forecast_data_time_slot_series, slot_unit, key, this_slot_start_timePoint, this_slot_end_timePoint, first_call, n) : #, data_time_slot_series, key, from_index, to_index):
 
         # Compute the offset (avg diff between the real values and the forecasts on the first window)
         try:
@@ -688,6 +705,124 @@ class PeriodicAverageForecaster(Forecaster):
 
 
 
+
+
+class ProphetForecaster(Forecaster):
+    '''Prophet (from facebook) implements a procedure for forecasting time series data based on an additive 
+model where non-linear trends are fit with yearly, weekly, and daily seasonality, plus holiday effects.
+It works best with time series that have strong seasonal effects and several seasons of historical data.
+Prophet is robust to missing data and shifts in the trend, and typically handles outliers well. 
+'''
+
+    @classmethod
+    def remove_timezone(cls, dt):
+        return dt.replace(tzinfo=None)
+
+
+    @classmethod
+    def from_timeseria_to_prophet(cls, timeseries):
+
+        # Create Python lists with data
+        try:
+            data_as_list = [[cls.remove_timezone(slot.start.dt), slot.data[0]] for slot in timeseries]
+        except:
+            data_as_list = [[cls.remove_timezone(slot.start.dt), slot.data[list(slot.data.keys())[0]]] for slot in timeseries]
+
+        # Create the pandas DataFrames
+        data = DataFrame(data_as_list, columns = ['ds', 'y'])
+
+        return data
+
+    
+    def _fit(self, data_time_slot_series, window=None, periodicity=None, evaluation_steps_set='auto', evaluation_samples=1000, evaluation_plots=False, dst_affected=False):
+
+        from fbprophet import Prophet
+
+        if len(data_time_slot_series.data_keys()) > 1:
+            raise NotImplementedError('Multivariate time series are not yet supported')
+
+        data = self.from_timeseria_to_prophet(data_time_slot_series)
+
+        # Instantiate the Prophet model
+        self.prophet_model = Prophet()
+        
+        # Fit tjhe Prophet model
+        self.prophet_model.fit(data)
+        
+        if not window:
+            logger.info('Defaulting to a window of 10 slots for forecasting')
+            self.data['window'] = 10
+
+        self.data['evaluation_score']  = self._evaluate(data_time_slot_series, steps_set=evaluation_steps_set, samples=evaluation_samples, plots=evaluation_plots)
+        logger.info('Model evaluation score: "{}"'.format(self.data['evaluation_score']))
+
+
+    def _forecast(self, forecast_data_time_slot_series, slot_unit, key, this_slot_start_timePoint, this_slot_end_timePoint, first_call, n, multi=True) : #, data_time_slot_series, key, from_index, to_index):
+
+        slot_unit = forecast_data_time_slot_series.slot_unit
+
+        if not multi:
+
+            if isinstance (slot_unit, TimeUnit):
+                data_to_forecast = [self.remove_timezone( forecast_data_time_slot_series[-1].start.dt + forecast_data_time_slot_series[-1].unit)]
+            else:
+                data_to_forecast = [self.remove_timezone(dt_from_s(forecast_data_time_slot_series[-1].start.t + forecast_data_time_slot_series[-1].unit.value))]
+            
+            dataframe_to_forecast = DataFrame(data_to_forecast, columns = ['ds'])
+            
+            forecast = self.prophet_model.predict(dataframe_to_forecast)
+            #forecast[['ds', 'yhat', 'yhat_lower', 'yhat_upper']].tail()
+    
+            # Compute and add the real forecast data
+            forecasted_data_time_slot = DataTimeSlot(start = this_slot_start_timePoint,
+                                                     end   = this_slot_end_timePoint,
+                                                     unit  = forecast_data_time_slot_series[-1].unit,
+                                                     coverage = None,
+                                                     data  = {key: float(forecast['yhat'])})
+    
+            return forecasted_data_time_slot
+        
+        else:
+            last_slot    = forecast_data_time_slot_series[-1]
+            last_slot_t  = last_slot.start.t
+            last_slot_dt = last_slot.start.dt
+            forecast_timestamps = []
+            data_to_forecast = []
+            
+            # Prepare a dataframe wiht all the slots to forecast
+            for _ in range(n):
+                if isinstance (slot_unit, TimeUnit):
+                    new_slot_dt = last_slot_dt + slot_unit
+                    data_to_forecast.append(self.remove_timezone(new_slot_dt))
+                    last_slot_dt = new_slot_dt
+                    forecast_timestamps.append(new_slot_dt)
+                else:
+                    new_slot_t = last_slot_t + slot_unit.value
+                    new_slot_dt = dt_from_s(new_slot_t, tz=forecast_data_time_slot_series.tz)
+                    data_to_forecast.append(self.remove_timezone(new_slot_dt))
+                    last_slot_t = new_slot_t
+                    forecast_timestamps.append(new_slot_dt)
+                    
+            dataframe_to_forecast = DataFrame(data_to_forecast, columns = ['ds'])
+                         
+            forecast = self.prophet_model.predict(dataframe_to_forecast)
+            #forecast[['ds', 'yhat', 'yhat_lower', 'yhat_upper']].tail()
+        
+            forecasted_data_time_slots = []
+        
+            # Re convert to slots
+            for i in range(n):
+
+                # Compute and add the real forecast data
+                forecasted_data_time_slot = DataTimeSlot(start = TimePoint(dt=forecast_timestamps[i]),
+                                                         unit  = slot_unit,
+                                                         coverage = None,
+                                                         data  = {key: float(forecast['yhat'][i])})
+                forecasted_data_time_slots.append(forecasted_data_time_slot)
+                
+        
+            return forecasted_data_time_slots      
+    
 
 
 
