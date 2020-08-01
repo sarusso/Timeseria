@@ -1,9 +1,10 @@
 import unittest
 import os
 import tempfile
+from math import sin
 from ..datastructures import DataTimeSlotSeries, DataTimeSlot, TimePoint
 from ..models import Model, ParametricModel
-from ..models import PeriodicAverageReconstructor, PeriodicAverageForecaster
+from ..models import PeriodicAverageReconstructor, PeriodicAverageForecaster, ProphetForecaster, ProphetReconstructor
 from ..exceptions import NotFittedError
 from ..storages import CSVFileStorage
 from ..transformations import Slotter
@@ -121,21 +122,54 @@ class TestReconstructors(unittest.TestCase):
         
 
 
+    def test_ProphetReconstructor(self):
+        
+        # Get test data        
+        data_time_point_series = CSVFileStorage(TEST_DATA_PATH + '/csv/temperature.csv').get(limit=200)
+        data_time_slot_series = Slotter('3600s').process(data_time_point_series)
+        
+        # Instantiate
+        prophet_reconstructor = ProphetReconstructor()
+
+        # Fit
+        prophet_reconstructor.fit(data_time_slot_series, evaluation_samples=1)
+
+        # Apply
+        data_time_slot_series_reconstructed = prophet_reconstructor.apply(data_time_slot_series, data_loss_threshold=0.3)
+        self.assertEqual(len(data_time_slot_series), len(data_time_slot_series_reconstructed))
+        for i in range(len(data_time_slot_series)):
+            if data_time_slot_series[i].data_loss >= 0.3:
+                if (data_time_slot_series[i-1].data_loss < 0.3) and (data_time_slot_series[i+1].data_loss < 0.3):
+                    # You need at least two "missing" slots in succession for the reconstructor to kick in. 
+                    pass
+                else:
+                    self.assertNotEqual(data_time_slot_series_reconstructed[i].data, data_time_slot_series[i].data, 'at position {}'.format(i))
+
+
+
 class TestForecasters(unittest.TestCase):
 
     def setUp(self):
         
-        # Create a test DataTimeSlotSeries
-        from math import sin
-        self.sine_data_time_slot_series = DataTimeSlotSeries()
+        # Create a minute-resolution test DataTimeSlotSeries
+        
+        self.sine_data_time_slot_series_minute = DataTimeSlotSeries()
         for i in range(1000):
-            self.sine_data_time_slot_series.append(DataTimeSlot(start=TimePoint(i*60), end=TimePoint((i+1)*60), data={'value':sin(i/10.0)}))
+            self.sine_data_time_slot_series_minute.append(DataTimeSlot(start=TimePoint(i*60), end=TimePoint((i+1)*60), data={'value':sin(i/10.0)}))
+
+        # Create a day-resolution test DataTimeSlotSeries
+        self.sine_data_time_slot_series_day = DataTimeSlotSeries()
+        for i in range(1000):
+            step = 60 * 60 * 24
+            self.sine_data_time_slot_series_day.append(DataTimeSlot(start=TimePoint(i*step), end=TimePoint((i+1)*step), data={'value':sin(i/10.0)}))
+            
+    
 
     def test_PeriodicAverageForecaster(self):
                  
         forecaster = PeriodicAverageForecaster()
         
-        forecaster.fit(self.sine_data_time_slot_series, periodicity=63, evaluation_steps_set='auto', evaluation_samples=100)
+        forecaster.fit(self.sine_data_time_slot_series_minute, periodicity=63, evaluation_steps_set='auto', evaluation_samples=100)
         evaluation = forecaster.evaluation_score
         self.assertEqual(forecaster.data['periodicity'], 63)
         self.assertAlmostEqual(evaluation['rmse_1_steps'], 0.005356297784166798)
@@ -145,7 +179,7 @@ class TestForecasters(unittest.TestCase):
         self.assertAlmostEqual(evaluation['mrmse'], 0.004921145531494635)
         self.assertAlmostEqual(evaluation['mme'], 0.06319499855337883)
 
-        forecaster.fit(self.sine_data_time_slot_series, periodicity=63, evaluation_steps_set=[1,3], evaluation_samples=100)
+        forecaster.fit(self.sine_data_time_slot_series_minute, periodicity=63, evaluation_steps_set=[1,3], evaluation_samples=100)
         evaluation = forecaster.evaluation_score
         self.assertEqual(forecaster.data['periodicity'], 63)
         self.assertAlmostEqual(evaluation['rmse_1_steps'], 0.005356297784166798)
@@ -154,10 +188,20 @@ class TestForecasters(unittest.TestCase):
         self.assertAlmostEqual(evaluation['me_3_steps'], 0.06567523200748912)     
 
  
-        forecast_sine_data_time_slot_series = forecaster.apply(self.sine_data_time_slot_series, n=3)
-        self.assertEqual(len(self.sine_data_time_slot_series)+3, len(forecast_sine_data_time_slot_series))
+        forecast_sine_data_time_slot_series_minute = forecaster.apply(self.sine_data_time_slot_series_minute, n=3)
+        self.assertEqual(len(self.sine_data_time_slot_series_minute)+3, len(forecast_sine_data_time_slot_series_minute))
 
 
+
+    def test_ProphetForecaster(self):
+        
+        forecaster = ProphetForecaster()
+        
+        forecaster.fit(self.sine_data_time_slot_series_day, evaluation_samples=1)
+        self.assertEqual(len(self.sine_data_time_slot_series_day), 1000)
+
+        sine_data_time_slot_series_day_with_forecast = forecaster.apply(self.sine_data_time_slot_series_day, n=3)
+        self.assertEqual(len(sine_data_time_slot_series_day_with_forecast), 1003)
 
 
 

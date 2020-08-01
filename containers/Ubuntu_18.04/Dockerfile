@@ -15,8 +15,8 @@ RUN bash /tmp/Ubuntu_18.04.sh
 COPY requirements/python/requirements.txt /tmp
 RUN pip3 install -r /tmp/requirements.txt
 
-# Install Jupyter
-RUN pip3 install jupyter
+# Install Jupyter and Plotly
+RUN pip3 install jupyter==1.0.0 plotly==4.9.0
 
 # Add code
 #COPY ./ /opt/Timeseria
