@@ -4,7 +4,7 @@ import tempfile
 from math import sin
 from ..datastructures import DataTimeSlotSeries, DataTimeSlot, TimePoint
 from ..models import Model, ParametricModel
-from ..models import PeriodicAverageReconstructor, PeriodicAverageForecaster, ProphetForecaster
+from ..models import PeriodicAverageReconstructor, PeriodicAverageForecaster, ProphetForecaster, ProphetReconstructor
 from ..exceptions import NotFittedError
 from ..storages import CSVFileStorage
 from ..transformations import Slotter
@@ -120,6 +120,31 @@ class TestReconstructors(unittest.TestCase):
                 else:
                     self.assertNotEqual(data_time_slot_series_reconstructed[i].data, data_time_slot_series[i].data, 'at position {}'.format(i))
         
+
+
+    def test_ProphetReconstructor(self):
+        
+        # Get test data        
+        data_time_point_series = CSVFileStorage(TEST_DATA_PATH + '/csv/temperature.csv').get(limit=200)
+        data_time_slot_series = Slotter('3600s').process(data_time_point_series)
+        
+        # Instantiate
+        prophet_reconstructor = ProphetReconstructor()
+
+        # Fit
+        prophet_reconstructor.fit(data_time_slot_series, evaluation_samples=1)
+
+        # Apply
+        data_time_slot_series_reconstructed = prophet_reconstructor.apply(data_time_slot_series, data_loss_threshold=0.3)
+        self.assertEqual(len(data_time_slot_series), len(data_time_slot_series_reconstructed))
+        for i in range(len(data_time_slot_series)):
+            if data_time_slot_series[i].data_loss >= 0.3:
+                if (data_time_slot_series[i-1].data_loss < 0.3) and (data_time_slot_series[i+1].data_loss < 0.3):
+                    # You need at least two "missing" slots in succession for the reconstructor to kick in. 
+                    pass
+                else:
+                    self.assertNotEqual(data_time_slot_series_reconstructed[i].data, data_time_slot_series[i].data, 'at position {}'.format(i))
+
 
 
 class TestForecasters(unittest.TestCase):

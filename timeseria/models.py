@@ -261,7 +261,10 @@ class Reconstructor(ParametricModel):
 
         # Set evaluation_score steps if we have to
         if steps_set == 'auto':
-            steps_set = [1, self.data['periodicity']]
+            try:
+                steps_set = [1, self.data['periodicity']]
+            except KeyError:
+                steps_set = [1, 3]
 
         # Support var
         evaluation_score = {}
@@ -371,7 +374,6 @@ class Reconstructor(ParametricModel):
 
 
 
-
 class PeriodicAverageReconstructor(Reconstructor):
 
     def _fit(self, data_time_slot_series, data_loss_threshold=0.5, periodicity=None, evaluation_steps_set='auto', evaluation_samples=1000, dst_affected=False, timezone_affected=False):
@@ -444,6 +446,74 @@ class PeriodicAverageReconstructor(Reconstructor):
 
 
 
+class ProphetReconstructor(Reconstructor):
+
+    @classmethod
+    def remove_timezone(cls, dt):
+        return dt.replace(tzinfo=None)
+
+
+    @classmethod
+    def from_timeseria_to_prophet(cls, timeseries):
+
+        # Create Python lists with data
+        try:
+            data_as_list = [[cls.remove_timezone(slot.start.dt), slot.data[0]] for slot in timeseries]
+        except:
+            data_as_list = [[cls.remove_timezone(slot.start.dt), slot.data[list(slot.data.keys())[0]]] for slot in timeseries]
+
+        # Create the pandas DataFrames
+        data = DataFrame(data_as_list, columns = ['ds', 'y'])
+
+        return data
+
+    
+    def _fit(self, data_time_slot_series, window=None, periodicity=None, evaluation_steps_set='auto', evaluation_samples=1000, dst_affected=False):
+
+        from fbprophet import Prophet
+
+        if len(data_time_slot_series.data_keys()) > 1:
+            raise NotImplementedError('Multivariate time series are not yet supported')
+
+        data = self.from_timeseria_to_prophet(data_time_slot_series)
+
+        # Instantiate the Prophet model
+        self.prophet_model = Prophet()
+        
+        # Fit tjhe Prophet model
+        self.prophet_model.fit(data)
+        
+        if not window:
+            logger.info('Defaulting to a window of 10 slots for forecasting')
+            self.data['window'] = 10
+
+        self.data['evaluation_score']  = self._evaluate(data_time_slot_series, steps_set=evaluation_steps_set, samples=evaluation_samples)
+        logger.info('Model evaluation score: "{}"'.format(self.data['evaluation_score']))
+
+
+    def _reconstruct(self, data_time_slot_series, key, from_index, to_index):
+        logger.debug('Reconstructing between "{}" and "{}"'.format(from_index, to_index-1))
+    
+        # Get and prepare data to reconstruct
+        data_time_slots_to_reconstruct = []
+        for j in range(from_index, to_index):
+            data_time_slots_to_reconstruct.append(data_time_slot_series[j])
+        data_to_reconstruct = [self.remove_timezone(dt_from_s(data_time_slot.start.t)) for data_time_slot in data_time_slots_to_reconstruct]
+        dataframe_to_reconstruct = DataFrame(data_to_reconstruct, columns = ['ds'])
+
+        # Apply Prophet fit
+        forecast = self.prophet_model.predict(dataframe_to_reconstruct)
+        #forecast[['ds', 'yhat', 'yhat_lower', 'yhat_upper']].tail()
+
+        # Ok, replace the values withe the reconsturcted ones
+        for i, j in enumerate(range(from_index, to_index)):
+            #logger.debug('Reconstructing slot #{} with reconstucted slot #{}'.format(j,i))
+            data_time_slot_to_reconstruct = data_time_slot_series[j]
+            data_time_slot_to_reconstruct.data[key] = forecast['yhat'][i]
+            data_time_slot_to_reconstruct._data_reconstructed = 1
+    
+
+
 #======================
 #  Forecast
 #======================
@@ -459,7 +529,6 @@ class Forecaster(ParametricModel):
             except KeyError:
                 steps_set = [1, 3]
                 
-
         # Support var
         evaluation_score = {}
 
@@ -708,7 +777,7 @@ class PeriodicAverageForecaster(Forecaster):
 
 
 class ProphetForecaster(Forecaster):
-    '''Prophet (from facebook) implements a procedure for forecasting time series data based on an additive 
+    '''Prophet (from Facebook) implements a procedure for forecasting time series data based on an additive 
 model where non-linear trends are fit with yearly, weekly, and daily seasonality, plus holiday effects.
 It works best with time series that have strong seasonal effects and several seasons of historical data.
 Prophet is robust to missing data and shifts in the trend, and typically handles outliers well. 
