@@ -164,11 +164,14 @@ def to_dg_data(serie, aggregate_by=0, plot_data_loss=False, plot_data_reconstruc
                 
                 # Do we have a mark?
                 if serie_mark:
- 
                     if item.start.t >= serie_mark_start_t and item.end.t < serie_mark_end_t:
                         if isinstance(serie, DataTimeSlotSeries):
-                            # Add null data loss
-                            data_part+=','
+                            # Add data loss
+                            if data_loss is not None:
+                                data_part+='[0,{0},{0}],'.format(data_loss/aggregate_by)
+                            else:
+                                data_part+='[,,],'            
+                        # Add the (active) mark
                         data_part+='[0,1,1],'
                         
                     else:
@@ -177,9 +180,10 @@ def to_dg_data(serie, aggregate_by=0, plot_data_loss=False, plot_data_reconstruc
                             if data_loss is not None:
                                 data_part+='[0,{0},{0}],'.format(data_loss/aggregate_by)
                             else:
-                                data_part+=','
-                        # Add null data loss
-                        data_part+=','
+                                data_part+='[,,],'
+                        # Add the (inactive) mark
+                        data_part+='[0,0,0],'
+                            
                 else:
                     if isinstance(serie, DataTimeSlotSeries):
                         # Add data loss
