@@ -435,14 +435,14 @@ class PeriodicAverageReconstructor(Reconstructor):
             data_time_slot_to_reconstruct._data_reconstructed = 1
                         
 
-    def _plot_averages(self, data_time_slot_series, log_js=False):      
+    def _plot_averages(self, data_time_slot_series, **kwargs):   
         averages_data_time_slot_series = copy.deepcopy(data_time_slot_series)
         for data_time_slot in averages_data_time_slot_series:
             value = self.data['averages'][get_periodicity_index(data_time_slot.start, averages_data_time_slot_series.slot_unit, self.data['periodicity'], dst_affected=self.data['dst_affected'])]
             if not value:
                 value = 0
             data_time_slot.data['average'] =value 
-        averages_data_time_slot_series.plot(log_js=log_js)
+        averages_data_time_slot_series.plot(**kwargs)
 
 
 
@@ -762,14 +762,14 @@ class PeriodicAverageForecaster(Forecaster):
         return forecasted_data_time_slot
     
 
-    def _plot_averages(self, data_time_slot_series, log_js=False):      
+    def _plot_averages(self, data_time_slot_series, **kwargs):      
         averages_data_time_slot_series = copy.deepcopy(data_time_slot_series)
         for data_time_slot in averages_data_time_slot_series:
             value = self.data['averages'][get_periodicity_index(data_time_slot.start, averages_data_time_slot_series.slot_unit, self.data['periodicity'], dst_affected=self.data['dst_affected'])]
             if not value:
                 value = 0
             data_time_slot.data['average'] =value 
-        averages_data_time_slot_series.plot(log_js=log_js)
+        averages_data_time_slot_series.plot(**kwargs)
 
 
 
