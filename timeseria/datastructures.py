@@ -1,6 +1,7 @@
 from .time import s_from_dt , dt_from_s, UTC, timezonize
 from .units import Unit, TimeUnit
 from .utilities import is_close
+from copy import deepcopy
 
 # Setup logging
 import logging
@@ -91,6 +92,10 @@ class Series(list):
     
     def __str__(self):
         return self.__repr__()
+    
+    # Duplicate
+    def duplicate(self):
+        return deepcopy(self)
 
 
 #======================

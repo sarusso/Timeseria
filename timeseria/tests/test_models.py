@@ -39,15 +39,15 @@ class TestBaseModelClasses(unittest.TestCase):
         data_time_slot_series = DataTimeSlotSeries(DataTimeSlot(start=TimePoint(t=1), end=TimePoint(t=2), data={'metric1': 56}),
                                                    DataTimeSlot(start=TimePoint(t=2), end=TimePoint(t=3), data={'metric1': 56}))
 
-        # Instantiate a trainable model
+        # Instantiate a parametric model
         parametric_model = ParametricModelMock()
         parametric_model_id = parametric_model.id
         
-        # Cannot apply model before training
+        # Cannot apply model before fitting
         with self.assertRaises(NotFittedError):
             parametric_model.apply(data_time_slot_series)   
 
-        # Cannot save model before training
+        # Cannot save model before fitting
         with self.assertRaises(NotFittedError):
             parametric_model.save(TEMP_MODELS_DIR)  
         
@@ -90,8 +90,10 @@ class TestReconstructors(unittest.TestCase):
         periodic_average_reconstructor = PeriodicAverageReconstructor()
 
         # Fit
-        periodic_average_reconstructor.fit(data_time_slot_series, evaluation_samples=100)
-        evaluation = periodic_average_reconstructor.evaluation_score
+        periodic_average_reconstructor.fit(data_time_slot_series)
+        
+        # Evaluate
+        evaluation = periodic_average_reconstructor.evaluate(data_time_slot_series, samples=100)
         self.assertAlmostEqual(evaluation['rmse_1_steps'], 0.019193626979166593)
         self.assertAlmostEqual(evaluation['me_1_steps'], 0.10236999999999981)
         self.assertAlmostEqual(evaluation['rmse_24_steps'], 0.3176095032385909)
@@ -99,9 +101,8 @@ class TestReconstructors(unittest.TestCase):
         self.assertAlmostEqual(evaluation['mrmse'], 0.16840156510887874)
         self.assertAlmostEqual(evaluation['mme'], 0.29013510511348645)
 
-        # Fit again but evaluate on specific steps:
-        periodic_average_reconstructor.fit(data_time_slot_series, evaluation_steps_set=[1,3], evaluation_samples=100)
-        evaluation = periodic_average_reconstructor.evaluation_score
+        # Evaluatevaluate on specific steps:
+        evaluation = periodic_average_reconstructor.evaluate(data_time_slot_series, steps_set=[1,3], samples=100)
         self.assertAlmostEqual(evaluation['rmse_1_steps'], 0.019193626979166593)
         self.assertAlmostEqual(evaluation['me_1_steps'], 0.10236999999999981)
         self.assertAlmostEqual(evaluation['rmse_3_steps'], 0.05980500085942663)
@@ -132,7 +133,7 @@ class TestReconstructors(unittest.TestCase):
         prophet_reconstructor = ProphetReconstructor()
 
         # Fit
-        prophet_reconstructor.fit(data_time_slot_series, evaluation_samples=1)
+        prophet_reconstructor.fit(data_time_slot_series)
 
         # Apply
         data_time_slot_series_reconstructed = prophet_reconstructor.apply(data_time_slot_series, data_loss_threshold=0.3)
@@ -169,8 +170,11 @@ class TestForecasters(unittest.TestCase):
                  
         forecaster = PeriodicAverageForecaster()
         
-        forecaster.fit(self.sine_data_time_slot_series_minute, periodicity=63, evaluation_steps_set='auto', evaluation_samples=100)
-        evaluation = forecaster.evaluation_score
+        # Fit
+        forecaster.fit(self.sine_data_time_slot_series_minute, periodicity=63)
+
+        # Evaluate
+        evaluation = forecaster.evaluate(self.sine_data_time_slot_series_minute, steps_set='auto', samples=100)
         self.assertEqual(forecaster.data['periodicity'], 63)
         self.assertAlmostEqual(evaluation['rmse_1_steps'], 0.005356297784166798)
         self.assertAlmostEqual(evaluation['me_1_steps'], 0.06622794526818285)
@@ -179,27 +183,32 @@ class TestForecasters(unittest.TestCase):
         self.assertAlmostEqual(evaluation['mrmse'], 0.004921145531494635)
         self.assertAlmostEqual(evaluation['mme'], 0.06319499855337883)
 
-        forecaster.fit(self.sine_data_time_slot_series_minute, periodicity=63, evaluation_steps_set=[1,3], evaluation_samples=100)
-        evaluation = forecaster.evaluation_score
+        # Evaluate
+        evaluation = forecaster.evaluate(self.sine_data_time_slot_series_minute, steps_set=[1,3], samples=100)
         self.assertEqual(forecaster.data['periodicity'], 63)
         self.assertAlmostEqual(evaluation['rmse_1_steps'], 0.005356297784166798)
         self.assertAlmostEqual(evaluation['me_1_steps'], 0.06622794526818285)
         self.assertAlmostEqual(evaluation['rmse_3_steps'], 0.005260627756229373)
         self.assertAlmostEqual(evaluation['me_3_steps'], 0.06567523200748912)     
 
- 
-        forecast_sine_data_time_slot_series_minute = forecaster.apply(self.sine_data_time_slot_series_minute, n=3)
-        self.assertEqual(len(self.sine_data_time_slot_series_minute)+3, len(forecast_sine_data_time_slot_series_minute))
+        # Apply
+        sine_data_time_slot_series_minute_with_forecast = forecaster.apply(self.sine_data_time_slot_series_minute, n=3)
+        self.assertEqual(len(sine_data_time_slot_series_minute_with_forecast), 1003)
+
+        # Predict
+        forecast = forecaster.predict(self.sine_data_time_slot_series_minute, n=3)
+        self.assertTrue(isinstance(forecast, DataTimeSlotSeries))
+        self.assertEqual(len(forecast), 3)
 
 
 
     def test_ProphetForecaster(self):
-        
+         
         forecaster = ProphetForecaster()
-        
-        forecaster.fit(self.sine_data_time_slot_series_day, evaluation_samples=1)
+         
+        forecaster.fit(self.sine_data_time_slot_series_day)
         self.assertEqual(len(self.sine_data_time_slot_series_day), 1000)
-
+  
         sine_data_time_slot_series_day_with_forecast = forecaster.apply(self.sine_data_time_slot_series_day, n=3)
         self.assertEqual(len(sine_data_time_slot_series_day_with_forecast), 1003)
 

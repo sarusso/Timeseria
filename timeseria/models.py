@@ -89,8 +89,6 @@ def get_periodicity_index(time_point, slot_unit, periodicity, dst_affected=False
             #periodicity_index = (int(slot_start_t / slot_unit_duration) % periodicity) #+ dst_offset_slots
             
             periodicity_index = (int((slot_start_t + dst_offset_s) / slot_unit_duration) % periodicity)
-        
-        
 
     return periodicity_index
 
@@ -105,29 +103,62 @@ def get_periodicity_index(time_point, slot_unit, periodicity, dst_affected=False
 #    pass
 
 class Model(object):
-    '''A stateless model, or a white-box model. Exposes only predict, apply and evaluate methods, since it is assumed that all the
-    information is coded and nothing is learnt from data. Provides also an "evaluation_score_score" property which is set by the last evaluate() call.'''
+    '''A stateless model, or a white-box model. Exposes only predict(), apply() and evaluate() methods,
+    since it is assumed that all the information is coded and nothing is learnt from the data.'''
     
     def __init__(self):
         pass
+ 
     
-    def predict(self):
-        pass
-    
-    def apply(self, *args, **kwargs):
-        return self._apply(self,*args, **kwargs)
-    
-    def evaluate(self, *args, **kwargs):
-        return self._evaluate(self,*args, **kwargs)
+    def predict(self, data, *args, **kwargs):
+        try:
+            self._predict
+        except AttributeError:
+            raise NotImplementedError('Predicting from this model is not implemented')
 
+        if not isinstance(data, DataTimeSlotSeries):
+            raise TypeError('DataTimeSlotSeries is required (got "{}")'.format(data.__class__.__name__))
+    
+        if not data:
+            raise ValueError('A non-empty DataTimeSlotSeries is required')
+        
+        return self._predict(data, *args, **kwargs)
+
+
+    def apply(self, data, *args, **kwargs):
+        try:
+            self._apply
+        except AttributeError:
+            raise NotImplementedError('Applying this model is not implemented')
+
+        if not isinstance(data, DataTimeSlotSeries):
+            raise TypeError('DataTimeSlotSeries is required (got "{}")'.format(data.__class__.__name__))
+    
+        if not data:
+            raise ValueError('A non-empty DataTimeSlotSeries is required')
+        
+        return self._apply(data, *args, **kwargs)
+
+
+    def evaluate(self, data, *args, **kwargs):
+        try:
+            self._evaluate
+        except AttributeError:
+            raise NotImplementedError('Evaluating this model is not implemented')
+
+        if not isinstance(data, DataTimeSlotSeries):
+            raise TypeError('DataTimeSlotSeries is required (got "{}")'.format(data.__class__.__name__))
+    
+        if not data:
+            raise ValueError('A non-empty DataTimeSlotSeries is required')
+        
+        return self._evaluate(data, *args, **kwargs)
 
 
 class ParametricModel(Model):
     '''A stateful model with parameters, or a (partly) black-box model. Parameters can be set manually or learnt (fitted) from data.
-    On top of the predict(), apply() and evaluate() methods it provides a save() method to store the parameters of the model,
-    and optionally a fit() method if the parameters are to be learnt form data. Provides also an "evaluation_score_score" property which is set
-    by the last evaluate() call or, in case of cross validation, by the average of the evaluate() functions called in the cross-validation
-    process. Can optionally have a kernel incapsulating an external model (Keras, Tensorflow, Scikit-learn etc.)'''
+On top of the predict(), apply() and evaluate() methods it provides a save() method to store the parameters of the model,
+and optionally a fit() method if the parameters are to be learnt form data.'''
     
     def __init__(self, path=None, id=None):
         
@@ -136,7 +167,6 @@ class ParametricModel(Model):
                 self.data = json.loads(f.read())         
             self.fitted=True
         else:
-            
             if not id:
                 id = str(uuid.uuid4())
             self.fitted = False
@@ -145,22 +175,85 @@ class ParametricModel(Model):
         super(ParametricModel, self).__init__()
 
 
-    def fit(self, data_time_slot_series, *args, **kwargs):
-        
-        if not isinstance(data_time_slot_series, DataTimeSlotSeries):
-            raise TypeError('DataTimeSlotSeries is required (got "{}")'.format(data_time_slot_series.__class__.__name__))
-    
-        if not data_time_slot_series:
-            raise ValueError('A non-empty DataTimeSlotSeries is required')
+    def predict(self, data, *args, **kwargs):
 
-        fit_output = self._fit(data_time_slot_series, *args, **kwargs)
+        try:
+            self._predict
+        except AttributeError:
+            raise NotImplementedError('Predicting from this model is not implemented')
+
+        if not self.fitted:
+            raise NotFittedError()
+
+        if not isinstance(data, DataTimeSlotSeries):
+            raise TypeError('DataTimeSlotSeries is required (got "{}")'.format(data.__class__.__name__))
+    
+        if not data:
+            raise ValueError('A non-empty DataTimeSlotSeries is required')
+        
+        return self._predict(data, *args, **kwargs)
+
+
+    def apply(self, data, *args, **kwargs):
+
+        try:
+            self._apply
+        except AttributeError:
+            raise NotImplementedError('Applying this model is not implemented')
+
+        if not self.fitted:
+            raise NotFittedError()
+
+        if not isinstance(data, DataTimeSlotSeries):
+            raise TypeError('DataTimeSlotSeries is required (got "{}")'.format(data.__class__.__name__))
+    
+        if not data:
+            raise ValueError('A non-empty DataTimeSlotSeries is required')
+        
+        return self._apply(data, *args, **kwargs)
+
+
+    def evaluate(self, data, *args, **kwargs):
+
+        try:
+            self._evaluate
+        except AttributeError:
+            raise NotImplementedError('Evaluating this model is not implemented')
+
+        if not self.fitted:
+            raise NotFittedError()
+
+        if not isinstance(data, DataTimeSlotSeries):
+            raise TypeError('DataTimeSlotSeries is required (got "{}")'.format(data.__class__.__name__))
+    
+        if not data:
+            raise ValueError('A non-empty DataTimeSlotSeries is required')
+        
+        return self._evaluate(data, *args, **kwargs)
+
+
+    def fit(self, data, *args, **kwargs):
+
+        try:
+            self._fit
+        except AttributeError:
+            raise NotImplementedError('Fitting this model is not implemented')
+
+        if not isinstance(data, DataTimeSlotSeries):
+            raise TypeError('DataTimeSlotSeries is required (got "{}")'.format(data.__class__.__name__))
+    
+        if not data:
+            raise ValueError('A non-empty DataTimeSlotSeries is required')
+        
+        fit_output = self._fit(data, *args, **kwargs)
+
         self.data['fitted_at'] = now_t()
         self.fitted = True
         return fit_output
 
         
     def save(self, path):
-        # TODO: dump and enforce the TimeUnit as well
+        # TODO: dump and enforce the TimeUnit as well?
         if not self.fitted:
             raise NotFittedError()
         model_dir = '{}/{}'.format(path, self.data['id'])
@@ -170,29 +263,6 @@ class ParametricModel(Model):
             f.write(json.dumps(self.data))
         logger.info('Saved model with id "%s" in "%s"', self.data['id'], model_dir)
         return model_dir
-
-      
-    def apply(self, data_time_slot_series, *args, **kwargs):
-        if not self.fitted:
-            raise NotFittedError()
-
-        if not isinstance(data_time_slot_series, DataTimeSlotSeries):
-            raise TypeError('DataTimeSlotSeries is required (got "{}")'.format(data_time_slot_series.__class__.__name__))
-    
-        if not data_time_slot_series:
-            raise ValueError('A non-empty DataTimeSlotSeries is required')
-
-        return self._apply(data_time_slot_series, *args, **kwargs)
-
-
-    def _fit(self, *args, **krargs):
-        raise NotImplementedError('Fitting this model is not implemented')
-
-    def _apply(self, *args, **krargs):
-        raise NotImplementedError('Applying this model is not implemented')
-
-    def _evaluate(self, *args, **krargs):
-        raise NotImplementedError('Evaluating this model is not implemented')
 
 
     @property
@@ -218,11 +288,8 @@ class Reconstructor(ParametricModel):
     def _apply(self, data_time_slot_series, remove_data_loss=False, data_loss_threshold=1, inplace=False):
         logger.debug('Using data_loss_threshold="%s"', data_loss_threshold)
         
-        if inplace:
-            pass # The function use the same "data_time_slot_series" variable
-        
-        else:
-            data_time_slot_series = copy.deepcopy(data_time_slot_series)
+        if not inplace:
+            data_time_slot_series = data_time_slot_series.duplicate()
 
         if len(data_time_slot_series.data_keys()) > 1:
             raise NotImplementedError('Multivariate time series are not yet supported')
@@ -254,7 +321,10 @@ class Reconstructor(ParametricModel):
             if gap_started is not None:
                 self._reconstruct(from_index=gap_started, to_index=i+1, data_time_slot_series=data_time_slot_series, key=key)
 
-        return data_time_slot_series
+        if not inplace:
+            return data_time_slot_series
+        else:
+            return None
 
 
     def _evaluate(self, data_time_slot_series, steps_set='auto', samples=1000, data_loss_threshold=1):
@@ -376,7 +446,7 @@ class Reconstructor(ParametricModel):
 
 class PeriodicAverageReconstructor(Reconstructor):
 
-    def _fit(self, data_time_slot_series, data_loss_threshold=0.5, periodicity=None, evaluation_steps_set='auto', evaluation_samples=1000, dst_affected=False, timezone_affected=False):
+    def _fit(self, data_time_slot_series, data_loss_threshold=0.5, periodicity=None, dst_affected=False, timezone_affected=False):
 
         if len(data_time_slot_series.data_keys()) > 1:
             raise NotImplementedError('Multivariate time series are not yet supported')
@@ -410,9 +480,6 @@ class PeriodicAverageReconstructor(Reconstructor):
         for key in sums:
             averages[key] = sums[key]/totals[key]
         self.data['averages'] = averages
-
-        self.data['evaluation_score'] = self._evaluate(data_time_slot_series, steps_set=evaluation_steps_set, samples=evaluation_samples)
-        logger.info('Model evaluation score: "{}"'.format(self.data['evaluation_score']))
 
 
     def _reconstruct(self, data_time_slot_series, key, from_index, to_index):
@@ -468,7 +535,7 @@ class ProphetReconstructor(Reconstructor):
         return data
 
     
-    def _fit(self, data_time_slot_series, window=None, periodicity=None, evaluation_steps_set='auto', evaluation_samples=1000, dst_affected=False):
+    def _fit(self, data_time_slot_series, window=None, periodicity=None, dst_affected=False):
 
         from fbprophet import Prophet
 
@@ -486,9 +553,6 @@ class ProphetReconstructor(Reconstructor):
         if not window:
             logger.info('Defaulting to a window of 10 slots for forecasting')
             self.data['window'] = 10
-
-        self.data['evaluation_score']  = self._evaluate(data_time_slot_series, steps_set=evaluation_steps_set, samples=evaluation_samples)
-        logger.info('Model evaluation score: "{}"'.format(self.data['evaluation_score']))
 
 
     def _reconstruct(self, data_time_slot_series, key, from_index, to_index):
@@ -562,7 +626,7 @@ class Forecaster(ParametricModel):
                         forecast_data_time_slot_series.append(data_time_slot_series[j])
  
                     # Apply the forecasting model
-                    forecast_data_time_slot_series = self._apply(forecast_data_time_slot_series, n=steps, inplace=True)
+                    self._apply(forecast_data_time_slot_series, n=steps, inplace=True)
 
                     # Plot evaluation_score time series?
                     if plots:
@@ -617,6 +681,8 @@ class Forecaster(ParametricModel):
 
     def _apply(self, data_time_slot_series, n=1, inplace=False):
 
+        # TODO: refacotr to use the predict below
+
         if len(data_time_slot_series.data_keys()) > 1:
             raise NotImplementedError('Multivariate time series are not yet supported')
  
@@ -626,7 +692,7 @@ class Forecaster(ParametricModel):
         if inplace:
             forecast_data_time_slot_series = data_time_slot_series
         else:
-            forecast_data_time_slot_series = copy.deepcopy(data_time_slot_series)
+            forecast_data_time_slot_series = data_time_slot_series.duplicate()
         
         for key in forecast_data_time_slot_series.data_keys():
 
@@ -678,13 +744,25 @@ class Forecaster(ParametricModel):
 
         # Set serie mark for the forecast and return
         forecast_data_time_slot_series.mark = [forecast_data_time_slot_series[-n].start.dt, forecast_data_time_slot_series[-1].end.dt]
+        
+        if not inplace:
+            return forecast_data_time_slot_series
+        else:
+            return None
+
+
+    def _predict(self, data_time_slot_series, n=1):
+        
+        # TODO: this is highly inefficient, fix me!
+        forecast_data_time_slot_series = DataTimeSlotSeries(*self.apply(data_time_slot_series, inplace=False, n=n)[len(data_time_slot_series):])
+
         return forecast_data_time_slot_series
 
 
 
 class PeriodicAverageForecaster(Forecaster):
-    
-    def _fit(self, data_time_slot_series, window=None, periodicity=None, evaluation_steps_set='auto', evaluation_samples=1000, evaluation_plots=False, dst_affected=False):
+        
+    def _fit(self, data_time_slot_series, window=None, periodicity=None, dst_affected=False):
 
         if len(data_time_slot_series.data_keys()) > 1:
             raise NotImplementedError('Multivariate time series are not yet supported')
@@ -722,9 +800,6 @@ class PeriodicAverageForecaster(Forecaster):
         for key in sums:
             averages[key] = sums[key]/totals[key]
         self.data['averages'] = averages
-
-        self.data['evaluation_score']  = self._evaluate(data_time_slot_series, steps_set=evaluation_steps_set, samples=evaluation_samples, plots=evaluation_plots)
-        logger.info('Model evaluation score: "{}"'.format(self.data['evaluation_score']))
 
 
     def _forecast(self, forecast_data_time_slot_series, slot_unit, key, this_slot_start_timePoint, this_slot_end_timePoint, first_call, n) : #, data_time_slot_series, key, from_index, to_index):
@@ -803,7 +878,7 @@ Prophet is robust to missing data and shifts in the trend, and typically handles
         return data
 
     
-    def _fit(self, data_time_slot_series, window=None, periodicity=None, evaluation_steps_set='auto', evaluation_samples=1000, evaluation_plots=False, dst_affected=False):
+    def _fit(self, data_time_slot_series, window=None, periodicity=None, dst_affected=False):
 
         from fbprophet import Prophet
 
@@ -821,9 +896,6 @@ Prophet is robust to missing data and shifts in the trend, and typically handles
         if not window:
             logger.info('Defaulting to a window of 10 slots for forecasting')
             self.data['window'] = 10
-
-        self.data['evaluation_score']  = self._evaluate(data_time_slot_series, steps_set=evaluation_steps_set, samples=evaluation_samples, plots=evaluation_plots)
-        logger.info('Model evaluation score: "{}"'.format(self.data['evaluation_score']))
 
 
     def _forecast(self, forecast_data_time_slot_series, slot_unit, key, this_slot_start_timePoint, this_slot_end_timePoint, first_call, n, multi=True) : #, data_time_slot_series, key, from_index, to_index):
