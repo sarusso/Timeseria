@@ -4,6 +4,7 @@ import datetime
 from .time import dt_from_s, dt_to_str, utckfake_s_from_dt
 from .datastructures import DataTimePointSeries, DataTimeSlotSeries
 from .units import TimeUnit
+from .utilities import is_numerical
 
 # Setup logging
 import logging
@@ -14,14 +15,6 @@ logger = logging.getLogger(__name__)
 #=================
 #   Utilities
 #=================
-
-def is_numerical(item):
-    if isinstance(item, float):
-        return True
-    if isinstance(item, int):
-        return True
-    return False
-
 
 def get_keys_and_check_data_for_plot(data):
     if is_numerical(data):

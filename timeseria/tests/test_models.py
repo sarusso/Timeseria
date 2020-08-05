@@ -213,6 +213,24 @@ class TestForecasters(unittest.TestCase):
         self.assertEqual(len(sine_data_time_slot_series_day_with_forecast), 1003)
 
 
+#         print('\n-------------------------------')
+#         timeseries = DataTimeSlotSeries()
+#         step = 60 * 60 * 24
+#         for i in range(100000):
+#             timeseries.append(DataTimeSlot(start=TimePoint(i*step), end=TimePoint((i+1)*step), data={'value':sin(i/10.0)}))
+#          
+#  
+#         print('\n-------------------------------')
+#  
+#         ProphetForecaster.from_timeseria_to_prophet(timeseries)
+#         print('\n-------------------------------')
+
+
+
+
+
+
+
 
 
 

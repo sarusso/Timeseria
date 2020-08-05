@@ -5,12 +5,45 @@ from numpy import fft
 from scipy.signal import find_peaks
 from .time import dt_from_s
 from .exceptions import InputException
+from datetime import datetime
+from .time import s_from_dt
 
 # Setup logging
 import logging
 logger = logging.getLogger(__name__)
 
 HARD_DEBUG = False
+
+
+def is_numerical(item):
+    if isinstance(item, float):
+        return True
+    if isinstance(item, int):
+        return True
+    return False
+
+
+def set_from_t_and_to_t(from_dt, to_dt, from_t, to_t):
+    
+    # Sanity chceks
+    if from_t is not None and not is_numerical(from_t):
+        raise Exception('from_t is not numerical')        
+    if to_t is not None and not is_numerical(to_t):
+        raise Exception('to_t is not numerical')
+    if from_dt is not None and not isinstance(from_dt, datetime):
+        raise Exception('from_dt is not datetime')    
+    if to_dt is not None and not isinstance(to_dt, datetime):
+        raise Exception('to_t is not datetime')
+
+    if from_dt is not None:
+        if from_t is not None:
+            raise Exception('Got both from_t and from_dt, pick one')
+        from_t = s_from_dt(from_dt)
+    if to_dt is not None:
+        if to_t is not None:
+            raise Exception('Got both to_t and to_dt, pick one')
+        to_t = s_from_dt(to_dt)
+    return from_t, to_t
 
 
 def detect_encoding(filename, streaming=False):
@@ -224,7 +257,7 @@ def is_almost_equal(one, two):
 # Periodicity
 #==============================
 
-def get_periodicity(data_time_slot_series):
+def get_periodicity(data_time_slot_series, from_t=None, to_t=None):
     
     # Import here or you will end up with cyclic imports
     from .datastructures import DataTimeSlotSeries
@@ -241,10 +274,18 @@ def get_periodicity(data_time_slot_series):
     if len(data_keys) > 1:
         raise NotImplementedError()
 
+    # TODO: improve me, highly ineficcient
     for key in data_keys:
         
         # Get data as a vector
-        y = [item.data[key] for item in data_time_slot_series]
+        y = []
+        for slot in data_time_slot_series:
+            if from_t is not None and slot.start.t < from_t:
+                continue
+            if to_t is not None and slot.end.t > to_t:
+                break
+            y.append(slot.data[key])
+        #y = [item.data[key] for item in data_time_slot_series]
 
         # Compute FFT (Fast Fourier Transform)
         yf = fft.fft(y)

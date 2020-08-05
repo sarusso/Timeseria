@@ -4,9 +4,9 @@ import uuid
 import copy
 from .datastructures import DataTimeSlotSeries, DataTimeSlot, TimePoint
 from .exceptions import NotFittedError
-from .utilities import get_periodicity
+from .utilities import get_periodicity, is_numerical, set_from_t_and_to_t
 from .time import now_t, dt_from_s, s_from_dt
-from datetime import timedelta
+from datetime import timedelta, datetime
 from sklearn.metrics import mean_squared_error
 from .units import TimeUnit
 from pandas import DataFrame
@@ -287,6 +287,14 @@ class Reconstructor(ParametricModel):
 
     def _apply(self, data_time_slot_series, remove_data_loss=False, data_loss_threshold=1, inplace=False):
         logger.debug('Using data_loss_threshold="%s"', data_loss_threshold)
+
+        # TODO: understand if we want the apply from/to behavior. For now it is disabled
+        # (add from_t=None, to_t=None, from_dt=None, to_dt=None in the function call above)
+        # from_t, to_t = set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
+        # Maybe also add a data_time_slot_series.mark=[from_dt, to_dt]
+         
+        from_t = None
+        to_t   = None
         
         if not inplace:
             data_time_slot_series = data_time_slot_series.duplicate()
@@ -299,6 +307,13 @@ class Reconstructor(ParametricModel):
             gap_started = None
             
             for i, data_time_slot in enumerate(data_time_slot_series):
+                
+                # Skip if before from_t/dt of after to_t/dt
+                if from_t is not None and data_time_slot_series[i].start.t < from_t:
+                    continue
+                if to_t is not None and data_time_slot_series[i].end.t > to_t:
+                    break
+
                 if data_time_slot.data_loss >= data_loss_threshold:
                     # This is the beginning of an area we want to reconstruct according to the data_loss_threshold
                     if gap_started is None:
@@ -327,7 +342,7 @@ class Reconstructor(ParametricModel):
             return None
 
 
-    def _evaluate(self, data_time_slot_series, steps_set='auto', samples=1000, data_loss_threshold=1):
+    def _evaluate(self, data_time_slot_series, steps_set='auto', samples=1000, data_loss_threshold=1, from_t=None, to_t=None, from_dt=None, to_dt=None):
 
         # Set evaluation_score steps if we have to
         if steps_set == 'auto':
@@ -336,9 +351,10 @@ class Reconstructor(ParametricModel):
             except KeyError:
                 steps_set = [1, 3]
 
-        # Support var
+        # Support vars
         evaluation_score = {}
-         
+        from_t, to_t = set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
+
         # Find areas where to evaluate the model
         for key in data_time_slot_series.data_keys():
              
@@ -353,7 +369,13 @@ class Reconstructor(ParametricModel):
                 logger.debug('Evaluating model for steps %s', steps)
                 
                 for i in range(len(data_time_slot_series)):
-                                  
+
+                    # Skip if before from_t/dt of after to_t/dt
+                    if from_t is not None and data_time_slot_series[i].start.t < from_t:
+                        continue
+                    if to_t is not None and data_time_slot_series[i].end.t > to_t:
+                        break
+         
                     # Skip the first and the last ones, otherwise reconstruct the ones in the middle
                     if (i == 0) or (i >= len(data_time_slot_series)-steps):
                         continue
@@ -446,14 +468,16 @@ class Reconstructor(ParametricModel):
 
 class PeriodicAverageReconstructor(Reconstructor):
 
-    def _fit(self, data_time_slot_series, data_loss_threshold=0.5, periodicity=None, dst_affected=False, timezone_affected=False):
+    def _fit(self, data_time_slot_series, data_loss_threshold=0.5, periodicity=None, dst_affected=False, timezone_affected=False, from_t=None, to_t=None, from_dt=None, to_dt=None):
 
         if len(data_time_slot_series.data_keys()) > 1:
             raise NotImplementedError('Multivariate time series are not yet supported')
+
+        from_t, to_t = set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
         
         # Set or detect periodicity
         if periodicity is None:
-            periodicity =  get_periodicity(data_time_slot_series)
+            periodicity =  get_periodicity(data_time_slot_series, from_t=from_t, to_t=to_t)
             if isinstance(data_time_slot_series.slot_unit, TimeUnit):
                 logger.info('Detected periodicity: %sx %s', periodicity, data_time_slot_series.slot_unit)
             else:
@@ -467,6 +491,14 @@ class PeriodicAverageReconstructor(Reconstructor):
             sums   = {}
             totals = {}
             for data_time_slot in data_time_slot_series:
+                
+                # Skip if needed
+                if from_t is not None and data_time_slot.start.t < from_t:
+                    continue
+                if to_t is not None and data_time_slot.end.t > to_t:
+                    break
+                
+                # Process
                 if data_time_slot.data_loss < data_loss_threshold:
                     periodicity_index = get_periodicity_index(data_time_slot.start, data_time_slot_series.slot_unit, periodicity, dst_affected=dst_affected)
                     if not periodicity_index in sums:
@@ -513,46 +545,61 @@ class PeriodicAverageReconstructor(Reconstructor):
 
 
 
-class ProphetReconstructor(Reconstructor):
+class ProphetModel(ParametricModel):
 
     @classmethod
     def remove_timezone(cls, dt):
         return dt.replace(tzinfo=None)
 
-
     @classmethod
-    def from_timeseria_to_prophet(cls, timeseries):
+    def from_timeseria_to_prophet(cls, timeseries, from_t=None, to_t=None):
 
         # Create Python lists with data
         try:
-            data_as_list = [[cls.remove_timezone(slot.start.dt), slot.data[0]] for slot in timeseries]
-        except:
-            data_as_list = [[cls.remove_timezone(slot.start.dt), slot.data[list(slot.data.keys())[0]]] for slot in timeseries]
+            timeseries[0].data[0]
+            data_keys_are_indexes = True
+        except KeyError:
+            timeseries[0].data.keys()
+            data_keys_are_indexes = False
+        
+        data_as_list=[]
+        for slot in timeseries:
+            if from_t is not None and slot.start.t < from_t:
+                continue
+            if to_t is not None and slot.end.t > to_t:
+                break
+            
+            if data_keys_are_indexes:     
+                data_as_list.append([cls.remove_timezone(slot.start.dt), slot.data[0]])
+            else:
+                data_as_list.append([cls.remove_timezone(slot.start.dt), slot.data[list(slot.data.keys())[0]]])
 
         # Create the pandas DataFrames
         data = DataFrame(data_as_list, columns = ['ds', 'y'])
 
         return data
 
+
+
+class ProphetReconstructor(Reconstructor, ProphetModel):
     
-    def _fit(self, data_time_slot_series, window=None, periodicity=None, dst_affected=False):
+    def _fit(self, data_time_slot_series, from_t=None, to_t=None, from_dt=None, to_dt=None):
 
         from fbprophet import Prophet
+
+        from_t, to_t = set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
 
         if len(data_time_slot_series.data_keys()) > 1:
             raise NotImplementedError('Multivariate time series are not yet supported')
 
-        data = self.from_timeseria_to_prophet(data_time_slot_series)
+        data = self.from_timeseria_to_prophet(data_time_slot_series, from_t, to_t)
 
         # Instantiate the Prophet model
         self.prophet_model = Prophet()
         
         # Fit tjhe Prophet model
         self.prophet_model.fit(data)
-        
-        if not window:
-            logger.info('Defaulting to a window of 10 slots for forecasting')
-            self.data['window'] = 10
+
 
 
     def _reconstruct(self, data_time_slot_series, key, from_index, to_index):
@@ -584,7 +631,7 @@ class ProphetReconstructor(Reconstructor):
 
 class Forecaster(ParametricModel):
 
-    def _evaluate(self, data_time_slot_series, steps_set='auto', samples=1000, plots=False):
+    def _evaluate(self, data_time_slot_series, steps_set='auto', samples=1000, plots=False, from_t=None, to_t=None, from_dt=None, to_dt=None):
         
         # Set evaluation_score steps if we have to
         if steps_set == 'auto':
@@ -595,6 +642,7 @@ class Forecaster(ParametricModel):
                 
         # Support var
         evaluation_score = {}
+        from_t, to_t = set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
 
         for steps in steps_set:
             
@@ -606,7 +654,13 @@ class Forecaster(ParametricModel):
             # For each point of the data_time_slot_series, after the window, apply the prediction and compare it with the actual value
             for key in data_time_slot_series.data_keys():
                 for i in range(len(data_time_slot_series)):
-                    
+
+                    # Skip if before from_t/dt of after to_t/dt
+                    if from_t is not None and data_time_slot_series[i].start.t < from_t:
+                        continue
+                    if to_t is not None and data_time_slot_series[i].end.t > to_t:
+                        break
+         
                     # Check that we can get enough data
                     if i < self.data['window']+steps:
                         continue
@@ -762,14 +816,16 @@ class Forecaster(ParametricModel):
 
 class PeriodicAverageForecaster(Forecaster):
         
-    def _fit(self, data_time_slot_series, window=None, periodicity=None, dst_affected=False):
+    def _fit(self, data_time_slot_series, window=None, periodicity=None, dst_affected=False, from_t=None, to_t=None, from_dt=None, to_dt=None):
 
         if len(data_time_slot_series.data_keys()) > 1:
             raise NotImplementedError('Multivariate time series are not yet supported')
 
+        from_t, to_t = set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
+
         # Set or detect periodicity
         if periodicity is None:        
-            periodicity =  get_periodicity(data_time_slot_series)
+            periodicity =  get_periodicity(data_time_slot_series, from_t=from_t, to_t=to_t)
             if isinstance(data_time_slot_series.slot_unit, TimeUnit):
                 logger.info('Detected periodicity: %sx %s', periodicity, data_time_slot_series.slot_unit)
             else:
@@ -788,6 +844,14 @@ class PeriodicAverageForecaster(Forecaster):
             sums   = {}
             totals = {}
             for data_time_slot in data_time_slot_series:
+
+                # Skip if needed
+                if from_t is not None and data_time_slot.start.t < from_t:
+                    continue
+                if to_t is not None and data_time_slot.end.t > to_t:
+                    break
+                
+                # Process
                 periodicity_index = get_periodicity_index(data_time_slot.start, data_time_slot_series.slot_unit, periodicity, dst_affected)
                 if not periodicity_index in sums:
                     sums[periodicity_index] = data_time_slot.data[key]
@@ -851,41 +915,24 @@ class PeriodicAverageForecaster(Forecaster):
 
 
 
-class ProphetForecaster(Forecaster):
+class ProphetForecaster(Forecaster, ProphetModel):
     '''Prophet (from Facebook) implements a procedure for forecasting time series data based on an additive 
 model where non-linear trends are fit with yearly, weekly, and daily seasonality, plus holiday effects.
 It works best with time series that have strong seasonal effects and several seasons of historical data.
 Prophet is robust to missing data and shifts in the trend, and typically handles outliers well. 
 '''
 
-    @classmethod
-    def remove_timezone(cls, dt):
-        return dt.replace(tzinfo=None)
 
-
-    @classmethod
-    def from_timeseria_to_prophet(cls, timeseries):
-
-        # Create Python lists with data
-        try:
-            data_as_list = [[cls.remove_timezone(slot.start.dt), slot.data[0]] for slot in timeseries]
-        except:
-            data_as_list = [[cls.remove_timezone(slot.start.dt), slot.data[list(slot.data.keys())[0]]] for slot in timeseries]
-
-        # Create the pandas DataFrames
-        data = DataFrame(data_as_list, columns = ['ds', 'y'])
-
-        return data
-
-    
-    def _fit(self, data_time_slot_series, window=None, periodicity=None, dst_affected=False):
+    def _fit(self, data_time_slot_series, window=None, periodicity=None, dst_affected=False, from_t=None, to_t=None, from_dt=None, to_dt=None):
 
         from fbprophet import Prophet
 
         if len(data_time_slot_series.data_keys()) > 1:
             raise NotImplementedError('Multivariate time series are not yet supported')
 
-        data = self.from_timeseria_to_prophet(data_time_slot_series)
+        from_t, to_t = set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
+
+        data = self.from_timeseria_to_prophet(data_time_slot_series, from_t=from_t, to_t=to_t)
 
         # Instantiate the Prophet model
         self.prophet_model = Prophet()
