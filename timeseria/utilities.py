@@ -46,6 +46,22 @@ def set_from_t_and_to_t(from_dt, to_dt, from_t, to_t):
     return from_t, to_t
 
 
+def slot_is_in_range(slot, from_t, to_t):
+    # TODO: maybe use a custom iterator for looping over time series slots? 
+    # see https://stackoverflow.com/questions/6920206/sending-stopiteration-to-for-loop-from-outside-of-the-iterator
+    if from_t is not None and to_t is not None and from_t > to_t:
+        if slot.end.t <= to_t:
+            return True
+        if slot.start.t >= from_t:
+            return True
+    else:     
+        if from_t is not None and slot.start.t < from_t:
+            return False
+        if to_t is not None and slot.end.t > to_t:
+            raise StopIteration
+        return True
+
+
 def detect_encoding(filename, streaming=False):
     
     if streaming:
@@ -280,9 +296,11 @@ def get_periodicity(data_time_slot_series, from_t=None, to_t=None):
         # Get data as a vector
         y = []
         for slot in data_time_slot_series:
-            if from_t is not None and slot.start.t < from_t:
-                continue
-            if to_t is not None and slot.end.t > to_t:
+            # Skip if needed
+            try:
+                if not slot_is_in_range(slot, from_t, to_t):
+                    continue
+            except StopIteration:
                 break
             y.append(slot.data[key])
         #y = [item.data[key] for item in data_time_slot_series]

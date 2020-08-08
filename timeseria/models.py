@@ -4,7 +4,7 @@ import uuid
 import copy
 from .datastructures import DataTimeSlotSeries, DataTimeSlot, TimePoint
 from .exceptions import NotFittedError
-from .utilities import get_periodicity, is_numerical, set_from_t_and_to_t
+from .utilities import get_periodicity, is_numerical, set_from_t_and_to_t, slot_is_in_range
 from .time import now_t, dt_from_s, s_from_dt
 from datetime import timedelta, datetime
 from sklearn.metrics import mean_squared_error
@@ -270,14 +270,6 @@ and optionally a fit() method if the parameters are to be learnt form data.'''
         return self.data['id']
 
 
-    @property
-    def evaluation_score(self):
-        if not self.fitted:
-            raise NotFittedError()
-        else:
-            return self.data['evaluation_score']
-    
-
 
 #======================
 # Data Reconstruction
@@ -370,12 +362,13 @@ class Reconstructor(ParametricModel):
                 
                 for i in range(len(data_time_slot_series)):
 
-                    # Skip if before from_t/dt of after to_t/dt
-                    if from_t is not None and data_time_slot_series[i].start.t < from_t:
-                        continue
-                    if to_t is not None and data_time_slot_series[i].end.t > to_t:
-                        break
-         
+                    # Skip if needed
+                    try:
+                        if not slot_is_in_range(data_time_slot_series[i], from_t, to_t):
+                            continue
+                    except StopIteration:
+                        break                  
+                
                     # Skip the first and the last ones, otherwise reconstruct the ones in the middle
                     if (i == 0) or (i >= len(data_time_slot_series)-steps):
                         continue
@@ -485,17 +478,19 @@ class PeriodicAverageReconstructor(Reconstructor):
         self.data['periodicity']  = periodicity
         self.data['dst_affected'] = dst_affected 
         
-        logger.info('dst_affected: {}'.format(dst_affected))
+        # logger.info('dst_affected: {}'.format(dst_affected))
         
         for key in data_time_slot_series.data_keys():
             sums   = {}
             totals = {}
+            processed = 0
             for data_time_slot in data_time_slot_series:
                 
                 # Skip if needed
-                if from_t is not None and data_time_slot.start.t < from_t:
-                    continue
-                if to_t is not None and data_time_slot.end.t > to_t:
+                try:
+                    if not slot_is_in_range(data_time_slot, from_t, to_t):
+                        continue
+                except StopIteration:
                     break
                 
                 # Process
@@ -507,11 +502,14 @@ class PeriodicAverageReconstructor(Reconstructor):
                     else:
                         sums[periodicity_index] += data_time_slot.data[key]
                         totals[periodicity_index] +=1
+                processed += 1
 
         averages={}
-        for key in sums:
-            averages[key] = sums[key]/totals[key]
+        for periodicity_index in sums:
+            averages[periodicity_index] = sums[periodicity_index]/totals[periodicity_index]
         self.data['averages'] = averages
+
+        # logger.info('Processed "{}" slots'.format(processed))
 
 
     def _reconstruct(self, data_time_slot_series, key, from_index, to_index):
@@ -564,11 +562,14 @@ class ProphetModel(ParametricModel):
         
         data_as_list=[]
         for slot in timeseries:
-            if from_t is not None and slot.start.t < from_t:
-                continue
-            if to_t is not None and slot.end.t > to_t:
-                break
             
+            # Skip if needed
+            try:
+                if not slot_is_in_range(slot, from_t, to_t):
+                    continue
+            except StopIteration:
+                break                
+
             if data_keys_are_indexes:     
                 data_as_list.append([cls.remove_timezone(slot.start.dt), slot.data[0]])
             else:
@@ -655,12 +656,13 @@ class Forecaster(ParametricModel):
             for key in data_time_slot_series.data_keys():
                 for i in range(len(data_time_slot_series)):
 
-                    # Skip if before from_t/dt of after to_t/dt
-                    if from_t is not None and data_time_slot_series[i].start.t < from_t:
-                        continue
-                    if to_t is not None and data_time_slot_series[i].end.t > to_t:
-                        break
-         
+                    # Skip if needed
+                    try:
+                        if not slot_is_in_range(data_time_slot_series[i], from_t, to_t):
+                            continue
+                    except StopIteration:
+                        break  
+                
                     # Check that we can get enough data
                     if i < self.data['window']+steps:
                         continue
@@ -843,12 +845,14 @@ class PeriodicAverageForecaster(Forecaster):
         for key in data_time_slot_series.data_keys():
             sums   = {}
             totals = {}
+            processed = 0
             for data_time_slot in data_time_slot_series:
 
                 # Skip if needed
-                if from_t is not None and data_time_slot.start.t < from_t:
-                    continue
-                if to_t is not None and data_time_slot.end.t > to_t:
+                try:
+                    if not slot_is_in_range(data_time_slot, from_t, to_t):
+                        continue                  
+                except StopIteration:
                     break
                 
                 # Process
@@ -859,11 +863,14 @@ class PeriodicAverageForecaster(Forecaster):
                 else:
                     sums[periodicity_index] += data_time_slot.data[key]
                     totals[periodicity_index] +=1
+                processed += 1
 
         averages={}
-        for key in sums:
-            averages[key] = sums[key]/totals[key]
+        for periodicity_index in sums:
+            averages[periodicity_index] = sums[periodicity_index]/totals[periodicity_index]
         self.data['averages'] = averages
+        
+        #logger.info('Processed "{}" slots'.format(processed))
 
 
     def _forecast(self, forecast_data_time_slot_series, slot_unit, key, this_slot_start_timePoint, this_slot_end_timePoint, first_call, n) : #, data_time_slot_series, key, from_index, to_index):
