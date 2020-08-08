@@ -2,6 +2,7 @@ import os
 import json
 import uuid
 import copy
+import statistics
 from .datastructures import DataTimeSlotSeries, DataTimeSlot, TimePoint
 from .exceptions import NotFittedError
 from .utilities import get_periodicity, is_numerical, set_from_t_and_to_t, slot_is_in_range
@@ -265,6 +266,87 @@ and optionally a fit() method if the parameters are to be learnt form data.'''
         return model_dir
 
 
+    def cross_validate(self, data, *args, **kwargs):
+        try:
+            self._evaluate
+        except AttributeError:
+            raise NotImplementedError('Evaluating this model is not implemented')
+
+        if not isinstance(data, DataTimeSlotSeries):
+            raise TypeError('DataTimeSlotSeries is required (got "{}")'.format(data.__class__.__name__))
+    
+        if not data:
+            raise ValueError('A non-empty DataTimeSlotSeries is required')
+
+        # Decouple fit from validate args
+        fit_kwargs = {}
+        evaluate_kwargs = {}
+        consumed_kwargs = []
+        for kwarg in kwargs:
+            if kwarg.startswith('fit_'):
+                consumed_kwargs.append(kwarg)
+                fit_kwargs[kwarg.replace('fit_', '')] = kwargs[kwarg]
+            if kwarg.startswith('evaluate_'):
+                consumed_kwargs.append(kwarg)
+                evaluate_kwargs[kwarg.replace('evaluate_', '')] = kwargs[kwarg]
+        for consumed_kwarg in consumed_kwargs:
+            kwargs.pop(consumed_kwarg)
+
+        # For readability
+        data_time_slot_series = data
+        
+        # How many rounds
+        rounds = kwargs.pop('rounds', 10)
+
+        # Do we still have some kwargs?
+        if kwargs:
+            raise Exception('Got some unknown args: {}'.format(kwargs))
+            
+        # How many items per round?
+        round_items = int(len(data_time_slot_series) / rounds)
+        logger.debug('Items per round: {}'.format(round_items))
+        
+        # Start the fit / evaluate loop
+        evaluations = []        
+        for i in range(rounds):
+            from_t = data_time_slot_series[(round_items*i)].start.t
+            to_t = data_time_slot_series[(round_items*i) + round_items].start.t
+            from_dt = dt_from_s(from_t)
+            to_dt   = dt_from_s(to_t)
+            logger.info('Cross validation round #{} of {}: validate from {} ({}) to {} ({}), fit on the rest.'.format(i+1, rounds, from_t, from_dt, to_t, to_dt))
+            
+            # Fit
+            if i == 0:            
+                logger.debug('Fitting from {} ({})'.format(to_t, to_dt))
+                self.fit(data, from_t=to_t, **fit_kwargs)
+            else:
+                logger.debug('Fitting until {} ({}) and then from {} ({}).'.format(to_t, to_dt, from_t, from_dt))
+                self.fit(data, from_t=to_t, to_t=from_t, **fit_kwargs)                
+            
+            # Evaluate & append
+            evaluations.append(self.evaluate(data, from_t=from_t, to_t=to_t, **evaluate_kwargs))
+        
+        # Regroup evaluations
+        evaluation_metrics = list(evaluations[0].keys())
+        scores_by_evaluation_metric = {}
+        for evaluation in evaluations:
+            for evaluation_metric in evaluation_metrics:
+                try:
+                    scores_by_evaluation_metric[evaluation_metric].append(evaluation[evaluation_metric])
+                except KeyError:
+                    try:
+                        scores_by_evaluation_metric[evaluation_metric] = [evaluation[evaluation_metric]]
+                    except KeyError:
+                        raise Exception('Error, the model generated different evaluation metrics over the rounds, cannot compute cross validation.') from None
+        
+        # Prepare and return results
+        results = {}
+        for evaluation_metric in scores_by_evaluation_metric:
+            results[evaluation_metric+'_avg'] = statistics.mean(scores_by_evaluation_metric[evaluation_metric])
+            results[evaluation_metric+'_stdev'] = statistics.stdev(scores_by_evaluation_metric[evaluation_metric])         
+        return results
+
+
     @property
     def id(self):
         return self.data['id']
@@ -470,7 +552,7 @@ class PeriodicAverageReconstructor(Reconstructor):
         
         # Set or detect periodicity
         if periodicity is None:
-            periodicity =  get_periodicity(data_time_slot_series, from_t=from_t, to_t=to_t)
+            periodicity =  get_periodicity(data_time_slot_series)
             if isinstance(data_time_slot_series.slot_unit, TimeUnit):
                 logger.info('Detected periodicity: %sx %s', periodicity, data_time_slot_series.slot_unit)
             else:
@@ -827,7 +909,7 @@ class PeriodicAverageForecaster(Forecaster):
 
         # Set or detect periodicity
         if periodicity is None:        
-            periodicity =  get_periodicity(data_time_slot_series, from_t=from_t, to_t=to_t)
+            periodicity =  get_periodicity(data_time_slot_series)
             if isinstance(data_time_slot_series.slot_unit, TimeUnit):
                 logger.info('Detected periodicity: %sx %s', periodicity, data_time_slot_series.slot_unit)
             else:

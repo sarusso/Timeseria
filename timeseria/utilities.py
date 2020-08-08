@@ -273,7 +273,7 @@ def is_almost_equal(one, two):
 # Periodicity
 #==============================
 
-def get_periodicity(data_time_slot_series, from_t=None, to_t=None):
+def get_periodicity(data_time_slot_series):
     
     # Import here or you will end up with cyclic imports
     from .datastructures import DataTimeSlotSeries
@@ -296,12 +296,6 @@ def get_periodicity(data_time_slot_series, from_t=None, to_t=None):
         # Get data as a vector
         y = []
         for slot in data_time_slot_series:
-            # Skip if needed
-            try:
-                if not slot_is_in_range(slot, from_t, to_t):
-                    continue
-            except StopIteration:
-                break
             y.append(slot.data[key])
         #y = [item.data[key] for item in data_time_slot_series]
 
