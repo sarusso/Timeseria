@@ -8,9 +8,10 @@ from .exceptions import NotFittedError
 from .utilities import get_periodicity, is_numerical, set_from_t_and_to_t, slot_is_in_range
 from .time import now_t, dt_from_s, s_from_dt
 from datetime import timedelta, datetime
-from sklearn.metrics import mean_squared_error
+from sklearn.metrics import mean_squared_error, mean_absolute_error
 from .units import TimeUnit
 from pandas import DataFrame
+from math import sqrt
 
 # Setup logging
 import logging
@@ -23,14 +24,22 @@ HARD_DEBUG = False
 #  Utility functions
 #======================
 
+#def mean_absolute_error(list1, list2):
+#    if len(list1) != len(list2):
+#        raise ValueError('Lists have different lengths, cannot continue')
+#    error_sum = 0
+#    for i in range(len(list1)):
+#        error_sum += abs(list1[i] - list2[i])
+#    return error_sum/len(list1)
 
-def mean_error(list1, list2):
+def mean_absolute_percentage_error(list1, list2):
+    '''Computes the MAPE, list 1 are true values, list2 arepredicted values'''
     if len(list1) != len(list2):
         raise ValueError('Lists have different lengths, cannot continue')
-    error_sum = 0
+    p_error_sum = 0
     for i in range(len(list1)):
-        error_sum += abs(list1[i] - list2[i])
-    return error_sum/len(list1)
+        p_error_sum += abs((list1[i] - list2[i])/list1[i])
+    return p_error_sum/len(list1)
 
 
 def get_periodicity_index(time_point, slot_unit, periodicity, dst_affected=False):
@@ -416,23 +425,29 @@ class Reconstructor(ParametricModel):
             return None
 
 
-    def _evaluate(self, data_time_slot_series, steps_set='auto', samples=1000, data_loss_threshold=1, from_t=None, to_t=None, from_dt=None, to_dt=None):
+    def _evaluate(self, data_time_slot_series, steps='auto', samples=1000, data_loss_threshold=1, metrics=['RMSE', 'MAE'], details=False, from_t=None, to_t=None, from_dt=None, to_dt=None):
 
         # Set evaluation_score steps if we have to
-        if steps_set == 'auto':
+        if steps == 'auto':
             try:
-                steps_set = [1, self.data['periodicity']]
+                steps = [1, self.data['periodicity']]
             except KeyError:
-                steps_set = [1, 3]
-
+                steps = [1, 2, 3]
+        elif isinstance(steps, list):
+            pass
+        else:
+            steps = list(range(1, steps+1))
+         
         # Support vars
         evaluation_score = {}
         from_t, to_t = set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
 
+        logger.info('Will evaluate model for %s steps with metrics %s', steps, metrics)
+
         # Find areas where to evaluate the model
         for key in data_time_slot_series.data_keys():
              
-            for steps in steps_set:
+            for steps_round in steps:
                 
                 # Support vars
                 real_values = []
@@ -440,7 +455,7 @@ class Reconstructor(ParametricModel):
                 processed_samples = 0
 
                 # Here we will have steps=1, steps=2 .. steps=n          
-                logger.debug('Evaluating model for steps %s', steps)
+                logger.debug('Evaluating model for %s steps', steps_round)
                 
                 for i in range(len(data_time_slot_series)):
 
@@ -452,25 +467,25 @@ class Reconstructor(ParametricModel):
                         break                  
                 
                     # Skip the first and the last ones, otherwise reconstruct the ones in the middle
-                    if (i == 0) or (i >= len(data_time_slot_series)-steps):
+                    if (i == 0) or (i >= len(data_time_slot_series)-steps_round):
                         continue
 
                     # Is this a "good area" where to test or do we have to stop?
                     stop = False
                     if data_time_slot_series[i-1].data_loss >= data_loss_threshold:
                         stop = True
-                    for j in range(steps):
+                    for j in range(steps_round):
                         if data_time_slot_series[i+j].data_loss >= data_loss_threshold:
                             stop = True
                             break
-                    if data_time_slot_series[i+steps].data_loss >= data_loss_threshold:
+                    if data_time_slot_series[i+steps_round].data_loss >= data_loss_threshold:
                         stop = True
                     if stop:
                         continue
                             
                     # Set prev and next
                     prev_value = data_time_slot_series[i-1].data[key]
-                    next_value = data_time_slot_series[i+steps].data[key]
+                    next_value = data_time_slot_series[i+steps_round].data[key]
                     
                     # Compute average value
                     average_value = (prev_value+next_value)/2
@@ -482,7 +497,7 @@ class Reconstructor(ParametricModel):
                     #data_time_slot_series_to_reconstruct.append(copy.deepcopy(data_time_slot_series[i-1]))
                     
                     # Append in the middle and store real values
-                    for j in range(steps):
+                    for j in range(steps_round):
                         data_time_slot = copy.deepcopy(data_time_slot_series[i+j])
                         # Set the coverage to zero so the slot will be reconstructed
                         data_time_slot._coverage = 0
@@ -492,47 +507,73 @@ class Reconstructor(ParametricModel):
                         real_values.append(data_time_slot_series[i+j].data[key])
               
                     # Append next
-                    #data_time_slot_series_to_reconstruct.append(copy.deepcopy(data_time_slot_series[i+steps]))
+                    #data_time_slot_series_to_reconstruct.append(copy.deepcopy(data_time_slot_series[i+steps_round]))
 
                     # Apply model inplace
                     self._apply(data_time_slot_series_to_reconstruct, inplace=True)
                     processed_samples += 1
 
                     # Store reconstructed values
-                    for j in range(steps):
+                    for j in range(steps_round):
                         reconstructed_values.append(data_time_slot_series_to_reconstruct[j].data[key])
                     
                     if samples is not None and processed_samples >= samples:
                         break
 
                 if processed_samples < samples:
-                    logger.warning('Could not evaluate "{}" samples for "{}" steps, processed "{}" samples only'.format(samples, steps, processed_samples))
+                    logger.warning('Could not evaluate "{}" samples for "{}" steps_round, processed "{}" samples only'.format(samples, steps_round, processed_samples))
 
                 if not reconstructed_values:
                     raise Exception('Could not evaluate model, maybe not enough data?')
 
                 # Compute RMSE and ME, and add to the evaluation_score
-                evaluation_score['rmse_{}_steps'.format(steps)] = mean_squared_error(real_values, reconstructed_values)
-                evaluation_score['me_{}_steps'.format(steps)] = mean_error(real_values, reconstructed_values)
+                if 'RMSE' in metrics:
+                    evaluation_score['RMSE_{}_steps'.format(steps_round)] = sqrt(mean_squared_error(real_values, reconstructed_values))
+                if 'MAE' in metrics:
+                    evaluation_score['MAE_{}_steps'.format(steps_round)] = mean_absolute_error(real_values, reconstructed_values)
+                if 'MAPE' in metrics:
+                    evaluation_score['MAPE_{}_steps'.format(steps_round)] = mean_absolute_percentage_error(real_values, reconstructed_values)
 
-        # Compute average RMSE
-        sum_rmse = 0
-        count = 0
-        for key in evaluation_score:
-            if key.startswith('rmse_'):
-                sum_rmse += evaluation_score[key]
-                count += 1
-        evaluation_score['mrmse'] = sum_rmse/count
+        # Compute overall RMSE
+        if 'RMSE' in metrics:
+            sum_rmse = 0
+            count = 0
+            for key in evaluation_score:
+                if key.startswith('RMSE_'):
+                    sum_rmse += evaluation_score[key]
+                    count += 1
+            evaluation_score['RMSE'] = sum_rmse/count
 
-        # Compute average ME
-        sum_me = 0
-        count = 0
-        for key in evaluation_score:
-            if key.startswith('me_'):
-                sum_me += evaluation_score[key]
-                count += 1
-        evaluation_score['mme'] = sum_me/count
+        # Compute overall MAE
+        if 'MAE' in metrics:
+            sum_me = 0
+            count = 0
+            for key in evaluation_score:
+                if key.startswith('MAE_'):
+                    sum_me += evaluation_score[key]
+                    count += 1
+            evaluation_score['MAE'] = sum_me/count
+
+        # Compute overall MAPE
+        if 'MAPE' in metrics:
+            sum_me = 0
+            count = 0
+            for key in evaluation_score:
+                if key.startswith('MAPE_'):
+                    sum_me += evaluation_score[key]
+                    count += 1
+            evaluation_score['MAPE'] = sum_me/count
         
+        if not details:
+            simple_evaluation_score = {}
+            if 'RMSE' in metrics:
+                simple_evaluation_score['RMSE'] = evaluation_score['RMSE']
+            if 'MAE' in metrics:
+                simple_evaluation_score['MAE'] = evaluation_score['MAE']
+            if 'MAPE' in metrics:
+                simple_evaluation_score['MAPE'] = evaluation_score['MAPE']
+            evaluation_score = simple_evaluation_score
+            
         return evaluation_score
 
 
@@ -714,20 +755,27 @@ class ProphetReconstructor(Reconstructor, ProphetModel):
 
 class Forecaster(ParametricModel):
 
-    def _evaluate(self, data_time_slot_series, steps_set='auto', samples=1000, plots=False, from_t=None, to_t=None, from_dt=None, to_dt=None):
-        
+    #def _evaluate(self, data_time_slot_series, steps_set='auto', samples=1000, plots=False, from_t=None, to_t=None, from_dt=None, to_dt=None):
+    def _evaluate(self, data_time_slot_series, steps='auto', samples=1000, plots=False, metrics=['RMSE', 'MAE'], details=False, from_t=None, to_t=None, from_dt=None, to_dt=None):
+
         # Set evaluation_score steps if we have to
-        if steps_set == 'auto':
+        if steps == 'auto':
             try:
-                steps_set = [1, self.data['periodicity']]
+                steps = [1, self.data['periodicity']]
             except KeyError:
-                steps_set = [1, 3]
-                
-        # Support var
+                steps = [1, 2, 3]
+        elif isinstance(steps, list):
+            pass
+        else:
+            steps = list(range(1, steps+1))
+                            
+        # Support vars
         evaluation_score = {}
         from_t, to_t = set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
 
-        for steps in steps_set:
+        logger.info('Will evaluate model for %s steps with metrics %s', steps, metrics)
+
+        for steps_round in steps:
             
             # Support vars
             real_values = []
@@ -746,17 +794,17 @@ class Forecaster(ParametricModel):
                         break  
                 
                     # Check that we can get enough data
-                    if i < self.data['window']+steps:
+                    if i < self.data['window']+steps_round:
                         continue
-                    if i > (len(data_time_slot_series)-steps):
+                    if i > (len(data_time_slot_series)-steps_round):
                         continue
 
                     # Compute the various boundaries
-                    original_serie_boundaries_start = i - (self.data['window']) - steps
+                    original_serie_boundaries_start = i - (self.data['window']) - steps_round
                     original_serie_boundaries_end = i
                     
                     original_forecast_serie_boundaries_start = original_serie_boundaries_start
-                    original_forecast_serie_boundaries_end = original_serie_boundaries_end-steps
+                    original_forecast_serie_boundaries_end = original_serie_boundaries_end-steps_round
                     
                     # Create the time series where to apply the forecast on
                     forecast_data_time_slot_series = DataTimeSlotSeries()
@@ -764,14 +812,14 @@ class Forecaster(ParametricModel):
                         forecast_data_time_slot_series.append(data_time_slot_series[j])
  
                     # Apply the forecasting model
-                    self._apply(forecast_data_time_slot_series, n=steps, inplace=True)
+                    self._apply(forecast_data_time_slot_series, n=steps_round, inplace=True)
 
                     # Plot evaluation_score time series?
                     if plots:
                         forecast_data_time_slot_series.plot(log_js=False)
                     
                     # Compare each forecast with the original value
-                    for step in range(steps):
+                    for step in range(steps_round):
                         original_index = original_serie_boundaries_start + self.data['window'] + step
 
                         forecast_index = self.data['window'] + step
@@ -787,33 +835,59 @@ class Forecaster(ParametricModel):
                         break
                 
             if processed_samples < samples:
-                logger.warning('Could not evaluate "{}" samples for "{}" steps, processed "{}" samples only'.format(samples, steps, processed_samples))
+                logger.warning('Could not evaluate "{}" samples for "{}" steps_round, processed "{}" samples only'.format(samples, steps_round, processed_samples))
 
             if not model_values:
                 raise Exception('Could not evaluate model, maybe not enough data?')
 
             # Compute RMSE and ME, and add to the evaluation_score
-            evaluation_score['rmse_{}_steps'.format(steps)] = mean_squared_error(real_values, model_values)
-            evaluation_score['me_{}_steps'.format(steps)] = mean_error(real_values, model_values)
-   
-        # Compute average RMSE
-        sum_rmse = 0
-        count = 0
-        for key in evaluation_score:
-            if key.startswith('rmse_'):
-                sum_rmse += evaluation_score[key]
-                count += 1
-        evaluation_score['mrmse'] = sum_rmse/count
+            if 'RMSE' in metrics:
+                evaluation_score['RMSE_{}_steps'.format(steps_round)] = sqrt(mean_squared_error(real_values, model_values))
+            if 'MAE' in metrics:
+                evaluation_score['MAE_{}_steps'.format(steps_round)] = mean_absolute_error(real_values, model_values)
+            if 'MAPE' in metrics:
+                evaluation_score['MAPE_{}_steps'.format(steps_round)] = mean_absolute_percentage_error(real_values, model_values)
 
-        # Compute average ME
-        sum_me = 0
-        count = 0
-        for key in evaluation_score:
-            if key.startswith('me_'):
-                sum_me += evaluation_score[key]
-                count += 1
-        evaluation_score['mme'] = sum_me/count
+        # Compute overall RMSE
+        if 'RMSE' in metrics:
+            sum_rmse = 0
+            count = 0
+            for key in evaluation_score:
+                if key.startswith('RMSE_'):
+                    sum_rmse += evaluation_score[key]
+                    count += 1
+            evaluation_score['RMSE'] = sum_rmse/count
+
+        # Compute overall MAE
+        if 'MAE' in metrics:
+            sum_me = 0
+            count = 0
+            for key in evaluation_score:
+                if key.startswith('MAE_'):
+                    sum_me += evaluation_score[key]
+                    count += 1
+            evaluation_score['MAE'] = sum_me/count
+
+        # Compute overall MAPE
+        if 'MAPE' in metrics:
+            sum_me = 0
+            count = 0
+            for key in evaluation_score:
+                if key.startswith('MAPE_'):
+                    sum_me += evaluation_score[key]
+                    count += 1
+            evaluation_score['MAPE'] = sum_me/count
         
+        if not details:
+            simple_evaluation_score = {}
+            if 'RMSE' in metrics:
+                simple_evaluation_score['RMSE'] = evaluation_score['RMSE']
+            if 'MAE' in metrics:
+                simple_evaluation_score['MAE'] = evaluation_score['MAE']
+            if 'MAPE' in metrics:
+                simple_evaluation_score['MAPE'] = evaluation_score['MAPE']
+            evaluation_score = simple_evaluation_score
+            
         return evaluation_score
 
 
