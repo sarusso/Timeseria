@@ -2,14 +2,16 @@ import os
 import json
 import uuid
 import copy
+import statistics
 from .datastructures import DataTimeSlotSeries, DataTimeSlot, TimePoint
 from .exceptions import NotFittedError
-from .utilities import get_periodicity
+from .utilities import get_periodicity, is_numerical, set_from_t_and_to_t, slot_is_in_range
 from .time import now_t, dt_from_s, s_from_dt
-from datetime import timedelta
-from sklearn.metrics import mean_squared_error
+from datetime import timedelta, datetime
+from sklearn.metrics import mean_squared_error, mean_absolute_error
 from .units import TimeUnit
 from pandas import DataFrame
+from math import sqrt
 
 # Setup logging
 import logging
@@ -22,14 +24,22 @@ HARD_DEBUG = False
 #  Utility functions
 #======================
 
+#def mean_absolute_error(list1, list2):
+#    if len(list1) != len(list2):
+#        raise ValueError('Lists have different lengths, cannot continue')
+#    error_sum = 0
+#    for i in range(len(list1)):
+#        error_sum += abs(list1[i] - list2[i])
+#    return error_sum/len(list1)
 
-def mean_error(list1, list2):
+def mean_absolute_percentage_error(list1, list2):
+    '''Computes the MAPE, list 1 are true values, list2 arepredicted values'''
     if len(list1) != len(list2):
         raise ValueError('Lists have different lengths, cannot continue')
-    error_sum = 0
+    p_error_sum = 0
     for i in range(len(list1)):
-        error_sum += abs(list1[i] - list2[i])
-    return error_sum/len(list1)
+        p_error_sum += abs((list1[i] - list2[i])/list1[i])
+    return p_error_sum/len(list1)
 
 
 def get_periodicity_index(time_point, slot_unit, periodicity, dst_affected=False):
@@ -89,8 +99,6 @@ def get_periodicity_index(time_point, slot_unit, periodicity, dst_affected=False
             #periodicity_index = (int(slot_start_t / slot_unit_duration) % periodicity) #+ dst_offset_slots
             
             periodicity_index = (int((slot_start_t + dst_offset_s) / slot_unit_duration) % periodicity)
-        
-        
 
     return periodicity_index
 
@@ -105,29 +113,62 @@ def get_periodicity_index(time_point, slot_unit, periodicity, dst_affected=False
 #    pass
 
 class Model(object):
-    '''A stateless model, or a white-box model. Exposes only predict, apply and evaluate methods, since it is assumed that all the
-    information is coded and nothing is learnt from data. Provides also an "evaluation_score_score" property which is set by the last evaluate() call.'''
+    '''A stateless model, or a white-box model. Exposes only predict(), apply() and evaluate() methods,
+    since it is assumed that all the information is coded and nothing is learnt from the data.'''
     
     def __init__(self):
         pass
+ 
     
-    def predict(self):
-        pass
-    
-    def apply(self, *args, **kwargs):
-        return self._apply(self,*args, **kwargs)
-    
-    def evaluate(self, *args, **kwargs):
-        return self._evaluate(self,*args, **kwargs)
+    def predict(self, data, *args, **kwargs):
+        try:
+            self._predict
+        except AttributeError:
+            raise NotImplementedError('Predicting from this model is not implemented')
 
+        if not isinstance(data, DataTimeSlotSeries):
+            raise TypeError('DataTimeSlotSeries is required (got "{}")'.format(data.__class__.__name__))
+    
+        if not data:
+            raise ValueError('A non-empty DataTimeSlotSeries is required')
+        
+        return self._predict(data, *args, **kwargs)
+
+
+    def apply(self, data, *args, **kwargs):
+        try:
+            self._apply
+        except AttributeError:
+            raise NotImplementedError('Applying this model is not implemented')
+
+        if not isinstance(data, DataTimeSlotSeries):
+            raise TypeError('DataTimeSlotSeries is required (got "{}")'.format(data.__class__.__name__))
+    
+        if not data:
+            raise ValueError('A non-empty DataTimeSlotSeries is required')
+        
+        return self._apply(data, *args, **kwargs)
+
+
+    def evaluate(self, data, *args, **kwargs):
+        try:
+            self._evaluate
+        except AttributeError:
+            raise NotImplementedError('Evaluating this model is not implemented')
+
+        if not isinstance(data, DataTimeSlotSeries):
+            raise TypeError('DataTimeSlotSeries is required (got "{}")'.format(data.__class__.__name__))
+    
+        if not data:
+            raise ValueError('A non-empty DataTimeSlotSeries is required')
+        
+        return self._evaluate(data, *args, **kwargs)
 
 
 class ParametricModel(Model):
     '''A stateful model with parameters, or a (partly) black-box model. Parameters can be set manually or learnt (fitted) from data.
-    On top of the predict(), apply() and evaluate() methods it provides a save() method to store the parameters of the model,
-    and optionally a fit() method if the parameters are to be learnt form data. Provides also an "evaluation_score_score" property which is set
-    by the last evaluate() call or, in case of cross validation, by the average of the evaluate() functions called in the cross-validation
-    process. Can optionally have a kernel incapsulating an external model (Keras, Tensorflow, Scikit-learn etc.)'''
+On top of the predict(), apply() and evaluate() methods it provides a save() method to store the parameters of the model,
+and optionally a fit() method if the parameters are to be learnt form data.'''
     
     def __init__(self, path=None, id=None):
         
@@ -136,7 +177,6 @@ class ParametricModel(Model):
                 self.data = json.loads(f.read())         
             self.fitted=True
         else:
-            
             if not id:
                 id = str(uuid.uuid4())
             self.fitted = False
@@ -145,22 +185,85 @@ class ParametricModel(Model):
         super(ParametricModel, self).__init__()
 
 
-    def fit(self, data_time_slot_series, *args, **kwargs):
-        
-        if not isinstance(data_time_slot_series, DataTimeSlotSeries):
-            raise TypeError('DataTimeSlotSeries is required (got "{}")'.format(data_time_slot_series.__class__.__name__))
-    
-        if not data_time_slot_series:
-            raise ValueError('A non-empty DataTimeSlotSeries is required')
+    def predict(self, data, *args, **kwargs):
 
-        fit_output = self._fit(data_time_slot_series, *args, **kwargs)
+        try:
+            self._predict
+        except AttributeError:
+            raise NotImplementedError('Predicting from this model is not implemented')
+
+        if not self.fitted:
+            raise NotFittedError()
+
+        if not isinstance(data, DataTimeSlotSeries):
+            raise TypeError('DataTimeSlotSeries is required (got "{}")'.format(data.__class__.__name__))
+    
+        if not data:
+            raise ValueError('A non-empty DataTimeSlotSeries is required')
+        
+        return self._predict(data, *args, **kwargs)
+
+
+    def apply(self, data, *args, **kwargs):
+
+        try:
+            self._apply
+        except AttributeError:
+            raise NotImplementedError('Applying this model is not implemented')
+
+        if not self.fitted:
+            raise NotFittedError()
+
+        if not isinstance(data, DataTimeSlotSeries):
+            raise TypeError('DataTimeSlotSeries is required (got "{}")'.format(data.__class__.__name__))
+    
+        if not data:
+            raise ValueError('A non-empty DataTimeSlotSeries is required')
+        
+        return self._apply(data, *args, **kwargs)
+
+
+    def evaluate(self, data, *args, **kwargs):
+
+        try:
+            self._evaluate
+        except AttributeError:
+            raise NotImplementedError('Evaluating this model is not implemented')
+
+        if not self.fitted:
+            raise NotFittedError()
+
+        if not isinstance(data, DataTimeSlotSeries):
+            raise TypeError('DataTimeSlotSeries is required (got "{}")'.format(data.__class__.__name__))
+    
+        if not data:
+            raise ValueError('A non-empty DataTimeSlotSeries is required')
+        
+        return self._evaluate(data, *args, **kwargs)
+
+
+    def fit(self, data, *args, **kwargs):
+
+        try:
+            self._fit
+        except AttributeError:
+            raise NotImplementedError('Fitting this model is not implemented')
+
+        if not isinstance(data, DataTimeSlotSeries):
+            raise TypeError('DataTimeSlotSeries is required (got "{}")'.format(data.__class__.__name__))
+    
+        if not data:
+            raise ValueError('A non-empty DataTimeSlotSeries is required')
+        
+        fit_output = self._fit(data, *args, **kwargs)
+
         self.data['fitted_at'] = now_t()
         self.fitted = True
         return fit_output
 
         
     def save(self, path):
-        # TODO: dump and enforce the TimeUnit as well
+        # TODO: dump and enforce the TimeUnit as well?
         if not self.fitted:
             raise NotFittedError()
         model_dir = '{}/{}'.format(path, self.data['id'])
@@ -171,42 +274,92 @@ class ParametricModel(Model):
         logger.info('Saved model with id "%s" in "%s"', self.data['id'], model_dir)
         return model_dir
 
-      
-    def apply(self, data_time_slot_series, *args, **kwargs):
-        if not self.fitted:
-            raise NotFittedError()
 
-        if not isinstance(data_time_slot_series, DataTimeSlotSeries):
-            raise TypeError('DataTimeSlotSeries is required (got "{}")'.format(data_time_slot_series.__class__.__name__))
+    def cross_validate(self, data, *args, **kwargs):
+        try:
+            self._evaluate
+        except AttributeError:
+            raise NotImplementedError('Evaluating this model is not implemented')
+
+        if not isinstance(data, DataTimeSlotSeries):
+            raise TypeError('DataTimeSlotSeries is required (got "{}")'.format(data.__class__.__name__))
     
-        if not data_time_slot_series:
+        if not data:
             raise ValueError('A non-empty DataTimeSlotSeries is required')
 
-        return self._apply(data_time_slot_series, *args, **kwargs)
+        # Decouple fit from validate args
+        fit_kwargs = {}
+        evaluate_kwargs = {}
+        consumed_kwargs = []
+        for kwarg in kwargs:
+            if kwarg.startswith('fit_'):
+                consumed_kwargs.append(kwarg)
+                fit_kwargs[kwarg.replace('fit_', '')] = kwargs[kwarg]
+            if kwarg.startswith('evaluate_'):
+                consumed_kwargs.append(kwarg)
+                evaluate_kwargs[kwarg.replace('evaluate_', '')] = kwargs[kwarg]
+        for consumed_kwarg in consumed_kwargs:
+            kwargs.pop(consumed_kwarg)
 
+        # For readability
+        data_time_slot_series = data
+        
+        # How many rounds
+        rounds = kwargs.pop('rounds', 10)
 
-    def _fit(self, *args, **krargs):
-        raise NotImplementedError('Fitting this model is not implemented')
-
-    def _apply(self, *args, **krargs):
-        raise NotImplementedError('Applying this model is not implemented')
-
-    def _evaluate(self, *args, **krargs):
-        raise NotImplementedError('Evaluating this model is not implemented')
+        # Do we still have some kwargs?
+        if kwargs:
+            raise Exception('Got some unknown args: {}'.format(kwargs))
+            
+        # How many items per round?
+        round_items = int(len(data_time_slot_series) / rounds)
+        logger.debug('Items per round: {}'.format(round_items))
+        
+        # Start the fit / evaluate loop
+        evaluations = []        
+        for i in range(rounds):
+            from_t = data_time_slot_series[(round_items*i)].start.t
+            to_t = data_time_slot_series[(round_items*i) + round_items].start.t
+            from_dt = dt_from_s(from_t)
+            to_dt   = dt_from_s(to_t)
+            logger.info('Cross validation round #{} of {}: validate from {} ({}) to {} ({}), fit on the rest.'.format(i+1, rounds, from_t, from_dt, to_t, to_dt))
+            
+            # Fit
+            if i == 0:            
+                logger.debug('Fitting from {} ({})'.format(to_t, to_dt))
+                self.fit(data, from_t=to_t, **fit_kwargs)
+            else:
+                logger.debug('Fitting until {} ({}) and then from {} ({}).'.format(to_t, to_dt, from_t, from_dt))
+                self.fit(data, from_t=to_t, to_t=from_t, **fit_kwargs)                
+            
+            # Evaluate & append
+            evaluations.append(self.evaluate(data, from_t=from_t, to_t=to_t, **evaluate_kwargs))
+        
+        # Regroup evaluations
+        evaluation_metrics = list(evaluations[0].keys())
+        scores_by_evaluation_metric = {}
+        for evaluation in evaluations:
+            for evaluation_metric in evaluation_metrics:
+                try:
+                    scores_by_evaluation_metric[evaluation_metric].append(evaluation[evaluation_metric])
+                except KeyError:
+                    try:
+                        scores_by_evaluation_metric[evaluation_metric] = [evaluation[evaluation_metric]]
+                    except KeyError:
+                        raise Exception('Error, the model generated different evaluation metrics over the rounds, cannot compute cross validation.') from None
+        
+        # Prepare and return results
+        results = {}
+        for evaluation_metric in scores_by_evaluation_metric:
+            results[evaluation_metric+'_avg'] = statistics.mean(scores_by_evaluation_metric[evaluation_metric])
+            results[evaluation_metric+'_stdev'] = statistics.stdev(scores_by_evaluation_metric[evaluation_metric])         
+        return results
 
 
     @property
     def id(self):
         return self.data['id']
 
-
-    @property
-    def evaluation_score(self):
-        if not self.fitted:
-            raise NotFittedError()
-        else:
-            return self.data['evaluation_score']
-    
 
 
 #======================
@@ -217,12 +370,17 @@ class Reconstructor(ParametricModel):
 
     def _apply(self, data_time_slot_series, remove_data_loss=False, data_loss_threshold=1, inplace=False):
         logger.debug('Using data_loss_threshold="%s"', data_loss_threshold)
+
+        # TODO: understand if we want the apply from/to behavior. For now it is disabled
+        # (add from_t=None, to_t=None, from_dt=None, to_dt=None in the function call above)
+        # from_t, to_t = set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
+        # Maybe also add a data_time_slot_series.mark=[from_dt, to_dt]
+         
+        from_t = None
+        to_t   = None
         
-        if inplace:
-            pass # The function use the same "data_time_slot_series" variable
-        
-        else:
-            data_time_slot_series = copy.deepcopy(data_time_slot_series)
+        if not inplace:
+            data_time_slot_series = data_time_slot_series.duplicate()
 
         if len(data_time_slot_series.data_keys()) > 1:
             raise NotImplementedError('Multivariate time series are not yet supported')
@@ -232,6 +390,13 @@ class Reconstructor(ParametricModel):
             gap_started = None
             
             for i, data_time_slot in enumerate(data_time_slot_series):
+                
+                # Skip if before from_t/dt of after to_t/dt
+                if from_t is not None and data_time_slot_series[i].start.t < from_t:
+                    continue
+                if to_t is not None and data_time_slot_series[i].end.t > to_t:
+                    break
+
                 if data_time_slot.data_loss >= data_loss_threshold:
                     # This is the beginning of an area we want to reconstruct according to the data_loss_threshold
                     if gap_started is None:
@@ -254,25 +419,35 @@ class Reconstructor(ParametricModel):
             if gap_started is not None:
                 self._reconstruct(from_index=gap_started, to_index=i+1, data_time_slot_series=data_time_slot_series, key=key)
 
-        return data_time_slot_series
+        if not inplace:
+            return data_time_slot_series
+        else:
+            return None
 
 
-    def _evaluate(self, data_time_slot_series, steps_set='auto', samples=1000, data_loss_threshold=1):
+    def _evaluate(self, data_time_slot_series, steps='auto', samples=1000, data_loss_threshold=1, metrics=['RMSE', 'MAE'], details=False, from_t=None, to_t=None, from_dt=None, to_dt=None):
 
         # Set evaluation_score steps if we have to
-        if steps_set == 'auto':
+        if steps == 'auto':
             try:
-                steps_set = [1, self.data['periodicity']]
+                steps = [1, self.data['periodicity']]
             except KeyError:
-                steps_set = [1, 3]
-
-        # Support var
-        evaluation_score = {}
+                steps = [1, 2, 3]
+        elif isinstance(steps, list):
+            pass
+        else:
+            steps = list(range(1, steps+1))
          
+        # Support vars
+        evaluation_score = {}
+        from_t, to_t = set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
+
+        logger.info('Will evaluate model for %s steps with metrics %s', steps, metrics)
+
         # Find areas where to evaluate the model
         for key in data_time_slot_series.data_keys():
              
-            for steps in steps_set:
+            for steps_round in steps:
                 
                 # Support vars
                 real_values = []
@@ -280,30 +455,37 @@ class Reconstructor(ParametricModel):
                 processed_samples = 0
 
                 # Here we will have steps=1, steps=2 .. steps=n          
-                logger.debug('Evaluating model for steps %s', steps)
+                logger.debug('Evaluating model for %s steps', steps_round)
                 
                 for i in range(len(data_time_slot_series)):
-                                  
+
+                    # Skip if needed
+                    try:
+                        if not slot_is_in_range(data_time_slot_series[i], from_t, to_t):
+                            continue
+                    except StopIteration:
+                        break                  
+                
                     # Skip the first and the last ones, otherwise reconstruct the ones in the middle
-                    if (i == 0) or (i >= len(data_time_slot_series)-steps):
+                    if (i == 0) or (i >= len(data_time_slot_series)-steps_round):
                         continue
 
                     # Is this a "good area" where to test or do we have to stop?
                     stop = False
                     if data_time_slot_series[i-1].data_loss >= data_loss_threshold:
                         stop = True
-                    for j in range(steps):
+                    for j in range(steps_round):
                         if data_time_slot_series[i+j].data_loss >= data_loss_threshold:
                             stop = True
                             break
-                    if data_time_slot_series[i+steps].data_loss >= data_loss_threshold:
+                    if data_time_slot_series[i+steps_round].data_loss >= data_loss_threshold:
                         stop = True
                     if stop:
                         continue
                             
                     # Set prev and next
                     prev_value = data_time_slot_series[i-1].data[key]
-                    next_value = data_time_slot_series[i+steps].data[key]
+                    next_value = data_time_slot_series[i+steps_round].data[key]
                     
                     # Compute average value
                     average_value = (prev_value+next_value)/2
@@ -315,7 +497,7 @@ class Reconstructor(ParametricModel):
                     #data_time_slot_series_to_reconstruct.append(copy.deepcopy(data_time_slot_series[i-1]))
                     
                     # Append in the middle and store real values
-                    for j in range(steps):
+                    for j in range(steps_round):
                         data_time_slot = copy.deepcopy(data_time_slot_series[i+j])
                         # Set the coverage to zero so the slot will be reconstructed
                         data_time_slot._coverage = 0
@@ -325,47 +507,73 @@ class Reconstructor(ParametricModel):
                         real_values.append(data_time_slot_series[i+j].data[key])
               
                     # Append next
-                    #data_time_slot_series_to_reconstruct.append(copy.deepcopy(data_time_slot_series[i+steps]))
+                    #data_time_slot_series_to_reconstruct.append(copy.deepcopy(data_time_slot_series[i+steps_round]))
 
                     # Apply model inplace
                     self._apply(data_time_slot_series_to_reconstruct, inplace=True)
                     processed_samples += 1
 
                     # Store reconstructed values
-                    for j in range(steps):
+                    for j in range(steps_round):
                         reconstructed_values.append(data_time_slot_series_to_reconstruct[j].data[key])
                     
                     if samples is not None and processed_samples >= samples:
                         break
 
                 if processed_samples < samples:
-                    logger.warning('Could not evaluate "{}" samples for "{}" steps, processed "{}" samples only'.format(samples, steps, processed_samples))
+                    logger.warning('Could not evaluate "{}" samples for "{}" steps_round, processed "{}" samples only'.format(samples, steps_round, processed_samples))
 
                 if not reconstructed_values:
                     raise Exception('Could not evaluate model, maybe not enough data?')
 
                 # Compute RMSE and ME, and add to the evaluation_score
-                evaluation_score['rmse_{}_steps'.format(steps)] = mean_squared_error(real_values, reconstructed_values)
-                evaluation_score['me_{}_steps'.format(steps)] = mean_error(real_values, reconstructed_values)
+                if 'RMSE' in metrics:
+                    evaluation_score['RMSE_{}_steps'.format(steps_round)] = sqrt(mean_squared_error(real_values, reconstructed_values))
+                if 'MAE' in metrics:
+                    evaluation_score['MAE_{}_steps'.format(steps_round)] = mean_absolute_error(real_values, reconstructed_values)
+                if 'MAPE' in metrics:
+                    evaluation_score['MAPE_{}_steps'.format(steps_round)] = mean_absolute_percentage_error(real_values, reconstructed_values)
 
-        # Compute average RMSE
-        sum_rmse = 0
-        count = 0
-        for key in evaluation_score:
-            if key.startswith('rmse_'):
-                sum_rmse += evaluation_score[key]
-                count += 1
-        evaluation_score['mrmse'] = sum_rmse/count
+        # Compute overall RMSE
+        if 'RMSE' in metrics:
+            sum_rmse = 0
+            count = 0
+            for key in evaluation_score:
+                if key.startswith('RMSE_'):
+                    sum_rmse += evaluation_score[key]
+                    count += 1
+            evaluation_score['RMSE'] = sum_rmse/count
 
-        # Compute average ME
-        sum_me = 0
-        count = 0
-        for key in evaluation_score:
-            if key.startswith('me_'):
-                sum_me += evaluation_score[key]
-                count += 1
-        evaluation_score['mme'] = sum_me/count
+        # Compute overall MAE
+        if 'MAE' in metrics:
+            sum_me = 0
+            count = 0
+            for key in evaluation_score:
+                if key.startswith('MAE_'):
+                    sum_me += evaluation_score[key]
+                    count += 1
+            evaluation_score['MAE'] = sum_me/count
+
+        # Compute overall MAPE
+        if 'MAPE' in metrics:
+            sum_me = 0
+            count = 0
+            for key in evaluation_score:
+                if key.startswith('MAPE_'):
+                    sum_me += evaluation_score[key]
+                    count += 1
+            evaluation_score['MAPE'] = sum_me/count
         
+        if not details:
+            simple_evaluation_score = {}
+            if 'RMSE' in metrics:
+                simple_evaluation_score['RMSE'] = evaluation_score['RMSE']
+            if 'MAE' in metrics:
+                simple_evaluation_score['MAE'] = evaluation_score['MAE']
+            if 'MAPE' in metrics:
+                simple_evaluation_score['MAPE'] = evaluation_score['MAPE']
+            evaluation_score = simple_evaluation_score
+            
         return evaluation_score
 
 
@@ -376,10 +584,12 @@ class Reconstructor(ParametricModel):
 
 class PeriodicAverageReconstructor(Reconstructor):
 
-    def _fit(self, data_time_slot_series, data_loss_threshold=0.5, periodicity=None, evaluation_steps_set='auto', evaluation_samples=1000, dst_affected=False, timezone_affected=False):
+    def _fit(self, data_time_slot_series, data_loss_threshold=0.5, periodicity=None, dst_affected=False, timezone_affected=False, from_t=None, to_t=None, from_dt=None, to_dt=None):
 
         if len(data_time_slot_series.data_keys()) > 1:
             raise NotImplementedError('Multivariate time series are not yet supported')
+
+        from_t, to_t = set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
         
         # Set or detect periodicity
         if periodicity is None:
@@ -391,12 +601,22 @@ class PeriodicAverageReconstructor(Reconstructor):
         self.data['periodicity']  = periodicity
         self.data['dst_affected'] = dst_affected 
         
-        logger.info('dst_affected: {}'.format(dst_affected))
+        # logger.info('dst_affected: {}'.format(dst_affected))
         
         for key in data_time_slot_series.data_keys():
             sums   = {}
             totals = {}
+            processed = 0
             for data_time_slot in data_time_slot_series:
+                
+                # Skip if needed
+                try:
+                    if not slot_is_in_range(data_time_slot, from_t, to_t):
+                        continue
+                except StopIteration:
+                    break
+                
+                # Process
                 if data_time_slot.data_loss < data_loss_threshold:
                     periodicity_index = get_periodicity_index(data_time_slot.start, data_time_slot_series.slot_unit, periodicity, dst_affected=dst_affected)
                     if not periodicity_index in sums:
@@ -405,14 +625,14 @@ class PeriodicAverageReconstructor(Reconstructor):
                     else:
                         sums[periodicity_index] += data_time_slot.data[key]
                         totals[periodicity_index] +=1
+                processed += 1
 
         averages={}
-        for key in sums:
-            averages[key] = sums[key]/totals[key]
+        for periodicity_index in sums:
+            averages[periodicity_index] = sums[periodicity_index]/totals[periodicity_index]
         self.data['averages'] = averages
 
-        self.data['evaluation_score'] = self._evaluate(data_time_slot_series, steps_set=evaluation_steps_set, samples=evaluation_samples)
-        logger.info('Model evaluation score: "{}"'.format(self.data['evaluation_score']))
+        # logger.info('Processed "{}" slots'.format(processed))
 
 
     def _reconstruct(self, data_time_slot_series, key, from_index, to_index):
@@ -446,49 +666,64 @@ class PeriodicAverageReconstructor(Reconstructor):
 
 
 
-class ProphetReconstructor(Reconstructor):
+class ProphetModel(ParametricModel):
 
     @classmethod
     def remove_timezone(cls, dt):
         return dt.replace(tzinfo=None)
 
-
     @classmethod
-    def from_timeseria_to_prophet(cls, timeseries):
+    def from_timeseria_to_prophet(cls, timeseries, from_t=None, to_t=None):
 
         # Create Python lists with data
         try:
-            data_as_list = [[cls.remove_timezone(slot.start.dt), slot.data[0]] for slot in timeseries]
-        except:
-            data_as_list = [[cls.remove_timezone(slot.start.dt), slot.data[list(slot.data.keys())[0]]] for slot in timeseries]
+            timeseries[0].data[0]
+            data_keys_are_indexes = True
+        except KeyError:
+            timeseries[0].data.keys()
+            data_keys_are_indexes = False
+        
+        data_as_list=[]
+        for slot in timeseries:
+            
+            # Skip if needed
+            try:
+                if not slot_is_in_range(slot, from_t, to_t):
+                    continue
+            except StopIteration:
+                break                
+
+            if data_keys_are_indexes:     
+                data_as_list.append([cls.remove_timezone(slot.start.dt), slot.data[0]])
+            else:
+                data_as_list.append([cls.remove_timezone(slot.start.dt), slot.data[list(slot.data.keys())[0]]])
 
         # Create the pandas DataFrames
         data = DataFrame(data_as_list, columns = ['ds', 'y'])
 
         return data
 
+
+
+class ProphetReconstructor(Reconstructor, ProphetModel):
     
-    def _fit(self, data_time_slot_series, window=None, periodicity=None, evaluation_steps_set='auto', evaluation_samples=1000, dst_affected=False):
+    def _fit(self, data_time_slot_series, from_t=None, to_t=None, from_dt=None, to_dt=None):
 
         from fbprophet import Prophet
+
+        from_t, to_t = set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
 
         if len(data_time_slot_series.data_keys()) > 1:
             raise NotImplementedError('Multivariate time series are not yet supported')
 
-        data = self.from_timeseria_to_prophet(data_time_slot_series)
+        data = self.from_timeseria_to_prophet(data_time_slot_series, from_t, to_t)
 
         # Instantiate the Prophet model
         self.prophet_model = Prophet()
         
         # Fit tjhe Prophet model
         self.prophet_model.fit(data)
-        
-        if not window:
-            logger.info('Defaulting to a window of 10 slots for forecasting')
-            self.data['window'] = 10
 
-        self.data['evaluation_score']  = self._evaluate(data_time_slot_series, steps_set=evaluation_steps_set, samples=evaluation_samples)
-        logger.info('Model evaluation score: "{}"'.format(self.data['evaluation_score']))
 
 
     def _reconstruct(self, data_time_slot_series, key, from_index, to_index):
@@ -520,19 +755,27 @@ class ProphetReconstructor(Reconstructor):
 
 class Forecaster(ParametricModel):
 
-    def _evaluate(self, data_time_slot_series, steps_set='auto', samples=1000, plots=False):
-        
-        # Set evaluation_score steps if we have to
-        if steps_set == 'auto':
-            try:
-                steps_set = [1, self.data['periodicity']]
-            except KeyError:
-                steps_set = [1, 3]
-                
-        # Support var
-        evaluation_score = {}
+    #def _evaluate(self, data_time_slot_series, steps_set='auto', samples=1000, plots=False, from_t=None, to_t=None, from_dt=None, to_dt=None):
+    def _evaluate(self, data_time_slot_series, steps='auto', samples=1000, plots=False, metrics=['RMSE', 'MAE'], details=False, from_t=None, to_t=None, from_dt=None, to_dt=None):
 
-        for steps in steps_set:
+        # Set evaluation_score steps if we have to
+        if steps == 'auto':
+            try:
+                steps = [1, self.data['periodicity']]
+            except KeyError:
+                steps = [1, 2, 3]
+        elif isinstance(steps, list):
+            pass
+        else:
+            steps = list(range(1, steps+1))
+                            
+        # Support vars
+        evaluation_score = {}
+        from_t, to_t = set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
+
+        logger.info('Will evaluate model for %s steps with metrics %s', steps, metrics)
+
+        for steps_round in steps:
             
             # Support vars
             real_values = []
@@ -542,19 +785,26 @@ class Forecaster(ParametricModel):
             # For each point of the data_time_slot_series, after the window, apply the prediction and compare it with the actual value
             for key in data_time_slot_series.data_keys():
                 for i in range(len(data_time_slot_series)):
-                    
+
+                    # Skip if needed
+                    try:
+                        if not slot_is_in_range(data_time_slot_series[i], from_t, to_t):
+                            continue
+                    except StopIteration:
+                        break  
+                
                     # Check that we can get enough data
-                    if i < self.data['window']+steps:
+                    if i < self.data['window']+steps_round:
                         continue
-                    if i > (len(data_time_slot_series)-steps):
+                    if i > (len(data_time_slot_series)-steps_round):
                         continue
 
                     # Compute the various boundaries
-                    original_serie_boundaries_start = i - (self.data['window']) - steps
+                    original_serie_boundaries_start = i - (self.data['window']) - steps_round
                     original_serie_boundaries_end = i
                     
                     original_forecast_serie_boundaries_start = original_serie_boundaries_start
-                    original_forecast_serie_boundaries_end = original_serie_boundaries_end-steps
+                    original_forecast_serie_boundaries_end = original_serie_boundaries_end-steps_round
                     
                     # Create the time series where to apply the forecast on
                     forecast_data_time_slot_series = DataTimeSlotSeries()
@@ -562,14 +812,14 @@ class Forecaster(ParametricModel):
                         forecast_data_time_slot_series.append(data_time_slot_series[j])
  
                     # Apply the forecasting model
-                    forecast_data_time_slot_series = self._apply(forecast_data_time_slot_series, n=steps, inplace=True)
+                    self._apply(forecast_data_time_slot_series, n=steps_round, inplace=True)
 
                     # Plot evaluation_score time series?
                     if plots:
                         forecast_data_time_slot_series.plot(log_js=False)
                     
                     # Compare each forecast with the original value
-                    for step in range(steps):
+                    for step in range(steps_round):
                         original_index = original_serie_boundaries_start + self.data['window'] + step
 
                         forecast_index = self.data['window'] + step
@@ -585,37 +835,65 @@ class Forecaster(ParametricModel):
                         break
                 
             if processed_samples < samples:
-                logger.warning('Could not evaluate "{}" samples for "{}" steps, processed "{}" samples only'.format(samples, steps, processed_samples))
+                logger.warning('Could not evaluate "{}" samples for "{}" steps_round, processed "{}" samples only'.format(samples, steps_round, processed_samples))
 
             if not model_values:
                 raise Exception('Could not evaluate model, maybe not enough data?')
 
             # Compute RMSE and ME, and add to the evaluation_score
-            evaluation_score['rmse_{}_steps'.format(steps)] = mean_squared_error(real_values, model_values)
-            evaluation_score['me_{}_steps'.format(steps)] = mean_error(real_values, model_values)
-   
-        # Compute average RMSE
-        sum_rmse = 0
-        count = 0
-        for key in evaluation_score:
-            if key.startswith('rmse_'):
-                sum_rmse += evaluation_score[key]
-                count += 1
-        evaluation_score['mrmse'] = sum_rmse/count
+            if 'RMSE' in metrics:
+                evaluation_score['RMSE_{}_steps'.format(steps_round)] = sqrt(mean_squared_error(real_values, model_values))
+            if 'MAE' in metrics:
+                evaluation_score['MAE_{}_steps'.format(steps_round)] = mean_absolute_error(real_values, model_values)
+            if 'MAPE' in metrics:
+                evaluation_score['MAPE_{}_steps'.format(steps_round)] = mean_absolute_percentage_error(real_values, model_values)
 
-        # Compute average ME
-        sum_me = 0
-        count = 0
-        for key in evaluation_score:
-            if key.startswith('me_'):
-                sum_me += evaluation_score[key]
-                count += 1
-        evaluation_score['mme'] = sum_me/count
+        # Compute overall RMSE
+        if 'RMSE' in metrics:
+            sum_rmse = 0
+            count = 0
+            for key in evaluation_score:
+                if key.startswith('RMSE_'):
+                    sum_rmse += evaluation_score[key]
+                    count += 1
+            evaluation_score['RMSE'] = sum_rmse/count
+
+        # Compute overall MAE
+        if 'MAE' in metrics:
+            sum_me = 0
+            count = 0
+            for key in evaluation_score:
+                if key.startswith('MAE_'):
+                    sum_me += evaluation_score[key]
+                    count += 1
+            evaluation_score['MAE'] = sum_me/count
+
+        # Compute overall MAPE
+        if 'MAPE' in metrics:
+            sum_me = 0
+            count = 0
+            for key in evaluation_score:
+                if key.startswith('MAPE_'):
+                    sum_me += evaluation_score[key]
+                    count += 1
+            evaluation_score['MAPE'] = sum_me/count
         
+        if not details:
+            simple_evaluation_score = {}
+            if 'RMSE' in metrics:
+                simple_evaluation_score['RMSE'] = evaluation_score['RMSE']
+            if 'MAE' in metrics:
+                simple_evaluation_score['MAE'] = evaluation_score['MAE']
+            if 'MAPE' in metrics:
+                simple_evaluation_score['MAPE'] = evaluation_score['MAPE']
+            evaluation_score = simple_evaluation_score
+            
         return evaluation_score
 
 
     def _apply(self, data_time_slot_series, n=1, inplace=False):
+
+        # TODO: refacotr to use the predict below
 
         if len(data_time_slot_series.data_keys()) > 1:
             raise NotImplementedError('Multivariate time series are not yet supported')
@@ -626,7 +904,7 @@ class Forecaster(ParametricModel):
         if inplace:
             forecast_data_time_slot_series = data_time_slot_series
         else:
-            forecast_data_time_slot_series = copy.deepcopy(data_time_slot_series)
+            forecast_data_time_slot_series = data_time_slot_series.duplicate()
         
         for key in forecast_data_time_slot_series.data_keys():
 
@@ -678,16 +956,30 @@ class Forecaster(ParametricModel):
 
         # Set serie mark for the forecast and return
         forecast_data_time_slot_series.mark = [forecast_data_time_slot_series[-n].start.dt, forecast_data_time_slot_series[-1].end.dt]
+        
+        if not inplace:
+            return forecast_data_time_slot_series
+        else:
+            return None
+
+
+    def _predict(self, data_time_slot_series, n=1):
+        
+        # TODO: this is highly inefficient, fix me!
+        forecast_data_time_slot_series = DataTimeSlotSeries(*self.apply(data_time_slot_series, inplace=False, n=n)[len(data_time_slot_series):])
+
         return forecast_data_time_slot_series
 
 
 
 class PeriodicAverageForecaster(Forecaster):
-    
-    def _fit(self, data_time_slot_series, window=None, periodicity=None, evaluation_steps_set='auto', evaluation_samples=1000, evaluation_plots=False, dst_affected=False):
+        
+    def _fit(self, data_time_slot_series, window=None, periodicity=None, dst_affected=False, from_t=None, to_t=None, from_dt=None, to_dt=None):
 
         if len(data_time_slot_series.data_keys()) > 1:
             raise NotImplementedError('Multivariate time series are not yet supported')
+
+        from_t, to_t = set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
 
         # Set or detect periodicity
         if periodicity is None:        
@@ -709,7 +1001,17 @@ class PeriodicAverageForecaster(Forecaster):
         for key in data_time_slot_series.data_keys():
             sums   = {}
             totals = {}
+            processed = 0
             for data_time_slot in data_time_slot_series:
+
+                # Skip if needed
+                try:
+                    if not slot_is_in_range(data_time_slot, from_t, to_t):
+                        continue                  
+                except StopIteration:
+                    break
+                
+                # Process
                 periodicity_index = get_periodicity_index(data_time_slot.start, data_time_slot_series.slot_unit, periodicity, dst_affected)
                 if not periodicity_index in sums:
                     sums[periodicity_index] = data_time_slot.data[key]
@@ -717,14 +1019,14 @@ class PeriodicAverageForecaster(Forecaster):
                 else:
                     sums[periodicity_index] += data_time_slot.data[key]
                     totals[periodicity_index] +=1
+                processed += 1
 
         averages={}
-        for key in sums:
-            averages[key] = sums[key]/totals[key]
+        for periodicity_index in sums:
+            averages[periodicity_index] = sums[periodicity_index]/totals[periodicity_index]
         self.data['averages'] = averages
-
-        self.data['evaluation_score']  = self._evaluate(data_time_slot_series, steps_set=evaluation_steps_set, samples=evaluation_samples, plots=evaluation_plots)
-        logger.info('Model evaluation score: "{}"'.format(self.data['evaluation_score']))
+        
+        #logger.info('Processed "{}" slots'.format(processed))
 
 
     def _forecast(self, forecast_data_time_slot_series, slot_unit, key, this_slot_start_timePoint, this_slot_end_timePoint, first_call, n) : #, data_time_slot_series, key, from_index, to_index):
@@ -776,41 +1078,24 @@ class PeriodicAverageForecaster(Forecaster):
 
 
 
-class ProphetForecaster(Forecaster):
+class ProphetForecaster(Forecaster, ProphetModel):
     '''Prophet (from Facebook) implements a procedure for forecasting time series data based on an additive 
 model where non-linear trends are fit with yearly, weekly, and daily seasonality, plus holiday effects.
 It works best with time series that have strong seasonal effects and several seasons of historical data.
 Prophet is robust to missing data and shifts in the trend, and typically handles outliers well. 
 '''
 
-    @classmethod
-    def remove_timezone(cls, dt):
-        return dt.replace(tzinfo=None)
 
-
-    @classmethod
-    def from_timeseria_to_prophet(cls, timeseries):
-
-        # Create Python lists with data
-        try:
-            data_as_list = [[cls.remove_timezone(slot.start.dt), slot.data[0]] for slot in timeseries]
-        except:
-            data_as_list = [[cls.remove_timezone(slot.start.dt), slot.data[list(slot.data.keys())[0]]] for slot in timeseries]
-
-        # Create the pandas DataFrames
-        data = DataFrame(data_as_list, columns = ['ds', 'y'])
-
-        return data
-
-    
-    def _fit(self, data_time_slot_series, window=None, periodicity=None, evaluation_steps_set='auto', evaluation_samples=1000, evaluation_plots=False, dst_affected=False):
+    def _fit(self, data_time_slot_series, window=None, periodicity=None, dst_affected=False, from_t=None, to_t=None, from_dt=None, to_dt=None):
 
         from fbprophet import Prophet
 
         if len(data_time_slot_series.data_keys()) > 1:
             raise NotImplementedError('Multivariate time series are not yet supported')
 
-        data = self.from_timeseria_to_prophet(data_time_slot_series)
+        from_t, to_t = set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
+
+        data = self.from_timeseria_to_prophet(data_time_slot_series, from_t=from_t, to_t=to_t)
 
         # Instantiate the Prophet model
         self.prophet_model = Prophet()
@@ -821,9 +1106,6 @@ Prophet is robust to missing data and shifts in the trend, and typically handles
         if not window:
             logger.info('Defaulting to a window of 10 slots for forecasting')
             self.data['window'] = 10
-
-        self.data['evaluation_score']  = self._evaluate(data_time_slot_series, steps_set=evaluation_steps_set, samples=evaluation_samples, plots=evaluation_plots)
-        logger.info('Model evaluation score: "{}"'.format(self.data['evaluation_score']))
 
 
     def _forecast(self, forecast_data_time_slot_series, slot_unit, key, this_slot_start_timePoint, this_slot_end_timePoint, first_call, n, multi=True) : #, data_time_slot_series, key, from_index, to_index):
