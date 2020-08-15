@@ -12,6 +12,8 @@ logger = logging.getLogger(__name__)
 
 ''' Note: the code in this module is spaghetti-code, and there are no tests. A major refactoring is required.'''
 
+INDEX_METRICS = ['anomaly']
+
 #=================
 #   Utilities
 #=================
@@ -86,7 +88,9 @@ def to_dg_data(serie, aggregate_by=0, plot_data_loss=False, plot_data_reconstruc
                     first_t = item.t
                 elif isinstance(serie, DataTimeSlotSeries):
                     first_t = item.start.t
-                
+            
+            # Prepare to exclude index metrics from the min/max computation
+            index_metrics_positions = []
                   
             # Define data
             if keys:
@@ -95,6 +99,8 @@ def to_dg_data(serie, aggregate_by=0, plot_data_loss=False, plot_data_reconstruc
                     if key is None:
                         datas.append(item.data)
                     else:
+                        if key in INDEX_METRICS:
+                            index_metrics_positions.append(j) 
                         datas.append(item.data[key])
 
             else:
@@ -105,19 +111,20 @@ def to_dg_data(serie, aggregate_by=0, plot_data_loss=False, plot_data_reconstruc
                 # Sum
                 data_sums[j] += data
                 
-                # Global min
-                if global_min is None:
-                    global_min = data
-                else:
-                    if data < global_min:
-                        global_min = data                
-                
-                # Global max
-                if global_max is None:
-                    global_max = data
-                else:
-                    if data > global_max:
+                if j not in index_metrics_positions:
+                    # Global min
+                    if global_min is None:
+                        global_min = data
+                    else:
+                        if data < global_min:
+                            global_min = data                
+                    
+                    # Global max
+                    if global_max is None:
                         global_max = data
+                    else:
+                        if data > global_max:
+                            global_max = data
 
                 # Min
                 if data_mins[j] is None:
@@ -150,7 +157,11 @@ def to_dg_data(serie, aggregate_by=0, plot_data_loss=False, plot_data_reconstruc
                 data_part=''
                 for i, key in enumerate(keys):
                     avg = data_sums[i]/aggregate_by
-                    data_part+='[{},{},{}],'.format( data_mins[i], avg, data_maxs[i])
+                    if i  in index_metrics_positions:
+                        data_part+='[{},{},{}],'.format( 0, avg, avg)
+                    else:
+                        data_part+='[{},{},{}],'.format( data_mins[i], avg, data_maxs[i])
+                        
                 #if isinstance(serie, DataTimeSlotSeries):
                 #    # Add data loss
                 #    data_part+='[0,{0},{0}],'.format(data_loss/aggregate_by)
@@ -212,20 +223,24 @@ def to_dg_data(serie, aggregate_by=0, plot_data_loss=False, plot_data_reconstruc
                     data = item.data[key]
 
                 data_part += '{},'.format(data)   #item.data
-
-                # Global min
-                if global_min is None:
-                    global_min = data
-                else:
-                    if data < global_min:
-                        global_min = data                
                 
-                # Global max
-                if global_max is None:
-                    global_max = data
-                else:
-                    if data > global_max:
+                # Exclude some special stuff from the min/max computation
+
+                if key not in INDEX_METRICS:
+
+                    # Global min
+                    if global_min is None:
+                        global_min = data
+                    else:
+                        if data < global_min:
+                            global_min = data                
+                    
+                    # Global max
+                    if global_max is None:
                         global_max = data
+                    else:
+                        if data > global_max:
+                            global_max = data
                 
 
             if isinstance(serie, DataTimePointSeries):
@@ -548,20 +563,28 @@ animatedZooms: true,"""
 
     if isinstance(serie, DataTimeSlotSeries):
         if aggregate_by:
-            rgba_value_red    = 'rgba(255,128,128,1)' # For the legend
-            rgba_value_gray   = 'rgba(240,240,240,1)' # For the legend
-            rgba_value_orange = 'rgba(255,169,128,1)' # For the legend
-            fill_alpha_value  = 0.31                  # For the area
+            rgba_value_red    = 'rgba(255,128,128,1)'
+            rgba_value_gray   = 'rgba(240,240,240,1)'
+            rgba_value_orange = 'rgba(255,169,128,1)'
+            fill_alpha_value  = 0.31 # Alpha for the area
         else:
-            rgba_value_red    = 'rgba(255,128,128,1)' # For the legend
-            rgba_value_gray   = 'rgba(240,240,240,1)' # For the legend
-            rgba_value_orange = 'rgba(255,179,128,1)' # For the legend
-            fill_alpha_value  = 0.5                   # For the area
+            rgba_value_red    = 'rgba(255,128,128,1)'
+            rgba_value_gray   = 'rgba(240,240,240,1)'
+            rgba_value_orange = 'rgba(255,179,128,1)'
+            fill_alpha_value  = 0.5  # Alpha for the area
             
         rgba_value_yellow = 'rgba(255, 255, 102, 1)'
+        rgba_value_orangered = 'rgba(255, 69, 0, 0.5)'
+        rgba_value_darkorange = 'rgba(255, 140, 0, 0.9)'
+        
+        
+        # Special series
+        dygraphs_javascript += """
+         series: {"""
         
         if show_data_reconstructed and data_reconstructed_indexes:
-            dygraphs_javascript += """series: {
+            # Add data reconstructed special serie
+            dygraphs_javascript += """
            'data_reconstructed': {
              //customBars: false, // Does not work?
              axis: 'y2',
@@ -571,11 +594,11 @@ animatedZooms: true,"""
              fillGraph: true,
              fillAlpha: """+str(fill_alpha_value)+""",            // This alpha is used for the area
              color: '"""+rgba_value_orange+"""'
-           },
-         },
-    """
+           },"""
+           
         elif show_data_loss and data_loss_indexes:
-            dygraphs_javascript += """series: {
+            # Add data loss special serie
+            dygraphs_javascript += """
            'data_loss': {
              //customBars: false, // Does not work?
              axis: 'y2',
@@ -583,10 +606,12 @@ animatedZooms: true,"""
              strokeWidth: 0,
              highlightCircleSize:0,
              fillGraph: true,
-             fillAlpha: """+str(fill_alpha_value)+""",            // This alpha is used for the area
-             //color: 'rgba(255,0,0,0.6)' // This alpha is used for the legend 
-             color: '"""+rgba_value_red+"""'
-           },
+             fillAlpha: """+str(fill_alpha_value)+""",  // This alpha is used for the area 
+             color: '"""+rgba_value_red+"""'            // Alpha here is used for the legend 
+           },"""
+        
+        # Add data mark and anomalay series
+        dygraphs_javascript += """
            'data_mark': {
              //customBars: false, // Does not work?
              axis: 'y2',
@@ -594,14 +619,31 @@ animatedZooms: true,"""
              strokeWidth: 0,
              highlightCircleSize:0,
              fillGraph: true,
-             fillAlpha: """+str(fill_alpha_value)+""",            // This alpha is used for the area
-             //color: 'rgba(122,122,122,0.6)' // This alpha is used for the legend 
-             color: '"""+rgba_value_yellow+"""'
-           }
+             fillAlpha: """+str(fill_alpha_value)+""",  // This alpha is used for the area
+             color: '"""+rgba_value_yellow+"""'         // Alpha here is used for the legend 
+           },
+           'anomaly': {
+             //customBars: false, // Does not work?
+             axis: 'y2',
+             drawPoints: false,
+             strokeWidth: 0,
+             highlightCircleSize:0,
+             fillGraph: true,
+             fillAlpha: 0.6,  // This alpha is used for the area
+             color: '"""+rgba_value_darkorange+"""'     // Alpha here is used for the legend 
+           },
          },
     """
-    if isinstance(serie, DataTimeSlotSeries) and len(serie[0].data) <=1:
-        dygraphs_javascript += """colors: ['rgb(0,128,128)'],""" # Force "original" Dygraph color.
+    
+    # Force "original" Dygraph color.
+    labels_excluding_index_metrics= 0
+    if isinstance(serie, DataTimeSlotSeries):    
+        for key in serie.data_keys():
+            if key not in INDEX_METRICS:
+                labels_excluding_index_metrics +=1
+                    
+        if labels_excluding_index_metrics <=1:
+            dygraphs_javascript += """colors: ['rgb(0,128,128)'],""" 
 
     # Plotting series mark is disabled for now as we use the data_mark series instead
     if serie_mark and False:            
