@@ -266,7 +266,7 @@ class TestAnomalyDetectors(unittest.TestCase):
         
         anomaly_detector.fit(self.sine_data_time_slot_series_minute, periodicity=63)
         
-        self.assertAlmostEqual(anomaly_detector.AE_threshold, 0.5913884737277646)
+        self.assertAlmostEqual(anomaly_detector.AE_threshold, 0.5914733390853167)
         
         result_time_series = anomaly_detector.apply(self.sine_data_time_slot_series_minute)
 

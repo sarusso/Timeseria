@@ -1030,7 +1030,7 @@ class PeriodicAverageForecaster(Forecaster):
         #logger.info('Processed "{}" slots'.format(processed))
 
 
-    def _forecast(self, forecast_data_time_slot_series, slot_unit, key, this_slot_start_timePoint, this_slot_end_timePoint, first_call, n) : #, data_time_slot_series, key, from_index, to_index):
+    def _forecast(self, forecast_data_time_slot_series, slot_unit, key, this_slot_start_timePoint, this_slot_end_timePoint, first_call, n, window_start=None, raw=False) : #, data_time_slot_series, key, from_index, to_index):
 
         # Compute the offset (avg diff between the real values and the forecasts on the first window)
         try:
@@ -1040,13 +1040,21 @@ class PeriodicAverageForecaster(Forecaster):
             
         if key not in self.offsets or first_call:
 
-            diffs  = 0  
-            for j in range(self.data['window']):
-                serie_index = -(self.data['window']-j)
-                real_value = forecast_data_time_slot_series[serie_index].data[key]
-                forecast_value = self.data['averages'][get_periodicity_index(forecast_data_time_slot_series[serie_index].start, forecast_data_time_slot_series.slot_unit, self.data['periodicity'], dst_affected=self.data['dst_affected'])]
-                diffs += (real_value - forecast_value)
-   
+            diffs  = 0
+            
+            if window_start is not None:
+                for j in range(self.data['window']):
+                    serie_index = window_start + j
+                    real_value = forecast_data_time_slot_series[serie_index].data[key]
+                    forecast_value = self.data['averages'][get_periodicity_index(forecast_data_time_slot_series[serie_index].start, forecast_data_time_slot_series.slot_unit, self.data['periodicity'], dst_affected=self.data['dst_affected'])]
+                    diffs += (real_value - forecast_value)            
+            else:
+                for j in range(self.data['window']):
+                    serie_index = -(self.data['window']-j)
+                    real_value = forecast_data_time_slot_series[serie_index].data[key]
+                    forecast_value = self.data['averages'][get_periodicity_index(forecast_data_time_slot_series[serie_index].start, forecast_data_time_slot_series.slot_unit, self.data['periodicity'], dst_affected=self.data['dst_affected'])]
+                    diffs += (real_value - forecast_value)
+       
             # Sum the avg diff between the real and the forecast on the window to the forecast (the offset)
             offset = diffs/j
             self.offsets[key] = offset
@@ -1056,13 +1064,18 @@ class PeriodicAverageForecaster(Forecaster):
         
         # Compute and add the real forecast data
         periodicity_index = get_periodicity_index(this_slot_start_timePoint, slot_unit, self.data['periodicity'], dst_affected=self.data['dst_affected'])        
-        forecasted_data_time_slot = DataTimeSlot(start = this_slot_start_timePoint,
-                                               end   = this_slot_end_timePoint,
-                                               unit  = forecast_data_time_slot_series[-1].unit,
-                                               coverage = None,
-                                               data  = {key: self.data['averages'][periodicity_index] + (offset*1.0)})
+        forecast_data = {key: self.data['averages'][periodicity_index] + (offset*1.0)}
+        
+        if raw:
+            return forecast_data
+        else:
+            forecasted_data_time_slot = DataTimeSlot(start = this_slot_start_timePoint,
+                                                   end   = this_slot_end_timePoint,
+                                                   unit  = forecast_data_time_slot_series[-1].unit,
+                                                   coverage = None,
+                                                   data  = forecast_data)
 
-        return forecasted_data_time_slot
+            return forecasted_data_time_slot
     
 
     def _plot_averages(self, data_time_slot_series, **kwargs):      
@@ -1190,7 +1203,45 @@ class PeriodicAverageAnomalyDetector(AnomalyDetector):
         # Initialize
         super(PeriodicAverageAnomalyDetector, self).__init__()
 
-    def _fit(self, data_time_slot_series, *args, stddevs=3, **kwargs):
+
+    def __get_actual_and_predicted(self, data_time_slot_series, i, key, forecaster_window):
+
+        # Compute start/end for the slot to be forecasted
+        if isinstance(data_time_slot_series.slot_unit, TimeUnit):
+            this_slot_start_dt = data_time_slot_series[i-1].start.dt + data_time_slot_series.slot_unit
+            this_slot_end_dt   =  this_slot_start_dt + data_time_slot_series.slot_unit
+            this_slot_start_t  = s_from_dt(this_slot_start_dt) 
+            this_slot_end_t    = s_from_dt(this_slot_end_dt)
+        else:
+            this_slot_start_t = data_time_slot_series[i-1].start.t + data_time_slot_series.slot_unit.value
+            this_slot_end_t   = this_slot_start_t + data_time_slot_series.slot_unit.value
+            this_slot_start_dt = dt_from_s(this_slot_start_t, tz=data_time_slot_series.tz)
+            this_slot_end_dt = dt_from_s(this_slot_end_t, tz=data_time_slot_series.tz )                    
+
+        # Set time zone
+        tz = data_time_slot_series[i-1].start.tz
+        
+        # Define TimePoints
+        this_slot_start_timePoint = TimePoint(this_slot_start_t, tz=tz)
+        this_slot_end_timePoint = TimePoint(this_slot_end_t, tz=tz)
+
+        # Call model forecasting logic
+        actual    = data_time_slot_series[i].data[key]
+        predicted = self.forecaster._forecast(data_time_slot_series,
+                                              data_time_slot_series.slot_unit,
+                                              key,
+                                              this_slot_start_timePoint,
+                                              this_slot_end_timePoint,
+                                              first_call=True,
+                                              n=1,
+                                              window_start = i-forecaster_window-1,
+                                              raw=True)[key]
+        
+        return (actual, predicted)
+
+
+
+    def _fit(self, data_time_slot_series, *args, stdevs=3, **kwargs):
 
         if len(data_time_slot_series.data_keys()) > 1:
             raise NotImplementedError('Multivariate time series are not yet supported')
@@ -1207,31 +1258,27 @@ class PeriodicAverageAnomalyDetector(AnomalyDetector):
         AEs = []
         for key in data_time_slot_series.data_keys():
             
-            for i, slot in enumerate(data_time_slot_series):
+            for i, _ in enumerate(data_time_slot_series):
+                
                 forecaster_window = self.forecaster.data['window']
+                
                 if i <=  forecaster_window:    
                     continue
                 
-                # Create the windows time series
-                window_time_series = DataTimeSlotSeries()
-                for j in range(forecaster_window):
-                    window_time_series.append(data_time_slot_series[i-forecaster_window+j])
-                    
-                actual    = slot.data[key]
-                predicted = self.forecaster.predict(window_time_series)[0].data[key]
-
+                actual, predicted = self.__get_actual_and_predicted(data_time_slot_series, i, key, forecaster_window)
+                
                 AEs.append(abs(actual-predicted))
 
         # Compute distribution for the AEs ans set the threshold
         from scipy.stats import norm
-        mean, stddev = norm.fit(AEs)
-        logger.info('Using {} standard deviations as anomaly threshold: {}'.format(stddevs, stddev*3))
+        mean, stdev = norm.fit(AEs)
+        logger.info('Using {} standard deviations as anomaly threshold: {}'.format(stdevs, stdev*stdevs))
         
         # Set AE-based threshold
-        self.AE_threshold = stddev*3 
+        self.AE_threshold = stdev*stdevs
 
 
-    def _apply(self, data_time_slot_series, inplace=False, details=False):
+    def _apply(self, data_time_slot_series, inplace=False, details=False, logs=False):
         
         if inplace:
             raise Exception('Anomaly detection cannot be run inplace')
@@ -1248,19 +1295,14 @@ class PeriodicAverageAnomalyDetector(AnomalyDetector):
                 if i <=  forecaster_window:    
                     continue
                 
-                # Create the windows time series
-                window_time_series = DataTimeSlotSeries()
-                for j in range(forecaster_window):
-                    window_time_series.append(data_time_slot_series[i-forecaster_window+j])
-                    
-                actual    = slot.data[key]
-                predicted = self.forecaster.predict(window_time_series)[0].data[key]
+                actual, predicted = self.__get_actual_and_predicted(data_time_slot_series, i, key, forecaster_window)
 
                 AE = abs(actual-predicted)
                 
                 slot = deepcopy(slot)
                 if AE > self.AE_threshold:
-                    logger.info('Detected anomaly for slot starting @ {} ({}) with AE="{:.3f}..."'.format(slot.start.t, slot.start.dt, AE))
+                    if logs:
+                        logger.info('Detected anomaly for slot starting @ {} ({}) with AE="{:.3f}..."'.format(slot.start.t, slot.start.dt, AE))
                     slot.data['anomaly'.format(key)] = 1
                     if details:
                         slot.data['AE_{}'.format(key)] = AE
