@@ -171,7 +171,6 @@ class TestForecasters(unittest.TestCase):
     def setUp(self):
         
         # Create a minute-resolution test DataTimeSlotSeries
-        
         self.sine_data_time_slot_series_minute = DataTimeSlotSeries()
         for i in range(1000):
             self.sine_data_time_slot_series_minute.append(DataTimeSlot(start=TimePoint(i*60), end=TimePoint((i+1)*60), data={'value':sin(i/10.0)}))
@@ -183,7 +182,6 @@ class TestForecasters(unittest.TestCase):
             self.sine_data_time_slot_series_day.append(DataTimeSlot(start=TimePoint(i*step), end=TimePoint((i+1)*step), data={'value':sin(i/10.0)}))
             
     
-
     def test_PeriodicAverageForecaster(self):
                  
         forecaster = PeriodicAverageForecaster()
@@ -244,6 +242,47 @@ class TestForecasters(unittest.TestCase):
 
 
 
+
+class TestAnomalyDetectors(unittest.TestCase):
+
+    def setUp(self):
+        
+        # Create a minute-resolution test DataTimeSlotSeries
+        self.sine_data_time_slot_series_minute = DataTimeSlotSeries()
+        for i in range(1000):
+            if i % 100 == 0:
+                value = 2
+            else:
+                value = sin(i/10.0)
+
+            self.sine_data_time_slot_series_minute.append(DataTimeSlot(start=TimePoint(i*60), end=TimePoint((i+1)*60), data={'value':value}))
+
+
+    def test_PeriodicAverageAnomalyDetector(self):
+
+        from ..models import PeriodicAverageAnomalyDetector
+        
+        anomaly_detector = PeriodicAverageAnomalyDetector()
+        
+        anomaly_detector.fit(self.sine_data_time_slot_series_minute, periodicity=63)
+        
+        self.assertAlmostEqual(anomaly_detector.AE_threshold, 0.5913884737277646)
+        
+        result_time_series = anomaly_detector.apply(self.sine_data_time_slot_series_minute)
+
+        # Count how many anomalies were detected
+        anomalies_count = 0
+        for slot in result_time_series:
+            if slot.data['anomaly']:
+                anomalies_count += 1
+        self.assertEqual(anomalies_count, 9)
+
+
+
+
+
+
+    
 
 
 

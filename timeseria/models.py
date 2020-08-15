@@ -12,6 +12,8 @@ from sklearn.metrics import mean_squared_error, mean_absolute_error
 from .units import TimeUnit
 from pandas import DataFrame
 from math import sqrt
+from copy import deepcopy
+
 
 # Setup logging
 import logging
@@ -755,7 +757,6 @@ class ProphetReconstructor(Reconstructor, ProphetModel):
 
 class Forecaster(ParametricModel):
 
-    #def _evaluate(self, data_time_slot_series, steps_set='auto', samples=1000, plots=False, from_t=None, to_t=None, from_dt=None, to_dt=None):
     def _evaluate(self, data_time_slot_series, steps='auto', samples=1000, plots=False, metrics=['RMSE', 'MAE'], details=False, from_t=None, to_t=None, from_dt=None, to_dt=None):
 
         # Set evaluation_score steps if we have to
@@ -1173,8 +1174,106 @@ Prophet is robust to missing data and shifts in the trend, and typically handles
                 
         
             return forecasted_data_time_slots      
-    
 
+
+
+class AnomalyDetector(ParametricModel):
+    pass
+
+
+
+class PeriodicAverageAnomalyDetector(AnomalyDetector):
+
+
+    def __init__(self, *args, **kwargs):
+
+        # Initialize
+        super(PeriodicAverageAnomalyDetector, self).__init__()
+
+    def _fit(self, data_time_slot_series, *args, stddevs=3, **kwargs):
+
+        if len(data_time_slot_series.data_keys()) > 1:
+            raise NotImplementedError('Multivariate time series are not yet supported')
+        
+    
+        # Fit a forecaster               
+        forecaster = PeriodicAverageForecaster()
+        
+        # Fit and save
+        forecaster.fit(data_time_slot_series, *args, **kwargs)
+        self.forecaster = forecaster
+        
+        # Evaluate the forecaster for one step ahead and get AEs
+        AEs = []
+        for key in data_time_slot_series.data_keys():
+            
+            for i, slot in enumerate(data_time_slot_series):
+                forecaster_window = self.forecaster.data['window']
+                if i <=  forecaster_window:    
+                    continue
+                
+                # Create the windows time series
+                window_time_series = DataTimeSlotSeries()
+                for j in range(forecaster_window):
+                    window_time_series.append(data_time_slot_series[i-forecaster_window+j])
+                    
+                actual    = slot.data[key]
+                predicted = self.forecaster.predict(window_time_series)[0].data[key]
+
+                AEs.append(abs(actual-predicted))
+
+        # Compute distribution for the AEs ans set the threshold
+        from scipy.stats import norm
+        mean, stddev = norm.fit(AEs)
+        logger.info('Using {} standard deviations as anomaly threshold: {}'.format(stddevs, stddev*3))
+        
+        # Set AE-based threshold
+        self.AE_threshold = stddev*3 
+
+
+    def _apply(self, data_time_slot_series, inplace=False, details=False):
+        
+        if inplace:
+            raise Exception('Anomaly detection cannot be run inplace')
+
+        if len(data_time_slot_series.data_keys()) > 1:
+            raise NotImplementedError('Multivariate time series are not yet supported')
+        
+        result_time_series = DataTimeSlotSeries()
+
+        for key in data_time_slot_series.data_keys():
+            
+            for i, slot in enumerate(data_time_slot_series):
+                forecaster_window = self.forecaster.data['window']
+                if i <=  forecaster_window:    
+                    continue
+                
+                # Create the windows time series
+                window_time_series = DataTimeSlotSeries()
+                for j in range(forecaster_window):
+                    window_time_series.append(data_time_slot_series[i-forecaster_window+j])
+                    
+                actual    = slot.data[key]
+                predicted = self.forecaster.predict(window_time_series)[0].data[key]
+
+                AE = abs(actual-predicted)
+                
+                slot = deepcopy(slot)
+                if AE > self.AE_threshold:
+                    logger.info('Detected anomaly for slot starting @ {} ({}) with AE="{:.3f}..."'.format(slot.start.t, slot.start.dt, AE))
+                    slot.data['anomaly'.format(key)] = 1
+                    if details:
+                        slot.data['AE_{}'.format(key)] = AE
+                        slot.data['predicted_{}'.format(key)] = predicted
+                else:
+                    slot.data['anomaly'.format(key)] = 0
+                    if details:
+                        slot.data['AE_{}'.format(key)] = AE
+                        slot.data['predicted_{}'.format(key)] = predicted
+
+                result_time_series.append(slot)
+        
+        return result_time_series 
 
 
 
