@@ -384,13 +384,16 @@ def dygraphs_plot(serie, aggregate_by, log_js=False, show_data_loss=True, show_d
             show_data_reconstructed=False
             #show_data_loss=False
             serie_mark=True
-            serie_mark_html = ' &nbsp; (forecast highlighted in <unit style="background:rgba(255, 255, 102, .6);">yellow</unit>)'
+            serie_mark_html = '<span style="background:rgba(255, 255, 102, .6);">&nbsp;forecast&nbsp;</span>'
+            serie_mark_html_off = '<span style="background:rgba(255, 255, 102, .2);">&nbsp;forecast&nbsp;</span>'
         else:
             serie_mark=False
             serie_mark_html=''
+            serie_mark_html_off = ''
     except AttributeError:
         serie_mark=False
         serie_mark_html = ''
+        serie_mark_html_off=''
 
     # Dygraphs javascript
     dygraphs_javascript = """
@@ -419,16 +422,33 @@ function legendFormatter(data) {
           
 
           if (html !== '') html += sepLines ? '<br/>' : ' ';
-          html += "<unit style='margin-left:15px; font-weight: bold; color: " + series.color + ";'>" + series.dashHTML + " " + series.labelHTML + "</unit>, ";
+          html += "<span style='margin-left:15px; font-weight: bold; color: " + series.color + ";'>" + series.dashHTML + " " + series.labelHTML + "</span>, ";
           // Remove last comma and space
           html = html.substring(0, html.length - 2);
         }
-        html += '"""+serie_mark_html +"""'
+        html += ' &nbsp;&nbsp; """+serie_mark_html +"""'
         return html;
       }
 
+      // Find out if we have a forcast
+      mark_as_forecast = false
+      for (var i = 0; i < data.series.length; i++) {
+        if ( data.series[i].label=='data_mark' && data.series[i].y==1 )  {
+           mark_as_forecast = true;
+        }
+      }
+
+
       html = '""" + legend_pre + """' + data.xHTML + ' (""" + str(serie.tz)+ """):';
-      for (var i = 0; i < data.series.length; i++) {  
+      for (var i = 0; i < data.series.length; i++) {
+        
+        var mark_as_forecast = false;
+        
+        if ( data.series[i].label=='data_mark' && data.series[i].y==1 )  {
+           mark_as_forecast = true;
+           console.log('forecast')
+        }
+                 
         var series = data.series[i];
         
         // Skip not visible series
@@ -449,11 +469,19 @@ function legendFormatter(data) {
         }
         console.log(decoration)*/
         //decoration = ' style="background-color: #fcf8b0"'
-        html += "<unit" + decoration + "> <b><unit style='color: " + series.color + ";'>" + series.labelHTML + "</unit></b>:&#160;" + series.yHTML + "</unit>, ";
+        html += "<span" + decoration + "> <b><span style='color: " + series.color + ";'>" + series.labelHTML + "</span></b>:&#160;" + series.yHTML + "</span>, ";
+        
+      
       }
       // Remove last comma and space
       html = html.substring(0, html.length - 2);
-      html += '"""+serie_mark_html +"""'
+      
+      if (mark_as_forecast) {
+          html += ' &nbsp;"""+ serie_mark_html +"""'
+      }
+      //else {
+      //    html += ' &nbsp;"""+ serie_mark_html_off +"""'
+      //}
       return html;
     };
 """
