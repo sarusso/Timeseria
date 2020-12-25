@@ -92,14 +92,14 @@ class Slotter(Transformation):
         return(most_common_diff)
 
 
-    def _compute_slot(self, data_time_pointSeries, unit, start_t, end_t, validity, timezone):
+    def _compute_slot(self, data_time_pointSeries, unit, start_t, end_t, validity, timezone, fill_with, force_coverage):
 
         # Compute coverage
         slot_coverage = compute_coverage(data_time_pointSeries,
                                          from_t   = start_t,
                                          to_t     = end_t,
                                          validity = validity)
-        
+
         # Compute data
         keys = None
         avgs = {}
@@ -111,8 +111,16 @@ class Slotter(Transformation):
                     avgs[key] = 0
                 avgs[key] += data_time_point.data[key]
         
-        slot_data = {key:avgs[key]/len(data_time_pointSeries) for key in keys}
+        # Do we have a 100% and a fill_with?
+        if fill_with is not None and slot_coverage == 0:
+            slot_data = {key:fill_with for key in keys}                
+        else:
+            slot_data = {key:avgs[key]/len(data_time_pointSeries) for key in keys}
 
+        # Do we have a force coverage? #TODO: do not compute coverage if fill_with not present and force_coverage 
+        if force_coverage is not None:
+            slot_coverage = force_coverage
+        
         # Create the DataTimeSlot
         data_time_slot = DataTimeSlot(start = TimePoint(t=start_t, tz=timezone),
                                     end   = TimePoint(t=end_t, tz=timezone),
@@ -123,7 +131,7 @@ class Slotter(Transformation):
         return data_time_slot
 
 
-    def _process(self, data_time_pointSeries, from_t=None, to_t=None, validity=None, force_close_last=False, include_extremes=False):
+    def _process(self, data_time_pointSeries, from_t=None, to_t=None, validity=None, force_close_last=False, include_extremes=False, fill_with=None, force_coverage=None):
         ''' Start the slotting process. If start and/or end are not set, they are set automatically based on first and last points of the sereis'''
 
         if not isinstance(data_time_pointSeries, DataTimePointSeries):
@@ -263,7 +271,9 @@ class Slotter(Transformation):
                                                           start_t  = slot_start_t,
                                                           end_t    = slot_end_t,
                                                           validity = validity,
-                                                          timezone = timezone)
+                                                          timezone = timezone,
+                                                          fill_with = fill_with,
+                                                          force_coverage = force_coverage)
                         
                         # .. and append results 
                         data_time_slot_series.append(dataTimeslot)
@@ -294,7 +304,9 @@ class Slotter(Transformation):
                                                           start_t  = slot_start_t,
                                                           end_t    = slot_end_t,
                                                           validity = validity,
-                                                          timezone = timezone)
+                                                          timezone = timezone,
+                                                          fill_with = fill_with,
+                                                          force_coverage = force_coverage)
                         
                         # .. and append results 
                         data_time_slot_series.append(dataTimeslot)
@@ -323,7 +335,9 @@ class Slotter(Transformation):
                                                   start_t  = slot_start_t,
                                                   end_t    = slot_end_t,
                                                   validity = validity,
-                                                  timezone = timezone)
+                                                  timezone = timezone,
+                                                  fill_with = fill_with,
+                                                  force_coverage = force_coverage)
                 
                 # .. and append results 
                 data_time_slot_series.append(dataTimeslot)
