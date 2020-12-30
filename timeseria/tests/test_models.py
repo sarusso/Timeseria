@@ -2,12 +2,12 @@ import unittest
 import os
 import tempfile
 from math import sin
-from ..datastructures import DataTimeSlotSeries, DataTimeSlot, TimePoint
+from ..datastructures import DataTimeSlotSeries, DataTimeSlot, TimePoint, DataTimePoint
 from ..models import Model, ParametricModel
 from ..models import PeriodicAverageReconstructor, PeriodicAverageForecaster, ProphetForecaster, ProphetReconstructor
 from ..exceptions import NotFittedError
 from ..storages import CSVFileStorage
-from ..transformations import Slotter
+from ..transformations import Slotter, Resampler
 from ..time import dt
 
 # Setup logging
@@ -83,10 +83,26 @@ class TestReconstructors(unittest.TestCase):
 
     def test_PeriodicAverageReconstructor(self):
         
-        # Get test data        
-        data_time_point_series = CSVFileStorage(TEST_DATA_PATH + '/csv/temperature.csv').get()
-        data_time_slot_series = Slotter('3600s').process(data_time_point_series)
+        # Prepare test data        
+        #data_time_point_series = CSVFileStorage(TEST_DATA_PATH + '/csv/temperature.csv').get()
+        #data_time_slot_series = Slotter('3600s').process(data_time_point_series)
+        #for item in data_time_slot_series:
+        #    print('{},{},{}'.format(item.start.t, item.data['temperature'], item.coverage))
         
+        # Get test data 
+        with open(TEST_DATA_PATH + '/csv/temp_slots_1h.csv') as f:
+            data=f.read()
+        
+        data_time_slot_series = DataTimeSlotSeries()
+        for line in data.split('\n'):
+            if line:
+                start_t = float(line.split(',')[0])
+                start_point = TimePoint(t=start_t)
+                end_point = TimePoint(t=start_t+3600)
+                coverage = float(line.split(',')[2])
+                value =  float(line.split(',')[1])
+                data_time_slot_series.append(DataTimeSlot(start=start_point, end=end_point, data={'temperature':value}, coverage=coverage))
+            
         # Instantiate
         periodic_average_reconstructor = PeriodicAverageReconstructor()
 
@@ -140,6 +156,18 @@ class TestReconstructors(unittest.TestCase):
         self.assertAlmostEqual(cross_validation['MAE_3_steps_avg'],  0.24029106113368606)
         self.assertAlmostEqual(cross_validation['MAE_3_steps_stdev'], 0.047895485925726636)
 
+        # Test on Points as well
+#         data_time_point_series = CSVFileStorage(TEST_DATA_PATH + '/csv/temperature.csv').get(limit=200)
+#         periodic_average_reconstructor = PeriodicAverageReconstructor()
+#         with self.assertRaises(Exception):
+#             periodic_average_reconstructor.fit(data_time_point_series)
+#         
+#         data_time_point_series = Resampler(600).process(data_time_point_series)
+#         periodic_average_reconstructor.fit(data_time_point_series)
+#         
+#         # TODO: do some actual testing.. not only that "it works"
+#         reconstructed_data_time_point_series  = periodic_average_reconstructor.apply(data_time_point_series)
+        
 
     def test_ProphetReconstructor(self):
         
@@ -163,7 +191,6 @@ class TestReconstructors(unittest.TestCase):
                     pass
                 else:
                     self.assertNotEqual(data_time_slot_series_reconstructed[i].data, data_time_slot_series[i].data, 'at position {}'.format(i))
-
 
 
 class TestForecasters(unittest.TestCase):
@@ -225,6 +252,19 @@ class TestForecasters(unittest.TestCase):
         forecaster.fit(self.sine_data_time_slot_series_minute, to_t=20000, from_t=40000)
         evaluation = forecaster.evaluate(self.sine_data_time_slot_series_minute, steps=[1,3], samples=100, details=True)
         self.assertAlmostEqual(evaluation['RMSE_1_steps'], 0.36033834603736264)
+
+#         # Test on Points as well
+#         data_time_point_series = CSVFileStorage(TEST_DATA_PATH + '/csv/temperature.csv').get(limit=200)
+#         forecaster = PeriodicAverageForecaster()
+#         with self.assertRaises(Exception):
+#             forecaster.fit(data_time_point_series)
+#          
+#         data_time_point_series = Resampler(600).process(data_time_point_series)
+#         forecaster.fit(data_time_point_series)
+#          
+#         # TODO: do some actual tetsing.. not only that "it works"
+#         forecasted_data_time_point_series  = forecaster.apply(data_time_point_series)
+        
 
 
     def test_ProphetForecaster(self):

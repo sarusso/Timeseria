@@ -202,8 +202,7 @@ class TestPointSeries(unittest.TestCase):
         
         time_point_serie = TimePointSeries()
         time_point_serie.append(TimePoint(t=60))
-        
-        
+                
         # Test for UTC time zone (autodetect)
         time_point_serie = TimePointSeries()
         time_point_serie.append(TimePoint(t=5))         
@@ -242,7 +241,26 @@ class TestPointSeries(unittest.TestCase):
         self.assertEqual(type(time_point_serie.tz), type(UTC))
         time_point_serie.tz = 'Europe/Rome'
         self.assertEqual(str(time_point_serie.tz), 'Europe/Rome')
-        self.assertEqual(str(type(time_point_serie.tz)), "<class 'pytz.tzfile.Europe/Rome'>")         
+        self.assertEqual(str(type(time_point_serie.tz)), "<class 'pytz.tzfile.Europe/Rome'>")  
+        
+        # Test sampling rate detection 
+        time_point_serie = TimePointSeries(TimePoint(t=60))
+        self.assertEqual(time_point_serie.sample_rate, None)
+        
+        time_point_serie = TimePointSeries(TimePoint(t=60),TimePoint(t=121))
+        self.assertEqual(time_point_serie.sample_rate, 61)
+        
+        time_point_serie = TimePointSeries(TimePoint(t=60),TimePoint(t=120),TimePoint(t=130))
+        self.assertEqual(time_point_serie.sample_rate, 'variable')
+        
+        # Test cut
+        time_point_serie = TimePointSeries(TimePoint(t=60),TimePoint(t=120),TimePoint(t=130))
+        self.assertEqual(len(time_point_serie.cut(from_t=1, to_t=140)),3)
+        self.assertEqual(len(time_point_serie.cut(from_t=61, to_t=140)),2)
+        self.assertEqual(len(time_point_serie.cut(from_t=61)),2)
+        self.assertEqual(len(time_point_serie.cut(to_t=61)),1)
+        
+
 
 
     def test_DataPointSeries(self):

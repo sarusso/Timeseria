@@ -140,12 +140,12 @@ def to_dg_data(serie, aggregate_by=0, plot_data_loss=False, plot_data_reconstruc
                     if data > data_maxs[j]:
                         data_maxs[j] = data
             
-            if isinstance(serie, DataTimeSlotSeries):
-                # Data loss
-                if item.data_loss is not None:
-                    if data_loss is None:
-                        data_loss = 0
-                    data_loss += item.data_loss 
+            #if isinstance(serie, DataTimeSlotSeries):
+            # Data loss
+            if item.data_loss is not None:
+                if data_loss is None:
+                    data_loss = 0
+                data_loss += item.data_loss 
 
             # Dump aggregated data?
             if (i!=0)  and ((i % aggregate_by)==0):
@@ -189,12 +189,12 @@ def to_dg_data(serie, aggregate_by=0, plot_data_loss=False, plot_data_reconstruc
                         data_part+='[0,0,0],'
                             
                 else:
-                    if isinstance(serie, DataTimeSlotSeries):
-                        # Add data loss
-                        if data_loss is not None:
-                            data_part+='[0,{0},{0}],'.format(data_loss/aggregate_by)
-                        else:
-                            data_part+=','
+                    #if isinstance(serie, DataTimeSlotSeries):
+                    # Add data loss
+                    if data_loss is not None:
+                        data_part+='[0,{0},{0}],'.format(data_loss/aggregate_by)
+                    else:
+                        data_part+=','
                             
                     
                 
@@ -245,6 +245,38 @@ def to_dg_data(serie, aggregate_by=0, plot_data_loss=False, plot_data_reconstruc
 
             if isinstance(serie, DataTimePointSeries):
                 t = item.t
+
+                            # Do we have a mark?
+                if serie_mark:
+ 
+                    if item.t >= serie_mark_start_t and item.t < serie_mark_end_t:
+                        #if isinstance(serie, DataTimeSlotSeries):
+                        # Add data loss
+                        if item.data_loss is None:
+                            data_part+=','
+                        else:
+                            data_part+='{},'.format(item.data_loss)
+                        data_part+='1,'
+                        
+                    else:
+                        #if isinstance(serie, DataTimeSlotSeries):
+                        # Add null data loss
+                        if item.data_loss is None:
+                            data_part+=','
+                        else:
+                            data_part+='{},'.format(item.data_loss)
+                        
+                        data_part+='0,'
+                else:
+                    #if isinstance(serie, DataTimeSlotSeries):
+                    # Add null data loss
+                    if item.data_loss is None:
+                        data_part+=','
+                    else:
+                        data_part+='{},'.format(item.data_loss)
+                    
+            
+            
             elif isinstance(serie, DataTimeSlotSeries):
                 t = item.start.t
                 #if plot_data_loss:
@@ -507,12 +539,15 @@ function legendFormatter(data) {
 
     data_reconstructed_indexes = False
     data_loss_indexes          = False
-    if isinstance(serie, DataTimeSlotSeries):
-        # Do we have data reconstructed or losses indexes?
+    #if isinstance(serie, DataTimeSlotSeries):
+    # Do we have data reconstructed or losses indexes?
+    try:
         if serie[0].data_reconstructed is not None:
             data_reconstructed_indexes = True
-        if serie[0].data_loss is not None:
-            data_loss_indexes = True
+    except:
+        data_reconstructed_indexes = False
+    if serie[0].data_loss is not None:
+        data_loss_indexes = True
 
     plot_data_reconstructed = False
     plot_data_loss = False
@@ -579,7 +614,7 @@ axes: {
     drawAxis: false,
     axisLabelWidth:0,
     independentTicks: true,
-    valueRange: [0,1],
+    valueRange: [0,1.01],
     //customBars: false, // Does not work?
   }/*,
   x : {
@@ -589,7 +624,7 @@ axes: {
 },
 animatedZooms: true,"""
 
-    if isinstance(serie, DataTimeSlotSeries):
+    if True: #isinstance(serie, DataTimeSlotSeries):
         if aggregate_by:
             rgba_value_red    = 'rgba(255,128,128,1)'
             rgba_value_gray   = 'rgba(240,240,240,1)'
@@ -630,6 +665,7 @@ animatedZooms: true,"""
            'data_loss': {
              //customBars: false, // Does not work?
              axis: 'y2',
+             //stepPlot: true,
              drawPoints: false,
              strokeWidth: 0,
              highlightCircleSize:0,
@@ -665,7 +701,7 @@ animatedZooms: true,"""
     
     # Force "original" Dygraph color.
     labels_excluding_index_metrics= 0
-    if isinstance(serie, DataTimeSlotSeries):    
+    if True: #isinstance(serie, DataTimeSlotSeries):    
         for key in serie.data_keys():
             if key not in INDEX_METRICS:
                 labels_excluding_index_metrics +=1
