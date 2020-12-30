@@ -96,6 +96,17 @@ class Series(list):
     # Duplicate
     def duplicate(self):
         return deepcopy(self)
+    
+    # Slice
+    def __getitem__(self, key):
+        if isinstance(key, slice):            
+            indices = range(*key.indices(len(self)))
+            series = self.__class__()
+            for i in indices:
+                series.append(super(Series, self).__getitem__(i))
+            return series
+        else:
+            return super(Series, self).__getitem__(key)
 
 
 #======================
@@ -215,7 +226,7 @@ class TimePoint(Point):
     def change_timezone(self, new_timezone):
         self._tz = timezonize(new_timezone)
 
-    @ property
+    @property
     def dt(self):
         return dt_from_s(self.t, tz=self.tz)
 
@@ -223,6 +234,17 @@ class TimePoint(Point):
         return '{} @ {} ({})'.format(self.__class__.__name__, self.t, self.dt)
         # return '{} @ t={} ({})'.format(self.__class__.__name__, self.t, self.dt)
     
+    
+    # Tricks to make them behave as slots
+    #@property
+    #def start(self):
+    #    return self
+    
+    #@property
+    #def end(self):
+    #    return self
+
+
 
 class DataPoint(Point):
     def __init__(self, *args, **kwargs):
@@ -230,6 +252,11 @@ class DataPoint(Point):
             self._data = kwargs.pop('data')
         except KeyError:
             raise Exception('A DataPoint requires a special "data" argument (got only "{}")'.format(kwargs))
+
+        coverage = kwargs.pop('coverage', None)
+        if coverage is not None:
+            self._coverage=coverage
+        
         super(DataPoint, self).__init__(*args, **kwargs)
 
     def __repr__(self):
@@ -244,6 +271,12 @@ class DataPoint(Point):
     def data(self):
         return self._data
 
+    @property
+    def data_loss(self):
+        try:
+            return 1-self._coverage
+        except AttributeError:
+            return None
 
 class DataTimePoint(DataPoint, TimePoint):
     pass
@@ -269,19 +302,33 @@ class TimePointSeries(PointSeries):
         tz = kwargs.pop('tz', None)
         if tz:
             self._tz = timezonize(tz)
+        
+        self.sample_rate = None
 
         super(TimePointSeries, self).__init__(*args, **kwargs)
+        
 
-    # Check time ordering
+    # Check time ordering and sample rate
     def append(self, item):
         try:
-            if HARD_DEBUG: logger.debug('Checking time ordering for t="%s" (prev_t="%s")', item.t, self.prev_t)
-            if item.t < self.prev_t:
-                raise ValueError('Time t="{}" is out of order (prev t="{}")'.format(item.t, self.prev_t))
             
-            if item.t == self.prev_t:
-                raise ValueError('Time t="{}" is a duplicate'.format(item.t))
-            
+            # This is to support the deepcopy, otherwise the original prev_t will be used
+            if len(self)>0:
+                
+                if HARD_DEBUG: logger.debug('Checking time ordering for t="%s" (prev_t="%s")', item.t, self.prev_t)
+                if item.t < self.prev_t:
+                    raise ValueError('Time t="{}" is out of order (prev t="{}")'.format(item.t, self.prev_t))
+                
+                if item.t == self.prev_t:
+                    raise ValueError('Time t="{}" is a duplicate'.format(item.t))
+                
+                if self.sample_rate is None:
+                    self.sample_rate = item.t - self.prev_t
+                    
+                elif self.sample_rate != 'variable':
+                    if self.sample_rate != item.t - self.prev_t:
+                        self.sample_rate = 'variable'
+
             self.prev_t = item.t
                 
         except AttributeError:
@@ -315,6 +362,36 @@ class TimePointSeries(PointSeries):
         self.tz = time_point.tz
 
 
+    def cut(self, from_t=None, to_t=None, from_dt=None, to_dt=None):
+        if from_dt:
+            if from_t is not None:
+                raise Exception('Cannot set both from_t and from_dt')
+            from_t = s_from_dt(from_dt)
+        if to_dt:
+            if to_t is not None:
+                raise Exception('Cannot set both to_t and to_dt')
+            to_t = s_from_dt(to_dt)
+            
+        if from_t is not None and to_t is not None:
+            if from_t >= to_t:
+                raise Exception('Got from >= to')
+        
+        series = self.__class__()
+        for item in self:
+            if from_t is not None and to_t is not None:
+                if item.t >= from_t and item.t <to_t:
+                    series.append(item)
+            else:
+                if from_t is not None:
+                    if item.t >= from_t:
+                        series.append(item) 
+                if to_t is not None:
+                    if item.t < to_t:
+                        series.append(item)
+        return series           
+        
+    
+
 class DataPointSeries(PointSeries):
     '''A series of DataPoints where each item is guaranteed to carry the same data type'''
 
@@ -342,6 +419,15 @@ class DataPointSeries(PointSeries):
             
         super(DataPointSeries, self).append(item)
 
+    def data_keys(self):
+        if len(self) == 0:
+            return None
+        else:
+            # TODO: can we optimize here? Computing them once and then serving them does not work if someone changes data keys...
+            try:
+                return list(self[0].data.keys())
+            except AttributeError:
+                return list(range(len(self[0].data)))
 
 class DataTimePointSeries(DataPointSeries, TimePointSeries):
     '''A series of DataTimePoint where each item is guaranteed to carry the same data type and to be ordered'''
@@ -524,9 +610,6 @@ class DataSlot(Slot):
         coverage = kwargs.pop('coverage', None)
         if coverage is not None:
             self._coverage=coverage
-        #else:
-        #    self._coverage=1
-            
 
         super(DataSlot, self).__init__(**kwargs)
 

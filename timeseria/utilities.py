@@ -268,24 +268,35 @@ def is_almost_equal(one, two):
         return False 
 
 
+#==============================
+# Check timeseries
+#==============================
+
+def check_timeseries(timeseries):
+    # Import here or you will end up with cyclic imports
+    from .datastructures import DataTimePointSeries, DataTimeSlotSeries 
+    if isinstance(timeseries, DataTimePointSeries):
+        if timeseries.sample_rate == 'variable':
+            raise TypeError('Variable sampling rates are not supported. Resample or slot the time series first.')
+    elif isinstance(timeseries, DataTimeSlotSeries):
+        pass
+    else:
+        raise TypeError('Either a DataTimePointSeries or a DataTimeSlotSeries is required (got "{}")'.format(timeseries.__class__.__name__))
+
+    if not timeseries:
+        raise ValueError('A non-empty time series is required')
+
 
 #==============================
 # Periodicity
 #==============================
 
-def get_periodicity(data_time_slot_series):
+def get_periodicity(timeseries):
     
-    # Import here or you will end up with cyclic imports
-    from .datastructures import DataTimeSlotSeries
+    check_timeseries(timeseries)
     
-    if not isinstance(data_time_slot_series, DataTimeSlotSeries):
-        raise TypeError('DataTimeSlotSeries is required (got"{}")'.format(data_time_slot_series.__class__.__name__))
-
-    if not data_time_slot_series:
-        raise ValueError('A non-empty DataTimeSlotSeries is required')
-        
     # TODO: fix me, data_loss must not belong as key
-    data_keys = data_time_slot_series.data_keys()
+    data_keys = timeseries.data_keys()
     
     if len(data_keys) > 1:
         raise NotImplementedError()
@@ -295,9 +306,9 @@ def get_periodicity(data_time_slot_series):
         
         # Get data as a vector
         y = []
-        for slot in data_time_slot_series:
+        for slot in timeseries:
             y.append(slot.data[key])
-        #y = [item.data[key] for item in data_time_slot_series]
+        #y = [item.data[key] for item in timeseries]
 
         # Compute FFT (Fast Fourier Transform)
         yf = fft.fft(y)
@@ -317,15 +328,37 @@ def get_periodicity(data_time_slot_series):
             peaks.append([i, yf[i]])
         
         # Sort by peaks intensity and compute actual frequency in base units
-        # TODO: round peak frequencies to integers and/or neighbours first 
+        # TODO: round peak frequencies to integers and/or neighbours first
         peaks = sorted(peaks, key=lambda t: t[1])
         peaks.reverse()
+        
+        # Compute peak frequencies:
+        for i in range(len(peaks)):
+            
+            # Set peak frequency
+            peak_frequency = (len(y) / peaks[i][0])
+            peaks[i].append(peak_frequency)
+        
+        # Find most relevant frequency
         max_peak_frequency = None
-        for i, peak in enumerate(peaks):
-            peak_frequency = (len(y) / peak[0])
+        for i in range(len(peaks)):
+
+            logger.debug('Peak #%s: \t index=%s,\t value=%s, freq=%s (over %s)', i, peaks[i][0], int(peaks[i][1]), peaks[i][2], len(timeseries))
+
+            # Do not consider lower frequencies if there is a closer and higher one
+            try:
+                diff1=peaks[i][1]-peaks[i+1][1]
+                diff2=peaks[i+1][1]-peaks[i+2][1]
+                if diff1 *3 < diff2:
+                    logger.debug('Peak #{} candidate to removal'.format(i))
+                    if (peaks[i][2] > peaks[i+1][2]*10) and (peaks[i][2] > len(timeseries)/10):
+                        logger.debug('peak #{} marked to be removed'.format(i))
+                        continue
+            except IndexError:
+                pass
+            
             if not max_peak_frequency:
-                max_peak_frequency = peak_frequency
-            logger.debug('Peak index \t#%s,\t value=%s, freq=%s', peak[0], int(peak[1]), peak_frequency)
+                max_peak_frequency = peaks[i][2]
             if i>10:
                 break
         
@@ -341,4 +374,3 @@ def get_periodicity(data_time_slot_series):
 
 
 
- 

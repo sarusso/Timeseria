@@ -3,9 +3,9 @@ import json
 import uuid
 import copy
 import statistics
-from .datastructures import DataTimeSlotSeries, DataTimeSlot, TimePoint
+from .datastructures import DataTimeSlotSeries, DataTimeSlot, TimePoint, DataTimePointSeries
 from .exceptions import NotFittedError
-from .utilities import get_periodicity, is_numerical, set_from_t_and_to_t, slot_is_in_range
+from .utilities import get_periodicity, is_numerical, set_from_t_and_to_t, slot_is_in_range, check_timeseries
 from .time import now_t, dt_from_s, s_from_dt
 from datetime import timedelta, datetime
 from sklearn.metrics import mean_squared_error, mean_absolute_error
@@ -120,7 +120,7 @@ class Model(object):
     
     def __init__(self):
         pass
- 
+
     
     def predict(self, data, *args, **kwargs):
         try:
@@ -128,11 +128,7 @@ class Model(object):
         except AttributeError:
             raise NotImplementedError('Predicting from this model is not implemented')
 
-        if not isinstance(data, DataTimeSlotSeries):
-            raise TypeError('DataTimeSlotSeries is required (got "{}")'.format(data.__class__.__name__))
-    
-        if not data:
-            raise ValueError('A non-empty DataTimeSlotSeries is required')
+        check_timeseries(data)
         
         return self._predict(data, *args, **kwargs)
 
@@ -143,11 +139,7 @@ class Model(object):
         except AttributeError:
             raise NotImplementedError('Applying this model is not implemented')
 
-        if not isinstance(data, DataTimeSlotSeries):
-            raise TypeError('DataTimeSlotSeries is required (got "{}")'.format(data.__class__.__name__))
-    
-        if not data:
-            raise ValueError('A non-empty DataTimeSlotSeries is required')
+        check_timeseries(data)
         
         return self._apply(data, *args, **kwargs)
 
@@ -158,11 +150,7 @@ class Model(object):
         except AttributeError:
             raise NotImplementedError('Evaluating this model is not implemented')
 
-        if not isinstance(data, DataTimeSlotSeries):
-            raise TypeError('DataTimeSlotSeries is required (got "{}")'.format(data.__class__.__name__))
-    
-        if not data:
-            raise ValueError('A non-empty DataTimeSlotSeries is required')
+        check_timeseries(data)
         
         return self._evaluate(data, *args, **kwargs)
 
@@ -197,11 +185,7 @@ and optionally a fit() method if the parameters are to be learnt form data.'''
         if not self.fitted:
             raise NotFittedError()
 
-        if not isinstance(data, DataTimeSlotSeries):
-            raise TypeError('DataTimeSlotSeries is required (got "{}")'.format(data.__class__.__name__))
-    
-        if not data:
-            raise ValueError('A non-empty DataTimeSlotSeries is required')
+        check_timeseries(data)
         
         return self._predict(data, *args, **kwargs)
 
@@ -216,11 +200,7 @@ and optionally a fit() method if the parameters are to be learnt form data.'''
         if not self.fitted:
             raise NotFittedError()
 
-        if not isinstance(data, DataTimeSlotSeries):
-            raise TypeError('DataTimeSlotSeries is required (got "{}")'.format(data.__class__.__name__))
-    
-        if not data:
-            raise ValueError('A non-empty DataTimeSlotSeries is required')
+        check_timeseries(data)
         
         return self._apply(data, *args, **kwargs)
 
@@ -234,12 +214,8 @@ and optionally a fit() method if the parameters are to be learnt form data.'''
 
         if not self.fitted:
             raise NotFittedError()
-
-        if not isinstance(data, DataTimeSlotSeries):
-            raise TypeError('DataTimeSlotSeries is required (got "{}")'.format(data.__class__.__name__))
-    
-        if not data:
-            raise ValueError('A non-empty DataTimeSlotSeries is required')
+        
+        check_timeseries(data)
         
         return self._evaluate(data, *args, **kwargs)
 
@@ -251,11 +227,7 @@ and optionally a fit() method if the parameters are to be learnt form data.'''
         except AttributeError:
             raise NotImplementedError('Fitting this model is not implemented')
 
-        if not isinstance(data, DataTimeSlotSeries):
-            raise TypeError('DataTimeSlotSeries is required (got "{}")'.format(data.__class__.__name__))
-    
-        if not data:
-            raise ValueError('A non-empty DataTimeSlotSeries is required')
+        check_timeseries(data)
         
         fit_output = self._fit(data, *args, **kwargs)
 
@@ -283,11 +255,7 @@ and optionally a fit() method if the parameters are to be learnt form data.'''
         except AttributeError:
             raise NotImplementedError('Evaluating this model is not implemented')
 
-        if not isinstance(data, DataTimeSlotSeries):
-            raise TypeError('DataTimeSlotSeries is required (got "{}")'.format(data.__class__.__name__))
-    
-        if not data:
-            raise ValueError('A non-empty DataTimeSlotSeries is required')
+        check_timeseries(data)
 
         # Decouple fit from validate args
         fit_kwargs = {}
@@ -586,8 +554,13 @@ class Reconstructor(ParametricModel):
 
 class PeriodicAverageReconstructor(Reconstructor):
 
-    def _fit(self, data_time_slot_series, data_loss_threshold=0.5, periodicity=None, dst_affected=False, timezone_affected=False, from_t=None, to_t=None, from_dt=None, to_dt=None):
 
+    def _fit(self, data_time_slot_series, data_loss_threshold=0.5, periodicity=None, dst_affected=False, timezone_affected=False, from_t=None, to_t=None, from_dt=None, to_dt=None, offset_method='average'):
+
+        if not offset_method in ['average', 'extremes']:
+            raise Exception('Unknown offset method "{}"'.format(self.offset_method))
+        self.offset_method = offset_method
+    
         if len(data_time_slot_series.data_keys()) > 1:
             raise NotImplementedError('Multivariate time series are not yet supported')
 
@@ -596,10 +569,14 @@ class PeriodicAverageReconstructor(Reconstructor):
         # Set or detect periodicity
         if periodicity is None:
             periodicity =  get_periodicity(data_time_slot_series)
-            if isinstance(data_time_slot_series.slot_unit, TimeUnit):
-                logger.info('Detected periodicity: %sx %s', periodicity, data_time_slot_series.slot_unit)
-            else:
-                logger.info('Detected periodicity: %sx %ss', periodicity, data_time_slot_series.slot_unit)
+            try:
+                if isinstance(data_time_slot_series.slot_unit, TimeUnit):
+                    logger.info('Detected periodicity: %sx %s', periodicity, data_time_slot_series.slot_unit)
+                else:
+                    logger.info('Detected periodicity: %sx %ss', periodicity, data_time_slot_series.slot_unit)
+            except AttributeError:
+                logger.info('Detected periodicity: %sx %ss', periodicity, data_time_slot_series.sample_rate)
+                
         self.data['periodicity']  = periodicity
         self.data['dst_affected'] = dst_affected 
         
@@ -639,15 +616,32 @@ class PeriodicAverageReconstructor(Reconstructor):
 
     def _reconstruct(self, data_time_slot_series, key, from_index, to_index):
         logger.debug('Reconstructing between "{}" and "{}"'.format(from_index, to_index-1))
-    
-        # Compute offset
-        diffs=0
-        for j in range(from_index, to_index):
-            real_value = data_time_slot_series[j].data[key]
-            periodicity_index = get_periodicity_index(data_time_slot_series[j].start, data_time_slot_series.slot_unit, self.data['periodicity'], dst_affected=self.data['dst_affected'])
-            reconstructed_value = self.data['averages'][periodicity_index]
-            diffs += (real_value - reconstructed_value)
-        offset = diffs/(to_index-from_index)
+
+        # Compute offset (old approach)
+        if self.offset_method == 'average':
+            diffs=0
+            for j in range(from_index, to_index):
+                real_value = data_time_slot_series[j].data[key]
+                periodicity_index = get_periodicity_index(data_time_slot_series[j].start, data_time_slot_series.slot_unit, self.data['periodicity'], dst_affected=self.data['dst_affected'])
+                reconstructed_value = self.data['averages'][periodicity_index]
+                diffs += (real_value - reconstructed_value)
+            offset = diffs/(to_index-from_index)
+        
+        elif self.offset_method == 'extremes':
+            # Compute offset (new approach)
+            diffs=0
+            try:
+                for j in [from_index-1, to_index+1]:
+                    real_value = data_time_slot_series[j].data[key]
+                    periodicity_index = get_periodicity_index(data_time_slot_series[j].start, data_time_slot_series.slot_unit, self.data['periodicity'], dst_affected=self.data['dst_affected'])
+                    reconstructed_value = self.data['averages'][periodicity_index]
+                    diffs += (real_value - reconstructed_value)
+                offset = diffs/2
+                logger.critical('offset: {}'.format(offset))
+            except IndexError:
+                offset=0
+        else:
+            raise Exception('Unknown offset method "{}"'.format(self.offset_method))
 
         # Actually reconstruct
         for j in range(from_index, to_index):
@@ -985,10 +979,14 @@ class PeriodicAverageForecaster(Forecaster):
         # Set or detect periodicity
         if periodicity is None:        
             periodicity =  get_periodicity(data_time_slot_series)
-            if isinstance(data_time_slot_series.slot_unit, TimeUnit):
-                logger.info('Detected periodicity: %sx %s', periodicity, data_time_slot_series.slot_unit)
-            else:
-                logger.info('Detected periodicity: %sx %ss', periodicity, data_time_slot_series.slot_unit)
+            try:
+                if isinstance(data_time_slot_series.slot_unit, TimeUnit):
+                    logger.info('Detected periodicity: %sx %s', periodicity, data_time_slot_series.slot_unit)
+                else:
+                    logger.info('Detected periodicity: %sx %ss', periodicity, data_time_slot_series.slot_unit)
+            except AttributeError:
+                logger.info('Detected periodicity: %sx %ss', periodicity, data_time_slot_series.sample_rate)
+                
         self.data['periodicity']  = periodicity
         self.data['dst_affected'] = dst_affected
 
