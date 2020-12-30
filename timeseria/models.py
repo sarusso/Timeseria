@@ -580,7 +580,7 @@ class PeriodicAverageReconstructor(Reconstructor):
                 else:
                     logger.info('Detected periodicity: %sx %ss', periodicity, data_time_slot_series.slot_unit)
             except AttributeError:
-                logger.info('Detected periodicity: %sx %ss', periodicity, data_time_slot_series.sample_rate)
+                logger.info('Detected periodicity: %sx %ss', periodicity, data_time_slot_series.sampling_period)
                 
         self.data['periodicity']  = periodicity
         self.data['dst_affected'] = dst_affected 
@@ -989,7 +989,7 @@ class PeriodicAverageForecaster(Forecaster):
                 else:
                     logger.info('Detected periodicity: %sx %ss', periodicity, data_time_slot_series.slot_unit)
             except AttributeError:
-                logger.info('Detected periodicity: %sx %ss', periodicity, data_time_slot_series.sample_rate)
+                logger.info('Detected periodicity: %sx %ss', periodicity, data_time_slot_series.sampling_period)
                 
         self.data['periodicity']  = periodicity
         self.data['dst_affected'] = dst_affected

@@ -403,10 +403,13 @@ class Slotter(Transformation):
 
 class Resampler(Transformation):
 
-    def __init__(self, rate):
-        if not isinstance(rate, int):
-            raise NotImplementedError('Sorry, only sample rates as (int) seconds are supported by the Resampler')
-        self.time_unit = self._unit_to_TimeUnit(rate)
+    def __init__(self, unit):
+        if isinstance(unit, int):
+            self.time_unit = self._unit_to_TimeUnit(unit)
+        elif isinstance(unit, TimeUnit):
+            self.time_unit = unit
+        else:
+            raise NotImplementedError('Sorry, only (re) sampling_periods as int (seconds) or TimeUnit objects are supported')
 
     @classmethod
     def _unit_to_TimeUnit(cls, unit):
@@ -453,7 +456,7 @@ class Resampler(Transformation):
                     diffs[diff] +=1            
             
             if i > 10:
-                raise Exception('Cannot automatically detect original sampling rate validity')
+                raise Exception('Cannot automatically detect original sampling_period')
         
         most_common_diff_total = 0
         most_common_diff = None

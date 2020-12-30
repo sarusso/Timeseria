@@ -307,12 +307,12 @@ class TimePointSeries(PointSeries):
         if tz:
             self._tz = timezonize(tz)
         
-        self.sample_rate = None
+        self.sampling_period = None
 
         super(TimePointSeries, self).__init__(*args, **kwargs)
         
 
-    # Check time ordering and sample rate
+    # Check time ordering and sampling_period
     def append(self, item):
         try:
             
@@ -326,12 +326,12 @@ class TimePointSeries(PointSeries):
                 if item.t == self.prev_t:
                     raise ValueError('Time t="{}" is a duplicate'.format(item.t))
                 
-                if self.sample_rate is None:
-                    self.sample_rate = item.t - self.prev_t
+                if self.sampling_period is None:
+                    self.sampling_period = item.t - self.prev_t
                     
-                elif self.sample_rate != 'variable':
-                    if self.sample_rate != item.t - self.prev_t:
-                        self.sample_rate = 'variable'
+                elif self.sampling_period != 'variable':
+                    if self.sampling_period != item.t - self.prev_t:
+                        self.sampling_period = 'variable'
 
             self.prev_t = item.t
                 

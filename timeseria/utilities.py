@@ -276,8 +276,8 @@ def check_timeseries(timeseries):
     # Import here or you will end up with cyclic imports
     from .datastructures import DataTimePointSeries, DataTimeSlotSeries 
     if isinstance(timeseries, DataTimePointSeries):
-        if timeseries.sample_rate == 'variable':
-            raise TypeError('Variable sampling rates are not supported. Resample or slot the time series first.')
+        if timeseries.sampling_period == 'variable':
+            raise TypeError('Variable sampling_periods are not supported. Resample or slot the time series first.')
     elif isinstance(timeseries, DataTimeSlotSeries):
         pass
     else:

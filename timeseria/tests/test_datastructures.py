@@ -245,13 +245,13 @@ class TestPointSeries(unittest.TestCase):
         
         # Test sampling rate detection 
         time_point_serie = TimePointSeries(TimePoint(t=60))
-        self.assertEqual(time_point_serie.sample_rate, None)
+        self.assertEqual(time_point_serie.sampling_period, None)
         
         time_point_serie = TimePointSeries(TimePoint(t=60),TimePoint(t=121))
-        self.assertEqual(time_point_serie.sample_rate, 61)
+        self.assertEqual(time_point_serie.sampling_period, 61)
         
         time_point_serie = TimePointSeries(TimePoint(t=60),TimePoint(t=120),TimePoint(t=130))
-        self.assertEqual(time_point_serie.sample_rate, 'variable')
+        self.assertEqual(time_point_serie.sampling_period, 'variable')
         
         # Test cut
         time_point_serie = TimePointSeries(TimePoint(t=60),TimePoint(t=120),TimePoint(t=130))
