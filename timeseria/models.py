@@ -637,7 +637,6 @@ class PeriodicAverageReconstructor(Reconstructor):
                     reconstructed_value = self.data['averages'][periodicity_index]
                     diffs += (real_value - reconstructed_value)
                 offset = diffs/2
-                logger.critical('offset: {}'.format(offset))
             except IndexError:
                 offset=0
         else:

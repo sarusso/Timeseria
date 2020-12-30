@@ -104,6 +104,10 @@ class Series(list):
             series = self.__class__()
             for i in indices:
                 series.append(super(Series, self).__getitem__(i))
+            try:
+                series.mark = self.mark
+            except:
+                pass
             return series
         else:
             return super(Series, self).__getitem__(key)
