@@ -487,13 +487,18 @@ class Slot(object):
     
     def __init__(self, start, end=None, unit=None):
         
-        
         if not isinstance(start, self.__POINT_TYPE__):
             raise TypeError('Slot start must be a Point object (got "{}")'.format(start.__class__.__name__))
         if end is None and unit is not None:
             if len(start.coordinates)>1:
                 raise Exception('Sorry, setting a start and a unit only works in unidimensional spaces')
-            end = start + unit
+            
+            # Handle start + unit
+            if isinstance(unit, Unit):
+                end = start + unit
+            else:
+                end = start.__class__(start.coordinates[0] + unit)    
+            
         if not isinstance(end, self.__POINT_TYPE__):
             raise TypeError('Slot end must be a Point object (got "{}")'.format(end.__class__.__name__))
         
@@ -564,7 +569,17 @@ class TimeSlot(Slot):
     __POINT_TYPE__ = TimePoint
 
    
-    def __init__(self, start, end=None, unit=None):
+    def __init__(self, start=None, end=None, unit=None, t=None, dt=None):
+        
+        # Handle t and dt shortcuts
+        if t:
+            start=TimePoint(t=t)
+        if dt:
+            start=TimePoint(dt=dt)
+        
+        if not isinstance(start, self.__POINT_TYPE__):
+            raise TypeError('Slot start must be a Point object (got "{}")'.format(start.__class__.__name__))
+
         try:
             if start.tz != end.tz:
                 raise ValueError('{} start and end must have the same time zone (got start.tz="{}", end.tz="{}")'.format(self.__class__.__name__, start.tz, end.tz))
@@ -578,6 +593,11 @@ class TimeSlot(Slot):
         else:    
             self.tz = start.tz
         super(TimeSlot, self).__init__(start=start, end=end, unit=unit)
+        
+        # If we did not have the end, set its timezone now:
+        if end is None:
+            self.end.change_timezone(self.start.tz)
+
 
     # Overwrite parent succedes, this has better performance as it checks for only one dimension
     def __succedes__(self, other):
@@ -588,20 +608,19 @@ class TimeSlot(Slot):
             return False
         else:
             return True
-        
-    @property
-    def duration(self):
-        return (self.end.t - self.start.t)
-    
+
     def change_timezone(self, new_timezone):
         self.start.change_timezone(new_timezone)
         self.end.change_timezone(new_timezone)
         self.tz = self.start.tz
     
-    #@property
-    #def t(self):
-    #    #return (self.start.t + (self.end.t - self.start.t))
-    #    return self.start.t
+    @property
+    def t(self):
+        return self.start.t
+    
+    @property
+    def dt(self):
+        return self.start.dt
 
 
 class DataSlot(Slot):

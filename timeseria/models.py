@@ -9,7 +9,7 @@ from .utilities import get_periodicity, is_numerical, set_from_t_and_to_t, slot_
 from .time import now_t, dt_from_s, s_from_dt
 from datetime import timedelta, datetime
 from sklearn.metrics import mean_squared_error, mean_absolute_error
-from .units import TimeUnit
+from .units import Unit, TimeUnit
 from pandas import DataFrame
 from math import sqrt
 from copy import deepcopy
@@ -55,19 +55,24 @@ def get_periodicity_index(time_point, slot_unit, periodicity, dst_affected=False
         else:
             raise Exception('Consistency error, got slot unit type "{}" which is unknown'.format(slot_unit.type))
 
-        slot_unit_duration = slot_unit.duration
-
-    else:
+        slot_unit_length = slot_unit.duration_s()
+    
+    elif isinstance(slot_unit, Unit):  
         if isinstance(slot_unit.value, list):
             raise NotImplementedError('Sorry, periodicty in multi-dimensional spaces are not defined')
-        slot_unit_duration = slot_unit.value
+        slot_unit_length = slot_unit.value
+
+    else:
+        if isinstance(slot_unit, list):
+            raise NotImplementedError('Sorry, periodicty in multi-dimensional spaces are not defined')
+        slot_unit_length = slot_unit
 
     # Compute periodicity index
     if not dst_affected:
     
         # Get index based on slot start, normalized to unit, modulus periodicity
         slot_start_t = time_point.t
-        periodicity_index =  int(slot_start_t / slot_unit_duration) % periodicity
+        periodicity_index =  int(slot_start_t / slot_unit_length) % periodicity
     
     else:
 
@@ -80,27 +85,27 @@ def get_periodicity_index(time_point, slot_unit, periodicity, dst_affected=False
         
         if dst_timedelta.days == 0 and dst_timedelta.seconds == 0:
             # No DST
-            periodicity_index = int(slot_start_t / slot_unit_duration) % periodicity
+            periodicity_index = int(slot_start_t / slot_unit_length) % periodicity
         
         else:
             # DST
             if dst_timedelta.days != 0:
                 raise Exception('Don\'t know how to handle DST with days timedelta = "{}"'.format(dst_timedelta.days))
 
-            if slot_unit_duration > 3600:
-                raise Exception('Sorry, this time series has not enough time-resolution to account for DST effects (slot_unit_duration="{}", must be below 3600 seconds)'.format(slot_unit_duration))
+            if slot_unit_length > 3600:
+                raise Exception('Sorry, this time series has not enough time-resolution to account for DST effects (slot_unit_length="{}", must be below 3600 seconds)'.format(slot_unit_length))
             
             # Get DST offset in seconds 
             dst_offset_s = dst_timedelta.seconds # 3600 usually
 
             # Compute periodicity in seconds (example: 144 10-minute slots) 
-            #periodicity_s = periodicity * slot_unit_duration
+            #periodicity_s = periodicity * slot_unit_length
             
             # Get DST offset "slots"
-            #dst_offset_slots = int(dst_offset_s / slot_unit_duration) # For ten-minutes slot is 6               
-            #periodicity_index = (int(slot_start_t / slot_unit_duration) % periodicity) #+ dst_offset_slots
+            #dst_offset_slots = int(dst_offset_s / slot_unit_length) # For ten-minutes slot is 6               
+            #periodicity_index = (int(slot_start_t / slot_unit_length) % periodicity) #+ dst_offset_slots
             
-            periodicity_index = (int((slot_start_t + dst_offset_s) / slot_unit_duration) % periodicity)
+            periodicity_index = (int((slot_start_t + dst_offset_s) / slot_unit_length) % periodicity)
 
     return periodicity_index
 

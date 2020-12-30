@@ -21,12 +21,16 @@ class Unit(object):
 
     def __add__(self, other):
 
+        # Sum with int or float
+        if (isinstance(self.value, int) or isinstance(self.value, float)) and (isinstance(other, int) or isinstance(other, float)):
+            return self.value + other
+
         try:
             if len(other.coordinates) > 1:
                 raise NotImplementedError('Cannot add Units in a multidimensional space')             
             return other.__class__(other.coordinates[0] + self.value)
         except:
-            raise NotImplementedError('Don\'t know how to add Units wiht {}'.format(other.__class__.__name__)) 
+            raise NotImplementedError('Don\'t know how to add Units with {}'.format(other.__class__.__name__)) 
     
     def __radd__(self, other):
         return self.__add__(other)
@@ -38,8 +42,8 @@ class Unit(object):
             return self.value == other.value
 
 
-class TimeUnit(object):
-    ''' A time unit is a duration. It can be physical (hours, minutes..),
+class TimeUnit(Unit):
+    ''' A time unit which can be both be physical (hours, minutes..),
     logical (months, for example) or defined from a start to an end'''
     
     LOGICAL  = 'Logical'
@@ -108,7 +112,7 @@ class TimeUnit(object):
                      
             # If nothing set, raise error
             if not self.years and not self.weeks and not self.months and not self.days and not self.hours and not self.minutes and not self.seconds and not self.microseconds:
-                raise InputException('Detected zero-length TimeUnit!')
+                raise InputException('Detected zero-duration TimeUnit!')
  
 
     # Representation..
@@ -200,7 +204,7 @@ class TimeUnit(object):
         '''Returns the type of the TimeUnit.
          - Physical if hours, minutes, seconds, micorseconds
          - Logical if Years, Months, Days, Weeks
-        The difference? Years, Months, Days, Weeks have different lengths depending on the starting date.
+        The difference? Years, Months, Days, Weeks have different durations depending on the starting date.
         '''
 
         if self.years or self.months or self.weeks or self.days:
@@ -355,11 +359,11 @@ class TimeUnit(object):
                
         return time_unit_s
         
-    @property
-    def duration(self):
-        if self.type == 'Logical':
-            raise InputException('Sorry, the duration of a LOGICAL time unit is not defined. use duration_s() providing the starting point.')
-        return self.duration_s()
+    #@property
+    #def duration(self):
+    #    if self.type == 'Logical':
+    #        raise InputException('Sorry, the duration of a LOGICAL time unit is not defined. use duration_s() providing the starting point.')
+    #    return self.duration_s()
 
 
     # Get start/end/center

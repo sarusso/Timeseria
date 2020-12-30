@@ -323,9 +323,11 @@ class TestPointSeries(unittest.TestCase):
 class TestUnit(unittest.TestCase):
 
     def test_Unit(self):      
-        #print(Unit([1,2]))     
+
         self.assertEqual( (Point(1) + Unit(5)).coordinates[0], 6) 
         self.assertEqual( (TimePoint(1) + Unit(5)).coordinates[0], 6) 
+        self.assertEqual(Unit(5)+1,6)
+
 
 
 class TestSlots(unittest.TestCase):
@@ -350,11 +352,6 @@ class TestSlots(unittest.TestCase):
         with self.assertRaises(ValueError):
             Slot(start=Point(1), end=Point(1))
 
-        #print('\n')
-        #print(Slot(start=Point(5), end=Point(7)))
-        #print(Slot(start=Point(1,2), end=Point(3,5)).length)
-        #print('\n')
-        
         slot = Slot(start=Point(1), end=Point(2)) 
         self.assertEqual(slot.start,Point(1))
         self.assertEqual(slot.end,Point(2))
@@ -370,10 +367,15 @@ class TestSlots(unittest.TestCase):
         slot = Slot(start=Point(1.5), end=Point(4.7)) 
         self.assertEqual(slot.length, 3.2)
 
-        # Slot using unit
-        slot = Slot(start=Point(1.5), unit=Unit(3.2)) 
-        self.assertEqual(slot.length, 3.2)
+        # Unit
+        slot = Slot(start=Point(1.5), unit=3.2) 
+        self.assertEqual(slot.end, Point(4.7))
 
+        slot = Slot(start=Point(1.5), unit=Unit(3.2)) 
+        self.assertEqual(slot.end, Point(4.7))
+
+        slot = Slot(start=Point(1.5), end=Point(3.0)) 
+        self.assertEqual(slot.unit, Unit(1.5))
 
   
     def test_TimeSlot(self):
@@ -399,8 +401,8 @@ class TestSlots(unittest.TestCase):
         self.assertFalse(time_slot_1.__succedes__(time_slot_2))
         self.assertFalse(time_slot_3.__succedes__(time_slot_1))
         
-        # Duration
-        self.assertEqual(time_slot_1.duration,1)
+        # Length
+        self.assertEqual(time_slot_1.length,1)
 
         # Time zone
         with self.assertRaises(ValueError):
@@ -408,10 +410,21 @@ class TestSlots(unittest.TestCase):
             TimeSlot(start=TimePoint(t=0, tz='Europe/Rome'), end=TimePoint(t=60))
         TimeSlot(start=TimePoint(t=0, tz='Europe/Rome'), end=TimePoint(t=60, tz='Europe/Rome'))
 
-        # Slot using unit
-        time_slot = TimeSlot(start=TimePoint(0), unit=Unit(3600)) 
-        self.assertEqual(time_slot.length, 3600)      
-          
+        # Slot t and dt shortcuts
+        slot = TimeSlot(start=TimePoint(60), end=TimePoint(120))
+        self.assertEqual(slot.t, 60)
+        self.assertEqual(slot.dt, dt(1970,1,1,0,1,0)) # 1 minute past midnight Jan 1970 UTC
+        
+        slot = TimeSlot(t=60, unit=60)
+        self.assertEqual(slot.start, TimePoint(60))
+        self.assertEqual(slot.end, TimePoint(120))
+        self.assertEqual(slot.unit, 60)
+
+        slot = TimeSlot(dt=dt(1970,1,1,0,1,0), unit=TimeUnit('1m'))
+        self.assertEqual(slot.start, TimePoint(60))
+        self.assertEqual(slot.end, TimePoint(120))
+        self.assertEqual(slot.unit, TimeUnit('1m'))
+        
 
     def test_DataSlot(self):
         
