@@ -8,7 +8,7 @@ if [[ "x$BUILD" != "xFalse" ]]; then
     echo -e "|  Building env container     |"
     echo -e "===============================\n"
 
-    if [[ "x$cache" == "xnocache" ]]; then
+    if [[ "x$CACHE" == "xFalse" ]]; then
         docker build --no-cache -f containers/Ubuntu_18.04/Dockerfile ./ -t timeseria_jupyter_container
     else
         docker build -f containers/Ubuntu_18.04/Dockerfile ./ -t timeseria_jupyter_container
