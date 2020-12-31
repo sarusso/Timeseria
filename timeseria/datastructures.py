@@ -307,12 +307,12 @@ class TimePointSeries(PointSeries):
         if tz:
             self._tz = timezonize(tz)
         
-        self.sampling_period = None
+        self.resolution = None
 
         super(TimePointSeries, self).__init__(*args, **kwargs)
         
 
-    # Check time ordering and sampling_period
+    # Check time ordering and resolution
     def append(self, item):
         try:
             
@@ -326,12 +326,12 @@ class TimePointSeries(PointSeries):
                 if item.t == self.prev_t:
                     raise ValueError('Time t="{}" is a duplicate'.format(item.t))
                 
-                if self.sampling_period is None:
-                    self.sampling_period = item.t - self.prev_t
+                if self.resolution is None:
+                    self.resolution = item.t - self.prev_t
                     
-                elif self.sampling_period != 'variable':
-                    if self.sampling_period != item.t - self.prev_t:
-                        self.sampling_period = 'variable'
+                elif self.resolution != 'variable':
+                    if self.resolution != item.t - self.prev_t:
+                        self.resolution = 'variable'
 
             self.prev_t = item.t
                 
@@ -715,7 +715,7 @@ class SlotSeries(Series):
         super(SlotSeries, self).append(item)
 
     @property
-    def sampling_period(self):
+    def resolution(self):
         return(self.slot_unit)
 
 

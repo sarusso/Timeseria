@@ -93,7 +93,7 @@ def get_periodicity_index(time_point, slot_unit, periodicity, dst_affected=False
                 raise Exception('Don\'t know how to handle DST with days timedelta = "{}"'.format(dst_timedelta.days))
 
             if slot_unit_length > 3600:
-                raise Exception('Sorry, this time series has not enough time-resolution to account for DST effects (slot_unit_length="{}", must be below 3600 seconds)'.format(slot_unit_length))
+                raise Exception('Sorry, this time series has not enough resolution to account for DST effects (slot_unit_length="{}", must be below 3600 seconds)'.format(slot_unit_length))
             
             # Get DST offset in seconds 
             dst_offset_s = dst_timedelta.seconds # 3600 usually
@@ -580,7 +580,7 @@ class PeriodicAverageReconstructor(Reconstructor):
                 else:
                     logger.info('Detected periodicity: %sx %ss', periodicity, data_time_slot_series.slot_unit)
             except AttributeError:
-                logger.info('Detected periodicity: %sx %ss', periodicity, data_time_slot_series.sampling_period)
+                logger.info('Detected periodicity: %sx %ss', periodicity, data_time_slot_series.resolution)
                 
         self.data['periodicity']  = periodicity
         self.data['dst_affected'] = dst_affected 
@@ -989,7 +989,7 @@ class PeriodicAverageForecaster(Forecaster):
                 else:
                     logger.info('Detected periodicity: %sx %ss', periodicity, data_time_slot_series.slot_unit)
             except AttributeError:
-                logger.info('Detected periodicity: %sx %ss', periodicity, data_time_slot_series.sampling_period)
+                logger.info('Detected periodicity: %sx %ss', periodicity, data_time_slot_series.resolution)
                 
         self.data['periodicity']  = periodicity
         self.data['dst_affected'] = dst_affected

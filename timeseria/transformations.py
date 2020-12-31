@@ -409,7 +409,7 @@ class Resampler(Transformation):
         elif isinstance(unit, TimeUnit):
             self.time_unit = unit
         else:
-            raise NotImplementedError('Sorry, only (re) sampling_periods as int (seconds) or TimeUnit objects are supported')
+            raise NotImplementedError('Sorry, only (re) resolutions as int (seconds) or TimeUnit objects are supported')
 
     @classmethod
     def _unit_to_TimeUnit(cls, unit):
@@ -456,7 +456,7 @@ class Resampler(Transformation):
                     diffs[diff] +=1            
             
             if i > 10:
-                raise Exception('Cannot automatically detect original sampling_period')
+                raise Exception('Cannot automatically detect original resolution')
         
         most_common_diff_total = 0
         most_common_diff = None

@@ -243,15 +243,15 @@ class TestPointSeries(unittest.TestCase):
         self.assertEqual(str(time_point_serie.tz), 'Europe/Rome')
         self.assertEqual(str(type(time_point_serie.tz)), "<class 'pytz.tzfile.Europe/Rome'>")  
         
-        # Test sampling_period 
+        # Test resolution 
         time_point_serie = TimePointSeries(TimePoint(t=60))
-        self.assertEqual(time_point_serie.sampling_period, None)
+        self.assertEqual(time_point_serie.resolution, None)
         
         time_point_serie = TimePointSeries(TimePoint(t=60),TimePoint(t=121))
-        self.assertEqual(time_point_serie.sampling_period, 61)
+        self.assertEqual(time_point_serie.resolution, 61)
         
         time_point_serie = TimePointSeries(TimePoint(t=60),TimePoint(t=120),TimePoint(t=130))
-        self.assertEqual(time_point_serie.sampling_period, 'variable')
+        self.assertEqual(time_point_serie.resolution, 'variable')
         
         # Test cut
         time_point_serie = TimePointSeries(TimePoint(t=60),TimePoint(t=120),TimePoint(t=130))
@@ -524,8 +524,8 @@ class TestSlotSeries(unittest.TestCase):
         # Test slot unit
         self.assertEqual(time_slot_series.slot_unit, Unit(60.0))
 
-        # Test sampling_period 
-        self.assertEqual(time_slot_series.sampling_period, Unit(60))
+        # Test resolution 
+        self.assertEqual(time_slot_series.resolution, Unit(60))
         
         
  
