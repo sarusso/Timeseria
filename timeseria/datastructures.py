@@ -698,25 +698,22 @@ class SlotSeries(Series):
         # Slots can belong to the same series if they are in succession (tested with the __succedes__ method)
         # and if they have the same unit, which we test here instead as the __succedes__ is more general.
         try:
-            if self.slot_unit != item.unit:
+            if self.resolution != item.unit:
                 # Try for floatign point precision errors
                 abort = False
                 try:
-                    if not  is_close(self.slot_unit, item.unit):
+                    if not  is_close(self.resolution, item.unit):
                         abort = True
                 except (TypeError, ValueError):
                     abort = True
                 if abort:
-                    raise ValueError('Cannot add items with different units (I have "{}" and you tried to add "{}")'.format(self.slot_unit, item.unit))
+                    raise ValueError('Cannot add items with different units (I have "{}" and you tried to add "{}")'.format(self.resolution, item.unit))
         except AttributeError:
-            self.slot_unit = item.unit
+            self.resolution = item.unit
 
         # Call parent append
         super(SlotSeries, self).append(item)
 
-    @property
-    def resolution(self):
-        return(self.slot_unit)
 
 
 class TimeSlotSeries(SlotSeries):
@@ -760,7 +757,7 @@ class DataSlotSeries(SlotSeries):
                     raise ValueError('Got different data keys: {} vs {}'.format(self.item_data_reference.keys(), item.data.keys()))
 
         except AttributeError:
-            # TODO: uniform self.tz, self.slot_unit, self.item_data_reference
+            # TODO: uniform self.tz, self.resolution, self.item_data_reference
             self.item_data_reference = item.data
         
         super(DataSlotSeries, self).append(item)
@@ -819,12 +816,12 @@ class DataTimeSlotSeries(DataSlotSeries, TimeSlotSeries):
 
     def __repr__(self):
         if len(self):
-            if isinstance(self.slot_unit, TimeUnit):
-                slot_unit_str = str(self.slot_unit)
+            if isinstance(self.resolution, TimeUnit):
+                resolution_str = str(self.resolution)
             else:
-                slot_unit_str = str(self.slot_unit)# + 's' 
+                resolution_str = str(self.resolution)# + 's' 
             # TODO: "slots of unit" ?
-            return 'Time series of #{} slots of {}, from slot starting @ {} ({}) to slot ending @ {} ({})'.format(len(self), slot_unit_str, self[0].start.t, self[0].end.dt, self[-1].end.t, self[-1].end.dt)            
+            return 'Time series of #{} slots of {}, from slot starting @ {} ({}) to slot ending @ {} ({})'.format(len(self), resolution_str, self[0].start.t, self[0].end.dt, self[-1].end.t, self[-1].end.dt)            
         else:
             return 'Time series of #0 slots'
     

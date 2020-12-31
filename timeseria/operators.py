@@ -101,7 +101,7 @@ class Derivative(Operator):
                     # Both left and right derivative for the items in the middle
                     der =  ((data_time_slot_series[i+1].data[key] - data_time_slot_series[i].data[key]) + (data_time_slot_series[i].data[key] - data_time_slot_series[i-1].data[key])) /2
                     
-                der = der / (data_time_slot_series.slot_unit)
+                der = der / (data_time_slot_series.resolution)
 
                 # Add data
                 if not inplace:
@@ -129,18 +129,18 @@ class Merge(Operator):
 
     def __call__(self, *args):
         
-        slot_unit = None
+        resolution = None
         for i, arg in enumerate(args):
             if not isinstance(arg, DataTimeSlotSeries):
                 raise TypeError('Argument #{} is not of type DataTimeSlotSeries, got "{}"'.format(i, arg.__class__.__name__))
-            if slot_unit is None:
-                slot_unit = arg.slot_unit
+            if resolution is None:
+                resolution = arg.resolution
             else:
-                if arg.slot_unit != slot_unit:
+                if arg.resolution != resolution:
                     abort = True
                     try:
                         # Handle floating point precision issues 
-                        if is_close(arg.slot_unit, slot_unit):
+                        if is_close(arg.resolution, resolution):
                             abort = False
                     except (ValueError,TypeError):
                         pass
@@ -149,7 +149,7 @@ class Merge(Operator):
         
         length = len(args[0])
         n_args = len(args)
-        result_data_time_slot_series = DataTimeSlotSeries(unit=slot_unit)
+        result_data_time_slot_series = DataTimeSlotSeries(unit=resolution)
         import copy
         
         for i in range(length):
