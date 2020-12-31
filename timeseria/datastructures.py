@@ -714,6 +714,10 @@ class SlotSeries(Series):
         # Call parent append
         super(SlotSeries, self).append(item)
 
+    @property
+    def sampling_period(self):
+        return(self.slot_unit)
+
 
 class TimeSlotSeries(SlotSeries):
     '''A series of TimeSlots where each item is guaranteed to be ordered'''

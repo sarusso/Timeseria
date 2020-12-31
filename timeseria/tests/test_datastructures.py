@@ -243,7 +243,7 @@ class TestPointSeries(unittest.TestCase):
         self.assertEqual(str(time_point_serie.tz), 'Europe/Rome')
         self.assertEqual(str(type(time_point_serie.tz)), "<class 'pytz.tzfile.Europe/Rome'>")  
         
-        # Test sampling rate detection 
+        # Test sampling_period 
         time_point_serie = TimePointSeries(TimePoint(t=60))
         self.assertEqual(time_point_serie.sampling_period, None)
         
@@ -521,8 +521,12 @@ class TestSlotSeries(unittest.TestCase):
             time_slot_series.append(TimeSlot(start=TimePoint(t=60), end=TimePoint(t=210)))
         time_slot_series.append(TimeSlot(start=TimePoint(t=60, tz='Europe/Rome'), end=TimePoint(t=120, tz='Europe/Rome')))
 
-        # Test unit
+        # Test slot unit
         self.assertEqual(time_slot_series.slot_unit, Unit(60.0))
+
+        # Test sampling_period 
+        self.assertEqual(time_slot_series.sampling_period, Unit(60))
+        
         
  
     def test_DataSlotSeries(self):
