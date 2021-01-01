@@ -5,7 +5,7 @@ import copy
 import statistics
 from .datastructures import DataTimeSlotSeries, DataTimeSlot, TimePoint, DataTimePointSeries, DataTimePoint, Slot
 from .exceptions import NotFittedError
-from .utilities import get_periodicity, is_numerical, set_from_t_and_to_t, slot_is_in_range, check_timeseries
+from .utilities import get_periodicity, is_numerical, set_from_t_and_to_t, item_is_in_range, check_timeseries
 from .time import now_t, dt_from_s, s_from_dt
 from datetime import timedelta, datetime
 from sklearn.metrics import mean_squared_error, mean_absolute_error
@@ -53,7 +53,7 @@ def get_periodicity_index(time_point, resolution, periodicity, dst_affected=Fals
         elif resolution.type == TimeUnit.PHYSICAL:
             pass
         else:
-            raise Exception('Consistency error, got slot unit type "{}" which is unknown'.format(resolution.type))
+            raise Exception('Consistency error, got item unit type "{}" which is unknown'.format(resolution.type))
 
         resolution_s = resolution.duration_s()
     
@@ -70,7 +70,7 @@ def get_periodicity_index(time_point, resolution, periodicity, dst_affected=Fals
     # Compute periodicity index
     if not dst_affected:
     
-        # Get index based on slot start, normalized to unit, modulus periodicity
+        # Get index based on item start, normalized to unit, modulus periodicity
         t = time_point.t
         periodicity_index =  int(t / resolution_s) % periodicity
     
@@ -98,12 +98,12 @@ def get_periodicity_index(time_point, resolution, periodicity, dst_affected=Fals
             # Get DST offset in seconds 
             dst_offset_s = dst_timedelta.seconds # 3600 usually
 
-            # Compute periodicity in seconds (example: 144 10-minute slots) 
+            # Compute periodicity in seconds (example: 144 10-minute items) 
             #periodicity_s = periodicity * resolution_s
             
-            # Get DST offset "slots"
-            #dst_offset_slots = int(dst_offset_s / resolution_s) # For ten-minutes slot is 6               
-            #periodicity_index = (int(t / resolution_s) % periodicity) #+ dst_offset_slots
+            # Get DST offset "items"
+            #dst_offset_items = int(dst_offset_s / resolution_s) # For ten-minutes item is 6               
+            #periodicity_index = (int(t / resolution_s) % periodicity) #+ dst_offset_items
             
             periodicity_index = (int((t + dst_offset_s) / resolution_s) % periodicity)
 
@@ -277,7 +277,7 @@ and optionally a fit() method if the parameters are to be learnt form data.'''
             kwargs.pop(consumed_kwarg)
 
         # For readability
-        data_time_slot_series = data
+        timeseries = data
         
         # How many rounds
         rounds = kwargs.pop('rounds', 10)
@@ -287,14 +287,14 @@ and optionally a fit() method if the parameters are to be learnt form data.'''
             raise Exception('Got some unknown args: {}'.format(kwargs))
             
         # How many items per round?
-        round_items = int(len(data_time_slot_series) / rounds)
+        round_items = int(len(timeseries) / rounds)
         logger.debug('Items per round: {}'.format(round_items))
         
         # Start the fit / evaluate loop
         evaluations = []        
         for i in range(rounds):
-            from_t = data_time_slot_series[(round_items*i)].t
-            to_t = data_time_slot_series[(round_items*i) + round_items].t
+            from_t = timeseries[(round_items*i)].t
+            to_t = timeseries[(round_items*i) + round_items].t
             from_dt = dt_from_s(from_t)
             to_dt   = dt_from_s(to_t)
             logger.info('Cross validation round #{} of {}: validate from {} ({}) to {} ({}), fit on the rest.'.format(i+1, rounds, from_t, from_dt, to_t, to_dt))
@@ -343,42 +343,42 @@ and optionally a fit() method if the parameters are to be learnt form data.'''
 
 class Reconstructor(ParametricModel):
 
-    def _apply(self, data_time_slot_series, remove_data_loss=False, data_loss_threshold=1, inplace=False):
+    def _apply(self, timeseries, remove_data_loss=False, data_loss_threshold=1, inplace=False):
         logger.debug('Using data_loss_threshold="%s"', data_loss_threshold)
 
         # TODO: understand if we want the apply from/to behavior. For now it is disabled
         # (add from_t=None, to_t=None, from_dt=None, to_dt=None in the function call above)
         # from_t, to_t = set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
-        # Maybe also add a data_time_slot_series.mark=[from_dt, to_dt]
+        # Maybe also add a timeseries.mark=[from_dt, to_dt]
          
         from_t = None
         to_t   = None
         
         if not inplace:
-            data_time_slot_series = data_time_slot_series.duplicate()
+            timeseries = timeseries.duplicate()
 
-        if len(data_time_slot_series.data_keys()) > 1:
+        if len(timeseries.data_keys()) > 1:
             raise NotImplementedError('Multivariate time series are not yet supported')
 
-        for key in data_time_slot_series.data_keys():
+        for key in timeseries.data_keys():
             
             gap_started = None
             
-            for i, data_time_slot in enumerate(data_time_slot_series):
+            for i, item in enumerate(timeseries):
                 
                 # Skip if before from_t/dt of after to_t/dt
-                if from_t is not None and data_time_slot_series[i].t < from_t:
+                if from_t is not None and timeseries[i].t < from_t:
                     continue
                 try:
-                    # Handle slots
-                    if to_t is not None and data_time_slot_series[i].end.t > to_t:
+                    # Handle items
+                    if to_t is not None and timeseries[i].end.t > to_t:
                         break
                 except AttributeError:
                     # Handle points
-                    if to_t is not None and data_time_slot_series[i].t > to_t:
+                    if to_t is not None and timeseries[i].t > to_t:
                         break                
 
-                if data_time_slot.data_loss >= data_loss_threshold:
+                if item.data_loss >= data_loss_threshold:
                     # This is the beginning of an area we want to reconstruct according to the data_loss_threshold
                     if gap_started is None:
                         gap_started = i
@@ -387,26 +387,26 @@ class Reconstructor(ParametricModel):
                     if gap_started is not None:
                     
                         # Reconstruct for this gap
-                        self._reconstruct(from_index=gap_started, to_index=i, data_time_slot_series=data_time_slot_series, key=key)
+                        self._reconstruct(from_index=gap_started, to_index=i, timeseries=timeseries, key=key)
                         gap_started = None
                     
-                    data_time_slot._data_reconstructed = 0
+                    item._data_reconstructed = 0
                     
                 if remove_data_loss:
                     # TOOD: move to None if we allow data_losses (coverages) to None?
-                    data_time_slot._coverage = 1
+                    item._coverage = 1
             
             # Reconstruct the last gap as well if left "open"
             if gap_started is not None:
-                self._reconstruct(from_index=gap_started, to_index=i+1, data_time_slot_series=data_time_slot_series, key=key)
+                self._reconstruct(from_index=gap_started, to_index=i+1, timeseries=timeseries, key=key)
 
         if not inplace:
-            return data_time_slot_series
+            return timeseries
         else:
             return None
 
 
-    def _evaluate(self, data_time_slot_series, steps='auto', samples=1000, data_loss_threshold=1, metrics=['RMSE', 'MAE'], details=False, from_t=None, to_t=None, from_dt=None, to_dt=None):
+    def _evaluate(self, timeseries, steps='auto', samples=1000, data_loss_threshold=1, metrics=['RMSE', 'MAE'], details=False, from_t=None, to_t=None, from_dt=None, to_dt=None):
 
         # Set evaluation_score steps if we have to
         if steps == 'auto':
@@ -426,7 +426,7 @@ class Reconstructor(ParametricModel):
         logger.info('Will evaluate model for %s steps with metrics %s', steps, metrics)
 
         # Find areas where to evaluate the model
-        for key in data_time_slot_series.data_keys():
+        for key in timeseries.data_keys():
              
             for steps_round in steps:
                 
@@ -438,65 +438,65 @@ class Reconstructor(ParametricModel):
                 # Here we will have steps=1, steps=2 .. steps=n          
                 logger.debug('Evaluating model for %s steps', steps_round)
                 
-                for i in range(len(data_time_slot_series)):
+                for i in range(len(timeseries)):
 
                     # Skip if needed
                     try:
-                        if not slot_is_in_range(data_time_slot_series[i], from_t, to_t):
+                        if not item_is_in_range(timeseries[i], from_t, to_t):
                             continue
                     except StopIteration:
                         break                  
                 
                     # Skip the first and the last ones, otherwise reconstruct the ones in the middle
-                    if (i == 0) or (i >= len(data_time_slot_series)-steps_round):
+                    if (i == 0) or (i >= len(timeseries)-steps_round):
                         continue
 
                     # Is this a "good area" where to test or do we have to stop?
                     stop = False
-                    if data_time_slot_series[i-1].data_loss >= data_loss_threshold:
+                    if timeseries[i-1].data_loss >= data_loss_threshold:
                         stop = True
                     for j in range(steps_round):
-                        if data_time_slot_series[i+j].data_loss >= data_loss_threshold:
+                        if timeseries[i+j].data_loss >= data_loss_threshold:
                             stop = True
                             break
-                    if data_time_slot_series[i+steps_round].data_loss >= data_loss_threshold:
+                    if timeseries[i+steps_round].data_loss >= data_loss_threshold:
                         stop = True
                     if stop:
                         continue
                             
                     # Set prev and next
-                    prev_value = data_time_slot_series[i-1].data[key]
-                    next_value = data_time_slot_series[i+steps_round].data[key]
+                    prev_value = timeseries[i-1].data[key]
+                    next_value = timeseries[i+steps_round].data[key]
                     
                     # Compute average value
                     average_value = (prev_value+next_value)/2
                     
                     # Data to be reconstructed
-                    data_time_slot_series_to_reconstruct = data_time_slot_series.__class__()
+                    timeseries_to_reconstruct = timeseries.__class__()
                     
                     # Append prev
-                    #data_time_slot_series_to_reconstruct.append(copy.deepcopy(data_time_slot_series[i-1]))
+                    #timeseries_to_reconstruct.append(copy.deepcopy(timeseries[i-1]))
                     
                     # Append in the middle and store real values
                     for j in range(steps_round):
-                        data_time_slot = copy.deepcopy(data_time_slot_series[i+j])
-                        # Set the coverage to zero so the slot will be reconstructed
-                        data_time_slot._coverage = 0
-                        data_time_slot.data[key] = average_value
-                        data_time_slot_series_to_reconstruct.append(data_time_slot)
+                        item = copy.deepcopy(timeseries[i+j])
+                        # Set the coverage to zero so the item will be reconstructed
+                        item._coverage = 0
+                        item.data[key] = average_value
+                        timeseries_to_reconstruct.append(item)
                         
-                        real_values.append(data_time_slot_series[i+j].data[key])
+                        real_values.append(timeseries[i+j].data[key])
               
                     # Append next
-                    #data_time_slot_series_to_reconstruct.append(copy.deepcopy(data_time_slot_series[i+steps_round]))
+                    #timeseries_to_reconstruct.append(copy.deepcopy(timeseries[i+steps_round]))
 
                     # Apply model inplace
-                    self._apply(data_time_slot_series_to_reconstruct, inplace=True)
+                    self._apply(timeseries_to_reconstruct, inplace=True)
                     processed_samples += 1
 
                     # Store reconstructed values
                     for j in range(steps_round):
-                        reconstructed_values.append(data_time_slot_series_to_reconstruct[j].data[key])
+                        reconstructed_values.append(timeseries_to_reconstruct[j].data[key])
                     
                     if samples is not None and processed_samples >= samples:
                         break
@@ -566,54 +566,54 @@ class Reconstructor(ParametricModel):
 class PeriodicAverageReconstructor(Reconstructor):
 
 
-    def _fit(self, data_time_slot_series, data_loss_threshold=0.5, periodicity=None, dst_affected=False, timezone_affected=False, from_t=None, to_t=None, from_dt=None, to_dt=None, offset_method='average'):
+    def _fit(self, timeseries, data_loss_threshold=0.5, periodicity=None, dst_affected=False, timezone_affected=False, from_t=None, to_t=None, from_dt=None, to_dt=None, offset_method='average'):
 
         if not offset_method in ['average', 'extremes']:
             raise Exception('Unknown offset method "{}"'.format(self.offset_method))
         self.offset_method = offset_method
     
-        if len(data_time_slot_series.data_keys()) > 1:
+        if len(timeseries.data_keys()) > 1:
             raise NotImplementedError('Multivariate time series are not yet supported')
 
         from_t, to_t = set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
         
         # Set or detect periodicity
         if periodicity is None:
-            periodicity =  get_periodicity(data_time_slot_series)
+            periodicity =  get_periodicity(timeseries)
             try:
-                if isinstance(data_time_slot_series.resolution, TimeUnit):
-                    logger.info('Detected periodicity: %sx %s', periodicity, data_time_slot_series.resolution)
+                if isinstance(timeseries.resolution, TimeUnit):
+                    logger.info('Detected periodicity: %sx %s', periodicity, timeseries.resolution)
                 else:
-                    logger.info('Detected periodicity: %sx %ss', periodicity, data_time_slot_series.resolution)
+                    logger.info('Detected periodicity: %sx %ss', periodicity, timeseries.resolution)
             except AttributeError:
-                logger.info('Detected periodicity: %sx %ss', periodicity, data_time_slot_series.resolution)
+                logger.info('Detected periodicity: %sx %ss', periodicity, timeseries.resolution)
                 
         self.data['periodicity']  = periodicity
         self.data['dst_affected'] = dst_affected 
         
         # logger.info('dst_affected: {}'.format(dst_affected))
         
-        for key in data_time_slot_series.data_keys():
+        for key in timeseries.data_keys():
             sums   = {}
             totals = {}
             processed = 0
-            for data_time_slot in data_time_slot_series:
+            for item in timeseries:
                 
                 # Skip if needed
                 try:
-                    if not slot_is_in_range(data_time_slot, from_t, to_t):
+                    if not item_is_in_range(item, from_t, to_t):
                         continue
                 except StopIteration:
                     break
                 
                 # Process
-                if data_time_slot.data_loss < data_loss_threshold:
-                    periodicity_index = get_periodicity_index(data_time_slot, data_time_slot_series.resolution, periodicity, dst_affected=dst_affected)
+                if item.data_loss < data_loss_threshold:
+                    periodicity_index = get_periodicity_index(item, timeseries.resolution, periodicity, dst_affected=dst_affected)
                     if not periodicity_index in sums:
-                        sums[periodicity_index] = data_time_slot.data[key]
+                        sums[periodicity_index] = item.data[key]
                         totals[periodicity_index] = 1
                     else:
-                        sums[periodicity_index] += data_time_slot.data[key]
+                        sums[periodicity_index] += item.data[key]
                         totals[periodicity_index] +=1
                 processed += 1
 
@@ -622,18 +622,18 @@ class PeriodicAverageReconstructor(Reconstructor):
             averages[periodicity_index] = sums[periodicity_index]/totals[periodicity_index]
         self.data['averages'] = averages
 
-        # logger.info('Processed "{}" slots'.format(processed))
+        # logger.info('Processed "{}" items'.format(processed))
 
 
-    def _reconstruct(self, data_time_slot_series, key, from_index, to_index):
+    def _reconstruct(self, timeseries, key, from_index, to_index):
         logger.debug('Reconstructing between "{}" and "{}"'.format(from_index, to_index-1))
 
         # Compute offset (old approach)
         if self.offset_method == 'average':
             diffs=0
             for j in range(from_index, to_index):
-                real_value = data_time_slot_series[j].data[key]
-                periodicity_index = get_periodicity_index(data_time_slot_series[j], data_time_slot_series.resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])
+                real_value = timeseries[j].data[key]
+                periodicity_index = get_periodicity_index(timeseries[j], timeseries.resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])
                 reconstructed_value = self.data['averages'][periodicity_index]
                 diffs += (real_value - reconstructed_value)
             offset = diffs/(to_index-from_index)
@@ -643,8 +643,8 @@ class PeriodicAverageReconstructor(Reconstructor):
             diffs=0
             try:
                 for j in [from_index-1, to_index+1]:
-                    real_value = data_time_slot_series[j].data[key]
-                    periodicity_index = get_periodicity_index(data_time_slot_series[j], data_time_slot_series.resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])
+                    real_value = timeseries[j].data[key]
+                    periodicity_index = get_periodicity_index(timeseries[j], timeseries.resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])
                     reconstructed_value = self.data['averages'][periodicity_index]
                     diffs += (real_value - reconstructed_value)
                 offset = diffs/2
@@ -655,20 +655,20 @@ class PeriodicAverageReconstructor(Reconstructor):
 
         # Actually reconstruct
         for j in range(from_index, to_index):
-            data_time_slot_to_reconstruct = data_time_slot_series[j]
-            periodicity_index = get_periodicity_index(data_time_slot_to_reconstruct, data_time_slot_series.resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])
-            data_time_slot_to_reconstruct.data[key] = self.data['averages'][periodicity_index] + offset
-            data_time_slot_to_reconstruct._data_reconstructed = 1
+            item_to_reconstruct = timeseries[j]
+            periodicity_index = get_periodicity_index(item_to_reconstruct, timeseries.resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])
+            item_to_reconstruct.data[key] = self.data['averages'][periodicity_index] + offset
+            item_to_reconstruct._data_reconstructed = 1
                         
 
-    def _plot_averages(self, data_time_slot_series, **kwargs):   
-        averages_data_time_slot_series = copy.deepcopy(data_time_slot_series)
-        for data_time_slot in averages_data_time_slot_series:
-            value = self.data['averages'][get_periodicity_index(data_time_slot, averages_data_time_slot_series.resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])]
+    def _plot_averages(self, timeseries, **kwargs):   
+        averages_timeseries = copy.deepcopy(timeseries)
+        for item in averages_timeseries:
+            value = self.data['averages'][get_periodicity_index(item, averages_timeseries.resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])]
             if not value:
                 value = 0
-            data_time_slot.data['average'] =value 
-        averages_data_time_slot_series.plot(**kwargs)
+            item.data['average'] =value 
+        averages_timeseries.plot(**kwargs)
 
 
 
@@ -690,19 +690,19 @@ class ProphetModel(ParametricModel):
             data_keys_are_indexes = False
         
         data_as_list=[]
-        for slot in timeseries:
+        for item in timeseries:
             
             # Skip if needed
             try:
-                if not slot_is_in_range(slot, from_t, to_t):
+                if not item_is_in_range(item, from_t, to_t):
                     continue
             except StopIteration:
                 break                
 
             if data_keys_are_indexes:     
-                data_as_list.append([cls.remove_timezone(slot.dt), slot.data[0]])
+                data_as_list.append([cls.remove_timezone(item.dt), item.data[0]])
             else:
-                data_as_list.append([cls.remove_timezone(slot.dt), slot.data[list(slot.data.keys())[0]]])
+                data_as_list.append([cls.remove_timezone(item.dt), item.data[list(item.data.keys())[0]]])
 
         # Create the pandas DataFrames
         data = DataFrame(data_as_list, columns = ['ds', 'y'])
@@ -713,16 +713,16 @@ class ProphetModel(ParametricModel):
 
 class ProphetReconstructor(Reconstructor, ProphetModel):
     
-    def _fit(self, data_time_slot_series, from_t=None, to_t=None, from_dt=None, to_dt=None):
+    def _fit(self, timeseries, from_t=None, to_t=None, from_dt=None, to_dt=None):
 
         from fbprophet import Prophet
 
         from_t, to_t = set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
 
-        if len(data_time_slot_series.data_keys()) > 1:
+        if len(timeseries.data_keys()) > 1:
             raise NotImplementedError('Multivariate time series are not yet supported')
 
-        data = self.from_timeseria_to_prophet(data_time_slot_series, from_t, to_t)
+        data = self.from_timeseria_to_prophet(timeseries, from_t, to_t)
 
         # Instantiate the Prophet model
         self.prophet_model = Prophet()
@@ -732,14 +732,14 @@ class ProphetReconstructor(Reconstructor, ProphetModel):
 
 
 
-    def _reconstruct(self, data_time_slot_series, key, from_index, to_index):
+    def _reconstruct(self, timeseries, key, from_index, to_index):
         logger.debug('Reconstructing between "{}" and "{}"'.format(from_index, to_index-1))
     
         # Get and prepare data to reconstruct
-        data_time_slots_to_reconstruct = []
+        items_to_reconstruct = []
         for j in range(from_index, to_index):
-            data_time_slots_to_reconstruct.append(data_time_slot_series[j])
-        data_to_reconstruct = [self.remove_timezone(dt_from_s(data_time_slot.t)) for data_time_slot in data_time_slots_to_reconstruct]
+            items_to_reconstruct.append(timeseries[j])
+        data_to_reconstruct = [self.remove_timezone(dt_from_s(item.t)) for item in items_to_reconstruct]
         dataframe_to_reconstruct = DataFrame(data_to_reconstruct, columns = ['ds'])
 
         # Apply Prophet fit
@@ -748,10 +748,10 @@ class ProphetReconstructor(Reconstructor, ProphetModel):
 
         # Ok, replace the values withe the reconsturcted ones
         for i, j in enumerate(range(from_index, to_index)):
-            #logger.debug('Reconstructing slot #{} with reconstucted slot #{}'.format(j,i))
-            data_time_slot_to_reconstruct = data_time_slot_series[j]
-            data_time_slot_to_reconstruct.data[key] = forecast['yhat'][i]
-            data_time_slot_to_reconstruct._data_reconstructed = 1
+            #logger.debug('Reconstructing item #{} with reconstucted item #{}'.format(j,i))
+            item_to_reconstruct = timeseries[j]
+            item_to_reconstruct.data[key] = forecast['yhat'][i]
+            item_to_reconstruct._data_reconstructed = 1
     
 
 
@@ -761,7 +761,7 @@ class ProphetReconstructor(Reconstructor, ProphetModel):
 
 class Forecaster(ParametricModel):
 
-    def _evaluate(self, data_time_slot_series, steps='auto', samples=1000, plots=False, metrics=['RMSE', 'MAE'], details=False, from_t=None, to_t=None, from_dt=None, to_dt=None):
+    def _evaluate(self, timeseries, steps='auto', samples=1000, plots=False, metrics=['RMSE', 'MAE'], details=False, from_t=None, to_t=None, from_dt=None, to_dt=None):
 
         # Set evaluation_score steps if we have to
         if steps == 'auto':
@@ -787,13 +787,13 @@ class Forecaster(ParametricModel):
             model_values = []
             processed_samples = 0
     
-            # For each point of the data_time_slot_series, after the window, apply the prediction and compare it with the actual value
-            for key in data_time_slot_series.data_keys():
-                for i in range(len(data_time_slot_series)):
+            # For each point of the timeseries, after the window, apply the prediction and compare it with the actual value
+            for key in timeseries.data_keys():
+                for i in range(len(timeseries)):
 
                     # Skip if needed
                     try:
-                        if not slot_is_in_range(data_time_slot_series[i], from_t, to_t):
+                        if not item_is_in_range(timeseries[i], from_t, to_t):
                             continue
                     except StopIteration:
                         break  
@@ -801,7 +801,7 @@ class Forecaster(ParametricModel):
                     # Check that we can get enough data
                     if i < self.data['window']+steps_round:
                         continue
-                    if i > (len(data_time_slot_series)-steps_round):
+                    if i > (len(timeseries)-steps_round):
                         continue
 
                     # Compute the various boundaries
@@ -812,16 +812,16 @@ class Forecaster(ParametricModel):
                     original_forecast_serie_boundaries_end = original_serie_boundaries_end-steps_round
                     
                     # Create the time series where to apply the forecast on
-                    forecast_data_time_slot_series = data_time_slot_series.__class__()
+                    forecast_timeseries = timeseries.__class__()
                     for j in range(original_forecast_serie_boundaries_start, original_forecast_serie_boundaries_end):
-                        forecast_data_time_slot_series.append(data_time_slot_series[j])
+                        forecast_timeseries.append(timeseries[j])
  
                     # Apply the forecasting model
-                    self._apply(forecast_data_time_slot_series, n=steps_round, inplace=True)
+                    self._apply(forecast_timeseries, n=steps_round, inplace=True)
 
                     # Plot evaluation_score time series?
                     if plots:
-                        forecast_data_time_slot_series.plot(log_js=False)
+                        forecast_timeseries.plot(log_js=False)
                     
                     # Compare each forecast with the original value
                     for step in range(steps_round):
@@ -829,10 +829,10 @@ class Forecaster(ParametricModel):
 
                         forecast_index = self.data['window'] + step
 
-                        model_value = forecast_data_time_slot_series[forecast_index].data[key]
+                        model_value = forecast_timeseries[forecast_index].data[key]
                         model_values.append(model_value)
                         
-                        real_value = data_time_slot_series[original_index].data[key]
+                        real_value = timeseries[original_index].data[key]
                         real_values.append(real_value)
  
                     processed_samples+=1
@@ -896,55 +896,55 @@ class Forecaster(ParametricModel):
         return evaluation_score
 
 
-    def _apply(self, data_time_slot_series, n=1, inplace=False):
+    def _apply(self, timeseries, n=1, inplace=False):
 
         # TODO: refacotr to use the predict below
 
-        if len(data_time_slot_series.data_keys()) > 1:
+        if len(timeseries.data_keys()) > 1:
             raise NotImplementedError('Multivariate time series are not yet supported')
  
-        if len(data_time_slot_series) < self.data['window']:
-            raise ValueError('The data_time_slot_series length ({}) is shorter than the model window ({}), it must be at least equal.'.format(len(data_time_slot_series), self.data['window']))
+        if len(timeseries) < self.data['window']:
+            raise ValueError('The timeseries length ({}) is shorter than the model window ({}), it must be at least equal.'.format(len(timeseries), self.data['window']))
  
         if inplace:
-            forecast_data_time_slot_series = data_time_slot_series
+            forecast_timeseries = timeseries
         else:
-            forecast_data_time_slot_series = data_time_slot_series.duplicate()
+            forecast_timeseries = timeseries.duplicate()
         
-        for key in forecast_data_time_slot_series.data_keys():
+        for key in forecast_timeseries.data_keys():
 
             # Support var
             first_call = True
 
             for _ in range(n):
                 
-                # Compute start/end for the slot to be forecasted
-                if isinstance(forecast_data_time_slot_series.resolution, TimeUnit):
-                    this_slot_start_dt = forecast_data_time_slot_series[-1].dt + forecast_data_time_slot_series.resolution
-                    this_slot_end_dt   =  this_slot_start_dt + forecast_data_time_slot_series.resolution
-                    this_slot_start_t  = s_from_dt(this_slot_start_dt) 
-                    this_slot_end_t    = s_from_dt(this_slot_end_dt)
+                # Compute start/end for the item to be forecasted
+                if isinstance(forecast_timeseries.resolution, TimeUnit):
+                    this_item_start_dt = forecast_timeseries[-1].dt + forecast_timeseries.resolution
+                    this_item_end_dt   =  this_item_start_dt + forecast_timeseries.resolution
+                    this_item_start_t  = s_from_dt(this_item_start_dt) 
+                    this_item_end_t    = s_from_dt(this_item_end_dt)
                 else:
-                    this_slot_start_t = forecast_data_time_slot_series[-1].t + forecast_data_time_slot_series.resolution
-                    this_slot_end_t   = this_slot_start_t + forecast_data_time_slot_series.resolution
-                    this_slot_start_dt = dt_from_s(this_slot_start_t, tz=forecast_data_time_slot_series.tz)
-                    this_slot_end_dt = dt_from_s(this_slot_end_t, tz=forecast_data_time_slot_series.tz )                    
+                    this_item_start_t = forecast_timeseries[-1].t + forecast_timeseries.resolution
+                    this_item_end_t   = this_item_start_t + forecast_timeseries.resolution
+                    this_item_start_dt = dt_from_s(this_item_start_t, tz=forecast_timeseries.tz)
+                    this_item_end_dt = dt_from_s(this_item_end_t, tz=forecast_timeseries.tz )                    
 
                 # Set time zone
-                tz = forecast_data_time_slot_series[-1].tz
+                tz = forecast_timeseries[-1].tz
                 
                 # Define TimePoints
-                this_slot_start_timePoint = TimePoint(this_slot_start_t, tz=tz)
-                this_slot_end_timePoint = TimePoint(this_slot_end_t, tz=tz)
+                this_item_start_timePoint = TimePoint(this_item_start_t, tz=tz)
+                this_item_end_timePoint = TimePoint(this_item_end_t, tz=tz)
 
                 # Call model forecasting logic
-                forecast_model_results = self._forecast(forecast_data_time_slot_series, data_time_slot_series.resolution, key, this_slot_start_timePoint, this_slot_end_timePoint, first_call, n=n)
+                forecast_model_results = self._forecast(forecast_timeseries, timeseries.resolution, key, this_item_start_timePoint, this_item_end_timePoint, first_call, n=n)
 
                 if isinstance(forecast_model_results, list):
-                    for forecasted_data_time_slot in forecast_model_results:
+                    for forecasted_item in forecast_model_results:
                     
                         # Add the forecast to the forecasts time series
-                        forecast_data_time_slot_series.append(forecasted_data_time_slot)
+                        forecast_timeseries.append(forecasted_item)
                     
                     # We are done
                     break
@@ -952,8 +952,8 @@ class Forecaster(ParametricModel):
                 else:
                 
                     # Add the forecast to the forecasts time series
-                    forecasted_data_time_slot = forecast_model_results
-                    forecast_data_time_slot_series.append(forecasted_data_time_slot)
+                    forecasted_item = forecast_model_results
+                    forecast_timeseries.append(forecasted_item)
                     
                 # Set fist call to false if this was the first call
                 if first_call:
@@ -961,46 +961,46 @@ class Forecaster(ParametricModel):
 
         # Set serie mark for the forecast and return
         try:
-            # Handle slots
-            forecast_data_time_slot_series.mark = [forecast_data_time_slot_series[-n].dt, forecast_data_time_slot_series[-1].end.dt]
+            # Handle items
+            forecast_timeseries.mark = [forecast_timeseries[-n].dt, forecast_timeseries[-1].end.dt]
         except AttributeError:
             # Handle points TODO: should be dt-(resolution/2) and dt+(resolution/2)
-            forecast_data_time_slot_series.mark = [forecast_data_time_slot_series[-n].dt, forecast_data_time_slot_series[-1].dt]
+            forecast_timeseries.mark = [forecast_timeseries[-n].dt, forecast_timeseries[-1].dt]
                 
         if not inplace:
-            return forecast_data_time_slot_series
+            return forecast_timeseries
         else:
             return None
 
 
-    def _predict(self, data_time_slot_series, n=1):
+    def _predict(self, timeseries, n=1):
         
         # TODO: this is highly inefficient, fix me!
-        forecast_data_time_slot_series = data_time_slot_series.__class__(*self.apply(data_time_slot_series, inplace=False, n=n)[len(data_time_slot_series):])
+        forecast_timeseries = timeseries.__class__(*self.apply(timeseries, inplace=False, n=n)[len(timeseries):])
 
-        return forecast_data_time_slot_series
+        return forecast_timeseries
 
 
 
 class PeriodicAverageForecaster(Forecaster):
         
-    def _fit(self, data_time_slot_series, window=None, periodicity=None, dst_affected=False, from_t=None, to_t=None, from_dt=None, to_dt=None):
+    def _fit(self, timeseries, window=None, periodicity=None, dst_affected=False, from_t=None, to_t=None, from_dt=None, to_dt=None):
 
-        if len(data_time_slot_series.data_keys()) > 1:
+        if len(timeseries.data_keys()) > 1:
             raise NotImplementedError('Multivariate time series are not yet supported')
 
         from_t, to_t = set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
 
         # Set or detect periodicity
         if periodicity is None:        
-            periodicity =  get_periodicity(data_time_slot_series)
+            periodicity =  get_periodicity(timeseries)
             try:
-                if isinstance(data_time_slot_series.resolution, TimeUnit):
-                    logger.info('Detected periodicity: %sx %s', periodicity, data_time_slot_series.resolution)
+                if isinstance(timeseries.resolution, TimeUnit):
+                    logger.info('Detected periodicity: %sx %s', periodicity, timeseries.resolution)
                 else:
-                    logger.info('Detected periodicity: %sx %ss', periodicity, data_time_slot_series.resolution)
+                    logger.info('Detected periodicity: %sx %ss', periodicity, timeseries.resolution)
             except AttributeError:
-                logger.info('Detected periodicity: %sx %ss', periodicity, data_time_slot_series.resolution)
+                logger.info('Detected periodicity: %sx %ss', periodicity, timeseries.resolution)
                 
         self.data['periodicity']  = periodicity
         self.data['dst_affected'] = dst_affected
@@ -1012,26 +1012,26 @@ class PeriodicAverageForecaster(Forecaster):
             logger.info('Using a window of "{}"'.format(periodicity))
             self.data['window'] = periodicity
 
-        for key in data_time_slot_series.data_keys():
+        for key in timeseries.data_keys():
             sums   = {}
             totals = {}
             processed = 0
-            for data_time_slot in data_time_slot_series:
+            for item in timeseries:
 
                 # Skip if needed
                 try:
-                    if not slot_is_in_range(data_time_slot, from_t, to_t):
+                    if not item_is_in_range(item, from_t, to_t):
                         continue                  
                 except StopIteration:
                     break
                 
                 # Process
-                periodicity_index = get_periodicity_index(data_time_slot, data_time_slot_series.resolution, periodicity, dst_affected)
+                periodicity_index = get_periodicity_index(item, timeseries.resolution, periodicity, dst_affected)
                 if not periodicity_index in sums:
-                    sums[periodicity_index] = data_time_slot.data[key]
+                    sums[periodicity_index] = item.data[key]
                     totals[periodicity_index] = 1
                 else:
-                    sums[periodicity_index] += data_time_slot.data[key]
+                    sums[periodicity_index] += item.data[key]
                     totals[periodicity_index] +=1
                 processed += 1
 
@@ -1040,10 +1040,10 @@ class PeriodicAverageForecaster(Forecaster):
             averages[periodicity_index] = sums[periodicity_index]/totals[periodicity_index]
         self.data['averages'] = averages
         
-        #logger.info('Processed "{}" slots'.format(processed))
+        #logger.info('Processed "{}" items'.format(processed))
 
 
-    def _forecast(self, forecast_data_time_slot_series, resolution, key, this_slot_start_timePoint, this_slot_end_timePoint, first_call, n, window_start=None, raw=False) : #, data_time_slot_series, key, from_index, to_index):
+    def _forecast(self, forecast_timeseries, resolution, key, this_item_start_timePoint, this_item_end_timePoint, first_call, n, window_start=None, raw=False) : #, timeseries, key, from_index, to_index):
 
         # Compute the offset (avg diff between the real values and the forecasts on the first window)
         try:
@@ -1058,14 +1058,14 @@ class PeriodicAverageForecaster(Forecaster):
             if window_start is not None:
                 for j in range(self.data['window']):
                     serie_index = window_start + j
-                    real_value = forecast_data_time_slot_series[serie_index].data[key]
-                    forecast_value = self.data['averages'][get_periodicity_index(forecast_data_time_slot_series[serie_index], forecast_data_time_slot_series.resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])]
+                    real_value = forecast_timeseries[serie_index].data[key]
+                    forecast_value = self.data['averages'][get_periodicity_index(forecast_timeseries[serie_index], forecast_timeseries.resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])]
                     diffs += (real_value - forecast_value)            
             else:
                 for j in range(self.data['window']):
                     serie_index = -(self.data['window']-j)
-                    real_value = forecast_data_time_slot_series[serie_index].data[key]
-                    forecast_value = self.data['averages'][get_periodicity_index(forecast_data_time_slot_series[serie_index], forecast_data_time_slot_series.resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])]
+                    real_value = forecast_timeseries[serie_index].data[key]
+                    forecast_value = self.data['averages'][get_periodicity_index(forecast_timeseries[serie_index], forecast_timeseries.resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])]
                     diffs += (real_value - forecast_value)
        
             # Sum the avg diff between the real and the forecast on the window to the forecast (the offset)
@@ -1076,34 +1076,34 @@ class PeriodicAverageForecaster(Forecaster):
             offset = self.offsets[key] 
         
         # Compute and add the real forecast data
-        periodicity_index = get_periodicity_index(this_slot_start_timePoint, resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])        
+        periodicity_index = get_periodicity_index(this_item_start_timePoint, resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])        
         forecast_data = {key: self.data['averages'][periodicity_index] + (offset*1.0)}
         
         if raw:
             return forecast_data
         else:
-            if isinstance(forecast_data_time_slot_series[0], Slot):
-                forecasted_data_time_slot = DataTimeSlot(start = this_slot_start_timePoint,
-                                                         end   = this_slot_end_timePoint,
-                                                         unit  = forecast_data_time_slot_series.resolution,
+            if isinstance(forecast_timeseries[0], Slot):
+                forecasted_item = DataTimeSlot(start = this_item_start_timePoint,
+                                                         end   = this_item_end_timePoint,
+                                                         unit  = forecast_timeseries.resolution,
                                                          coverage = None,
                                                          data  = forecast_data)
             else:
-                forecasted_data_time_slot = DataTimePoint(t = this_slot_start_timePoint.t,
-                                                          tz = this_slot_start_timePoint.tz,
+                forecasted_item = DataTimePoint(t = this_item_start_timePoint.t,
+                                                          tz = this_item_start_timePoint.tz,
                                                           data  = forecast_data)                
 
-            return forecasted_data_time_slot
+            return forecasted_item
     
 
-    def _plot_averages(self, data_time_slot_series, **kwargs):      
-        averages_data_time_slot_series = copy.deepcopy(data_time_slot_series)
-        for data_time_slot in averages_data_time_slot_series:
-            value = self.data['averages'][get_periodicity_index(data_time_slot, averages_data_time_slot_series.resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])]
+    def _plot_averages(self, timeseries, **kwargs):      
+        averages_timeseries = copy.deepcopy(timeseries)
+        for item in averages_timeseries:
+            value = self.data['averages'][get_periodicity_index(item, averages_timeseries.resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])]
             if not value:
                 value = 0
-            data_time_slot.data['average'] =value 
-        averages_data_time_slot_series.plot(**kwargs)
+            item.data['average'] =value 
+        averages_timeseries.plot(**kwargs)
 
 
 
@@ -1118,16 +1118,16 @@ Prophet is robust to missing data and shifts in the trend, and typically handles
 '''
 
 
-    def _fit(self, data_time_slot_series, window=None, periodicity=None, dst_affected=False, from_t=None, to_t=None, from_dt=None, to_dt=None):
+    def _fit(self, timeseries, window=None, periodicity=None, dst_affected=False, from_t=None, to_t=None, from_dt=None, to_dt=None):
 
         from fbprophet import Prophet
 
-        if len(data_time_slot_series.data_keys()) > 1:
+        if len(timeseries.data_keys()) > 1:
             raise NotImplementedError('Multivariate time series are not yet supported')
 
         from_t, to_t = set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
 
-        data = self.from_timeseria_to_prophet(data_time_slot_series, from_t=from_t, to_t=to_t)
+        data = self.from_timeseria_to_prophet(timeseries, from_t=from_t, to_t=to_t)
 
         # Instantiate the Prophet model
         self.prophet_model = Prophet()
@@ -1136,20 +1136,20 @@ Prophet is robust to missing data and shifts in the trend, and typically handles
         self.prophet_model.fit(data)
         
         if not window:
-            logger.info('Defaulting to a window of 10 slots for forecasting')
+            logger.info('Defaulting to a window of 10 items for forecasting')
             self.data['window'] = 10
 
 
-    def _forecast(self, forecast_data_time_slot_series, resolution, key, this_slot_start_timePoint, this_slot_end_timePoint, first_call, n, multi=True) : #, data_time_slot_series, key, from_index, to_index):
+    def _forecast(self, forecast_timeseries, resolution, key, this_item_start_timePoint, this_item_end_timePoint, first_call, n, multi=True) : #, timeseries, key, from_index, to_index):
 
-        resolution = forecast_data_time_slot_series.resolution
+        resolution = forecast_timeseries.resolution
 
         if not multi:
 
             if isinstance (resolution, TimeUnit):
-                data_to_forecast = [self.remove_timezone( forecast_data_time_slot_series[-1].dt + forecast_data_time_slot_series[-1].unit)]
+                data_to_forecast = [self.remove_timezone( forecast_timeseries[-1].dt + forecast_timeseries[-1].unit)]
             else:
-                data_to_forecast = [self.remove_timezone(dt_from_s(forecast_data_time_slot_series[-1].t + forecast_data_time_slot_series[-1].unit.value))]
+                data_to_forecast = [self.remove_timezone(dt_from_s(forecast_timeseries[-1].t + forecast_timeseries[-1].unit.value))]
             
             dataframe_to_forecast = DataFrame(data_to_forecast, columns = ['ds'])
             
@@ -1158,66 +1158,66 @@ Prophet is robust to missing data and shifts in the trend, and typically handles
 
 
             # Compute and add the real forecast data
-            if isinstance(forecast_data_time_slot_series[0], Slot):
-                forecasted_data_time_slot = DataTimeSlot(start = this_slot_start_timePoint,
+            if isinstance(forecast_timeseries[0], Slot):
+                forecasted_item = DataTimeSlot(start = this_item_start_timePoint,
                                                          unit  = resolution,
                                                          coverage = None,
                                                          data  = {key: float(forecast['yhat'])})
             else:
-                forecasted_data_time_slot = DataTimePoint(dt = this_slot_start_timePoint.dt,
-                                                          tz = this_slot_start_timePoint.tz,
+                forecasted_item = DataTimePoint(dt = this_item_start_timePoint.dt,
+                                                          tz = this_item_start_timePoint.tz,
                                                           data  = {key: float(forecast['yhat'])})
 
-            return forecasted_data_time_slot
+            return forecasted_item
         
         else:
-            last_slot    = forecast_data_time_slot_series[-1]
-            last_slot_t  = last_slot.t
-            last_slot_dt = last_slot.dt
+            last_item    = forecast_timeseries[-1]
+            last_item_t  = last_item.t
+            last_item_dt = last_item.dt
             forecast_timestamps = []
             data_to_forecast = []
             
-            # Prepare a dataframe wiht all the slots to forecast
+            # Prepare a dataframe wiht all the items to forecast
             for _ in range(n):
                 if isinstance (resolution, TimeUnit):
-                    new_slot_dt = last_slot_dt + resolution
-                    data_to_forecast.append(self.remove_timezone(new_slot_dt))
-                    last_slot_dt = new_slot_dt
-                    forecast_timestamps.append(new_slot_dt)
+                    new_item_dt = last_item_dt + resolution
+                    data_to_forecast.append(self.remove_timezone(new_item_dt))
+                    last_item_dt = new_item_dt
+                    forecast_timestamps.append(new_item_dt)
                 else:
-                    new_slot_t = last_slot_t + resolution.value
-                    new_slot_dt = dt_from_s(new_slot_t, tz=forecast_data_time_slot_series.tz)
-                    data_to_forecast.append(self.remove_timezone(new_slot_dt))
-                    last_slot_t = new_slot_t
-                    forecast_timestamps.append(new_slot_dt)
+                    new_item_t = last_item_t + resolution.value
+                    new_item_dt = dt_from_s(new_item_t, tz=forecast_timeseries.tz)
+                    data_to_forecast.append(self.remove_timezone(new_item_dt))
+                    last_item_t = new_item_t
+                    forecast_timestamps.append(new_item_dt)
                     
             dataframe_to_forecast = DataFrame(data_to_forecast, columns = ['ds'])
                          
             forecast = self.prophet_model.predict(dataframe_to_forecast)
             #forecast[['ds', 'yhat', 'yhat_lower', 'yhat_upper']].tail()
         
-            forecasted_data_time_slots = []
+            forecasted_items = []
         
-            # Re convert to slots
+            # Re convert to items
             for i in range(n):
 
                 # Compute and add the real forecast data
-                if isinstance(forecast_data_time_slot_series[0], Slot):
-                    forecasted_data_time_slot = DataTimeSlot(start = TimePoint(dt=forecast_timestamps[i]),
+                if isinstance(forecast_timeseries[0], Slot):
+                    forecasted_item = DataTimeSlot(start = TimePoint(dt=forecast_timestamps[i]),
                                                              unit  = resolution,
                                                              coverage = None,
                                                              data  = {key: float(forecast['yhat'][i])})
                 else:
-                    forecasted_data_time_slot = DataTimePoint(dt = forecast_timestamps[i],
-                                                              tz = this_slot_start_timePoint.tz,
+                    forecasted_item = DataTimePoint(dt = forecast_timestamps[i],
+                                                              tz = this_item_start_timePoint.tz,
                                                               data  = {key: float(forecast['yhat'][i])})     
                 
                 
                 
-                forecasted_data_time_slots.append(forecasted_data_time_slot)
+                forecasted_items.append(forecasted_item)
                 
         
-            return forecasted_data_time_slots      
+            return forecasted_items      
 
 
 
@@ -1235,34 +1235,34 @@ class PeriodicAverageAnomalyDetector(AnomalyDetector):
         super(PeriodicAverageAnomalyDetector, self).__init__()
 
 
-    def __get_actual_and_predicted(self, data_time_slot_series, i, key, forecaster_window):
+    def __get_actual_and_predicted(self, timeseries, i, key, forecaster_window):
 
-        # Compute start/end for the slot to be forecasted
-        if isinstance(data_time_slot_series.resolution, TimeUnit):
-            this_slot_start_dt = data_time_slot_series[i-1].dt + data_time_slot_series.resolution
-            this_slot_end_dt   =  this_slot_start_dt + data_time_slot_series.resolution
-            this_slot_start_t  = s_from_dt(this_slot_start_dt) 
-            this_slot_end_t    = s_from_dt(this_slot_end_dt)
+        # Compute start/end for the item to be forecasted
+        if isinstance(timeseries.resolution, TimeUnit):
+            this_item_start_dt = timeseries[i-1].dt + timeseries.resolution
+            this_item_end_dt   =  this_item_start_dt + timeseries.resolution
+            this_item_start_t  = s_from_dt(this_item_start_dt) 
+            this_item_end_t    = s_from_dt(this_item_end_dt)
         else:
-            this_slot_start_t = data_time_slot_series[i-1].t + data_time_slot_series.resolution
-            this_slot_end_t   = this_slot_start_t + data_time_slot_series.resolution
-            this_slot_start_dt = dt_from_s(this_slot_start_t, tz=data_time_slot_series.tz)
-            this_slot_end_dt = dt_from_s(this_slot_end_t, tz=data_time_slot_series.tz )                    
+            this_item_start_t = timeseries[i-1].t + timeseries.resolution
+            this_item_end_t   = this_item_start_t + timeseries.resolution
+            this_item_start_dt = dt_from_s(this_item_start_t, tz=timeseries.tz)
+            this_item_end_dt = dt_from_s(this_item_end_t, tz=timeseries.tz )                    
 
         # Set time zone
-        tz = data_time_slot_series[i-1].tz
+        tz = timeseries[i-1].tz
         
         # Define TimePoints
-        this_slot_start_timePoint = TimePoint(this_slot_start_t, tz=tz)
-        this_slot_end_timePoint = TimePoint(this_slot_end_t, tz=tz)
+        this_item_start_timePoint = TimePoint(this_item_start_t, tz=tz)
+        this_item_end_timePoint = TimePoint(this_item_end_t, tz=tz)
 
         # Call model forecasting logic
-        actual    = data_time_slot_series[i].data[key]
-        predicted = self.forecaster._forecast(data_time_slot_series,
-                                              data_time_slot_series.resolution,
+        actual    = timeseries[i].data[key]
+        predicted = self.forecaster._forecast(timeseries,
+                                              timeseries.resolution,
                                               key,
-                                              this_slot_start_timePoint,
-                                              this_slot_end_timePoint,
+                                              this_item_start_timePoint,
+                                              this_item_end_timePoint,
                                               first_call=True,
                                               n=1,
                                               window_start = i-forecaster_window-1,
@@ -1272,9 +1272,9 @@ class PeriodicAverageAnomalyDetector(AnomalyDetector):
 
 
 
-    def _fit(self, data_time_slot_series, *args, stdevs=3, **kwargs):
+    def _fit(self, timeseries, *args, stdevs=3, **kwargs):
 
-        if len(data_time_slot_series.data_keys()) > 1:
+        if len(timeseries.data_keys()) > 1:
             raise NotImplementedError('Multivariate time series are not yet supported')
         
     
@@ -1282,21 +1282,21 @@ class PeriodicAverageAnomalyDetector(AnomalyDetector):
         forecaster = PeriodicAverageForecaster()
         
         # Fit and save
-        forecaster.fit(data_time_slot_series, *args, **kwargs)
+        forecaster.fit(timeseries, *args, **kwargs)
         self.forecaster = forecaster
         
         # Evaluate the forecaster for one step ahead and get AEs
         AEs = []
-        for key in data_time_slot_series.data_keys():
+        for key in timeseries.data_keys():
             
-            for i, _ in enumerate(data_time_slot_series):
+            for i, _ in enumerate(timeseries):
                 
                 forecaster_window = self.forecaster.data['window']
                 
                 if i <=  forecaster_window:    
                     continue
                 
-                actual, predicted = self.__get_actual_and_predicted(data_time_slot_series, i, key, forecaster_window)
+                actual, predicted = self.__get_actual_and_predicted(timeseries, i, key, forecaster_window)
                 
                 AEs.append(abs(actual-predicted))
 
@@ -1309,44 +1309,44 @@ class PeriodicAverageAnomalyDetector(AnomalyDetector):
         self.AE_threshold = stdev*stdevs
 
 
-    def _apply(self, data_time_slot_series, inplace=False, details=False, logs=False):
+    def _apply(self, timeseries, inplace=False, details=False, logs=False):
         
         if inplace:
             raise Exception('Anomaly detection cannot be run inplace')
 
-        if len(data_time_slot_series.data_keys()) > 1:
+        if len(timeseries.data_keys()) > 1:
             raise NotImplementedError('Multivariate time series are not yet supported')
         
-        result_time_series = data_time_slot_series.__class__()
+        result_timeseries = timeseries.__class__()
 
-        for key in data_time_slot_series.data_keys():
+        for key in timeseries.data_keys():
             
-            for i, slot in enumerate(data_time_slot_series):
+            for i, item in enumerate(timeseries):
                 forecaster_window = self.forecaster.data['window']
                 if i <=  forecaster_window:    
                     continue
                 
-                actual, predicted = self.__get_actual_and_predicted(data_time_slot_series, i, key, forecaster_window)
+                actual, predicted = self.__get_actual_and_predicted(timeseries, i, key, forecaster_window)
 
                 AE = abs(actual-predicted)
                 
-                slot = deepcopy(slot)
+                item = deepcopy(item)
                 if AE > self.AE_threshold:
                     if logs:
-                        logger.info('Detected anomaly for slot starting @ {} ({}) with AE="{:.3f}..."'.format(slot.t, slot.dt, AE))
-                    slot.data['anomaly'.format(key)] = 1
+                        logger.info('Detected anomaly for item starting @ {} ({}) with AE="{:.3f}..."'.format(item.t, item.dt, AE))
+                    item.data['anomaly'.format(key)] = 1
                     if details:
-                        slot.data['AE_{}'.format(key)] = AE
-                        slot.data['predicted_{}'.format(key)] = predicted
+                        item.data['AE_{}'.format(key)] = AE
+                        item.data['predicted_{}'.format(key)] = predicted
                 else:
-                    slot.data['anomaly'.format(key)] = 0
+                    item.data['anomaly'.format(key)] = 0
                     if details:
-                        slot.data['AE_{}'.format(key)] = AE
-                        slot.data['predicted_{}'.format(key)] = predicted
+                        item.data['AE_{}'.format(key)] = AE
+                        item.data['predicted_{}'.format(key)] = predicted
 
-                result_time_series.append(slot)
+                result_timeseries.append(item)
         
-        return result_time_series 
+        return result_timeseries 
 
 
 
