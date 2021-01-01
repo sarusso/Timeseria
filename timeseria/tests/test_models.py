@@ -157,16 +157,16 @@ class TestReconstructors(unittest.TestCase):
         self.assertAlmostEqual(cross_validation['MAE_3_steps_stdev'], 0.047895485925726636)
 
         # Test on Points as well
-#         data_time_point_series = CSVFileStorage(TEST_DATA_PATH + '/csv/temperature.csv').get(limit=200)
-#         periodic_average_reconstructor = PeriodicAverageReconstructor()
-#         with self.assertRaises(Exception):
-#             periodic_average_reconstructor.fit(data_time_point_series)
-#         
-#         data_time_point_series = Resampler(600).process(data_time_point_series)
-#         periodic_average_reconstructor.fit(data_time_point_series)
-#         
-#         # TODO: do some actual testing.. not only that "it works"
-#         reconstructed_data_time_point_series  = periodic_average_reconstructor.apply(data_time_point_series)
+        data_time_point_series = CSVFileStorage(TEST_DATA_PATH + '/csv/temperature.csv').get(limit=200)
+        periodic_average_reconstructor = PeriodicAverageReconstructor()
+        with self.assertRaises(Exception):
+            periodic_average_reconstructor.fit(data_time_point_series)
+         
+        data_time_point_series = Resampler(600).process(data_time_point_series)
+        periodic_average_reconstructor.fit(data_time_point_series)
+         
+        # TODO: do some actual testing.. not only that "it works"
+        reconstructed_data_time_point_series  = periodic_average_reconstructor.apply(data_time_point_series)
         
 
     def test_ProphetReconstructor(self):
@@ -253,17 +253,17 @@ class TestForecasters(unittest.TestCase):
         evaluation = forecaster.evaluate(self.sine_data_time_slot_series_minute, steps=[1,3], samples=100, details=True)
         self.assertAlmostEqual(evaluation['RMSE_1_steps'], 0.36033834603736264)
 
-#         # Test on Points as well
-#         data_time_point_series = CSVFileStorage(TEST_DATA_PATH + '/csv/temperature.csv').get(limit=200)
-#         forecaster = PeriodicAverageForecaster()
-#         with self.assertRaises(Exception):
-#             forecaster.fit(data_time_point_series)
-#          
-#         data_time_point_series = Resampler(600).process(data_time_point_series)
-#         forecaster.fit(data_time_point_series)
-#          
-#         # TODO: do some actual tetsing.. not only that "it works"
-#         forecasted_data_time_point_series  = forecaster.apply(data_time_point_series)
+        # Test on Points as well
+        data_time_point_series = CSVFileStorage(TEST_DATA_PATH + '/csv/temperature.csv').get(limit=200)
+        forecaster = PeriodicAverageForecaster()
+        with self.assertRaises(Exception):
+            forecaster.fit(data_time_point_series)
+          
+        data_time_point_series = Resampler(600).process(data_time_point_series)
+        forecaster.fit(data_time_point_series)
+          
+        # TODO: do some actual tetsing.. not only that "it works"
+        forecasted_data_time_point_series  = forecaster.apply(data_time_point_series)
         
 
 
@@ -318,8 +318,17 @@ class TestAnomalyDetectors(unittest.TestCase):
         self.assertEqual(anomalies_count, 9)
 
 
-
-
+        # Test on Points as well
+        data_time_point_series = CSVFileStorage(TEST_DATA_PATH + '/csv/temperature.csv').get(limit=200)
+        anomaly_detector = PeriodicAverageAnomalyDetector()
+        with self.assertRaises(Exception):
+            anomaly_detector.fit(data_time_point_series)
+          
+        data_time_point_series = Resampler(600).process(data_time_point_series)
+        anomaly_detector.fit(data_time_point_series)
+          
+        # TODO: do some actual tetsing.. not only that "it works"
+        anomaly_data_time_point_series  = anomaly_detector.apply(data_time_point_series)
 
 
     
