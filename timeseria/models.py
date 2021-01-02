@@ -1089,7 +1089,7 @@ class PeriodicAverageForecaster(Forecaster):
                     forecast_timestamps.append(forecast_timestamp)
 
             else:
-                forecast_timestamp = TimePoint(t = forecast_start_item.t + (timeseries.resolution*step))
+                forecast_timestamp = TimePoint(t = forecast_start_item.t + (timeseries.resolution*step), tz=forecast_start_item.tz)
     
             # Compute the offset (avg diff between the real values and the forecasts on the first window)
             try:
