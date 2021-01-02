@@ -18,9 +18,6 @@ RUN pip3 install -r /tmp/requirements.txt
 # Install Jupyter
 RUN pip3 install notebook==5.7.10
 
-# Install Plotly (or Prophet will complain with an ERROR log message)
-RUN pip3 install plotly==4.9.0
-
 # Add code
 #COPY ./ /opt/Timeseria
 
