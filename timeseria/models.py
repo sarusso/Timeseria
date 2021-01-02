@@ -26,14 +26,6 @@ HARD_DEBUG = False
 #  Utility functions
 #======================
 
-#def mean_absolute_error(list1, list2):
-#    if len(list1) != len(list2):
-#        raise ValueError('Lists have different lengths, cannot continue')
-#    error_sum = 0
-#    for i in range(len(list1)):
-#        error_sum += abs(list1[i] - list2[i])
-#    return error_sum/len(list1)
-
 def mean_absolute_percentage_error(list1, list2):
     '''Computes the MAPE, list 1 are true values, list2 arepredicted values'''
     if len(list1) != len(list2):
@@ -44,7 +36,7 @@ def mean_absolute_percentage_error(list1, list2):
     return p_error_sum/len(list1)
 
 
-def get_periodicity_index(time_point, resolution, periodicity, dst_affected=False):
+def get_periodicity_index(item, resolution, periodicity, dst_affected=False):
 
     # Handle specific cases
     if isinstance(resolution, TimeUnit):  
@@ -70,22 +62,19 @@ def get_periodicity_index(time_point, resolution, periodicity, dst_affected=Fals
     # Compute periodicity index
     if not dst_affected:
     
-        # Get index based on item start, normalized to unit, modulus periodicity
-        t = time_point.t
-        periodicity_index =  int(t / resolution_s) % periodicity
+        # Get index based on item timestamp, normalized to unit, modulus periodicity
+        periodicity_index =  int(item.t / resolution_s) % periodicity
     
     else:
 
         # Get periodicity based on the datetime
-        t  = time_point.t
-        dt = time_point.dt
         
         # Do we have an active DST?  
-        dst_timedelta = dt.dst()
+        dst_timedelta = item.dt.dst()
         
         if dst_timedelta.days == 0 and dst_timedelta.seconds == 0:
             # No DST
-            periodicity_index = int(t / resolution_s) % periodicity
+            periodicity_index = int(item.t / resolution_s) % periodicity
         
         else:
             # DST
@@ -98,14 +87,8 @@ def get_periodicity_index(time_point, resolution, periodicity, dst_affected=Fals
             # Get DST offset in seconds 
             dst_offset_s = dst_timedelta.seconds # 3600 usually
 
-            # Compute periodicity in seconds (example: 144 10-minute items) 
-            #periodicity_s = periodicity * resolution_s
-            
-            # Get DST offset "items"
-            #dst_offset_items = int(dst_offset_s / resolution_s) # For ten-minutes item is 6               
-            #periodicity_index = (int(t / resolution_s) % periodicity) #+ dst_offset_items
-            
-            periodicity_index = (int((t + dst_offset_s) / resolution_s) % periodicity)
+            # Compute the periodicity index
+            periodicity_index = (int((item.t + dst_offset_s) / resolution_s) % periodicity)
 
     return periodicity_index
 
@@ -115,9 +98,6 @@ def get_periodicity_index(time_point, resolution, periodicity, dst_affected=Fals
 #  Base classes
 #======================
 
-#class EvaluationScore(object):
-#    '''Class to incapsulate a model score after an evaluation_score'''
-#    pass
 
 class Model(object):
     '''A stateless model, or a white-box model. Exposes only predict(), apply() and evaluate() methods,
@@ -242,7 +222,7 @@ and optionally a fit() method if the parameters are to be learnt form data.'''
 
         
     def save(self, path):
-        # TODO: dump and enforce the TimeUnit as well?
+        # TODO: dump and enforce the resolution as well?
         if not self.fitted:
             raise NotFittedError()
         model_dir = '{}/{}'.format(path, self.data['id'])
@@ -370,7 +350,7 @@ class Reconstructor(ParametricModel):
                 if from_t is not None and timeseries[i].t < from_t:
                     continue
                 try:
-                    # Handle items
+                    # Handle slots
                     if to_t is not None and timeseries[i].end.t > to_t:
                         break
                 except AttributeError:
@@ -566,7 +546,7 @@ class Reconstructor(ParametricModel):
 class PeriodicAverageReconstructor(Reconstructor):
 
 
-    def _fit(self, timeseries, data_loss_threshold=0.5, periodicity=None, dst_affected=False, timezone_affected=False, from_t=None, to_t=None, from_dt=None, to_dt=None, offset_method='average'):
+    def _fit(self, timeseries, data_loss_threshold=0.5, periodicity=None, dst_affected=False, from_t=None, to_t=None, from_dt=None, to_dt=None, offset_method='average'):
 
         if not offset_method in ['average', 'extremes']:
             raise Exception('Unknown offset method "{}"'.format(self.offset_method))
@@ -590,9 +570,7 @@ class PeriodicAverageReconstructor(Reconstructor):
                 
         self.data['periodicity']  = periodicity
         self.data['dst_affected'] = dst_affected 
-        
-        # logger.info('dst_affected: {}'.format(dst_affected))
-        
+                
         for key in timeseries.data_keys():
             sums   = {}
             totals = {}
@@ -621,8 +599,8 @@ class PeriodicAverageReconstructor(Reconstructor):
         for periodicity_index in sums:
             averages[periodicity_index] = sums[periodicity_index]/totals[periodicity_index]
         self.data['averages'] = averages
-
-        # logger.info('Processed "{}" items'.format(processed))
+        
+        logger.debug('Processed "%s" items', processed)
 
 
     def _reconstruct(self, timeseries, key, from_index, to_index):
@@ -746,7 +724,7 @@ class ProphetReconstructor(Reconstructor, ProphetModel):
         forecast = self.prophet_model.predict(dataframe_to_reconstruct)
         #forecast[['ds', 'yhat', 'yhat_lower', 'yhat_upper']].tail()
 
-        # Ok, replace the values withe the reconsturcted ones
+        # Ok, replace the values with the reconsturcted ones
         for i, j in enumerate(range(from_index, to_index)):
             #logger.debug('Reconstructing item #{} with reconstucted item #{}'.format(j,i))
             item_to_reconstruct = timeseries[j]
@@ -805,15 +783,15 @@ class Forecaster(ParametricModel):
                         continue
 
                     # Compute the various boundaries
-                    original_serie_boundaries_start = i - (self.data['window']) - steps_round
-                    original_serie_boundaries_end = i
+                    original_timeseries_boundaries_start = i - (self.data['window']) - steps_round
+                    original_timeseries_boundaries_end = i
                     
-                    original_forecast_serie_boundaries_start = original_serie_boundaries_start
-                    original_forecast_serie_boundaries_end = original_serie_boundaries_end-steps_round
+                    original_forecast_timeseries_boundaries_start = original_timeseries_boundaries_start
+                    original_forecast_timeseries_boundaries_end = original_timeseries_boundaries_end-steps_round
                     
-                    # Create the time series where to apply the forecast on
+                    # Create the time series where to apply the forecast
                     forecast_timeseries = timeseries.__class__()
-                    for j in range(original_forecast_serie_boundaries_start, original_forecast_serie_boundaries_end):
+                    for j in range(original_forecast_timeseries_boundaries_start, original_forecast_timeseries_boundaries_end):
                         forecast_timeseries.append(timeseries[j])
  
                     # Apply the forecasting model
@@ -825,7 +803,7 @@ class Forecaster(ParametricModel):
                     
                     # Compare each forecast with the original value
                     for step in range(steps_round):
-                        original_index = original_serie_boundaries_start + self.data['window'] + step
+                        original_index = original_timeseries_boundaries_start + self.data['window'] + step
 
                         forecast_index = self.data['window'] + step
 
@@ -898,13 +876,15 @@ class Forecaster(ParametricModel):
 
     def _apply(self, timeseries, n=1, inplace=False):
 
-        # TODO: refacotr to use the predict below
-
         if len(timeseries.data_keys()) > 1:
             raise NotImplementedError('Multivariate time series are not yet supported')
  
-        if len(timeseries) < self.data['window']:
-            raise ValueError('The timeseries length ({}) is shorter than the model window ({}), it must be at least equal.'.format(len(timeseries), self.data['window']))
+        try:
+            if len(timeseries) < self.data['window']:
+                raise ValueError('The timeseries length ({}) is shorter than the model window ({}), it must be at least equal.'.format(len(timeseries), self.data['window']))
+        except KeyError:
+            pass
+            
  
         if inplace:
             forecast_timeseries = timeseries
@@ -913,51 +893,25 @@ class Forecaster(ParametricModel):
         
         for key in forecast_timeseries.data_keys():
 
-            # Support var
-            first_call = True
-
-            for _ in range(n):
-                
-                # Compute start/end for the item to be forecasted
-                if isinstance(forecast_timeseries.resolution, TimeUnit):
-                    this_item_start_dt = forecast_timeseries[-1].dt + forecast_timeseries.resolution
-                    this_item_end_dt   =  this_item_start_dt + forecast_timeseries.resolution
-                    this_item_start_t  = s_from_dt(this_item_start_dt) 
-                    this_item_end_t    = s_from_dt(this_item_end_dt)
+            # Call model forecasting logic
+            try:
+                forecast_model_results = self.forecast(timeseries = forecast_timeseries, key = key, n=n)
+                if not isinstance(forecast_model_results, list):
+                    forecast_timeseries.append(forecast_model_results)
                 else:
-                    this_item_start_t = forecast_timeseries[-1].t + forecast_timeseries.resolution
-                    this_item_end_t   = this_item_start_t + forecast_timeseries.resolution
-                    this_item_start_dt = dt_from_s(this_item_start_t, tz=forecast_timeseries.tz)
-                    this_item_end_dt = dt_from_s(this_item_end_t, tz=forecast_timeseries.tz )                    
+                    for item in forecast_model_results:
+                        forecast_timeseries.append(item)
 
-                # Set time zone
-                tz = forecast_timeseries[-1].tz
+            except NotImplementedError:
                 
-                # Define TimePoints
-                this_item_start_timePoint = TimePoint(this_item_start_t, tz=tz)
-                this_item_end_timePoint = TimePoint(this_item_end_t, tz=tz)
-
-                # Call model forecasting logic
-                forecast_model_results = self._forecast(forecast_timeseries, timeseries.resolution, key, this_item_start_timePoint, this_item_end_timePoint, first_call, n=n)
-
-                if isinstance(forecast_model_results, list):
-                    for forecasted_item in forecast_model_results:
-                    
-                        # Add the forecast to the forecasts time series
-                        forecast_timeseries.append(forecasted_item)
-                    
-                    # We are done
-                    break
-                
-                else:
-                
+                for _ in range(n):
+        
+                    # Call the forecast only on the last point
+                    forecast_model_results = self.forecast(timeseries = forecast_timeseries, key = key, n=1)
+    
                     # Add the forecast to the forecasts time series
-                    forecasted_item = forecast_model_results
-                    forecast_timeseries.append(forecasted_item)
-                    
-                # Set fist call to false if this was the first call
-                if first_call:
-                    first_call = False 
+                    forecast_timeseries.append(forecast_model_results)
+
 
         # Set serie mark for the forecast and return
         try:
@@ -973,12 +927,50 @@ class Forecaster(ParametricModel):
             return None
 
 
-    def _predict(self, timeseries, n=1):
-        
-        # TODO: this is highly inefficient, fix me!
-        forecast_timeseries = timeseries.__class__(*self.apply(timeseries, inplace=False, n=n)[len(timeseries):])
+    def forecast(self, timeseries, key, n=1, forecast_start=None):
 
-        return forecast_timeseries
+        # Set forecast starting item
+        if not forecast_start:
+            forecast_start_item = timeseries[-1]
+        else:
+            forecast_start_item = timeseries[forecast_start]
+
+        predicted_data = self._predict(timeseries=timeseries,
+                                       key=key,
+                                       n=n,
+                                       forecast_start = forecast_start)
+        
+        # List of predictions or single prediction?
+        if isinstance(predicted_data,list):
+            forecast = []
+            last_item = forecast_start_item
+            for data in predicted_data:
+
+                if isinstance(timeseries[0], Slot):
+                    forecast.append(DataTimeSlot(start = last_item.end,
+                                                 unit  = timeseries.resolution,
+                                                 coverage = None,
+                                                 #tz = timeseries.tz,
+                                                 data  = data))
+                else:
+                    forecast.append(DataTimePoint(t = last_item.t + timeseries.resolution,
+                                                  tz = timeseries.tz,
+                                                  data  = data))
+                last_item = forecast[-1]
+        else:
+            if isinstance(timeseries[0], Slot):
+                forecast = DataTimeSlot(start = forecast_start_item.end,
+                                        unit  = timeseries.resolution,
+                                        coverage = None,
+                                        #tz = timeseries.tz,
+                                        data  = predicted_data)
+            else:
+                forecast = DataTimePoint(t = forecast_start_item.t + timeseries.resolution,
+                                         tz = timeseries.tz,
+                                         data  = predicted_data)
+            
+         
+        return forecast
 
 
 
@@ -1040,62 +1032,66 @@ class PeriodicAverageForecaster(Forecaster):
             averages[periodicity_index] = sums[periodicity_index]/totals[periodicity_index]
         self.data['averages'] = averages
         
-        #logger.info('Processed "{}" items'.format(processed))
+        logger.debug('Processed %s items', processed)
 
 
-    def _forecast(self, forecast_timeseries, resolution, key, this_item_start_timePoint, this_item_end_timePoint, first_call, n, window_start=None, raw=False) : #, timeseries, key, from_index, to_index):
+    def _predict(self, timeseries, n=1, key=None, forecast_start=None):
+
+        #if n>1:
+        #    raise NotImplementedError('This forecaster does not support multi-step predictions.')
+
+        # Set data key
+        if not key:
+            if len(timeseries.data_keys()) > 1:
+                raise Exception('Multivariate time series require to have the key of the prediction specificed')
+            key=timeseries.data_keys()[0]
+                    
+        # Set forecast starting item
+        if forecast_start is None:
+            forecast_start = len(timeseries) - 1
+            
+        # Get forecast start item
+        forecast_start_item = timeseries[forecast_start]
+
+        # Support vars
+        forecast_timestamps = []
+        forecast_data = []
 
         # Compute the offset (avg diff between the real values and the forecasts on the first window)
-        try:
-            self.offsets
-        except AttributeError:
-            self.offsets={}
-            
-        if key not in self.offsets or first_call:
+        diffs  = 0                
+        for j in range(self.data['window']):
+            serie_index = forecast_start - self.data['window'] + j
+            real_value = timeseries[serie_index].data[key]
+            forecast_value = self.data['averages'][get_periodicity_index(timeseries[serie_index], timeseries.resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])]
+            diffs += (real_value - forecast_value)            
 
-            diffs  = 0
-            
-            if window_start is not None:
-                for j in range(self.data['window']):
-                    serie_index = window_start + j
-                    real_value = forecast_timeseries[serie_index].data[key]
-                    forecast_value = self.data['averages'][get_periodicity_index(forecast_timeseries[serie_index], forecast_timeseries.resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])]
-                    diffs += (real_value - forecast_value)            
-            else:
-                for j in range(self.data['window']):
-                    serie_index = -(self.data['window']-j)
-                    real_value = forecast_timeseries[serie_index].data[key]
-                    forecast_value = self.data['averages'][get_periodicity_index(forecast_timeseries[serie_index], forecast_timeseries.resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])]
-                    diffs += (real_value - forecast_value)
-       
-            # Sum the avg diff between the real and the forecast on the window to the forecast (the offset)
-            offset = diffs/j
-            self.offsets[key] = offset
-        
-        else:
-            offset = self.offsets[key] 
-        
-        # Compute and add the real forecast data
-        periodicity_index = get_periodicity_index(this_item_start_timePoint, resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])        
-        forecast_data = {key: self.data['averages'][periodicity_index] + (offset*1.0)}
-        
-        if raw:
-            return forecast_data
-        else:
-            if isinstance(forecast_timeseries[0], Slot):
-                forecasted_item = DataTimeSlot(start = this_item_start_timePoint,
-                                                         end   = this_item_end_timePoint,
-                                                         unit  = forecast_timeseries.resolution,
-                                                         coverage = None,
-                                                         data  = forecast_data)
-            else:
-                forecasted_item = DataTimePoint(t = this_item_start_timePoint.t,
-                                                          tz = this_item_start_timePoint.tz,
-                                                          data  = forecast_data)                
+        # Sum the avg diff between the real and the forecast on the window to the forecast (the offset)
+        offset = diffs/j
 
-            return forecasted_item
+        # Perform the forecast
+        for i in range(n):
+            step = i + 1
+
+            # Set forecast timestamp
+            if isinstance(timeseries[0], Slot):
+                try:
+                    forecast_timestamp = forecast_timestamps[-1] + timeseries.resolution
+                    forecast_timestamps.append(forecast_timestamp)
+                except IndexError:
+                    forecast_timestamp = forecast_start_item.end
+                    forecast_timestamps.append(forecast_timestamp)
+
+            else:
+                forecast_timestamp = TimePoint(t = forecast_start_item.t + (timeseries.resolution*step), tz = forecast_start_item.tz )
     
+            # Compute the real forecast data
+            periodicity_index = get_periodicity_index(forecast_timestamp, timeseries.resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])        
+            forecast_data.append({key: self.data['averages'][periodicity_index] + (offset*1.0)})
+        
+        # Return
+        return forecast_data
 
+    
     def _plot_averages(self, timeseries, **kwargs):      
         averages_timeseries = copy.deepcopy(timeseries)
         for item in averages_timeseries:
@@ -1116,7 +1112,6 @@ model where non-linear trends are fit with yearly, weekly, and daily seasonality
 It works best with time series that have strong seasonal effects and several seasons of historical data.
 Prophet is robust to missing data and shifts in the trend, and typically handles outliers well. 
 '''
-
 
     def _fit(self, timeseries, window=None, periodicity=None, dst_affected=False, from_t=None, to_t=None, from_dt=None, to_dt=None):
 
@@ -1140,84 +1135,37 @@ Prophet is robust to missing data and shifts in the trend, and typically handles
             self.data['window'] = 10
 
 
-    def _forecast(self, forecast_timeseries, resolution, key, this_item_start_timePoint, this_item_end_timePoint, first_call, n, multi=True) : #, timeseries, key, from_index, to_index):
+    def _predict(self, timeseries, n=1, key=None, forecast_start=None):
 
-        resolution = forecast_timeseries.resolution
-
-        if not multi:
-
-            if isinstance (resolution, TimeUnit):
-                data_to_forecast = [self.remove_timezone( forecast_timeseries[-1].dt + forecast_timeseries[-1].unit)]
-            else:
-                data_to_forecast = [self.remove_timezone(dt_from_s(forecast_timeseries[-1].t + forecast_timeseries[-1].unit.value))]
-            
-            dataframe_to_forecast = DataFrame(data_to_forecast, columns = ['ds'])
-            
-            forecast = self.prophet_model.predict(dataframe_to_forecast)
-            #forecast[['ds', 'yhat', 'yhat_lower', 'yhat_upper']].tail()
-
-
-            # Compute and add the real forecast data
-            if isinstance(forecast_timeseries[0], Slot):
-                forecasted_item = DataTimeSlot(start = this_item_start_timePoint,
-                                                         unit  = resolution,
-                                                         coverage = None,
-                                                         data  = {key: float(forecast['yhat'])})
-            else:
-                forecasted_item = DataTimePoint(dt = this_item_start_timePoint.dt,
-                                                          tz = this_item_start_timePoint.tz,
-                                                          data  = {key: float(forecast['yhat'])})
-
-            return forecasted_item
+        # Prepare a dataframe with all the timestamps to forecast
+        last_item    = timeseries[-1]
+        last_item_t  = last_item.t
+        last_item_dt = last_item.dt
+        data_to_forecast = []
         
-        else:
-            last_item    = forecast_timeseries[-1]
-            last_item_t  = last_item.t
-            last_item_dt = last_item.dt
-            forecast_timestamps = []
-            data_to_forecast = []
-            
-            # Prepare a dataframe wiht all the items to forecast
-            for _ in range(n):
-                if isinstance (resolution, TimeUnit):
-                    new_item_dt = last_item_dt + resolution
-                    data_to_forecast.append(self.remove_timezone(new_item_dt))
-                    last_item_dt = new_item_dt
-                    forecast_timestamps.append(new_item_dt)
-                else:
-                    new_item_t = last_item_t + resolution.value
-                    new_item_dt = dt_from_s(new_item_t, tz=forecast_timeseries.tz)
-                    data_to_forecast.append(self.remove_timezone(new_item_dt))
-                    last_item_t = new_item_t
-                    forecast_timestamps.append(new_item_dt)
+        for _ in range(n):
+            if isinstance (timeseries.resolution, TimeUnit):
+                new_item_dt = last_item_dt + timeseries.resolution
+                data_to_forecast.append(self.remove_timezone(new_item_dt))
+                last_item_dt = new_item_dt
+            else:
+                new_item_t = last_item_t + timeseries.resolution
+                new_item_dt = dt_from_s(new_item_t, tz=timeseries.tz)
+                data_to_forecast.append(self.remove_timezone(new_item_dt))
+                last_item_t = new_item_t  
+        dataframe_to_forecast = DataFrame(data_to_forecast, columns = ['ds'])
                     
-            dataframe_to_forecast = DataFrame(data_to_forecast, columns = ['ds'])
-                         
-            forecast = self.prophet_model.predict(dataframe_to_forecast)
-            #forecast[['ds', 'yhat', 'yhat_lower', 'yhat_upper']].tail()
-        
-            forecasted_items = []
-        
-            # Re convert to items
-            for i in range(n):
+        # Call Prophet predict 
+        forecast = self.prophet_model.predict(dataframe_to_forecast)
+        #forecast[['ds', 'yhat', 'yhat_lower', 'yhat_upper']].tail()
+    
+        # Re arrange predict results
+        forecasted_items = []
+        for i in range(n):
+            forecasted_items.append({key: float(forecast['yhat'][i])})
 
-                # Compute and add the real forecast data
-                if isinstance(forecast_timeseries[0], Slot):
-                    forecasted_item = DataTimeSlot(start = TimePoint(dt=forecast_timestamps[i]),
-                                                             unit  = resolution,
-                                                             coverage = None,
-                                                             data  = {key: float(forecast['yhat'][i])})
-                else:
-                    forecasted_item = DataTimePoint(dt = forecast_timestamps[i],
-                                                              tz = this_item_start_timePoint.tz,
-                                                              data  = {key: float(forecast['yhat'][i])})     
-                
-                
-                
-                forecasted_items.append(forecasted_item)
-                
-        
-            return forecasted_items      
+        # Return
+        return forecasted_items      
 
 
 
@@ -1229,44 +1177,14 @@ class AnomalyDetector(ParametricModel):
 class PeriodicAverageAnomalyDetector(AnomalyDetector):
 
 
-    def __init__(self, *args, **kwargs):
-
-        # Initialize
-        super(PeriodicAverageAnomalyDetector, self).__init__()
-
-
     def __get_actual_and_predicted(self, timeseries, i, key, forecaster_window):
 
-        # Compute start/end for the item to be forecasted
-        if isinstance(timeseries.resolution, TimeUnit):
-            this_item_start_dt = timeseries[i-1].dt + timeseries.resolution
-            this_item_end_dt   =  this_item_start_dt + timeseries.resolution
-            this_item_start_t  = s_from_dt(this_item_start_dt) 
-            this_item_end_t    = s_from_dt(this_item_end_dt)
-        else:
-            this_item_start_t = timeseries[i-1].t + timeseries.resolution
-            this_item_end_t   = this_item_start_t + timeseries.resolution
-            this_item_start_dt = dt_from_s(this_item_start_t, tz=timeseries.tz)
-            this_item_end_dt = dt_from_s(this_item_end_t, tz=timeseries.tz )                    
-
-        # Set time zone
-        tz = timeseries[i-1].tz
-        
-        # Define TimePoints
-        this_item_start_timePoint = TimePoint(this_item_start_t, tz=tz)
-        this_item_end_timePoint = TimePoint(this_item_end_t, tz=tz)
-
-        # Call model forecasting logic
+        # Call model predict logic and compare with the actual data
         actual    = timeseries[i].data[key]
-        predicted = self.forecaster._forecast(timeseries,
-                                              timeseries.resolution,
-                                              key,
-                                              this_item_start_timePoint,
-                                              this_item_end_timePoint,
-                                              first_call=True,
-                                              n=1,
-                                              window_start = i-forecaster_window-1,
-                                              raw=True)[key]
+        predicted = self.forecaster.predict(timeseries,
+                                            n=1,
+                                            key=key,
+                                            forecast_start = i-1)[0][key]
         
         return (actual, predicted)
 
@@ -1327,6 +1245,8 @@ class PeriodicAverageAnomalyDetector(AnomalyDetector):
                     continue
                 
                 actual, predicted = self.__get_actual_and_predicted(timeseries, i, key, forecaster_window)
+                #if logs:
+                #    logger.info('{}: {} vs {}'.format(timeseries[i].dt, actual, predicted))
 
                 AE = abs(actual-predicted)
                 

@@ -216,6 +216,15 @@ class TestForecasters(unittest.TestCase):
         # Fit
         forecaster.fit(self.sine_data_time_slot_series_minute, periodicity=63)
 
+        # Apply
+        sine_data_time_slot_series_minute_with_forecast = forecaster.apply(self.sine_data_time_slot_series_minute, n=3)
+        self.assertEqual(len(sine_data_time_slot_series_minute_with_forecast), 1003)
+
+        # Predict
+        prediction = forecaster.predict(self.sine_data_time_slot_series_minute, n=3)
+        self.assertTrue(isinstance(prediction, list))
+        self.assertEqual(len(prediction), 3)
+
         # Evaluate
         evaluation = forecaster.evaluate(self.sine_data_time_slot_series_minute, steps='auto', samples=100, details=True)
         self.assertEqual(forecaster.data['periodicity'], 63)
@@ -233,15 +242,6 @@ class TestForecasters(unittest.TestCase):
         self.assertAlmostEqual(evaluation['MAE_1_steps'], 0.06622794526818285)
         self.assertAlmostEqual(evaluation['RMSE_3_steps'], 0.07253018513852955)
         self.assertAlmostEqual(evaluation['MAE_3_steps'], 0.06567523200748912)     
-
-        # Apply
-        sine_data_time_slot_series_minute_with_forecast = forecaster.apply(self.sine_data_time_slot_series_minute, n=3)
-        self.assertEqual(len(sine_data_time_slot_series_minute_with_forecast), 1003)
-
-        # Predict
-        forecast = forecaster.predict(self.sine_data_time_slot_series_minute, n=3)
-        self.assertTrue(isinstance(forecast, DataTimeSlotSeries))
-        self.assertEqual(len(forecast), 3)
 
         # Fit from/to
         forecaster.fit(self.sine_data_time_slot_series_minute, from_t=20000, to_t=40000)
@@ -262,7 +262,7 @@ class TestForecasters(unittest.TestCase):
         data_time_point_series = Resampler(600).process(data_time_point_series)
         forecaster.fit(data_time_point_series)
           
-        # TODO: do some actual tetsing.. not only that "it works"
+        # TODO: do some actual testing.. not only that "it works"
         forecasted_data_time_point_series  = forecaster.apply(data_time_point_series)
         
 
@@ -277,6 +277,18 @@ class TestForecasters(unittest.TestCase):
         sine_data_time_slot_series_day_with_forecast = forecaster.apply(self.sine_data_time_slot_series_day, n=3)
         self.assertEqual(len(sine_data_time_slot_series_day_with_forecast), 1003)
 
+
+        # Test on Points as well
+        data_time_point_series = CSVFileStorage(TEST_DATA_PATH + '/csv/temperature.csv').get(limit=200)
+        forecaster = ProphetForecaster()
+        with self.assertRaises(Exception):
+            forecaster.fit(data_time_point_series)
+          
+        data_time_point_series = Resampler(600).process(data_time_point_series)
+        forecaster.fit(data_time_point_series)
+          
+        # TODO: do some actual testing.. not only that "it works"
+        forecasted_data_time_point_series  = forecaster.apply(data_time_point_series)
 
 
 
@@ -327,7 +339,7 @@ class TestAnomalyDetectors(unittest.TestCase):
         data_time_point_series = Resampler(600).process(data_time_point_series)
         anomaly_detector.fit(data_time_point_series)
           
-        # TODO: do some actual tetsing.. not only that "it works"
+        # TODO: do some actual testing.. not only that "it works"
         anomaly_data_time_point_series  = anomaly_detector.apply(data_time_point_series)
 
 
