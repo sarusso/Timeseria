@@ -946,7 +946,7 @@ class Forecaster(ParametricModel):
     #    return forecast_timeseries
 
     
-    def forecast(self, timeseries, key, n=1, window_start=None, forecast_start=None, first_call=False):
+    def forecast(self, timeseries, key, n=1, forecast_start=None, first_call=False):
 
         # Set forecast starting item
         if not forecast_start:
@@ -957,7 +957,6 @@ class Forecaster(ParametricModel):
         predicted_data = self._predict(timeseries=timeseries,
                                        key=key,
                                        n=n,
-                                       window_start=window_start,
                                        forecast_start = forecast_start,
                                        first_call=first_call)
         
@@ -1056,7 +1055,7 @@ class PeriodicAverageForecaster(Forecaster):
         logger.debug('Processed %s items', processed)
 
 
-    def _predict(self, timeseries, n=1, key=None, window_start=None, forecast_start=None, first_call=True):
+    def _predict(self, timeseries, n=1, key=None, forecast_start=None, first_call=True):
 
         #if n>1:
         #    raise NotImplementedError('This forecaster does not support multi-step predictions.')
@@ -1068,10 +1067,11 @@ class PeriodicAverageForecaster(Forecaster):
             key=timeseries.data_keys()[0]
                     
         # Set forecast starting item
-        if not forecast_start:
-            forecast_start_item = timeseries[-1]
-        else:
-            forecast_start_item = timeseries[forecast_start]
+        if forecast_start is None:
+            forecast_start = len(timeseries) - 1
+            
+        # Get forecast start item
+        forecast_start_item = timeseries[forecast_start]
 
         forecast_timestamps = []
         forecast_data = []
@@ -1096,24 +1096,15 @@ class PeriodicAverageForecaster(Forecaster):
                 self.offsets
             except AttributeError:
                 self.offsets={}
-                
+            
             if key not in self.offsets or first_call:
-    
-                diffs  = 0
-                
-                if window_start is not None:
-                    for j in range(self.data['window']):
-                        serie_index = window_start + j
-                        real_value = timeseries[serie_index].data[key]
-                        forecast_value = self.data['averages'][get_periodicity_index(timeseries[serie_index], timeseries.resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])]
-                        diffs += (real_value - forecast_value)            
-                else:
-                    for j in range(self.data['window']):
-                        serie_index = -(self.data['window']-j)
-                        real_value = timeseries[serie_index].data[key]
-                        forecast_value = self.data['averages'][get_periodicity_index(timeseries[serie_index], timeseries.resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])]
-                        diffs += (real_value - forecast_value)
-           
+                diffs  = 0                
+                for j in range(self.data['window']):
+                    serie_index = forecast_start - self.data['window'] + j
+                    real_value = timeseries[serie_index].data[key]
+                    forecast_value = self.data['averages'][get_periodicity_index(timeseries[serie_index], timeseries.resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])]
+                    diffs += (real_value - forecast_value)            
+
                 # Sum the avg diff between the real and the forecast on the window to the forecast (the offset)
                 offset = diffs/j
                 self.offsets[key] = offset
@@ -1171,7 +1162,7 @@ Prophet is robust to missing data and shifts in the trend, and typically handles
             self.data['window'] = 10
 
 
-    def _predict(self, timeseries, n=1, key=None, window_start=None, forecast_start=None, first_call=True):
+    def _predict(self, timeseries, n=1, key=None, forecast_start=None, first_call=True):
 
         # Prepare a dataframe with all the timestamps to forecast
         last_item    = timeseries[-1]
@@ -1221,8 +1212,7 @@ class PeriodicAverageAnomalyDetector(AnomalyDetector):
                                             n=1,
                                             key=key,
                                             first_call=True,
-                                            forecast_start = i-1,
-                                            window_start = i-1-forecaster_window)[0][key]
+                                            forecast_start = i-1)[0][key]
         
         return (actual, predicted)
 
