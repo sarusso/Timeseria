@@ -554,7 +554,7 @@ function legendFormatter(data) {
         
         //decoration = ' style="background-color: #fcf8b0"'
         if ((series.label=='data_reconstructed') || (series.label=='data_loss') || (series.label=='anomaly')){
-            html += "<span" + decoration + "> <span style='background: " + series.color + ";'>&nbsp" + series.labelHTML + "&nbsp</span>:&#160;" + series.yHTML + "</span>, ";
+            html += "<span" + decoration + "> <span style='background: " + series.color + ";'>&nbsp" + series.labelHTML + "&nbsp</span>:&#160;" + series.yHTML*100 + "%</span>, ";
         
         }
         else {
