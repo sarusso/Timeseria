@@ -80,6 +80,7 @@ def to_dg_data(serie, aggregate_by=0, plot_data_loss=False, plot_data_reconstruc
             data_mins = [None for key in keys]
             data_maxs = [None for key in keys]
             data_loss = None
+            data_reconstructed = None
 
         if aggregate_by:
 
@@ -146,7 +147,14 @@ def to_dg_data(serie, aggregate_by=0, plot_data_loss=False, plot_data_reconstruc
                 if data_loss is None:
                     data_loss = 0
                 data_loss += item.data_loss 
-
+            
+            # Data reconstructed
+            if plot_data_reconstructed:
+                if item._data_reconstructed is not None:
+                    if data_reconstructed is None:
+                        data_reconstructed = 0
+                    data_reconstructed += item._data_reconstructed
+    
             # Dump aggregated data?
             if (i!=0)  and ((i % aggregate_by)==0):
                 if isinstance(serie, DataTimePointSeries):
@@ -161,43 +169,48 @@ def to_dg_data(serie, aggregate_by=0, plot_data_loss=False, plot_data_reconstruc
                         data_part+='[{},{},{}],'.format( 0, avg, avg)
                     else:
                         data_part+='[{},{},{}],'.format( data_mins[i], avg, data_maxs[i])
-                        
-                #if isinstance(serie, DataTimeSlotSeries):
-                #    # Add data loss
-                #    data_part+='[0,{0},{0}],'.format(data_loss/aggregate_by)
-                
+
                 # Do we have a mark?
                 if serie_mark:
                     if item.start.t >= serie_mark_start_t and item.end.t < serie_mark_end_t:
-                        if isinstance(serie, DataTimeSlotSeries):
-                            # Add data loss
-                            if data_loss is not None:
-                                data_part+='[0,{0},{0}],'.format(data_loss/aggregate_by)
-                            else:
-                                data_part+='[,,],'            
-                        # Add the (active) mark
-                        data_part+='[0,1,1],'
-                        
-                    else:
-                        if isinstance(serie, DataTimeSlotSeries):
-                            # Add data loss
+                        # Plot data reconstructed
+                        if plot_data_reconstructed:
+                            data_part+='[0,{0},{0}],'.format(data_reconstructed/aggregate_by)                   
+                        # Plot data loss
+                        if plot_data_loss:
                             if data_loss is not None:
                                 data_part+='[0,{0},{0}],'.format(data_loss/aggregate_by)
                             else:
                                 data_part+='[,,],'
+                                    
+                        # Add the (active) mark
+                        data_part+='[0,1,1],'
+                        
+                    else:
+                        # Plot data reconstructed
+                        if plot_data_reconstructed:
+                            data_part+='[0,{0},{0}],'.format(data_reconstructed/aggregate_by)  
+                        # Plot data loss
+                        if plot_data_loss:
+                            if data_loss is not None:
+                                data_part+='[0,{0},{0}],'.format(data_loss/aggregate_by)
+                            else:
+                                data_part+='[,,],'
+                            
                         # Add the (inactive) mark
                         data_part+='[0,0,0],'
                             
                 else:
-                    #if isinstance(serie, DataTimeSlotSeries):
-                    # Add data loss
-                    if data_loss is not None:
-                        data_part+='[0,{0},{0}],'.format(data_loss/aggregate_by)
-                    else:
-                        data_part+=','
-                            
-                    
-                
+                    # Plot data reconstructed
+                    if plot_data_reconstructed:
+                        data_part+='[0,{0},{0}],'.format(data_reconstructed/aggregate_by)  
+                    # Plot data loss
+                    if plot_data_loss:
+                        if data_loss is not None:
+                            data_part+='[0,{0},{0}],'.format(data_loss/aggregate_by)
+                        else:
+                            data_part+=','
+
                 # Remove last comma
                 data_part=data_part[0:-1]
                 dg_data+='[{},{}],'.format(to_dg_time(dt_from_s(t, tz=item.tz)), data_part)
@@ -207,6 +220,7 @@ def to_dg_data(serie, aggregate_by=0, plot_data_loss=False, plot_data_reconstruc
                 data_mins = [None for key in keys]
                 data_maxs = [None for key in keys]
                 data_loss = None
+                data_reconstructed = None
                 first_t = None
 
         #====================
@@ -246,55 +260,71 @@ def to_dg_data(serie, aggregate_by=0, plot_data_loss=False, plot_data_reconstruc
             if isinstance(serie, DataTimePointSeries):
                 t = item.t
 
-                            # Do we have a mark?
+                # Do we have a mark?
                 if serie_mark:
  
                     if item.t >= serie_mark_start_t and item.t < serie_mark_end_t:
-                        #if isinstance(serie, DataTimeSlotSeries):
-                        # Add data loss
-                        if item.data_loss is None:
-                            data_part+=','
-                        else:
-                            data_part+='{},'.format(item.data_loss)
+                        # Plot data reconstructed
+                        if plot_data_reconstructed:
+                            if item._data_reconstructed is None:
+                                data_part+=','
+                            else:
+                                data_part+='{},'.format(item._data_reconstructed)
+                        # Plot data data loss
+                        if plot_data_loss:
+                            if item.data_loss is None:
+                                data_part+=','
+                            else:
+                                data_part+='{},'.format(item.data_loss)
                         data_part+='1,'
                         
                     else:
-                        #if isinstance(serie, DataTimeSlotSeries):
-                        # Add null data loss
+                        # Plot data reconstructed
+                        if plot_data_reconstructed:
+                            if item._data_reconstructed is None:
+                                data_part+=','
+                            else:
+                                data_part+='{},'.format(item._data_reconstructed)
+                        # Plot data loss
+                        if plot_data_loss:
+                            if item.data_loss is None:
+                                data_part+=','
+                            else:
+                                data_part+='{},'.format(item.data_loss)                        
+                        data_part+='0,'
+                else:
+                    # Plot data reconstructed
+                    if plot_data_reconstructed:
+                        if item._data_reconstructed is None:
+                            data_part+=','
+                        else:
+                            data_part+='{},'.format(item._data_reconstructed)
+                    # Plot data loss
+                    if plot_data_loss:
                         if item.data_loss is None:
                             data_part+=','
                         else:
                             data_part+='{},'.format(item.data_loss)
+
                         
-                        data_part+='0,'
-                else:
-                    #if isinstance(serie, DataTimeSlotSeries):
-                    # Add null data loss
-                    if item.data_loss is None:
-                        data_part+=','
-                    else:
-                        data_part+='{},'.format(item.data_loss)
                     
             
             
             elif isinstance(serie, DataTimeSlotSeries):
                 t = item.start.t
-                #if plot_data_loss:
-                #    if item.data_loss is None:
-                #        raise ValueError('I tried to plot the data_loss but i got a None value for {}'.format(item))
-                #    data_part+=',{}'.format(item.data_loss)
-                #elif plot_data_reconstructed:
-                #    if item.data_reconstructed is None:
-                #        raise ValueError('I tried to plot the data_reconstructed but i got a None value for {}'.format(item))
-                #    data_part+=',{}'.format(item.data_reconstructed)
-
 
                 # Do we have a mark?
                 if serie_mark:
  
                     if item.start.t >= serie_mark_start_t and item.end.t < serie_mark_end_t:
-                        if isinstance(serie, DataTimeSlotSeries):
-                            # Add data loss
+                        # Plot data reconstructed
+                        if plot_data_reconstructed:
+                            if item._data_reconstructed is None:
+                                data_part+=','
+                            else:
+                                data_part+='{},'.format(item._data_reconstructed)
+                        # Plot data loss
+                        if plot_data_loss:
                             if item.data_loss is None:
                                 data_part+=','
                             else:
@@ -302,22 +332,35 @@ def to_dg_data(serie, aggregate_by=0, plot_data_loss=False, plot_data_reconstruc
                         data_part+='1,'
                         
                     else:
-                        if isinstance(serie, DataTimeSlotSeries):
-                            # Add null data loss
+                        # Plot data reconstructed
+                        if plot_data_reconstructed:
+                            if item._data_reconstructed is None:
+                                data_part+=','
+                            else:
+                                data_part+='{},'.format(item._data_reconstructed)
+                        # Plot data loss
+                        if plot_data_loss:
                             if item.data_loss is None:
                                 data_part+=','
                             else:
                                 data_part+='{},'.format(item.data_loss)
-                        
+
+                                                
                         data_part+='0,'
                 else:
                     if isinstance(serie, DataTimeSlotSeries):
-                        # Add null data loss
-                        if item.data_loss is None:
-                            data_part+=','
-                        else:
-                            data_part+='{},'.format(item.data_loss)
-                    
+                        # Plot data reconstructed
+                        if plot_data_reconstructed:
+                            if item._data_reconstructed is None:
+                                data_part+=','
+                            else:
+                                data_part+='{},'.format(item._data_reconstructed)
+                        # Plot data loss
+                        if plot_data_loss:
+                            if item.data_loss is None:
+                                data_part+=','
+                            else:
+                                data_part+='{},'.format(item.data_loss)                          
                 
             # Remove last comma
             data_part = data_part[0:-1]
@@ -336,15 +379,15 @@ def to_dg_data(serie, aggregate_by=0, plot_data_loss=False, plot_data_reconstruc
 #  Dygraphs plot
 #=================
 
-def dygraphs_plot(serie, aggregate_by, log_js=False, show_data_loss=True, show_data_forecasted=True):
+def dygraphs_plot(serie, aggregate_by, log_js=False, show_data_loss=True, show_forecasted=True, show_data_reconstructed=False):
     '''Plot a data_time_pointSeries in Jupyter using Dugraph. Based on the work here: https://www.stefaanlippens.net/jupyter-custom-d3-visualization.html'''
     from IPython.display import display, Javascript, HTML
     
-    # Force disable of plotting reconstructed data
-    show_data_reconstructed=False
-    
     if len(serie)==0:
         raise Exception('Cannot plot empty serie')
+
+    #if show_data_reconstructed:
+    #    show_data_loss=False
 
     # Checks
     if isinstance(serie, DataTimePointSeries):
@@ -403,7 +446,7 @@ def dygraphs_plot(serie, aggregate_by, log_js=False, show_data_loss=True, show_d
 
     # Mark to use?
     try:
-        if show_data_forecasted and serie.mark:
+        if show_forecasted and serie.mark:
             if not isinstance(serie.mark, (list, tuple)):
                 raise TypeError('Series mark must be a list or tuple')
             if not len(serie.mark) == 2:
@@ -413,8 +456,6 @@ def dygraphs_plot(serie, aggregate_by, log_js=False, show_data_loss=True, show_d
             if not isinstance(serie.mark[1], datetime.datetime):
                 raise TypeError('Series marks must be datetime objects')
             logger.info('Found data forecast mark and showing it')
-            show_data_reconstructed=False
-            #show_data_loss=False
             serie_mark=True
             serie_mark_html = '<span style="background:rgba(255, 255, 102, .6);">&nbsp;forecast&nbsp;</span>'
             serie_mark_html_off = '<span style="background:rgba(255, 255, 102, .2);">&nbsp;forecast&nbsp;</span>'
@@ -452,9 +493,17 @@ function legendFormatter(data) {
           // Also skip Timeseria-specific series
           if (series.label=='data_mark') continue;
           
-
+          // Add some initial stuff
           if (html !== '') html += sepLines ? '<br/>' : ' ';
-          html += "<span style='margin-left:15px; font-weight: bold; color: " + series.color + ";'>" + series.dashHTML + " " + series.labelHTML + "</span>, ";
+          
+
+          if ((series.label=='data_reconstructed') || (series.label=='data_loss') || (series.label=='anomaly')){
+              html += "<span style='margin-left:15px; background: " + series.color + ";'>&nbsp;" + series.labelHTML + "&nbsp</span>, ";
+          }
+          else {
+              html += "<span style='margin-left:15px; font-weight: bold; color: " + series.color + ";'>" + series.dashHTML + " " + series.labelHTML + "</span>, ";
+          }
+          
           // Remove last comma and space
           html = html.substring(0, html.length - 2);
         }
@@ -493,16 +542,24 @@ function legendFormatter(data) {
         //var decoration = series.isHighlighted ? ' class="highlight"' : '';
         var decoration = series.isHighlighted ? ' style="background-color: #000000"' : '';
         
-        /*if (series.isHighlighted) {
+        /*
+        if (series.isHighlighted) {
             decoration = ' style="background-color: #fcf8b0"'
           }
         else{
             decoration = ' style="background-color: #ffffff"'
         }
-        console.log(decoration)*/
-        //decoration = ' style="background-color: #fcf8b0"'
-        html += "<span" + decoration + "> <b><span style='color: " + series.color + ";'>" + series.labelHTML + "</span></b>:&#160;" + series.yHTML + "</span>, ";
+        console.log(decoration)
+        */
         
+        //decoration = ' style="background-color: #fcf8b0"'
+        if ((series.label=='data_reconstructed') || (series.label=='data_loss') || (series.label=='anomaly')){
+            html += "<span" + decoration + "> <span style='background: " + series.color + ";'>&nbsp" + series.labelHTML + "&nbsp</span>:&#160;" + series.yHTML + "</span>, ";
+        
+        }
+        else {
+            html += "<span" + decoration + "> <b><span style='color: " + series.color + ";'>" + series.labelHTML + "</span></b>:&#160;" + series.yHTML + "</span>, ";
+        }
       
       }
       // Remove last comma and space
@@ -542,7 +599,7 @@ function legendFormatter(data) {
     #if isinstance(serie, DataTimeSlotSeries):
     # Do we have data reconstructed or losses indexes?
     try:
-        if serie[0].data_reconstructed is not None:
+        if serie[0]._data_reconstructed is not None:
             data_reconstructed_indexes = True
     except:
         data_reconstructed_indexes = False
@@ -555,7 +612,7 @@ function legendFormatter(data) {
         logger.info('Found data reconstruction index and showing it')
         labels+=',data_reconstructed'
         plot_data_reconstructed = True
-    elif show_data_loss and data_loss_indexes:
+    if show_data_loss and data_loss_indexes:
         labels+=',data_loss'
         plot_data_loss = True
     if serie_mark:
@@ -624,79 +681,88 @@ axes: {
 },
 animatedZooms: true,"""
 
-    if True: #isinstance(serie, DataTimeSlotSeries):
-        if aggregate_by:
-            rgba_value_red    = 'rgba(255,128,128,1)'
-            rgba_value_gray   = 'rgba(240,240,240,1)'
-            rgba_value_orange = 'rgba(255,169,128,1)'
-            fill_alpha_value  = 0.31 # Alpha for the area
-        else:
-            rgba_value_red    = 'rgba(255,128,128,1)'
-            rgba_value_gray   = 'rgba(240,240,240,1)'
-            rgba_value_orange = 'rgba(255,179,128,1)'
-            fill_alpha_value  = 0.5  # Alpha for the area
-            
-        rgba_value_yellow = 'rgba(255, 255, 102, 1)'
-        rgba_value_orangered = 'rgba(255, 69, 0, 0.5)'
-        rgba_value_darkorange = 'rgba(255, 140, 0, 0.9)'
+    if aggregate_by:
+        # Alpha is for the legend
+        rgba_value_red    = 'rgba(255,128,128,0.4)'
+        rgba_value_gray   = 'rgba(240,240,240,0.5)'
+        rgba_value_orange = 'rgba(235, 156, 56,1.0)'
+        fill_alpha_value  = 0.31 # 31 Alpha for the area (will not be used for rgba_value_orange)
+        fill_alpha_value_orange = 0.6
+    else:
+        # Alpha is for the legend
+        rgba_value_red    = 'rgba(255,128,128,0.4)' 
+        rgba_value_gray   = 'rgba(240,240,240,0.5)'
+        rgba_value_orange = 'rgba(245, 193, 130,0.8)'
+        fill_alpha_value  = 0.5  # Alpha for the area (will not be used for rgba_value_orange)
+        fill_alpha_value_orange = 0.6
         
-        
-        # Special series
+    rgba_value_yellow = 'rgba(255, 255, 102, 1)'
+    rgba_value_darkorange = 'rgba(255, 140, 0, 0.7)'
+    
+    
+    # Special series
+    dygraphs_javascript += """
+     series: {"""
+    
+    if show_data_reconstructed and data_reconstructed_indexes:
+        # Add data reconstructed special serie
         dygraphs_javascript += """
-         series: {"""
-        
-        if show_data_reconstructed and data_reconstructed_indexes:
-            # Add data reconstructed special serie
-            dygraphs_javascript += """
-           'data_reconstructed': {
-             //customBars: false, // Does not work?
-             axis: 'y2',
-             drawPoints: false,
-             strokeWidth: 0,
-             highlightCircleSize:0,
-             fillGraph: true,
-             fillAlpha: """+str(fill_alpha_value)+""",            // This alpha is used for the area
-             color: '"""+rgba_value_orange+"""'
-           },"""
-           
-        elif show_data_loss and data_loss_indexes:
-            # Add data loss special serie
-            dygraphs_javascript += """
-           'data_loss': {
-             //customBars: false, // Does not work?
-             axis: 'y2',
-             //stepPlot: true,
-             drawPoints: false,
-             strokeWidth: 0,
-             highlightCircleSize:0,
-             fillGraph: true,
-             fillAlpha: """+str(fill_alpha_value)+""",  // This alpha is used for the area 
-             color: '"""+rgba_value_red+"""'            // Alpha here is used for the legend 
-           },"""
-        
-        # Add data mark and anomalay series
+       'data_reconstructed': {
+         //customBars: false, // Does not work?
+         axis: 'y2',
+         drawPoints: false,
+         strokeWidth: 0,
+         highlightCircleSize:0,
+         fillGraph: true,
+         fillAlpha: """+str(fill_alpha_value_orange)+""",            // This alpha is used for the area
+         color: '"""+rgba_value_orange+"""'
+       },"""
+       
+    if show_data_loss and data_loss_indexes:
+        # Add data loss special serie
         dygraphs_javascript += """
-           'data_mark': {
-             //customBars: false, // Does not work?
-             axis: 'y2',
-             drawPoints: false,
-             strokeWidth: 0,
-             highlightCircleSize:0,
-             fillGraph: true,
-             fillAlpha: """+str(fill_alpha_value)+""",  // This alpha is used for the area
-             color: '"""+rgba_value_yellow+"""'         // Alpha here is used for the legend 
-           },
-           'anomaly': {
-             //customBars: false, // Does not work?
-             axis: 'y2',
-             drawPoints: false,
-             strokeWidth: 0,
-             highlightCircleSize:0,
-             fillGraph: true,
-             fillAlpha: 0.6,  // This alpha is used for the area
-             color: '"""+rgba_value_darkorange+"""'     // Alpha here is used for the legend 
-           },
-         },
+       'data_loss': {
+         //customBars: false, // Does not work?
+         axis: 'y2',
+         //stepPlot: true,
+         drawPoints: false,
+         strokeWidth: 0,
+         highlightCircleSize:0,
+         fillGraph: true,
+         fillAlpha: """+str(fill_alpha_value)+""",  // This alpha is used for the area 
+         color: '"""+rgba_value_red+"""'            // Alpha here is used for the legend 
+       },"""
+    
+    # Add all series to be included in the miniplot,
+    for label in serie.data_keys():
+        dygraphs_javascript += """
+           '"""+str(label)+"""': {
+             showInRangeSelector:true
+           },"""     
+    
+    # Add data mark and anomalay series
+    dygraphs_javascript += """
+       'data_mark': {
+         //customBars: false, // Does not work?
+         axis: 'y2',
+         drawPoints: false,
+         strokeWidth: 0,
+         highlightCircleSize:0,
+         fillGraph: true,
+         fillAlpha: """+str(fill_alpha_value)+""",  // This alpha is used for the area
+         color: '"""+rgba_value_yellow+"""'         // Alpha here is used for the legend 
+       },
+       'anomaly': {
+         //customBars: false, // Does not work?
+         axis: 'y2',
+         drawPoints: false,
+         strokeWidth: 0,
+         highlightCircleSize:0,
+         fillGraph: true,
+         fillAlpha: 0.6,  // This alpha is used for the area
+         color: '"""+rgba_value_darkorange+"""'     // Alpha here is used for the legend 
+       },
+     },
     """
     
     # Force "original" Dygraph color.
