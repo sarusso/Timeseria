@@ -1,6 +1,8 @@
 import unittest
 import datetime
 import os
+import pandas as pd
+
 
 from ..datastructures import Point, TimePoint, DataPoint, DataTimePoint
 from ..datastructures import Slot, TimeSlot, DataSlot, DataTimeSlot
@@ -15,6 +17,8 @@ from ..units import Unit, TimeUnit
 import logging
 logging.basicConfig(level=os.environ.get('LOGLEVEL') if os.environ.get('LOGLEVEL') else 'CRITICAL')
 
+# Set test data path
+TEST_DATA_PATH = '/'.join(os.path.realpath(__file__).split('/')[0:-1]) + '/test_data/'
 
 class TestSeries(unittest.TestCase):
 
@@ -318,6 +322,12 @@ class TestPointSeries(unittest.TestCase):
         with self.assertRaises(ValueError):
             data_time_point_series.append(DataTimePoint(t=180, data={'a':56, 'c':67}))            
 
+        # Test creating a time series from a Pandas data frame 
+        df = pd.read_csv(TEST_DATA_PATH+'csv/format3.csv', header=3, parse_dates=[0], index_col=0)
+        data_time_point_series = DataTimePointSeries(df)
+        self.assertEqual(len(data_time_point_series),6)
+        self.assertEqual(data_time_point_series[0].dt,dt(2020,4,3,0,0,0))
+        self.assertEqual(data_time_point_series[5].dt,dt(2020,4,3,5,0,0))
 
 
 class TestUnit(unittest.TestCase):
@@ -604,6 +614,13 @@ class TestSlotSeries(unittest.TestCase):
         #    prev_t    = t
         #self.assertEqual(len(data_time_slot_series),10)
         #self.assertEqual(data_time_slot_series[0].unit,TimeUnit('1D'))
+
+        # Test creating a time series from a Pandas data frame 
+        df = pd.read_csv(TEST_DATA_PATH+'csv/format4.csv', header=0, parse_dates=[0], index_col=0)
+        data_time_slot_series = DataTimeSlotSeries(df)
+        self.assertEqual(len(data_time_slot_series),5)
+        self.assertEqual(data_time_slot_series[0].start.dt,dt(2020,4,3,0,0,0))
+        self.assertEqual(data_time_slot_series[4].end.dt,dt(2020,4,3,10,0,0))
 
         
     def test_cannge_timezone_DataTimeSlotSeries(self):
