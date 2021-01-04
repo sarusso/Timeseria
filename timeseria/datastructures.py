@@ -480,6 +480,30 @@ class DataTimePointSeries(DataPointSeries, TimePointSeries):
         # Original init
         super(DataTimePointSeries, self).__init__(*args, **kwargs)
 
+    @property
+    def df(self):
+        data_keys = self.data_keys()
+        
+        if self[0].data_loss is not None:
+            dump_data_loss = True
+        else:
+            dump_data_loss = False
+        
+        if dump_data_loss:
+            columns = ['Timestamp'] + data_keys + ['data_loss']
+        else:
+            columns = ['Timestamp'] + data_keys
+            
+        df = DataFrame(columns=columns)
+        for item in self:
+            values = [item.data[key] for key in data_keys]
+            if dump_data_loss:
+                df = df.append(DataFrame([[item.dt]+values+[item.data_loss]], columns=columns))
+            else:
+                df = df.append(DataFrame([[item.dt]+values], columns=columns))                
+        df = df.set_index('Timestamp')
+        return df
+        
     def plot(self, engine='dg', **kwargs):
         if 'aggregate' in kwargs:
             if kwargs['aggregate'] is False:
@@ -855,12 +879,13 @@ class DataTimeSlotSeries(DataSlotSeries, TimeSlotSeries):
             
             # Physical
             unit_str=unit_str.replace('H', 'h')    # Hour
-            unit_str=unit_str.replace('T', 'h')    # Minute
-            unit_str=unit_str.replace('min', 'h')  # Minute
+            unit_str=unit_str.replace('T', 'm')    # Minute
+            unit_str=unit_str.replace('min', 'm')  # Minute
             unit_str=unit_str.replace('S', 's')    # Second
             
             if len(unit_str) == 1:
                 unit_str = '1'+unit_str
+            logger.info('Assuming a slot time unit of "{}"'.format(unit_str))
             
             for row in df.iterrows():
                 
@@ -873,7 +898,6 @@ class DataTimeSlotSeries(DataSlotSeries, TimeSlotSeries):
                 data = {}
                 for i,label in enumerate(labels):
                     data[label] = row[1][i]
-                
                 data_time_slots.append(DataTimeSlot(dt=dt, unit=TimeUnit(unit_str), data=data))
             
             # Set the list of data time points
@@ -883,6 +907,29 @@ class DataTimeSlotSeries(DataSlotSeries, TimeSlotSeries):
         # Original init
         super(DataTimeSlotSeries, self).__init__(*args, **kwargs)
 
+    @property
+    def df(self):
+        data_keys = self.data_keys()
+        
+        if self[0].data_loss is not None:
+            dump_data_loss = True
+        else:
+            dump_data_loss = False
+        
+        if dump_data_loss:
+            columns = ['Timestamp'] + data_keys + ['data_loss']
+        else:
+            columns = ['Timestamp'] + data_keys
+            
+        df = DataFrame(columns=columns)
+        for item in self:
+            values = [item.data[key] for key in data_keys]
+            if dump_data_loss:
+                df = df.append(DataFrame([[item.dt]+values+[item.data_loss]], columns=columns))
+            else:
+                df = df.append(DataFrame([[item.dt]+values], columns=columns))                
+        df = df.set_index('Timestamp')
+        return df
 
     def plot(self, engine='dg', **kwargs):
         if 'aggregate' in kwargs:

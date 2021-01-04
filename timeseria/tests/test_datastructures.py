@@ -328,6 +328,13 @@ class TestPointSeries(unittest.TestCase):
         self.assertEqual(len(data_time_point_series),6)
         self.assertEqual(data_time_point_series[0].dt,dt(2020,4,3,0,0,0))
         self.assertEqual(data_time_point_series[5].dt,dt(2020,4,3,5,0,0))
+        
+        # Test creating a Pandas data frame from a time series
+        self.assertEqual(len(data_time_point_series.df),6)
+        self.assertEqual(data_time_point_series.df.index[0],dt(2020,4,3,0,0,0))
+        self.assertEqual(list(data_time_point_series.df.columns),['C','RH'])
+        self.assertEqual(data_time_point_series.df.iloc[0][0],21.7)
+        self.assertEqual(data_time_point_series.df.iloc[0][1],54.9)
 
 
 class TestUnit(unittest.TestCase):
@@ -621,6 +628,13 @@ class TestSlotSeries(unittest.TestCase):
         self.assertEqual(len(data_time_slot_series),5)
         self.assertEqual(data_time_slot_series[0].start.dt,dt(2020,4,3,0,0,0))
         self.assertEqual(data_time_slot_series[4].end.dt,dt(2020,4,3,10,0,0))
+
+        # Test creating a Pandas data frame from a time series
+        self.assertEqual(len(data_time_slot_series.df),5)
+        self.assertEqual(data_time_slot_series.df.index[0],dt(2020,4,3,0,0,0))
+        self.assertEqual(list(data_time_slot_series.df.columns),['C','RH'])
+        self.assertEqual(data_time_slot_series.df.iloc[0][0],21.7)
+        self.assertEqual(data_time_slot_series.df.iloc[0][1],54.9)
 
         
     def test_cannge_timezone_DataTimeSlotSeries(self):
