@@ -49,7 +49,7 @@ class TimeUnit(Unit):
     human (months, for example) or defined from a start to an end'''
     
     HUMAN  = 'Human'
-    PHYSICAL = 'Phyisical'
+    PHYSICAL = 'Physical'
     
     # NOT ref to https://docs.python.org/3/library/datetime.html#strftime-and-strptime-format-codes :  %d, %m, %w %y - %H, %M, %S
     # Instead: M, D, Y, W - h m s
