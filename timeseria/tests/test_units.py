@@ -64,8 +64,8 @@ class TestUnits(unittest.TestCase):
         # Test type
         self.assertEqual(TimeUnit('15m').type, TimeUnit.PHYSICAL)
         self.assertEqual(TimeUnit('1h').type, TimeUnit.PHYSICAL)
-        self.assertEqual(TimeUnit('1D').type, TimeUnit.LOGICAL)
-        self.assertEqual(TimeUnit('1M').type, TimeUnit.LOGICAL)
+        self.assertEqual(TimeUnit('1D').type, TimeUnit.HUMAN)
+        self.assertEqual(TimeUnit('1M').type, TimeUnit.HUMAN)
         
         # Test sum with TimePoint
         time_unit = TimeUnit('1h')
@@ -73,6 +73,64 @@ class TestUnits(unittest.TestCase):
         time_point = TimePoint(60)
         self.assertEqual((time_point+time_unit).t, 3660)
 
+
+    def test_TimeUnit_duration(self):
+
+        date_time1 = dt(2015,10,24,0,15,0, tzinfo='Europe/Rome')
+        date_time2 = dt(2015,10,25,0,15,0, tzinfo='Europe/Rome')
+        date_time3 = dt(2015,10,26,0,15,0, tzinfo='Europe/Rome')
+ 
+        # Day unit
+        time_unit = TimeUnit('1D')
+        self.assertEqual(time_unit.duration_s(date_time1), 86400) # No DST, standard day
+        self.assertEqual(time_unit.duration_s(date_time2), 90000) # DST, change
+                 
+        # Week unit
+        time_unit = TimeUnit('1W')
+        self.assertEqual(time_unit.duration_s(date_time1), (86400*7)+3600)
+        self.assertEqual(time_unit.duration_s(date_time3), (86400*7))
+         
+        # Month Unit
+        time_unit = TimeUnit('1M')
+        self.assertEqual(time_unit.duration_s(date_time1), ((86400*31)+3600)) # October has 31 days, but here we have a DST change in the middle
+        self.assertEqual(time_unit.duration_s(date_time3), (86400*31)) # October has 31 days
+
+        # Year Unit
+        time_unit = TimeUnit('1Y')
+        self.assertEqual(time_unit.duration_s(dt(2014,10,24,0,15,0, tzinfo='Europe/Rome')), (86400*365)) # Standard year
+        self.assertEqual(time_unit.duration_s(dt(2015,10,24,0,15,0, tzinfo='Europe/Rome')), (86400*366)) # Leap year
+        
+
+    def test_TimeUnit_shift_dt(self):
+
+        date_time1 = dt(2015,10,24,0,15,0, tzinfo='Europe/Rome')
+        date_time2 = dt(2015,10,25,0,15,0, tzinfo='Europe/Rome')
+        date_time3 = dt(2015,10,26,0,15,0, tzinfo='Europe/Rome')
+
+        # Day unit
+        time_unit = TimeUnit('1D')
+        self.assertEqual(time_unit.shift_dt(date_time1), dt(2015,10,25,0,15,0, tzinfo='Europe/Rome')) # No DST, standard day
+        self.assertEqual(time_unit.shift_dt(date_time2), dt(2015,10,26,0,15,0, tzinfo='Europe/Rome')) # DST, change
+                 
+        # Week unit
+        time_unit = TimeUnit('1W')
+        self.assertEqual(time_unit.shift_dt(date_time1), dt(2015,10,31,0,15,0, tzinfo='Europe/Rome'))
+        self.assertEqual(time_unit.shift_dt(date_time3), dt(2015,11,2,0,15,0, tzinfo='Europe/Rome'))
+         
+        # Month Unit
+        time_unit = TimeUnit('1M')
+        self.assertEqual(time_unit.shift_dt(date_time1), dt(2015,11,24,0,15,0, tzinfo='Europe/Rome'))
+        self.assertEqual(time_unit.shift_dt(date_time2), dt(2015,11,25,0,15,0, tzinfo='Europe/Rome'))
+        self.assertEqual(time_unit.shift_dt(date_time3), dt(2015,11,26,0,15,0, tzinfo='Europe/Rome'))
+        
+        # Test 12%12 must give 12 edge case
+        self.assertEqual(time_unit.shift_dt(dt(2015,1,1,0,0,0, tzinfo='Europe/Rome')), dt(2015,2,1,0,0,0, tzinfo='Europe/Rome'))
+        self.assertEqual(time_unit.shift_dt(dt(2015,11,1,0,0,0, tzinfo='Europe/Rome')), dt(2015,12,1,0,0,0, tzinfo='Europe/Rome'))
+
+        # Year Unit
+        time_unit = TimeUnit('1Y')
+        self.assertEqual(time_unit.shift_dt(date_time1), dt(2016,10,24,0,15,0, tzinfo='Europe/Rome'))
+        
 
     def test_TimeUnit_math(self):
 
@@ -83,20 +141,17 @@ class TestUnits(unittest.TestCase):
         with self.assertRaises(InputException):
             _ = time_unit.floor_dt(date_time)
 
-
         # Test in ceil/floor/round normal conditions (hours)
         time_unit = TimeUnit('1h')
         date_time = dt(2015,1,1,16,37,14, tzinfo='Europe/Rome')
         self.assertEqual(time_unit.floor_dt(date_time), dt(2015,1,1,16,0,0, tzinfo='Europe/Rome'))
         self.assertEqual(time_unit.ceil_dt(date_time), dt(2015,1,1,17,0,0, tzinfo='Europe/Rome'))
 
-         
         # Test in ceil/floor/round normal conditions (minutes)
         time_unit = TimeUnit('15m')
         date_time = dt(2015,1,1,16,37,14, tzinfo='Europe/Rome')
         self.assertEqual(time_unit.floor_dt(date_time), dt(2015,1,1,16,30,0, tzinfo='Europe/Rome'))
         self.assertEqual(time_unit.ceil_dt(date_time), dt(2015,1,1,16,45,0, tzinfo='Europe/Rome'))
-
 
         # Test ceil/floor/round in normal conditions (seconds)
         time_unit = TimeUnit('30s')
@@ -104,7 +159,6 @@ class TestUnits(unittest.TestCase):
         self.assertEqual(time_unit.floor_dt(date_time), dt(2015,1,1,16,37,0, tzinfo='Europe/Rome'))
         self.assertEqual(time_unit.ceil_dt(date_time), dt(2015,1,1,16,37,30, tzinfo='Europe/Rome'))
 
-   
         # Test ceil/floor/round across 1970-1-1 (minutes) 
         time_unit = TimeUnit('5m')
         date_time1 = dt(1969,12,31,23,57,29, tzinfo='UTC') # epoch = -3601
@@ -114,7 +168,6 @@ class TestUnits(unittest.TestCase):
         self.assertEqual(time_unit.round_dt(date_time1), dt(1969,12,31,23,55,0, tzinfo='UTC'))
         self.assertEqual(time_unit.round_dt(date_time2), dt(1970,1,1,0,0, tzinfo='UTC'))
 
-
         # Test ceil/floor/round (3 hours-test)
         time_unit = TimeUnit('3h')
         date_time = dt(1969,12,31,22,0,1, tzinfo='Europe/Rome') # negative epoch
@@ -122,7 +175,6 @@ class TestUnits(unittest.TestCase):
         # TODO: test fails!! fix me!        
         #self.assertEqual(time_unit.floor_dt(date_time1), dt(1969,12,31,21,0,0, tzinfo='Europe/Rome'))
         #self.assertEqual(time_unit.ceil_dt(date_time1), dt(1970,1,1,0,0, tzinfo='Europe/Rome'))
-
 
         # Test ceil/floor/round across 1970-1-1 (together with the 2 hours-test, TODO: decouple) 
         time_unit = TimeUnit('2h')
@@ -157,25 +209,41 @@ class TestUnits(unittest.TestCase):
         self.assertEqual(time_unit.ceil_dt(date_time4), date_time5_rounded)
 
 
-        # Test ceil/floor/round with a logical timeunit
-        #time_unit = TimeUnit('1D')
+        # Test ceil/floor/round with a human timeunit and across a DST change
         
-        #date_time1 = dt(2015,10,25,0,15,0, tzinfo='Europe/Rome')
-        #date_time1_floor = dt(2015,10,25,0,0,0, tzinfo='Europe/Rome')
-
-
-        # TODO (test shift as well)        
-        #time_unit = TimeUnit('15m')
-        #date_time = dt(2015,1,1,16,37,14, tzinfo='Europe/Rome')
-        #date_time_rounded = dt(2015,1,1,16,0,0, tzinfo='Europe/Rome')
+        # Day unit
+        time_unit = TimeUnit('1D')
         
-        #print shift_dt(date_time, time_unit, 4)
-        #print shift_dt(date_time, time_unit, -2)
+        date_time1 = dt(2015,10,25,4,15,34, tzinfo='Europe/Rome') # DST off (+01:00)
+        date_time1_floor = dt(2015,10,25,0,0,0, tzinfo='Europe/Rome') # DST on (+02:00)
+        date_time1_ceil = dt(2015,10,26,0,0,0, tzinfo='Europe/Rome') # DST off (+01:00)
 
-        #print shift_dt(date_time_rounded, time_unit, 4)
-        #print shift_dt(date_time_rounded, time_unit, -2)
+        self.assertEqual(time_unit.floor_dt(date_time1), date_time1_floor)
+        self.assertEqual(time_unit.ceil_dt(date_time1), date_time1_ceil)
 
-        # Test shift across DST change
+        # Month unit
+        time_unit = TimeUnit('1M')
+        
+        date_time1 = dt(2015,10,25,4,15,34, tzinfo='Europe/Rome') # DST off (+01:00)
+        date_time1_floor = dt(2015,10,1,0,0,0, tzinfo='Europe/Rome') # DST on (+02:00)
+        date_time1_ceil = dt(2015,11,1,0,0,0, tzinfo='Europe/Rome') # DST off (+01:00)
+
+        self.assertEqual(time_unit.floor_dt(date_time1), date_time1_floor)
+        self.assertEqual(time_unit.ceil_dt(date_time1), date_time1_ceil)
+
+        # Week unit
+        # TODO: not implemented...
+
+        # Year unit
+        time_unit = TimeUnit('1Y')
+        
+        date_time1 = dt(2015,10,25,4,15,34, tzinfo='Europe/Rome')
+        date_time1_floor = dt(2015,1,1,0,0,0, tzinfo='Europe/Rome')
+        date_time1_ceil = dt(2016,1,1,0,0,0, tzinfo='Europe/Rome')
+
+        self.assertEqual(time_unit.floor_dt(date_time1), date_time1_floor)
+        self.assertEqual(time_unit.ceil_dt(date_time1), date_time1_ceil)
+
 
     def tearDown(self):
         pass

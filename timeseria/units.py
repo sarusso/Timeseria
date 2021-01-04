@@ -1,7 +1,9 @@
 import datetime
+import math
 from .time import s_from_dt , dt_from_s, get_tz_offset_s
+from .time import check_dt_consistency, correct_dt_dst
 from .exceptions import InputException, ConsistencyException
-
+            
 # Setup logging
 import logging
 logger = logging.getLogger(__name__)
@@ -44,10 +46,10 @@ class Unit(object):
 
 class TimeUnit(Unit):
     ''' A time unit which can be both be physical (hours, minutes..),
-    logical (months, for example) or defined from a start to an end'''
+    human (months, for example) or defined from a start to an end'''
     
-    LOGICAL  = 'Logical'
-    PHYSICAL = 'Phyisical'
+    HUMAN  = 'Human'
+    PHYSICAL = 'Physical'
     
     # NOT ref to https://docs.python.org/3/library/datetime.html#strftime-and-strptime-format-codes :  %d, %m, %w %y - %H, %M, %S
     # Instead: M, D, Y, W - h m s
@@ -203,12 +205,12 @@ class TimeUnit(Unit):
     def type(self):
         '''Returns the type of the TimeUnit.
          - Physical if hours, minutes, seconds, micorseconds
-         - Logical if Years, Months, Days, Weeks
+         - Human if Years, Months, Days, Weeks
         The difference? Years, Months, Days, Weeks have different durations depending on the starting date.
         '''
 
         if self.years or self.months or self.weeks or self.days:
-            return self.LOGICAL
+            return self.HUMAN
         elif self.hours or self.minutes or self.seconds or self.microseconds:
             return self.PHYSICAL
         else:
@@ -220,8 +222,8 @@ class TimeUnit(Unit):
         else:
             return False
         
-    def is_logical(self):
-        if self.type == self.LOGICAL:
+    def is_human(self):
+        if self.type == self.HUMAN:
             return True 
         else:       
             return False        
@@ -234,14 +236,13 @@ class TimeUnit(Unit):
 
         if not time_dt.tzinfo:
             raise InputException('Timezone of the datetime is required')    
-        
-        # Convert input time to seconds
-        time_s = s_from_dt(time_dt)
-        tz_offset_s = get_tz_offset_s(time_dt)
-        
-
+                
         # Handle physical time 
         if self.type == self.PHYSICAL:
+        
+            # Convert input time to seconds
+            time_s = s_from_dt(time_dt)
+            tz_offset_s = get_tz_offset_s(time_dt)
             
             # Get TimeUnit duration in seconds
             time_unit_s = self.duration_s(time_dt)
@@ -271,29 +272,43 @@ class TimeUnit(Unit):
                     time_rounded_s = time_floor_s
                 else:
                     time_rounded_s = time_ceil_s
+                
+            rounded_dt = dt_from_s(time_rounded_s, tz=time_dt.tzinfo)
 
-        # Handle logical time 
-        elif self.type == self.LOGICAL:
+        # Handle human time 
+        elif self.type == self.HUMAN:
             
+            if self.years:
+                if self.years > 1:
+                    raise NotImplementedError('Cannot round based on HUMAN TimeUnits > 1')
+                rounded_dt=time_dt.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+                
+            if self.months:
+                if self.months > 1:
+                    raise NotImplementedError('Cannot round based on HUMAN TimeUnits > 1')
+                rounded_dt=time_dt.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+            if self.weeks:
+                raise NotImplementedError('Cannot round based on HUMAN TimeUnits of week type')
+
+            if self.days:
+                if self.days > 1:
+                    raise NotImplementedError('Cannot round based on HUMAN TimeUnits > 1')
+                rounded_dt=time_dt.replace(hour=0, minute=0, second=0, microsecond=0)
+
+            # Check DST offset consistency and fix if not respected
+            if not check_dt_consistency(rounded_dt):
+                rounded_dt = correct_dt_dst(rounded_dt)
             
-            # Get TimeUnit duration in seconds
-            time_unit_s = self.duration_s(time_dt)
-            
-            logger.debug(time_unit_s)
-            
-            #time_rounded_s
-            
-            
-            
-            
-            
-            raise NotImplementedError('Logical not yet implemented')
+            if how == 'ceil':
+                rounded_dt = self.shift_dt(rounded_dt, 1)
 
         # Handle other cases (Consistency error)
         else:
-            raise ConsistencyException('Error, TimeSlot type not PHYSICAL nor LOGICAL?!')
+            raise ConsistencyException('Error, TimeSlot type not PHYSICAL nor HUMAN?!')
 
-        return dt_from_s(time_rounded_s, tz=time_dt.tzinfo)
+        # Return
+        return rounded_dt
 
 
     def floor_dt(self, time_dt):
@@ -320,30 +335,74 @@ class TimeUnit(Unit):
         if self.type == self.PHYSICAL:
             
             # Get TimeUnit duration in seconds
-            time_unit_s = self.duration_s(time_dt)
+            time_unit_s = self.duration_s()
 
             time_shifted_s = time_s + ( time_unit_s * times )
             time_shifted_dt = dt_from_s(time_shifted_s, tz=time_dt.tzinfo)
+            
+            return time_shifted_dt   
 
-        # Handle logical time TimeSlot
-        elif self.type == self.LOGICAL:
-            raise NotImplementedError('Shifting of Logical intervals not yet implemented')
+        # Handle human time TimeSlot
+        elif self.type == self.HUMAN:
+
+            # Create a TimeDelta object for everything but years and months
+            delta = datetime.timedelta(weeks = self.weeks,
+                                       days = self.days,
+                                       hours = self.hours,
+                                       minutes = self.minutes,
+                                       seconds = self.seconds,
+                                       microseconds = self.microseconds)
+            
+            # Apply the time deta for the shif
+            time_shifted_dt = time_dt + delta
+            
+            # Handle years
+            if self.years:
+                time_shifted_dt = time_shifted_dt.replace(year=time_shifted_dt.year + self.years)
+            
+            # Handle months
+            if self.months:
+                
+                tot_months = self.months + time_shifted_dt.month             
+                years_to_add = math.floor(tot_months/12.0)
+                new_month = (tot_months % 12 )
+                if new_month == 0:
+                    new_month=12
+                    years_to_add = years_to_add -1
+    
+                time_shifted_dt = time_shifted_dt.replace(year=time_shifted_dt.year + years_to_add)
+                time_shifted_dt = time_shifted_dt.replace(month=new_month)
+            
+            # Check DST offset consistency and fix if not respected
+            if not check_dt_consistency(time_shifted_dt):
+                time_shifted_dt = correct_dt_dst(time_shifted_dt)
 
         # Handle other cases (Consistency error)
         else:
-            raise ConsistencyException('Error, TimeSlot type not PHYSICAL nor LOGICAL?!')
+            raise ConsistencyException('Error, TimeSlot type not PHYSICAL nor HUMAN?!')
+        
+        # Return
+        return time_shifted_dt   
+        
  
-        return time_shifted_dt      
 
     def duration_s(self, start_dt=None):
         '''Get the duration of the interval in seconds'''
         if self.is_composite():
             raise InputException('Sorry, only simple time intervals are supported by this operation')
 
-        if self.type == 'Logical' and not start_dt:
-            raise InputException('With a logical TimeUnit you can ask for duration only if you provide the starting point')
+        if self.type == 'Human' and not start_dt:
+            raise InputException('With a human TimeUnit you can ask for duration only if you provide the starting point')
         
-        if self.type == 'Logical':
+        if self.type == 'Human':
+            
+            end_dt = self.shift_dt(start_dt, 1)
+            
+            start_epoch = s_from_dt(start_dt)
+            end_epoch = s_from_dt(end_dt)
+
+            return (end_epoch - start_epoch)
+            
             raise NotImplementedError('Computing the duration in seconds using a given start_time_dt is not yet supported')
 
         else:
@@ -361,8 +420,8 @@ class TimeUnit(Unit):
         
     #@property
     #def duration(self):
-    #    if self.type == 'Logical':
-    #        raise InputException('Sorry, the duration of a LOGICAL time unit is not defined. use duration_s() providing the starting point.')
+    #    if self.type == 'Human':
+    #        raise InputException('Sorry, the duration of a HUMAN time unit is not defined. use duration_s() providing the starting point.')
     #    return self.duration_s()
 
 
