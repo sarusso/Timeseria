@@ -9,6 +9,64 @@ logger = logging.getLogger(__name__)
 
 HARD_DEBUG = False
 
+#========================== 
+#  Utilities
+#==========================
+
+def unit_to_TimeUnit(unit):
+    if isinstance(unit, TimeUnit):
+        time_unit = unit
+    elif isinstance(unit, int):
+        time_unit = TimeUnit(seconds=unit)
+    elif isinstance(unit, float):
+        if int(str(unit).split('.')[1]) != 0:
+            raise ValueError('Cannot process decimal seconds yet')
+        time_unit = TimeUnit(seconds=unit)
+    elif isinstance(unit, str):
+        time_unit = TimeUnit(unit)
+        unit = time_unit
+    else:
+        raise ValueError('Unknown unit type "{}"'.format(unit.__class__.__name__))
+    return time_unit
+
+
+def detect_dataPoints_validity(data_time_pointSeries):
+
+    diffs={}
+    prev_data_time_point=None
+    for data_time_point in data_time_pointSeries:
+        if prev_data_time_point is not None:
+            diff = data_time_point.t - prev_data_time_point.t
+            if diff not in diffs:
+                diffs[diff] = 1
+            else:
+                diffs[diff] +=1
+        prev_data_time_point = data_time_point
+    
+    # Iterate until the diffs are not too spread, then pick the maximum.
+    i=0
+    while is_almost_equal(len(diffs), len(data_time_pointSeries)):
+        or_diffs=diffs
+        diffs={}
+        for diff in or_diffs:
+            diff=round(diff)
+            if diff not in diffs:
+                diffs[diff] = 1
+            else:
+                diffs[diff] +=1            
+        
+        if i > 10:
+            raise Exception('Cannot automatically detect original resolution')
+    
+    most_common_diff_total = 0
+    most_common_diff = None
+    for diff in diffs:
+        if diffs[diff] > most_common_diff_total:
+            most_common_diff_total = diffs[diff]
+            most_common_diff = diff
+    return(most_common_diff)
+
+
 
 #==========================
 #  Base Transformation
@@ -30,66 +88,14 @@ class Transformation(object):
 
 class Slotter(Transformation):
 
+
     def __init__(self, unit):
-        if isinstance(unit, str) or isinstance(unit, TimeUnit):
-            self.time_unit = self._unit_to_TimeUnit(unit)
+        if isinstance(unit, int):
+            self.time_unit = unit_to_TimeUnit(unit)
+        elif isinstance(unit, str) or isinstance(unit, TimeUnit):
+            self.time_unit = unit_to_TimeUnit(unit)
         else:
-            raise NotImplementedError('Sorry, only TimeUnit objects or their string representation are supported by the Slotter for now')
-            
-
-    @classmethod
-    def _unit_to_TimeUnit(cls, unit):
-        if isinstance(unit, TimeUnit):
-            time_unit = unit
-        elif isinstance(unit, int):
-            time_unit = TimeUnit(seconds=unit)
-        elif isinstance(unit, float):
-            if int(str(unit).split('.')[1]) != 0:
-                raise ValueError('Cannot process decimal seconds yet')
-            time_unit = TimeUnit(seconds=unit)
-        elif isinstance(unit, str):
-            time_unit = TimeUnit(unit)
-            unit = time_unit
-        else:
-            raise ValueError('Unknown unit type "{}"'.format(unit.__class__.__name__))
-        return time_unit
-
-    @classmethod
-    def _detect_dataPoints_validity(cls, data_time_pointSeries):
-    
-        diffs={}
-        prev_data_time_point=None
-        for data_time_point in data_time_pointSeries:
-            if prev_data_time_point is not None:
-                diff = data_time_point.t - prev_data_time_point.t
-                if diff not in diffs:
-                    diffs[diff] = 1
-                else:
-                    diffs[diff] +=1
-            prev_data_time_point = data_time_point
-        
-        # Iterate until the diffs are not too spread, then pick the maximum.
-        i=0
-        while is_almost_equal(len(diffs), len(data_time_pointSeries)):
-            or_diffs=diffs
-            diffs={}
-            for diff in or_diffs:
-                diff=round(diff)
-                if diff not in diffs:
-                    diffs[diff] = 1
-                else:
-                    diffs[diff] +=1            
-            
-            if i > 10:
-                raise Exception('Cannot automatically detect dataPoints validity')
-        
-        most_common_diff_total = 0
-        most_common_diff = None
-        for diff in diffs:
-            if diffs[diff] > most_common_diff_total:
-                most_common_diff_total = diffs[diff]
-                most_common_diff = diff
-        return(most_common_diff)
+            raise NotImplementedError('Sorry, only (re) resolutions as int (seconds) or TimeUnit objects (or their string representation) are supported')
 
 
     def _compute_slot(self, data_time_pointSeries, unit, start_t, end_t, validity, timezone, fill_with, force_coverage, fill_gaps, interpolation_method):
@@ -207,7 +213,7 @@ class Slotter(Transformation):
         
         # Automatically detect validity if not set
         if validity is None:
-            validity = self._detect_dataPoints_validity(data_time_pointSeries)
+            validity = detect_dataPoints_validity(data_time_pointSeries)
             logger.info('Auto-detected points validity: %ss', validity)
         
 
@@ -403,68 +409,14 @@ class Slotter(Transformation):
 
 class Resampler(Transformation):
 
+
     def __init__(self, unit):
         if isinstance(unit, int):
-            self.time_unit = self._unit_to_TimeUnit(unit)
-        elif isinstance(unit, TimeUnit):
-            self.time_unit = unit
+            self.time_unit = unit_to_TimeUnit(unit)
+        elif isinstance(unit, str) or isinstance(unit, TimeUnit):
+            self.time_unit = unit_to_TimeUnit(unit)
         else:
-            raise NotImplementedError('Sorry, only (re) resolutions as int (seconds) or TimeUnit objects are supported')
-
-    @classmethod
-    def _unit_to_TimeUnit(cls, unit):
-        if isinstance(unit, TimeUnit):
-            time_unit = unit
-        elif isinstance(unit, int):
-            time_unit = TimeUnit(seconds=unit)
-        elif isinstance(unit, float):
-            if int(str(unit).split('.')[1]) != 0:
-                raise ValueError('Cannot process decimal seconds yet')
-            time_unit = TimeUnit(seconds=unit)
-        elif isinstance(unit, str):
-            time_unit = TimeUnit(unit)
-            unit = time_unit
-        else:
-            raise ValueError('Unknown unit type "{}"'.format(unit.__class__.__name__))
-        return time_unit
-
-
-    @classmethod
-    def _detect_dataPoints_validity(cls, data_time_pointSeries):
-    
-        diffs={}
-        prev_data_time_point=None
-        for data_time_point in data_time_pointSeries:
-            if prev_data_time_point is not None:
-                diff = data_time_point.t - prev_data_time_point.t
-                if diff not in diffs:
-                    diffs[diff] = 1
-                else:
-                    diffs[diff] +=1
-            prev_data_time_point = data_time_point
-        
-        # Iterate until the diffs are not too spread, then pick the maximum.
-        i=0
-        while is_almost_equal(len(diffs), len(data_time_pointSeries)):
-            or_diffs=diffs
-            diffs={}
-            for diff in or_diffs:
-                diff=round(diff)
-                if diff not in diffs:
-                    diffs[diff] = 1
-                else:
-                    diffs[diff] +=1            
-            
-            if i > 10:
-                raise Exception('Cannot automatically detect original resolution')
-        
-        most_common_diff_total = 0
-        most_common_diff = None
-        for diff in diffs:
-            if diffs[diff] > most_common_diff_total:
-                most_common_diff_total = diffs[diff]
-                most_common_diff = diff
-        return(most_common_diff)
+            raise NotImplementedError('Sorry, only (re) resolutions as int (seconds) or TimeUnit objects (or their string representation) are supported')
 
 
     def _compute_resampled_point(self, data_time_pointSeries, unit, start_t, end_t, validity, timezone, fill_with, force_coverage, fill_gaps, interpolation_method):
@@ -588,7 +540,7 @@ class Resampler(Transformation):
         
         # Automatically detect validity if not set
         if validity is None:
-            validity = self._detect_dataPoints_validity(data_time_pointSeries)
+            validity = detect_dataPoints_validity(data_time_pointSeries)
             logger.info('Auto-detected points validity: %ss', validity)
         
 

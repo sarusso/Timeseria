@@ -4,7 +4,7 @@ from ..datastructures import Point, TimePoint, DataPoint, DataTimePoint, DataTim
 from ..datastructures import Series, DataPointSeries, TimePointSeries, DataTimePointSeries
 from ..storages import CSVFileStorage
 #from ..operators import diff, min, slot, Slotter,
-from ..transformations import Slotter
+from ..transformations import Resampler, Slotter, detect_dataPoints_validity, unit_to_TimeUnit 
 from ..time import dt, s_from_dt, dt_from_s, dt_from_str
 from ..exceptions import InputException
 from ..units import TimeUnit
@@ -104,28 +104,28 @@ class TestSlotter(unittest.TestCase):
 
     def test_unit_to_TimeUnit(self):
         
-        Slotter._unit_to_TimeUnit('1h')
-        Slotter._unit_to_TimeUnit(TimeUnit('1h'))
+        unit_to_TimeUnit('1h')
+        unit_to_TimeUnit(TimeUnit('1h'))
         
         with self.assertRaises(InputException):
-            Slotter._unit_to_TimeUnit('NO')
+            unit_to_TimeUnit('NO')
         
         
 
     def test_detect_dataPoints_validity(self):
         
         data_time_point_series = CSVFileStorage(TEST_DATA_PATH + '/csv/humitemp_short.csv').get()
-        self.assertEqual(Slotter._detect_dataPoints_validity(data_time_point_series), 61)
+        self.assertEqual(detect_dataPoints_validity(data_time_point_series), 61)
         
         data_time_point_series = CSVFileStorage(TEST_DATA_PATH + '/csv/shampoo_sales.csv', time_column = 'Month', time_format = '%y-%m').get()
-        self.assertEqual(Slotter._detect_dataPoints_validity(data_time_point_series), 2678400)
+        self.assertEqual(detect_dataPoints_validity(data_time_point_series), 2678400)
         # TODO: 2678400/60/60/24 = 31 --> detect month? same for day, week, year?
 
         data_time_point_series = CSVFileStorage(TEST_DATA_PATH + '/csv/temperature.csv').get()
-        self.assertEqual(Slotter._detect_dataPoints_validity(data_time_point_series), 600)
+        self.assertEqual(detect_dataPoints_validity(data_time_point_series), 600)
 
         data_time_point_series = CSVFileStorage(TEST_DATA_PATH + '/csv/temp_short_1h.csv').get()
-        self.assertEqual(Slotter._detect_dataPoints_validity(data_time_point_series), 3600)
+        self.assertEqual(detect_dataPoints_validity(data_time_point_series), 3600)
 
 
     def test_slot(self):
