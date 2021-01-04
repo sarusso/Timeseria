@@ -247,7 +247,7 @@ class Slotter(Transformation):
             #    from_dt = self.time_unit.timeInterval.round_dt(data_time_point.dt) if rounded else data_time_point.dt
             
             # Pretend there was a slot before if we are at the beginning. TOOD: improve me.
-            if not slot_end_t:   
+            if slot_end_t is None:   
                 slot_end_t = from_t
 
             # First, check if we have some points to discard at the beginning       
@@ -628,7 +628,7 @@ class Resampler(Transformation):
             #    from_dt = self.time_unit.timeInterval.round_dt(data_time_point.dt) if rounded else data_time_point.dt
             
             # Pretend there was a slot before if we are at the beginning. TOOD: improve me.
-            if not slot_end_t:   
+            if slot_end_t is None:   
                 slot_end_t = from_t
 
             # First, check if we have some points to discard at the beginning       
@@ -696,7 +696,7 @@ class Resampler(Transformation):
                     # Create a new slot. This is where all the "conventional" time logic kicks-in, and where the time zone is required.
                     slot_start_t = slot_end_t
                     slot_end_t   = s_from_dt(dt_from_s(slot_start_t, tz=timezone) + self.time_unit)
-                    
+
                     # Create a new working_serie as part of the "create a new slot" procedure
                     working_serie = DataTimePointSeries()
                     
