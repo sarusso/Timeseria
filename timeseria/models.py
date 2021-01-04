@@ -40,20 +40,11 @@ def get_periodicity_index(item, resolution, periodicity, dst_affected=False):
 
     # Handle specific cases
     if isinstance(resolution, TimeUnit):  
-        if resolution.type == TimeUnit.LOGICAL:
-            raise NotImplementedError('LOGICAL time units are not yet supported')
-        elif resolution.type == TimeUnit.PHYSICAL:
-            pass
-        else:
-            raise Exception('Consistency error, got item unit type "{}" which is unknown'.format(resolution.type))
-
-        resolution_s = resolution.duration_s()
-    
+        resolution_s = resolution.duration_s(item.dt)
     elif isinstance(resolution, Unit):  
         if isinstance(resolution.value, list):
             raise NotImplementedError('Sorry, periodicty in multi-dimensional spaces are not defined')
         resolution_s = resolution.value
-
     else:
         if isinstance(resolution, list):
             raise NotImplementedError('Sorry, periodicty in multi-dimensional spaces are not defined')
