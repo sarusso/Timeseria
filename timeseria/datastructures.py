@@ -2,6 +2,8 @@ from .time import s_from_dt , dt_from_s, UTC, timezonize
 from .units import Unit, TimeUnit
 from .utilities import is_close
 from copy import deepcopy
+from pandas import DataFrame
+from datetime import datetime
 
 # Setup logging
 import logging
@@ -433,11 +435,75 @@ class DataPointSeries(PointSeries):
             except AttributeError:
                 return list(range(len(self[0].data)))
 
+
 class DataTimePointSeries(DataPointSeries, TimePointSeries):
     '''A series of DataTimePoint where each item is guaranteed to carry the same data type and to be ordered'''
 
     __TYPE__ = DataTimePoint
 
+    def __init__(self, *args, **kwargs):
+
+        # Handle df kwarg
+        df = kwargs.pop('df', None)
+        
+        # Handle first argument as dataframe
+        if args and (isinstance(args[0], DataFrame)):
+            df = args[0]
+
+        # Do we have to initialize the time series from a dataframe?        
+        if df is not None:
+
+            # Create data time points list
+            data_time_points = []
+            
+            # Get data frame labels
+            labels = list(df.columns) 
+            
+            for row in df.iterrows():
+                
+                # Set the timestamp
+                if not isinstance(row[0], datetime):
+                    raise TypeError('A DataFrame with a DateTime index column is required')
+                dt = row[0]
+                
+                # Prepare data
+                data = {}
+                for i,label in enumerate(labels):
+                    data[label] = row[1][i]
+                
+                data_time_points.append(DataTimePoint(dt=dt, data=data))
+            
+            # Set the list of data time points
+            super(DataTimePointSeries, self).__init__(*data_time_points, **kwargs)
+            return None
+        
+        # Original init
+        super(DataTimePointSeries, self).__init__(*args, **kwargs)
+
+    @property
+    def df(self):
+        data_keys = self.data_keys()
+        
+        if self[0].data_loss is not None:
+            dump_data_loss = True
+        else:
+            dump_data_loss = False
+        
+        if dump_data_loss:
+            columns = ['Timestamp'] + data_keys + ['data_loss']
+        else:
+            columns = ['Timestamp'] + data_keys
+            
+        df = DataFrame(columns=columns)
+        for item in self:
+            values = [item.data[key] for key in data_keys]
+            if dump_data_loss:
+                df = df.append(DataFrame([[item.dt]+values+[item.data_loss]], columns=columns))
+            else:
+                df = df.append(DataFrame([[item.dt]+values], columns=columns))                
+        df = df.set_index('Timestamp')
+        return df
+        
     def plot(self, engine='dg', **kwargs):
         if 'aggregate' in kwargs:
             if kwargs['aggregate'] is False:
@@ -778,6 +844,93 @@ class DataTimeSlotSeries(DataSlotSeries, TimeSlotSeries):
 
     __TYPE__ = DataTimeSlot
 
+    def __init__(self, *args, **kwargs):
+
+        # Handle df kwarg
+        df = kwargs.pop('df', None)
+        
+        # Handle first argument as dataframe
+        if args and (isinstance(args[0], DataFrame)):
+            df = args[0]
+
+        # Do we have to initialize the time series from a dataframe?        
+        if df is not None:
+
+            # Create data time points list
+            data_time_slots = []
+            
+            # Get data frame labels
+            labels = list(df.columns) 
+
+            # Get TimeUnit directly using and converting the inferred frequncy on the Pandas Data Frame
+            unit_str=df.index.inferred_freq
+            
+            if not unit_str:
+                raise Exception('Cannot infer the time unit for the slots')
+            
+            # Human
+            unit_str=unit_str.replace('A', 'Y')    # Year (end) ?
+            unit_str=unit_str.replace('Y', 'Y')    # Year (end) )
+            unit_str=unit_str.replace('AS', 'Y')    # Year (start)
+            unit_str=unit_str.replace('YS', 'Y')    # Year (start)
+            unit_str=unit_str.replace('MS', 'M')    # Month (start)
+            unit_str=unit_str.replace('M', 'M')    # Month (end) 
+            unit_str=unit_str.replace('D', 'D')    # Day
+            
+            # Physical
+            unit_str=unit_str.replace('H', 'h')    # Hour
+            unit_str=unit_str.replace('T', 'm')    # Minute
+            unit_str=unit_str.replace('min', 'm')  # Minute
+            unit_str=unit_str.replace('S', 's')    # Second
+            
+            if len(unit_str) == 1:
+                unit_str = '1'+unit_str
+            logger.info('Assuming a slot time unit of "{}"'.format(unit_str))
+            
+            for row in df.iterrows():
+                
+                # Set the timestamp
+                if not isinstance(row[0], datetime):
+                    raise TypeError('A DataFrame with a DateTime index column is required')
+                dt = row[0]
+                
+                # Prepare data
+                data = {}
+                for i,label in enumerate(labels):
+                    data[label] = row[1][i]
+                data_time_slots.append(DataTimeSlot(dt=dt, unit=TimeUnit(unit_str), data=data))
+            
+            # Set the list of data time points
+            super(DataTimeSlotSeries, self).__init__(*data_time_slots, **kwargs)
+            return None
+        
+        # Original init
+        super(DataTimeSlotSeries, self).__init__(*args, **kwargs)
+
+    @property
+    def df(self):
+        data_keys = self.data_keys()
+        
+        if self[0].data_loss is not None:
+            dump_data_loss = True
+        else:
+            dump_data_loss = False
+        
+        if dump_data_loss:
+            columns = ['Timestamp'] + data_keys + ['data_loss']
+        else:
+            columns = ['Timestamp'] + data_keys
+            
+        df = DataFrame(columns=columns)
+        for item in self:
+            values = [item.data[key] for key in data_keys]
+            if dump_data_loss:
+                df = df.append(DataFrame([[item.dt]+values+[item.data_loss]], columns=columns))
+            else:
+                df = df.append(DataFrame([[item.dt]+values], columns=columns))                
+        df = df.set_index('Timestamp')
+        return df
+
     def plot(self, engine='dg', **kwargs):
         if 'aggregate' in kwargs:
             if kwargs['aggregate'] is False:
@@ -821,7 +974,7 @@ class DataTimeSlotSeries(DataSlotSeries, TimeSlotSeries):
             else:
                 resolution_str = str(self.resolution)# + 's' 
             # TODO: "slots of unit" ?
-            return 'Time series of #{} slots of {}, from slot starting @ {} ({}) to slot ending @ {} ({})'.format(len(self), resolution_str, self[0].start.t, self[0].end.dt, self[-1].end.t, self[-1].end.dt)            
+            return 'Time series of #{} slots of {}, from slot starting @ {} ({}) to slot ending @ {} ({})'.format(len(self), resolution_str, self[0].start.t, self[0].start.dt, self[-1].end.t, self[-1].end.dt)            
         else:
             return 'Time series of #0 slots'
     
