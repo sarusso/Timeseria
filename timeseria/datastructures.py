@@ -266,7 +266,10 @@ class DataPoint(Point):
         super(DataPoint, self).__init__(*args, **kwargs)
 
     def __repr__(self):
-        return '{} with data "{}"'.format(super(DataPoint, self).__repr__(), self.data)
+        try:
+            return '{} with data "{}" and data_loss="{}"'.format(super(DataPoint, self).__repr__(), self.data, 1-self._coverage)            
+        except:
+            return '{} with data "{}"'.format(super(DataPoint, self).__repr__(), self.data)
     
     def __eq__(self, other):
         if self._data != other._data:
