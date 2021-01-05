@@ -131,34 +131,14 @@ class TestSlotter(unittest.TestCase):
     def test_slot(self):
         
         # Time series from 16:58:00 to 17:32:00 (Europe/Rome), no from/to, extremes excluded (default)
-        data_time_slot_series = Slotter('600s').process(self.data_time_point_series_1)
-
-        # operators.slot()
-        # operations.slot .merge .min .max .sum .aggreate
-        # operators.slotter .merger .min .max .sum .diff
-        # slotter.apply max.apply() merge.apply()
-        
-        # Merge.process(time_series1, time_series2)
-        # Slotter('1h').process(time_series)
-        # Slotter('1h').process(time_series)
-        
-        
-        # Slots('1h').process(time_series)
-        
-        # Merge().process(time_series)
-        # Min().process
-        # Min.process
-        # Merge.merge
-        
-        
+        data_time_slot_series = Slotter('600s').process(self.data_time_point_series_1)        
         self.assertEqual(len(data_time_slot_series), 3)
         self.assertEqual(data_time_slot_series[0].start.dt, dt_from_str('2015-07-04 17:00:00+02:00'))
         self.assertEqual(data_time_slot_series[1].start.dt, dt_from_str('2015-07-04 17:10:00+02:00'))
         self.assertEqual(data_time_slot_series[2].start.dt, dt_from_str('2015-07-04 17:20:00+02:00'))
-        return
      
         # Time series from 16:58:00 to 17:32:00 (Europe/Rome), no from/to, extremes included.
-        data_time_slot_series = Slotter('10m').slot(self.data_time_point_series_1,  include_extremes = True)
+        data_time_slot_series = Slotter('10m').process(self.data_time_point_series_1,  include_extremes = True)
         self.assertEqual(len(data_time_slot_series), 4)
         self.assertEqual(data_time_slot_series[0].start.dt, dt_from_str('2015-07-04 16:50:00+02:00'))
         self.assertEqual(data_time_slot_series[1].start.dt, dt_from_str('2015-07-04 17:00:00+02:00'))
@@ -168,7 +148,7 @@ class TestSlotter(unittest.TestCase):
         #self.assertEqual(data_time_slot_series[4].start.dt, dt_from_str('2015-07-04 17:30:00+02:00'))
   
         # Time series from 16:58:00 to 17:32:00 (Europe/Rome), from 15:50 to 17:40
-        data_time_slot_series = Slotter('10m').slot(self.data_time_point_series_1,
+        data_time_slot_series = Slotter('10m').process(self.data_time_point_series_1,
                                     from_t = s_from_dt(dt_from_str('2015-07-04 16:50:00+02:00')),
                                     to_t   = s_from_dt(dt_from_str('2015-07-04 17:40:00+02:00')))
   
@@ -181,7 +161,7 @@ class TestSlotter(unittest.TestCase):
         #self.assertEqual(data_time_slot_series[4].start.dt, dt_from_str('2015-07-04 17:30:00+02:00'))
    
         # Time series from 2019,10,1,1,0,0 to 2019,10,1,6,0,0 (Europe/Rome), validity=15m
-        data_time_slot_series = Slotter('1h').slot(self.data_time_point_series_6)
+        data_time_slot_series = Slotter('1h').process(self.data_time_point_series_6)
         self.assertEqual(len(data_time_slot_series), 4)
         self.assertEqual(str(data_time_slot_series[0].start.dt), str('2019-10-01 01:00:00+02:00'))
         self.assertEqual(str(data_time_slot_series[1].start.dt), str('2019-10-01 02:00:00+02:00'))
@@ -190,7 +170,7 @@ class TestSlotter(unittest.TestCase):
  
         # Test changing timezone of the series
         self.data_time_point_series_6.tz = 'America/New_York'
-        data_time_slot_series = Slotter('1h').slot(self.data_time_point_series_6)
+        data_time_slot_series = Slotter('1h').process(self.data_time_point_series_6)
         self.assertEqual(len(data_time_slot_series), 4)
         self.assertEqual(str(data_time_slot_series[0].start.dt), str('2019-09-30 19:00:00-04:00'))
         self.assertEqual(str(data_time_slot_series[1].start.dt), str('2019-09-30 20:00:00-04:00'))
@@ -198,7 +178,7 @@ class TestSlotter(unittest.TestCase):
         self.assertEqual(str(data_time_slot_series[3].start.dt), str('2019-09-30 22:00:00-04:00'))
          
         # Time series from 2019,10,24,0,0,0 to 2019,10,31,0,0,0 (Europe/Rome), DST off -> 2 AM repeated
-        data_time_slot_series = Slotter('1h').slot(self.data_time_point_series_7)
+        data_time_slot_series = Slotter('1h').process(self.data_time_point_series_7)
  
         self.assertEqual(len(data_time_slot_series), 168)
         self.assertEqual(str(data_time_slot_series[73].start.dt), str('2019-10-27 01:00:00+02:00'))
@@ -233,8 +213,7 @@ class TestSlotter(unittest.TestCase):
  
  
  
- 
- 
+
  
  
 
