@@ -64,8 +64,8 @@ class TestUnits(unittest.TestCase):
         # Test type
         self.assertEqual(TimeUnit('15m').type, TimeUnit.PHYSICAL)
         self.assertEqual(TimeUnit('1h').type, TimeUnit.PHYSICAL)
-        self.assertEqual(TimeUnit('1D').type, TimeUnit.HUMAN)
-        self.assertEqual(TimeUnit('1M').type, TimeUnit.HUMAN)
+        self.assertEqual(TimeUnit('1D').type, TimeUnit.CALENDAR)
+        self.assertEqual(TimeUnit('1M').type, TimeUnit.CALENDAR)
         
         # Test sum with TimePoint
         time_unit = TimeUnit('1h')
@@ -209,7 +209,7 @@ class TestUnits(unittest.TestCase):
         self.assertEqual(time_unit.ceil_dt(date_time4), date_time5_rounded)
 
 
-        # Test ceil/floor/round with a human timeunit and across a DST change
+        # Test ceil/floor/round with a calendar timeunit and across a DST change
         
         # Day unit
         time_unit = TimeUnit('1D')

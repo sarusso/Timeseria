@@ -642,7 +642,7 @@ class TestSlotSeries(unittest.TestCase):
         self.assertEqual(data_time_slot_series[0].unit,TimeUnit('60s'))
         self.assertNotEqual(data_time_slot_series[0].unit, Unit(60))
 
-        # NotImplementedError: Shifting of Human intervals not yet implemented
+        # NotImplementedError: Shifting of Calendar intervals not yet implemented
         #data_time_slot_series = DataTimeSlotSeries()
         #prev_t    = 1595862221
         #for _ in range (0, 10):

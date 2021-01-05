@@ -888,7 +888,7 @@ class DataTimeSlotSeries(DataSlotSeries, TimeSlotSeries):
             if not unit_str:
                 raise Exception('Cannot infer the time unit for the slots')
             
-            # Human
+            # Calendar
             unit_str=unit_str.replace('A', 'Y')    # Year (end) ?
             unit_str=unit_str.replace('Y', 'Y')    # Year (end) )
             unit_str=unit_str.replace('AS', 'Y')    # Year (start)
