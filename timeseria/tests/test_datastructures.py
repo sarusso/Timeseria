@@ -249,13 +249,13 @@ class TestPointSeries(unittest.TestCase):
         
         # Test resolution 
         time_point_serie = TimePointSeries(TimePoint(t=60))
-        self.assertEqual(time_point_serie.resolution, None)
+        self.assertEqual(time_point_serie._resolution, None)
         
         time_point_serie = TimePointSeries(TimePoint(t=60),TimePoint(t=121))
-        self.assertEqual(time_point_serie.resolution, 61)
+        self.assertEqual(time_point_serie._resolution, 61)
         
         time_point_serie = TimePointSeries(TimePoint(t=60),TimePoint(t=120),TimePoint(t=130))
-        self.assertEqual(time_point_serie.resolution, 'variable')
+        self.assertEqual(time_point_serie._resolution, 'variable')
         
         # Test cut
         time_point_serie = TimePointSeries(TimePoint(t=60),TimePoint(t=120),TimePoint(t=130))
@@ -539,10 +539,10 @@ class TestSlotSeries(unittest.TestCase):
         time_slot_series.append(TimeSlot(start=TimePoint(t=60, tz='Europe/Rome'), end=TimePoint(t=120, tz='Europe/Rome')))
 
         # Test slot unit
-        self.assertEqual(time_slot_series.resolution, Unit(60.0))
+        self.assertEqual(time_slot_series._resolution, Unit(60.0))
 
         # Test resolution 
-        self.assertEqual(time_slot_series.resolution, Unit(60))
+        self.assertEqual(time_slot_series._resolution, Unit(60))
         
         
  
@@ -599,8 +599,8 @@ class TestSlotSeries(unittest.TestCase):
             data_time_slot_series.append(DataTimeSlot(start=TimePoint(t=120), end=TimePoint(t=180), data={'a':56, 'c':67}))            
 
         # Test with units
-        self.assertEqual(data_time_slot_series.resolution, Unit(60.0))
-        self.assertEqual(DataTimeSlotSeries(DataTimeSlot(start=TimePoint(t=60), end=TimePoint(t=120), data=23.8, unit=TimeUnit('60s'))).resolution, TimeUnit('60s'))
+        self.assertEqual(data_time_slot_series._resolution, Unit(60.0))
+        self.assertEqual(DataTimeSlotSeries(DataTimeSlot(start=TimePoint(t=60), end=TimePoint(t=120), data=23.8, unit=TimeUnit('60s')))._resolution, TimeUnit('60s'))
         
         data_time_slot_series = DataTimeSlotSeries()
         prev_t    = 1595862221
