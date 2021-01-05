@@ -384,7 +384,7 @@ class TimePointSeries(PointSeries):
         #    except:
         #        return self._resolution
 
-    def cut(self, from_t=None, to_t=None, from_dt=None, to_dt=None):
+    def slice(self, from_t=None, to_t=None, from_dt=None, to_dt=None):
         if from_dt:
             if from_t is not None:
                 raise Exception('Cannot set both from_t and from_dt')
@@ -888,7 +888,7 @@ class DataTimeSlotSeries(DataSlotSeries, TimeSlotSeries):
             if not unit_str:
                 raise Exception('Cannot infer the time unit for the slots')
             
-            # Human
+            # Calendar
             unit_str=unit_str.replace('A', 'Y')    # Year (end) ?
             unit_str=unit_str.replace('Y', 'Y')    # Year (end) )
             unit_str=unit_str.replace('AS', 'Y')    # Year (start)
@@ -994,7 +994,7 @@ class DataTimeSlotSeries(DataSlotSeries, TimeSlotSeries):
             else:
                 resolution_str = str(self._resolution)# + 's' 
             # TODO: "slots of unit" ?
-            return 'Time series of #{} slots of {}, from slot starting @ {} ({}) to slot ending @ {} ({})'.format(len(self), resolution_str, self[0].start.t, self[0].start.dt, self[-1].end.t, self[-1].end.dt)            
+            return 'Time series of #{} slots of {}, from slot starting @ {} ({}) to slot starting @ {} ({})'.format(len(self), resolution_str, self[0].start.t, self[0].start.dt, self[-1].start.t, self[-1].start.dt)            
         else:
             return 'Time series of #0 slots'
     

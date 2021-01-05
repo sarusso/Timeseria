@@ -46,9 +46,9 @@ class Unit(object):
 
 class TimeUnit(Unit):
     ''' A time unit which can be both be physical (hours, minutes..),
-    human (months, for example) or defined from a start to an end'''
+    calendar (months, for example) or defined from a start to an end'''
     
-    HUMAN  = 'Human'
+    CALENDAR  = 'Calendar'
     PHYSICAL = 'Physical'
     
     # NOT ref to https://docs.python.org/3/library/datetime.html#strftime-and-strptime-format-codes :  %d, %m, %w %y - %H, %M, %S
@@ -205,12 +205,12 @@ class TimeUnit(Unit):
     def type(self):
         '''Returns the type of the TimeUnit.
          - Physical if hours, minutes, seconds, micorseconds
-         - Human if Years, Months, Days, Weeks
+         - Calendar if Years, Months, Days, Weeks
         The difference? Years, Months, Days, Weeks have different durations depending on the starting date.
         '''
 
         if self.years or self.months or self.weeks or self.days:
-            return self.HUMAN
+            return self.CALENDAR
         elif self.hours or self.minutes or self.seconds or self.microseconds:
             return self.PHYSICAL
         else:
@@ -222,8 +222,8 @@ class TimeUnit(Unit):
         else:
             return False
         
-    def is_human(self):
-        if self.type == self.HUMAN:
+    def is_calendar(self):
+        if self.type == self.CALENDAR:
             return True 
         else:       
             return False        
@@ -275,25 +275,25 @@ class TimeUnit(Unit):
                 
             rounded_dt = dt_from_s(time_rounded_s, tz=time_dt.tzinfo)
 
-        # Handle human time 
-        elif self.type == self.HUMAN:
+        # Handle calendar time 
+        elif self.type == self.CALENDAR:
             
             if self.years:
                 if self.years > 1:
-                    raise NotImplementedError('Cannot round based on HUMAN TimeUnits > 1')
+                    raise NotImplementedError('Cannot round based on CALENDAR TimeUnits > 1')
                 rounded_dt=time_dt.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
                 
             if self.months:
                 if self.months > 1:
-                    raise NotImplementedError('Cannot round based on HUMAN TimeUnits > 1')
+                    raise NotImplementedError('Cannot round based on CALENDAR TimeUnits > 1')
                 rounded_dt=time_dt.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
             if self.weeks:
-                raise NotImplementedError('Cannot round based on HUMAN TimeUnits of week type')
+                raise NotImplementedError('Cannot round based on CALENDAR TimeUnits of week type')
 
             if self.days:
                 if self.days > 1:
-                    raise NotImplementedError('Cannot round based on HUMAN TimeUnits > 1')
+                    raise NotImplementedError('Cannot round based on CALENDAR TimeUnits > 1')
                 rounded_dt=time_dt.replace(hour=0, minute=0, second=0, microsecond=0)
 
             # Check DST offset consistency and fix if not respected
@@ -305,7 +305,7 @@ class TimeUnit(Unit):
 
         # Handle other cases (Consistency error)
         else:
-            raise ConsistencyException('Error, TimeSlot type not PHYSICAL nor HUMAN?!')
+            raise ConsistencyException('Error, TimeSlot type not PHYSICAL nor CALENDAR?!')
 
         # Return
         return rounded_dt
@@ -342,8 +342,8 @@ class TimeUnit(Unit):
             
             return time_shifted_dt   
 
-        # Handle human time TimeSlot
-        elif self.type == self.HUMAN:
+        # Handle calendar time TimeSlot
+        elif self.type == self.CALENDAR:
 
             # Create a TimeDelta object for everything but years and months
             delta = datetime.timedelta(weeks = self.weeks,
@@ -379,7 +379,7 @@ class TimeUnit(Unit):
 
         # Handle other cases (Consistency error)
         else:
-            raise ConsistencyException('Error, TimeSlot type not PHYSICAL nor HUMAN?!')
+            raise ConsistencyException('Error, TimeSlot type not PHYSICAL nor CALENDAR?!')
         
         # Return
         return time_shifted_dt   
@@ -391,10 +391,10 @@ class TimeUnit(Unit):
         if self.is_composite():
             raise InputException('Sorry, only simple time intervals are supported by this operation')
 
-        if self.type == 'Human' and not start_dt:
-            raise InputException('With a human TimeUnit you can ask for duration only if you provide the starting point')
+        if self.type == 'Calendar' and not start_dt:
+            raise InputException('With a calendar TimeUnit you can ask for duration only if you provide the starting point')
         
-        if self.type == 'Human':
+        if self.type == 'Calendar':
             
             end_dt = self.shift_dt(start_dt, 1)
             
@@ -420,8 +420,8 @@ class TimeUnit(Unit):
         
     #@property
     #def duration(self):
-    #    if self.type == 'Human':
-    #        raise InputException('Sorry, the duration of a HUMAN time unit is not defined. use duration_s() providing the starting point.')
+    #    if self.type == 'Calendar':
+    #        raise InputException('Sorry, the duration of a CALENDAR time unit is not defined. use duration_s() providing the starting point.')
     #    return self.duration_s()
 
 
