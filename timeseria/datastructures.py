@@ -347,17 +347,19 @@ class TimePointSeries(PointSeries):
 
     @property
     def tz(self):
+        # Note: we compute the tz on the fly beacuse for point time series we assume to use the tz
+        # attribute way lass than the slot time series, where the tz is instead computed at append-time.
         try:
             return self._tz
         except AttributeError:
-            
             # Detect time zone on the fly
             detected_tz = None
             for item in self:
                 if not detected_tz:
                     detected_tz = item.tz
                 else:
-                    if item.tz != detected_tz:
+                    # Terrible but seems like no other way to compare pytz.tzfile.* classes
+                    if str(item.tz) != str(detected_tz): 
                         return UTC
             return detected_tz
     

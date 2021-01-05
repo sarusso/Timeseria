@@ -215,15 +215,32 @@ class TestPointSeries(unittest.TestCase):
         time_point_serie.append(TimePoint(t=10)) 
         self.assertEqual(time_point_serie.tz, UTC)
         self.assertEqual(type(time_point_serie.tz), type(UTC))
-        time_point_serie.append(TimePoint(t=15, tz='Europe/Rome'))
+        time_point_serie.append(TimePoint(t=15, tz='Europe/Rome')) # This will get ignored and timezone will stay on UTC
         self.assertEqual(time_point_serie.tz, UTC)
         self.assertEqual(type(time_point_serie.tz), type(UTC))
 
+        # Test for Europe/Rome timezone
+        time_point_serie = TimePointSeries() 
+        time_point_serie.append(TimePoint(t=15, tz='Europe/Rome'))
+        self.assertEqual(str(time_point_serie.tz), 'Europe/Rome')
+
+        # Test for Europe/Rome timezone
+        time_point_serie = TimePointSeries() 
+        time_point_serie.append(TimePoint(dt=dt(2015,3,5,9,27,tz='Europe/Rome')))
+        self.assertEqual(str(time_point_serie.tz), 'Europe/Rome')
+        data_time_point_series = DataTimePointSeries(DataTimePoint(dt=dt(2015,10,25,0,0,0, tz='Europe/Rome'), data={'a':23.8}),
+                                                     DataTimePoint(dt=dt(2015,10,26,0,0,0, tz='Europe/Rome'), data={'a':23.8}))
+        self.assertEqual(str(data_time_point_series.tz), 'Europe/Rome')
+               
         # Change  tz
+        time_point_serie = TimePointSeries()
+        time_point_serie.append(TimePoint(t=5))
+        time_point_serie.append(TimePoint(t=10))
         time_point_serie.tz = 'Europe/Rome'
         self.assertEqual(str(time_point_serie.tz), 'Europe/Rome')
         self.assertEqual(str(type(time_point_serie.tz)), "<class 'pytz.tzfile.Europe/Rome'>")
-        
+        self.assertEqual(str(time_point_serie[0].tz), 'UTC') # This stays on UTC. TODO: seems a bug, actually!
+
         # Test for Europe/Rome time zone (set)
         time_point_serie = TimePointSeries(tz = 'Europe/Rome')
         self.assertEqual(str(time_point_serie.tz), 'Europe/Rome')
@@ -335,6 +352,20 @@ class TestPointSeries(unittest.TestCase):
         self.assertEqual(list(data_time_point_series.df.columns),['C','RH'])
         self.assertEqual(data_time_point_series.df.iloc[0][0],21.7)
         self.assertEqual(data_time_point_series.df.iloc[0][1],54.9)
+
+
+        # Test resolution
+        data_time_point_series = DataTimePointSeries(DataTimePoint(dt=dt(2015,10,24,0,0,0, tzinfo='Europe/Rome'), data=23.8),
+                                                     DataTimePoint(dt=dt(2015,10,25,0,0,0, tzinfo='Europe/Rome'), data=24.1),
+                                                     DataTimePoint(dt=dt(2015,10,26,0,0,0, tzinfo='Europe/Rome'), data=23.1))
+        
+        self.assertEqual(data_time_point_series.resolution, 'variable') # DST occurred
+        
+        data_time_point_series = DataTimePointSeries(DataTimePoint(dt=dt(2015,10,27,0,0,0, tzinfo='Europe/Rome'), data={'a':23.8}),
+                                                     DataTimePoint(dt=dt(2015,10,28,0,0,0, tzinfo='Europe/Rome'), data={'a':24.1}),
+                                                     DataTimePoint(dt=dt(2015,10,29,0,0,0, tzinfo='Europe/Rome'), data={'a':23.1}))
+        
+        self.assertEqual(data_time_point_series.resolution, 86400) # No DST occured
 
 
 class TestUnit(unittest.TestCase):
@@ -635,6 +666,25 @@ class TestSlotSeries(unittest.TestCase):
         self.assertEqual(list(data_time_slot_series.df.columns),['C','RH'])
         self.assertEqual(data_time_slot_series.df.iloc[0][0],21.7)
         self.assertEqual(data_time_slot_series.df.iloc[0][1],54.9)
+
+        # Test resolution
+#         data_time_slot_series =  DataTimeSlotSeries(DataTimeSlot(start=TimePoint(t=60),  end=TimePoint(t=120), data=23.8),
+#                                                     DataTimeSlot(start=TimePoint(t=120), end=TimePoint(t=180), data=24.1),
+#                                                     DataTimeSlot(start=TimePoint(t=180), end=TimePoint(t=240), data=23.1))
+#         print(data_time_slot_series.resolution)
+#         
+#         data_time_slot_series =  DataTimeSlotSeries(DataTimeSlot(start=TimePoint(t=60),  unit=TimeUnit('1m'), data=23.8),
+#                                                     DataTimeSlot(start=TimePoint(t=120), unit=TimeUnit('1m'), data=24.1),
+#                                                     DataTimeSlot(start=TimePoint(t=180), unit=TimeUnit('1m'), data=23.1))
+# 
+#         print(data_time_slot_series.resolution)
+# 
+#         data_time_slot_series =  DataTimeSlotSeries(DataTimeSlot(start=TimePoint(t=60),  end=TimePoint(t=120), data=23.8),
+#                                                     DataTimeSlot(start=TimePoint(t=120), end=TimePoint(t=180), data=24.1),
+#                                                     DataTimeSlot(start=TimePoint(t=180), end=TimePoint(t=240), data=23.1))
+#         print(data_time_slot_series.resolution)        
+        
+        
 
         
     def test_cannge_timezone_DataTimeSlotSeries(self):
