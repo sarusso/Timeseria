@@ -994,7 +994,7 @@ class DataTimeSlotSeries(DataSlotSeries, TimeSlotSeries):
             else:
                 resolution_str = str(self._resolution)# + 's' 
             # TODO: "slots of unit" ?
-            return 'Time series of #{} slots of {}, from slot starting @ {} ({}) to slot ending @ {} ({})'.format(len(self), resolution_str, self[0].start.t, self[0].start.dt, self[-1].end.t, self[-1].end.dt)            
+            return 'Time series of #{} slots of {}, from slot starting @ {} ({}) to slot starting @ {} ({})'.format(len(self), resolution_str, self[0].start.t, self[0].start.dt, self[-1].start.t, self[-1].start.dt)            
         else:
             return 'Time series of #0 slots'
     
