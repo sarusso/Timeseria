@@ -274,12 +274,12 @@ class TestPointSeries(unittest.TestCase):
         time_point_serie = TimePointSeries(TimePoint(t=60),TimePoint(t=120),TimePoint(t=130))
         self.assertEqual(time_point_serie._resolution, 'variable')
         
-        # Test cut
+        # Test datetime-based slice
         time_point_serie = TimePointSeries(TimePoint(t=60),TimePoint(t=120),TimePoint(t=130))
-        self.assertEqual(len(time_point_serie.cut(from_t=1, to_t=140)),3)
-        self.assertEqual(len(time_point_serie.cut(from_t=61, to_t=140)),2)
-        self.assertEqual(len(time_point_serie.cut(from_t=61)),2)
-        self.assertEqual(len(time_point_serie.cut(to_t=61)),1)
+        self.assertEqual(len(time_point_serie.slice(from_t=1, to_t=140)),3)
+        self.assertEqual(len(time_point_serie.slice(from_t=61, to_t=140)),2)
+        self.assertEqual(len(time_point_serie.slice(from_t=61)),2)
+        self.assertEqual(len(time_point_serie.slice(to_t=61)),1)
         
 
 

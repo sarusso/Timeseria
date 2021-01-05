@@ -384,7 +384,7 @@ class TimePointSeries(PointSeries):
         #    except:
         #        return self._resolution
 
-    def cut(self, from_t=None, to_t=None, from_dt=None, to_dt=None):
+    def slice(self, from_t=None, to_t=None, from_dt=None, to_dt=None):
         if from_dt:
             if from_t is not None:
                 raise Exception('Cannot set both from_t and from_dt')
