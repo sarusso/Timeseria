@@ -1,6 +1,6 @@
 from .time import dt_from_s, s_from_dt
 from .datastructures import DataTimeSlot, DataTimeSlotSeries, TimePoint, DataTimePointSeries, DataTimePoint
-from .utilities import compute_coverage, is_almost_equal, is_close
+from .utilities import compute_data_loss, is_almost_equal, is_close
 from .units import TimeUnit
 
 # Setup logging
@@ -98,16 +98,16 @@ class Slotter(Transformation):
             raise NotImplementedError('Sorry, only (re) resolutions as int (seconds) or TimeUnit objects (or their string representation) are supported')
 
 
-    def _compute_slot(self, data_time_pointSeries, unit, start_t, end_t, validity, timezone, fill_with, force_coverage, fill_gaps, interpolation_method):
+    def _compute_slot(self, data_time_pointSeries, unit, start_t, end_t, validity, timezone, fill_with, force_data_loss, fill_gaps, interpolation_method):
 
-        # Compute coverage
-        slot_coverage = compute_coverage(data_time_pointSeries,
+        # Compute data_loss
+        slot_data_loss = compute_data_loss(data_time_pointSeries,
                                          from_t   = start_t,
                                          to_t     = end_t,
                                          validity = validity)
 
         # If we have to fully reconstruct data
-        if slot_coverage == 0 and len(data_time_pointSeries) == 2:
+        if slot_data_loss == 1 and len(data_time_pointSeries) == 2:
 
             # Reconstruct (fill_gaps)
             slot_data = {}
@@ -148,26 +148,26 @@ class Slotter(Transformation):
                     avgs[key] += data_time_point.data[key]
             
             # Do we have a 100% and a fill_with?
-            if fill_with is not None and slot_coverage == 0:
+            if fill_with is not None and slot_data_loss == 1:
                 slot_data = {key:fill_with for key in keys}                
             else:
                 slot_data = {key:avgs[key]/count for key in keys}
 
-        # Do we have a force coverage? #TODO: do not compute coverage if fill_with not present and force_coverage 
-        if force_coverage is not None:
-            slot_coverage = force_coverage
+        # Do we have a force data_loss? #TODO: do not compute data_loss if fill_with not present and force_data_loss 
+        if force_data_loss is not None:
+            slot_data_loss = force_data_loss
         
         # Create the DataTimeSlot
         data_time_slot = DataTimeSlot(start = TimePoint(t=start_t, tz=timezone),
                                     end   = TimePoint(t=end_t, tz=timezone),
                                     unit  = unit,
                                     data  = slot_data,
-                                    coverage = slot_coverage)
+                                    data_loss = slot_data_loss)
         
         return data_time_slot
 
 
-    def _process(self, data_time_pointSeries, from_t=None, to_t=None, validity=None, force_close_last=False, include_extremes=False, fill_with=None, force_coverage=None, fill_gaps=True, interpolation_method='linear'):
+    def _process(self, data_time_pointSeries, from_t=None, to_t=None, validity=None, force_close_last=False, include_extremes=False, fill_with=None, force_data_loss=None, fill_gaps=True, interpolation_method='linear'):
         ''' Start the slotting process. If start and/or end are not set, they are set automatically based on first and last points of the sereis'''
 
         if not isinstance(data_time_pointSeries, DataTimePointSeries):
@@ -309,7 +309,7 @@ class Slotter(Transformation):
                                                           validity = validity,
                                                           timezone = timezone,
                                                           fill_with = fill_with,
-                                                          force_coverage = force_coverage,
+                                                          force_data_loss = force_data_loss,
                                                           fill_gaps = fill_gaps,
                                                           interpolation_method = interpolation_method)
                         
@@ -344,7 +344,7 @@ class Slotter(Transformation):
                                                           validity = validity,
                                                           timezone = timezone,
                                                           fill_with = fill_with,
-                                                          force_coverage = force_coverage,
+                                                          force_data_loss = force_data_loss,
                                                           fill_gaps = fill_gaps,
                                                           interpolation_method = interpolation_method)
                         
@@ -377,7 +377,7 @@ class Slotter(Transformation):
                                                   validity = validity,
                                                   timezone = timezone,
                                                   fill_with = fill_with,
-                                                  force_coverage = force_coverage,
+                                                  force_data_loss = force_data_loss,
                                                   fill_gaps = fill_gaps,
                                                   interpolation_method = interpolation_method)
                 
@@ -420,16 +420,16 @@ class Resampler(Transformation):
         if self.time_unit.is_human():
             raise ValueError('Sorry, human time units are not supported by the Resampler (got "{}"). Use the Slotter instead.'.format(self.time_unit))
 
-    def _compute_resampled_point(self, data_time_pointSeries, unit, start_t, end_t, validity, timezone, fill_with, force_coverage, fill_gaps, interpolation_method):
+    def _compute_resampled_point(self, data_time_pointSeries, unit, start_t, end_t, validity, timezone, fill_with, force_data_loss, fill_gaps, interpolation_method):
 
-        # Compute coverage
-        point_coverage = compute_coverage(data_time_pointSeries,
+        # Compute data_loss
+        point_data_loss = compute_data_loss(data_time_pointSeries,
                                          from_t   = start_t,
                                          to_t     = end_t,
                                          validity = validity)
 
         # If we have to reconstruct data
-        if point_coverage == 0 and len(data_time_pointSeries) == 2:
+        if point_data_loss == 1 and len(data_time_pointSeries) == 2:
             
             if not fill_gaps:
                 return None
@@ -472,30 +472,30 @@ class Resampler(Transformation):
                     avgs[key] += data_time_point.data[key]
             
             # Do we have a 100% and a fill_with?
-            if fill_with is not None and point_coverage == 0:
+            if fill_with is not None and point_data_loss == 1:
                 slot_data = {key:fill_with for key in keys}                
             else:
                 slot_data = {key:avgs[key]/count for key in keys}
 
-        # Do we have a force coverage? #TODO: do not compute coverage if fill_with not present and force_coverage 
-        if force_coverage is not None:
-            point_coverage = force_coverage
+        # Do we have a force data_loss? #TODO: do not compute data_loss if fill_with not present and force_data_loss 
+        if force_data_loss is not None:
+            point_data_loss = force_data_loss
         
-        # Create the DataTimePoint if we have coverage
-        if not point_coverage:
+        # Create the DataTimePoint if we have data_loss
+        if not point_data_loss:
             data_time_point = None
         else:      
             pass
         data_time_point = DataTimePoint(t = (start_t+((end_t-start_t)/2)),
                                             data  = slot_data,
-                                            coverage = point_coverage)
+                                            data_loss = point_data_loss)
 
         return data_time_point
 
 
     def _process(self, data_time_pointSeries, from_t=None, to_t=None, validity=None,
                  force_close_last=False, include_extremes=False, fill_with=None,
-                 force_coverage=None, fill_gaps=True, interpolation_method='linear'):
+                 force_data_loss=None, fill_gaps=True, interpolation_method='linear'):
         ''' Start the slotting process. If start and/or end are not set, they are set automatically based on first and last points of the sereis'''
 
         if not isinstance(data_time_pointSeries, DataTimePointSeries):
@@ -637,7 +637,7 @@ class Resampler(Transformation):
                                                                       validity = validity,
                                                                       timezone = timezone,
                                                                       fill_with = fill_with,
-                                                                      force_coverage = force_coverage,
+                                                                      force_data_loss = force_data_loss,
                                                                       fill_gaps = fill_gaps,
                                                                       interpolation_method = interpolation_method)
                         
@@ -673,7 +673,7 @@ class Resampler(Transformation):
                                                                       validity = validity,
                                                                       timezone = timezone,
                                                                       fill_with = fill_with,
-                                                                      force_coverage = force_coverage,
+                                                                      force_data_loss = force_data_loss,
                                                                       fill_gaps = fill_gaps,
                                                                       interpolation_method = interpolation_method)
                         
@@ -707,7 +707,7 @@ class Resampler(Transformation):
                                                               validity = validity,
                                                               timezone = timezone,
                                                               fill_with = fill_with,
-                                                              force_coverage = force_coverage,
+                                                              force_data_loss = force_data_loss,
                                                               fill_gaps = fill_gaps,
                                                               interpolation_method = interpolation_method)
                 

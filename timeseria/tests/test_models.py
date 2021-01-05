@@ -87,7 +87,7 @@ class TestReconstructors(unittest.TestCase):
         #data_time_point_series = CSVFileStorage(TEST_DATA_PATH + '/csv/temperature.csv').get()
         #data_time_slot_series = Slotter('3600s').process(data_time_point_series)
         #for item in data_time_slot_series:
-        #    print('{},{},{}'.format(item.start.t, item.data['temperature'], item.coverage))
+        #    print('{},{},{}'.format(item.start.t, item.data['temperature'], item.data_loss))
         
         # Get test data 
         with open(TEST_DATA_PATH + '/csv/temp_slots_1h.csv') as f:
@@ -99,9 +99,9 @@ class TestReconstructors(unittest.TestCase):
                 start_t = float(line.split(',')[0])
                 start_point = TimePoint(t=start_t)
                 end_point = TimePoint(t=start_t+3600)
-                coverage = float(line.split(',')[2])
+                data_loss = 1-float(line.split(',')[2]) # from coverage to data loss
                 value =  float(line.split(',')[1])
-                data_time_slot_series.append(DataTimeSlot(start=start_point, end=end_point, data={'temperature':value}, coverage=coverage))
+                data_time_slot_series.append(DataTimeSlot(start=start_point, end=end_point, data={'temperature':value}, data_loss=data_loss))
             
         # Instantiate
         periodic_average_reconstructor = PeriodicAverageReconstructor()

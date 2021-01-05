@@ -198,7 +198,7 @@ class TestSlotter(unittest.TestCase):
         #data_time_slot_series = slotter.process(self.data_time_point_series_7, from_t=1571868600, to_t=1571873400)
         #for item in data_time_slot_series:
         #    print(item)
-        # This is a downsampling, there are coverage=None.. TOOD: fix me
+        # This is a downsampling, there are data_loss=None.. TOOD: fix me
   
         # 1-day sloter TODO: add all the "logical" time part, nothing works here...
         #slotter = Slotter('1D')

@@ -86,8 +86,6 @@ def detect_encoding(filename, streaming=False):
     return encoding
 
 
-
-
 def compute_coverage(data_time_point_series, from_t, to_t, trustme=False, validity=None, validity_placement='center'):
     '''Compute the data coverage of a data_time_point_series based on the data_time_points validity'''
     
@@ -253,6 +251,10 @@ def compute_coverage(data_time_point_series, from_t, to_t, trustme=False, validi
     # Return
     logger.debug('compute_coverage: Returning %s (%s percent)', coverage, coverage*100.0)
     return coverage
+
+
+def compute_data_loss(data_time_point_series, from_t, to_t, trustme=False, validity=None, validity_placement='center'):
+    return 1-compute_coverage(data_time_point_series, from_t, to_t, trustme, validity, validity_placement)
 
 
 #==============================

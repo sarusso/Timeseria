@@ -494,10 +494,9 @@ class TestSlots(unittest.TestCase):
         self.assertEqual(data_slot_1, data_slot_2)
         self.assertNotEqual(data_slot_1, data_slot_3)
 
-        data_slot_with_coverage = DataSlot(start=Point(1), end=Point(2), data='hello', coverage=0.98)
-        self.assertEqual(data_slot_with_coverage.coverage, 0.98)
-        self.assertEqual(data_slot_with_coverage.coverage + data_slot_with_coverage.data_loss, 1) # Workaround 0.020000000000000018 != 0.2
-
+        data_slot_with_data_loss = DataSlot(start=Point(1), end=Point(2), data='hello', data_loss=0.98)
+        self.assertEqual(data_slot_with_data_loss.data_loss,0.98)
+    
 
     def test_DataTimeSlots(self):
 
