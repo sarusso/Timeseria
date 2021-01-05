@@ -214,7 +214,7 @@ class Slotter(Transformation):
         # Automatically detect validity if not set
         if validity is None:
             validity = detect_dataPoints_validity(data_time_pointSeries)
-            logger.info('Auto-detected points validity: %ss', validity)
+            logger.info('Auto-detected sampling interval: %ss', validity)
         
 
         
@@ -542,7 +542,7 @@ class Resampler(Transformation):
         # Automatically detect validity if not set
         if validity is None:
             validity = detect_dataPoints_validity(data_time_pointSeries)
-            logger.info('Auto-detected points validity: %ss', validity)
+            logger.info('Auto-detected sampling interval: %ss', validity)
         
 
         
