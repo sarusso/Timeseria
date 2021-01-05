@@ -259,15 +259,15 @@ class DataPoint(Point):
         except KeyError:
             raise Exception('A DataPoint requires a special "data" argument (got only "{}")'.format(kwargs))
 
-        coverage = kwargs.pop('coverage', None)
-        if coverage is not None:
-            self._coverage=coverage
+        data_loss = kwargs.pop('data_loss', None)
+        if data_loss is not None:
+            self._data_loss=data_loss
         
         super(DataPoint, self).__init__(*args, **kwargs)
 
     def __repr__(self):
         try:
-            return '{} with data "{}" and data_loss="{}"'.format(super(DataPoint, self).__repr__(), self.data, 1-self._coverage)            
+            return '{} with data "{}" and data_loss="{}"'.format(super(DataPoint, self).__repr__(), self.data, 1-self._data_loss)            
         except:
             return '{} with data "{}"'.format(super(DataPoint, self).__repr__(), self.data)
     
@@ -283,7 +283,7 @@ class DataPoint(Point):
     @property
     def data_loss(self):
         try:
-            return 1-self._coverage
+            return self._data_loss
         except AttributeError:
             return None
 
@@ -712,9 +712,9 @@ class DataSlot(Slot):
         except KeyError:
             raise Exception('A DataSlot requires a special "data" argument (got only "{}")'.format(kwargs))
 
-        coverage = kwargs.pop('coverage', None)
-        if coverage is not None:
-            self._coverage=coverage
+        data_loss = kwargs.pop('data_loss', None)
+        if data_loss is not None:
+            self._data_loss=data_loss
 
         super(DataSlot, self).__init__(**kwargs)
 
@@ -731,20 +731,12 @@ class DataSlot(Slot):
         return self._data
 
     @property
-    def coverage(self):
+    def data_loss(self):
         try:
-            return self._coverage
+            return self._data_loss
         except AttributeError:
             return None
     
-    @property
-    def data_loss(self):
-        try:
-            return 1-self._coverage
-        except AttributeError:
-            return None
-
-
     @property
     def data_reconstructed(self):
         try:
@@ -756,13 +748,13 @@ class DataSlot(Slot):
 class DataTimeSlot(DataSlot, TimeSlot):
     
     def __repr__(self):
-        #if self.coverage is not None:
-        #    return '{} @ t=[{},{}] ([{},{}]) with data={} and coverage={}'.format(self.__class__.__name__, self.start.t, self.end.t, self.start.dt, self.end.dt, self.data, self.coverage)
+        #if self.data_loss is not None:
+        #    return '{} @ t=[{},{}] ([{},{}]) with data={} and data_loss={}'.format(self.__class__.__name__, self.start.t, self.end.t, self.start.dt, self.end.dt, self.data, self.data_loss)
         #else:
         #    return '{} @ t=[{},{}] ([{},{}]) with data={}'.format(self.__class__.__name__, self.start.t, self.end.t, self.start.dt, self.end.dt, self.data)
 
-        if self.coverage is not None:
-            return '{} @ [{},{}] ([{},{}]) with data={} and coverage={}'.format(self.__class__.__name__, self.start.t, self.end.t, self.start.dt, self.end.dt, self.data, self.coverage)
+        if self.data_loss is not None:
+            return '{} @ [{},{}] ([{},{}]) with data={} and data_loss={}'.format(self.__class__.__name__, self.start.t, self.end.t, self.start.dt, self.end.dt, self.data, self.data_loss)
         else:
             return '{} @ [{},{}] ([{},{}]) with data={}'.format(self.__class__.__name__, self.start.t, self.end.t, self.start.dt, self.end.dt, self.data)
         

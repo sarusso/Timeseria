@@ -364,8 +364,7 @@ class Reconstructor(ParametricModel):
                     item._data_reconstructed = 0
                     
                 if remove_data_loss:
-                    # TOOD: move to None if we allow data_losses (coverages) to None?
-                    item._coverage = 1
+                    item._data_loss = 0
             
             # Reconstruct the last gap as well if left "open"
             if gap_started is not None:
@@ -451,8 +450,8 @@ class Reconstructor(ParametricModel):
                     # Append in the middle and store real values
                     for j in range(steps_round):
                         item = copy.deepcopy(timeseries[i+j])
-                        # Set the coverage to zero so the item will be reconstructed
-                        item._coverage = 0
+                        # Set the data_loss to one so the item will be reconstructed
+                        item._data_loss = 1
                         item.data[key] = average_value
                         timeseries_to_reconstruct.append(item)
                         
@@ -940,7 +939,7 @@ class Forecaster(ParametricModel):
                 if isinstance(timeseries[0], Slot):
                     forecast.append(DataTimeSlot(start = last_item.end,
                                                  unit  = timeseries._resolution,
-                                                 coverage = None,
+                                                 data_loss = None,
                                                  #tz = timeseries.tz,
                                                  data  = data))
                 else:
@@ -952,7 +951,7 @@ class Forecaster(ParametricModel):
             if isinstance(timeseries[0], Slot):
                 forecast = DataTimeSlot(start = forecast_start_item.end,
                                         unit  = timeseries._resolution,
-                                        coverage = None,
+                                        data_loss = None,
                                         #tz = timeseries.tz,
                                         data  = predicted_data)
             else:
