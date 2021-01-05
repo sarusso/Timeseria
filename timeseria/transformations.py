@@ -417,7 +417,8 @@ class Resampler(Transformation):
             self.time_unit = unit_to_TimeUnit(unit)
         else:
             raise NotImplementedError('Sorry, only (re) resolutions as int (seconds) or TimeUnit objects (or their string representation) are supported')
-
+        if self.time_unit.is_human():
+            raise ValueError('Sorry, human time units are not supported by the Resampler (got "{}"). Use the Slotter instead.'.format(self.time_unit))
 
     def _compute_resampled_point(self, data_time_pointSeries, unit, start_t, end_t, validity, timezone, fill_with, force_coverage, fill_gaps, interpolation_method):
 
