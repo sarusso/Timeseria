@@ -3,11 +3,28 @@
 
 # Timeseria
 
-A time serie processing library. Includes modules for data cleaning, resampling and reconstrution, as well as forecasting models and generic analysis tools.
+A time series processing library. Provides modules for data cleaning, resampling and reconstrution, as well as forecasting and anomaly detection models.
+
+Timeseria also tries to address and solve by design all those annoying things which are often left as a detail but that actually cause massive amounts of time wasted - as data losses, non-uniform sampling rates, differences between time-slotted data and punctual observations, variable time units, timezones, DST changes and so on.
+
+To get started you can read the [quickstart](https://sarusso.github.io/Timeseria/Welcome.html), or you can run it interactively in Binder with the button below (once the environment is ready, open the Welcome notebook).
+
+Examples are provided in the [Timeseria-notebooks](https://github.com/sarusso/Timeseria-notebooks) repository, and are accessible in Binder as well, ready to be played with.
+
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/sarusso/Timeseria-notebooks/HEAD)
+
+![Time series plot](docs/plot.png?raw=true "Time series data loss")
+
+
+![Time series data loss](docs/data_loss.png?raw=true "Time series data loss")
 
 ![Time series reconstruction](docs/reconstructed.png?raw=true "Time series reconstruction")
 
 ![Time series forecating](docs/forecasted.png?raw=true "Time series forecating")
+
+
+![Time series anomaly detection](docs/anomaly.png?raw=true "Time series anomaly detection")
+
 
 
 
@@ -17,7 +34,7 @@ Every commit on the Timeseria codebase is automatically tested with Travis-CI. [
 
 
 # Licensing
-Timeseria is licensed under the Apache License, Version 2.0. See [LICENSE](https://raw.githubusercontent.com/sarusso/Timeseria/master/LICENSE) for the full license text.
+Timeseria is licensed under the Apache License version 2.0, unless otherwise specified. See [LICENSE](https://github.com/sarusso/Timeseria/blob/master/LICENSE) for the full license text.
 
 
 
