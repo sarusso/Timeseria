@@ -101,7 +101,7 @@ class Derivative(Operator):
                     # Both left and right derivative for the items in the middle
                     der =  ((data_time_slot_series[i+1].data[key] - data_time_slot_series[i].data[key]) + (data_time_slot_series[i].data[key] - data_time_slot_series[i-1].data[key])) /2
                     
-                der = der / (data_time_slot_series.resolution)
+                der = der / (data_time_slot_series._resolution)
 
                 # Add data
                 if not inplace:
@@ -134,13 +134,13 @@ class Merge(Operator):
             if not isinstance(arg, DataTimeSlotSeries):
                 raise TypeError('Argument #{} is not of type DataTimeSlotSeries, got "{}"'.format(i, arg.__class__.__name__))
             if resolution is None:
-                resolution = arg.resolution
+                resolution = arg._resolution
             else:
-                if arg.resolution != resolution:
+                if arg._resolution != resolution:
                     abort = True
                     try:
                         # Handle floating point precision issues 
-                        if is_close(arg.resolution, resolution):
+                        if is_close(arg._resolution, resolution):
                             abort = False
                     except (ValueError,TypeError):
                         pass

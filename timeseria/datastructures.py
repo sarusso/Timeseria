@@ -312,7 +312,7 @@ class TimePointSeries(PointSeries):
         if tz:
             self._tz = timezonize(tz)
         
-        self.resolution = None
+        self._resolution = None
 
         super(TimePointSeries, self).__init__(*args, **kwargs)
         
@@ -331,12 +331,12 @@ class TimePointSeries(PointSeries):
                 if item.t == self.prev_t:
                     raise ValueError('Time t="{}" is a duplicate'.format(item.t))
                 
-                if self.resolution is None:
-                    self.resolution = item.t - self.prev_t
+                if self._resolution is None:
+                    self._resolution = item.t - self.prev_t
                     
-                elif self.resolution != 'variable':
-                    if self.resolution != item.t - self.prev_t:
-                        self.resolution = 'variable'
+                elif self._resolution != 'variable':
+                    if self._resolution != item.t - self.prev_t:
+                        self._resolution = 'variable'
 
             self.prev_t = item.t
                 
@@ -347,17 +347,19 @@ class TimePointSeries(PointSeries):
 
     @property
     def tz(self):
+        # Note: we compute the tz on the fly beacuse for point time series we assume to use the tz
+        # attribute way lass than the slot time series, where the tz is instead computed at append-time.
         try:
             return self._tz
         except AttributeError:
-            
             # Detect time zone on the fly
             detected_tz = None
             for item in self:
                 if not detected_tz:
                     detected_tz = item.tz
                 else:
-                    if item.tz != detected_tz:
+                    # Terrible but seems like no other way to compare pytz.tzfile.* classes
+                    if str(item.tz) != str(detected_tz): 
                         return UTC
             return detected_tz
     
@@ -370,6 +372,17 @@ class TimePointSeries(PointSeries):
             time_point.change_timezone(new_timezone)
         self.tz = time_point.tz
 
+    @property
+    def resolution(self):
+        return self._resolution
+        #if isinstance(self._resolution, Unit):
+        #    return self._resolution
+        #else:
+        #    from .transformations import unit_to_TimeUnit
+        #    try:
+        #        return unit_to_TimeUnit(self._resolution)
+        #    except:
+        #        return self._resolution
 
     def cut(self, from_t=None, to_t=None, from_dt=None, to_dt=None):
         if from_dt:
@@ -767,18 +780,18 @@ class SlotSeries(Series):
         # Slots can belong to the same series if they are in succession (tested with the __succedes__ method)
         # and if they have the same unit, which we test here instead as the __succedes__ is more general.
         try:
-            if self.resolution != item.unit:
+            if self._resolution != item.unit:
                 # Try for floatign point precision errors
                 abort = False
                 try:
-                    if not  is_close(self.resolution, item.unit):
+                    if not  is_close(self._resolution, item.unit):
                         abort = True
                 except (TypeError, ValueError):
                     abort = True
                 if abort:
-                    raise ValueError('Cannot add items with different units (I have "{}" and you tried to add "{}")'.format(self.resolution, item.unit))
+                    raise ValueError('Cannot add items with different units (I have "{}" and you tried to add "{}")'.format(self._resolution, item.unit))
         except AttributeError:
-            self.resolution = item.unit
+            self._resolution = item.unit
 
         # Call parent append
         super(SlotSeries, self).append(item)
@@ -805,6 +818,18 @@ class TimeSlotSeries(SlotSeries):
             time_slot.change_timezone(new_timezone)
         self.tz = time_slot.tz
 
+    @property
+    def resolution(self):
+        return self._resolution
+        #if isinstance(self._resolution, Unit):
+        #    return self._resolution
+        #else:
+        #    from .transformations import unit_to_TimeUnit
+        #    try:
+        #        return unit_to_TimeUnit(self._resolution)
+        #    except:
+        #        return self._resolution
+
 
 class DataSlotSeries(SlotSeries):
     '''A series of DataSlots where each item is guaranteed to carry the same data type'''
@@ -826,7 +851,7 @@ class DataSlotSeries(SlotSeries):
                     raise ValueError('Got different data keys: {} vs {}'.format(self.item_data_reference.keys(), item.data.keys()))
 
         except AttributeError:
-            # TODO: uniform self.tz, self.resolution, self.item_data_reference
+            # TODO: uniform self.tz, self._resolution, self.item_data_reference
             self.item_data_reference = item.data
         
         super(DataSlotSeries, self).append(item)
@@ -972,10 +997,10 @@ class DataTimeSlotSeries(DataSlotSeries, TimeSlotSeries):
 
     def __repr__(self):
         if len(self):
-            if isinstance(self.resolution, TimeUnit):
-                resolution_str = str(self.resolution)
+            if isinstance(self._resolution, TimeUnit):
+                resolution_str = str(self._resolution)
             else:
-                resolution_str = str(self.resolution)# + 's' 
+                resolution_str = str(self._resolution)# + 's' 
             # TODO: "slots of unit" ?
             return 'Time series of #{} slots of {}, from slot starting @ {} ({}) to slot ending @ {} ({})'.format(len(self), resolution_str, self[0].start.t, self[0].start.dt, self[-1].end.t, self[-1].end.dt)            
         else:
