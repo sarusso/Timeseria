@@ -379,7 +379,7 @@ class Reconstructor(ParametricModel):
             return None
 
 
-    def _evaluate(self, timeseries, steps='auto', limit=1000, data_loss_threshold=1, metrics=['RMSE', 'MAE'], details=False, from_t=None, to_t=None, from_dt=None, to_dt=None):
+    def _evaluate(self, timeseries, steps='auto', limit=None, data_loss_threshold=1, metrics=['RMSE', 'MAE'], details=False, from_t=None, to_t=None, from_dt=None, to_dt=None):
 
         # Set evaluation_score steps if we have to
         if steps == 'auto':
@@ -395,9 +395,11 @@ class Reconstructor(ParametricModel):
         # Support vars
         evaluation_score = {}
         from_t, to_t = set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
-
+        warned = False
+        
+        # Log
         logger.info('Will evaluate model for %s steps with metrics %s', steps, metrics)
-
+        
         # Find areas where to evaluate the model
         for key in timeseries.data_keys():
              
@@ -471,9 +473,15 @@ class Reconstructor(ParametricModel):
                     for j in range(steps_round):
                         reconstructed_values.append(timeseries_to_reconstruct[j].data[key])
                     
+                    # Break if we have to
                     if limit is not None and processed_samples >= limit:
                         break
-
+                    
+                    # Warn if no limit given and we are over
+                    if not limit and not warned and i > 10000:
+                        logger.warning('No limit set in the evaluation with a quite long time series, this could take some time.')
+                        warned=True
+                        
                 if processed_samples < limit:
                     logger.warning('The evaluation limit is set to "{}" but I have only "{}" samples for "{}" steps'.format(limit, processed_samples, steps_round))
 
@@ -732,7 +740,7 @@ class ProphetReconstructor(Reconstructor, ProphetModel):
 
 class Forecaster(ParametricModel):
 
-    def _evaluate(self, timeseries, steps='auto', limit=1000, plots=False, metrics=['RMSE', 'MAE'], details=False, from_t=None, to_t=None, from_dt=None, to_dt=None):
+    def _evaluate(self, timeseries, steps='auto', limit=None, plots=False, metrics=['RMSE', 'MAE'], details=False, from_t=None, to_t=None, from_dt=None, to_dt=None):
 
         # Set evaluation_score steps if we have to
         if steps == 'auto':
@@ -748,7 +756,9 @@ class Forecaster(ParametricModel):
         # Support vars
         evaluation_score = {}
         from_t, to_t = set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
+        warned = False
 
+        # Log
         logger.info('Will evaluate model for %s steps with metrics %s', steps, metrics)
 
         for steps_round in steps:
@@ -809,6 +819,11 @@ class Forecaster(ParametricModel):
                     processed_samples+=1
                     if limit is not None and processed_samples >= limit:
                         break
+                    
+                    # Warn if no limit given and we are over
+                    if not limit and not warned and i > 10000:
+                        logger.warning('No limit set in the evaluation with a quite long time series, this could take some time.')
+                        warned=True
                 
             if limit is not None and processed_samples < limit:
                 logger.warning('The evaluation limit is set to "{}" but I have only "{}" samples for "{}" steps'.format(limit, processed_samples, steps_round))
