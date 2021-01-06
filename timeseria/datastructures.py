@@ -267,7 +267,7 @@ class DataPoint(Point):
 
     def __repr__(self):
         try:
-            return '{} with data "{}" and data_loss="{}"'.format(super(DataPoint, self).__repr__(), self.data, 1-self._data_loss)            
+            return '{} with data "{}" and data_loss="{}"'.format(super(DataPoint, self).__repr__(), self.data, self._data_loss)            
         except:
             return '{} with data "{}"'.format(super(DataPoint, self).__repr__(), self.data)
     

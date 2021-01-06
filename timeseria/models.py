@@ -265,7 +265,10 @@ and optionally a fit() method if the parameters are to be learnt form data.'''
         evaluations = []        
         for i in range(rounds):
             from_t = timeseries[(round_items*i)].t
-            to_t = timeseries[(round_items*i) + round_items].t
+            try:
+                to_t = timeseries[(round_items*i) + round_items].t
+            except IndexError:
+                to_t = timeseries[(round_items*i) + round_items - 1].t
             from_dt = dt_from_s(from_t)
             to_dt   = dt_from_s(to_t)
             logger.info('Cross validation round #{} of {}: validate from {} ({}) to {} ({}), fit on the rest.'.format(i+1, rounds, from_t, from_dt, to_t, to_dt))
@@ -376,7 +379,7 @@ class Reconstructor(ParametricModel):
             return None
 
 
-    def _evaluate(self, timeseries, steps='auto', samples=1000, data_loss_threshold=1, metrics=['RMSE', 'MAE'], details=False, from_t=None, to_t=None, from_dt=None, to_dt=None):
+    def _evaluate(self, timeseries, steps='auto', limit=1000, data_loss_threshold=1, metrics=['RMSE', 'MAE'], details=False, from_t=None, to_t=None, from_dt=None, to_dt=None):
 
         # Set evaluation_score steps if we have to
         if steps == 'auto':
@@ -468,11 +471,11 @@ class Reconstructor(ParametricModel):
                     for j in range(steps_round):
                         reconstructed_values.append(timeseries_to_reconstruct[j].data[key])
                     
-                    if samples is not None and processed_samples >= samples:
+                    if limit is not None and processed_samples >= limit:
                         break
 
-                if processed_samples < samples:
-                    logger.warning('Could not evaluate "{}" samples for "{}" steps_round, processed "{}" samples only'.format(samples, steps_round, processed_samples))
+                if processed_samples < limit:
+                    logger.warning('The evaluation limit is set to "{}" but I have only "{}" samples for "{}" steps'.format(limit, processed_samples, steps_round))
 
                 if not reconstructed_values:
                     raise Exception('Could not evaluate model, maybe not enough data?')
@@ -729,7 +732,7 @@ class ProphetReconstructor(Reconstructor, ProphetModel):
 
 class Forecaster(ParametricModel):
 
-    def _evaluate(self, timeseries, steps='auto', samples=1000, plots=False, metrics=['RMSE', 'MAE'], details=False, from_t=None, to_t=None, from_dt=None, to_dt=None):
+    def _evaluate(self, timeseries, steps='auto', limit=1000, plots=False, metrics=['RMSE', 'MAE'], details=False, from_t=None, to_t=None, from_dt=None, to_dt=None):
 
         # Set evaluation_score steps if we have to
         if steps == 'auto':
@@ -804,11 +807,11 @@ class Forecaster(ParametricModel):
                         real_values.append(real_value)
  
                     processed_samples+=1
-                    if samples is not None and processed_samples >= samples:
+                    if limit is not None and processed_samples >= limit:
                         break
                 
-            if processed_samples < samples:
-                logger.warning('Could not evaluate "{}" samples for "{}" steps_round, processed "{}" samples only'.format(samples, steps_round, processed_samples))
+            if limit is not None and processed_samples < limit:
+                logger.warning('The evaluation limit is set to "{}" but I have only "{}" samples for "{}" steps'.format(limit, processed_samples, steps_round))
 
             if not model_values:
                 raise Exception('Could not evaluate model, maybe not enough data?')
