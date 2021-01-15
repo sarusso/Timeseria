@@ -1,5 +1,4 @@
 import datetime, calendar, pytz
-from dateutil.tz import tzoffset
 from .exceptions import InputException, ConsistencyException
 
 # Setup logging
@@ -59,6 +58,7 @@ def dt(*args, **kwargs):
     
     if offset_s:
         # Special case for the offset
+        from dateutil.tz import tzoffset
         if not tzoffset:
             raise Exception('For ISO date with offset please install dateutil')
         time_dt = datetime.datetime(*args, tzinfo=tzoffset(None, offset_s))
