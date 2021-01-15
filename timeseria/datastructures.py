@@ -68,12 +68,6 @@ class Series(list):
         
         # Append
         super(Series, self).append(item)
-            
-    def extend(self, orher):
-        raise NotImplementedError
-
-    def merge(self, orher):
-        raise NotImplementedError
     
     def __sum__(self, other):
         raise NotImplementedError
@@ -94,12 +88,8 @@ class Series(list):
     
     def __str__(self):
         return self.__repr__()
-    
-    # Duplicate
-    def duplicate(self):
-        return deepcopy(self)
-    
-    # Slice
+        
+    # Python slice (i.e [0:35])
     def __getitem__(self, key):
         if isinstance(key, slice):            
             indices = range(*key.indices(len(self)))
@@ -114,6 +104,74 @@ class Series(list):
         else:
             return super(Series, self).__getitem__(key)
 
+
+    # Operations
+    def duplicate(self):
+        return deepcopy(self)
+
+    def slice(self, *args, **kwargs):
+        from .operations import slice as slice_operation
+        return slice_operation(self, *args, **kwargs) 
+
+    def merge(self, *args, **kwargs):
+        from .operations import merge as merge_operation
+        return merge_operation(self, *args, **kwargs)
+    
+    def extend(self, orher):
+        raise NotImplementedError
+
+    def select(self, *args, **kwargs):
+        from .operations import select as select_operation
+        return select_operation(self, *args, **kwargs)
+    
+    def min(self, *args, **kwargs):
+        from .operations import min as min_operation
+        return min_operation(self, *args, **kwargs)
+
+    def max(self, *args, **kwargs):
+        from .operations import max as max_operation
+        return max_operation(self, *args, **kwargs)    
+
+    def avg(self, *args, **kwargs):
+        from .operations import avg as avg_operation
+        return avg_operation(self, *args, **kwargs)   
+
+    def sum(self, *args, **kwargs):
+        from .operations import sum as sum_operation
+        return sum_operation(self, *args, **kwargs)  
+
+    def derivative(self, *args, **kwargs):
+        from .operations import derivative as derivative_operation
+        return derivative_operation(self, *args, **kwargs)   
+
+    def integral(self, *args, **kwargs):
+        from .operations import integral as integral_operation
+        return integral_operation(self, *args, **kwargs)   
+
+    def diff(self, *args, **kwargs):
+        from .operations import diff as diff_operation
+        return diff_operation(self, *args, **kwargs)   
+
+    def csum(self, *args, **kwargs):
+        from .operations import csum as csum_operation
+        return csum_operation(self, *args, **kwargs)
+     
+    def mavg(self, *args, **kwargs):
+        from .operations import mavg as mavg_operation
+        return mavg_operation(self, *args, **kwargs)  
+
+
+    # Transformation-based operations
+    def slot(self, *args, **kwargs):
+        from .transformations import Slotter
+        slotter = Slotter(*args, **kwargs)
+        return slotter.process(self)  
+
+    # Transformation-based operations
+    def resample(self, *args, **kwargs):
+        from .transformations import Resampler
+        resampler = Resampler(*args, **kwargs)
+        return resampler.process(self)  
 
 #======================
 #  Points
@@ -383,34 +441,6 @@ class TimePointSeries(PointSeries):
         #        return unit_to_TimeUnit(self._resolution)
         #    except:
         #        return self._resolution
-
-    def slice(self, from_t=None, to_t=None, from_dt=None, to_dt=None):
-        if from_dt:
-            if from_t is not None:
-                raise Exception('Cannot set both from_t and from_dt')
-            from_t = s_from_dt(from_dt)
-        if to_dt:
-            if to_t is not None:
-                raise Exception('Cannot set both to_t and to_dt')
-            to_t = s_from_dt(to_dt)
-            
-        if from_t is not None and to_t is not None:
-            if from_t >= to_t:
-                raise Exception('Got from >= to')
-        
-        series = self.__class__()
-        for item in self:
-            if from_t is not None and to_t is not None:
-                if item.t >= from_t and item.t <to_t:
-                    series.append(item)
-            else:
-                if from_t is not None:
-                    if item.t >= from_t:
-                        series.append(item) 
-                if to_t is not None:
-                    if item.t < to_t:
-                        series.append(item)
-        return series           
         
     
 
