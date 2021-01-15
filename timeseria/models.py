@@ -1083,7 +1083,11 @@ class PeriodicAverageForecaster(Forecaster):
             # Set forecast timestamp
             if isinstance(timeseries[0], Slot):
                 try:
-                    forecast_timestamp = forecast_timestamps[-1] + timeseries._resolution
+                    if isinstance(timeseries._resolution, Unit):
+                        forecast_timestamp = forecast_timestamps[-1] + timeseries._resolution
+                    else:
+                        forecast_timestamp = TimePoint(forecast_timestamps[-1].t + timeseries._resolution)
+                        
                     forecast_timestamps.append(forecast_timestamp)
                 except IndexError:
                     forecast_timestamp = forecast_start_item.end
