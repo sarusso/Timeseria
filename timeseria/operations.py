@@ -25,17 +25,25 @@ class Operation(object):
         return cls.__str__()
 
 
+# types
+class OperationTypes():
+    SCALAR=1
+    SERIES=2
+
 
 #=======================
 #  Scalar result
 #=======================
 
 class Max(Operation):
-    
+
+    type = OperationTypes.SCALAR
+    label = 'max'
+
     def __init__(self):
         self.built_in_max = max
     
-    def __call__(self, arg, key=None):
+    def __call__(self, arg, key=None, **kwargs):
         if not isinstance(arg, Series):
             return self.built_in_max(arg)
         else:
@@ -58,11 +66,14 @@ class Max(Operation):
 
 
 class Min(Operation):
+
+    type = OperationTypes.SCALAR
+    label = 'min'
     
     def __init__(self):
         self.built_in_min = min
     
-    def __call__(self, arg, key=None):
+    def __call__(self, arg, key=None, **kwargs):
         if not isinstance(arg, Series):
             return self.built_in_min(arg)
         else:
@@ -86,7 +97,10 @@ class Min(Operation):
 
 class Avg(Operation):
     
-    def __call__(self, arg, key=None):
+    type = OperationTypes.SCALAR
+    label = 'avg'
+    
+    def __call__(self, arg, key=None, **kwargs):
         if not isinstance(arg, Series):
             raise NotImplementedError('Avg implemented only on series objects')
         else:
@@ -108,12 +122,39 @@ class Avg(Operation):
             else:
                 return avgs
 
+
+class WAvg(Operation):
+
+    type = OperationTypes.SCALAR
+    label = 'wavg'
+    
+    def __call__(self, series, prev_point=None, next_point=None):
+        raise NotImplementedError('Weighted Average is not yet implemented')
+        #keys = None
+        #avgs = {}
+        #count=0
+        #for data_time_point in series:
+        #    count+=1              
+        #    if not keys:
+        #        keys=data_time_point.data.keys()
+        #    for key in keys:
+        #        if key not in avgs:
+        #            avgs[key] = 0
+        #        avgs[key] += data_time_point.data[key]
+        #for key in keys:
+        #    new_avgs = {key:avgs[key]/count for key in keys}
+        #return new_avgs
+
+
 class Sum(Operation):
+
+    type = OperationTypes.SCALAR
+    label = 'sum'
     
     def __init__(self):
         self.built_in_sum = sum
     
-    def __call__(self, arg, key=None):
+    def __call__(self, arg, key=None, **kwargs):
         if not isinstance(arg, Series):
             return self.built_in_sum(arg)
         else:
@@ -503,6 +544,7 @@ class Merge(Operation):
 min = Min()
 max = Max()
 avg = Avg()
+wavg = WAvg()
 sum = Sum()
 
 # Series result

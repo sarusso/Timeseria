@@ -185,7 +185,7 @@ class TestSlotter(unittest.TestCase):
         self.assertEqual(str(data_time_slot_series[74].start.dt), str('2019-10-27 02:00:00+02:00'))
         self.assertEqual(str(data_time_slot_series[75].start.dt), str('2019-10-27 02:00:00+01:00'))
         self.assertEqual(str(data_time_slot_series[76].start.dt), str('2019-10-27 03:00:00+01:00'))
- 
+        self.assertEqual(data_time_slot_series[76].data['temperature'],230.5)
  
         # Work in progress in the following
         #print('--------------------------------------------')
@@ -208,20 +208,29 @@ class TestSlotter(unittest.TestCase):
         #    print(item)
  
  
- 
+    def test_slot_operations(self):
+
+        data_time_point_series = DataTimePointSeries()
+        start_t = 1436022000 - 120
+        for i in range(35):
+            data_time_point = DataTimePoint(t = start_t + (i*60),
+                                            data = {'temperature': 154+i, 'humidity': 5})
+            data_time_point_series.append(data_time_point)
+        
+        from ..operations import min, max, avg, sum
+        # Time series from 16:58:00 to 17:32:00 (Europe/Rome), no from/to, extremes excluded (default)
+        
+        # Add extra operations
+        data_time_slot_series = Slotter('600s', extra_operations=[min,max]).process(data_time_point_series)        
+        self.assertEqual(data_time_slot_series[0].data, {'temperature': 161.0, 'humidity': 5.0, 'temperature_min': 156, 'humidity_min': 5, 'temperature_max': 166, 'humidity_max': 5})
+
+        # Change default operations
+        data_time_slot_series = Slotter('600s', default_operation=sum).process(data_time_point_series)        
+        self.assertEqual(data_time_slot_series[0].data, {'temperature': 1771, 'humidity': 55})
+        self.assertEqual(data_time_slot_series[1].data, {'temperature': 1881, 'humidity': 55})
+
+        # Only extra operations
+        data_time_slot_series = Slotter('600s', default_operation=None, extra_operations=[avg,min,max]).process(data_time_point_series)        
+        self.assertEqual(data_time_slot_series[0].data, {'temperature_avg': 161.0, 'humidity_avg': 5.0, 'temperature_min': 156, 'humidity_min': 5, 'temperature_max': 166, 'humidity_max': 5})
 
  
- 
- 
-
- 
- 
-
-
-
-
-
-
-
-
-
