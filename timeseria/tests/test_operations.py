@@ -3,7 +3,7 @@ import os
 from ..datastructures import Point, TimePoint, DataPoint, DataTimePoint, DataTimeSlotSeries, DataTimeSlot
 from ..datastructures import Series, DataPointSeries, TimePointSeries, DataTimePointSeries
 from ..storages import CSVFileStorage
-from ..operations import derivative, integral, diff, csum, min, max, avg, slice, select, mavg
+from ..operations import derivative, integral, diff, csum, min, max, avg, filter, select, mavg
 from ..time import dt, s_from_dt, dt_from_s, dt_from_str
 from ..exceptions import InputException
 from ..units import TimeUnit
@@ -11,10 +11,6 @@ from ..units import TimeUnit
 # Setup logging
 import logging
 logging.basicConfig(level=os.environ.get('LOGLEVEL') if os.environ.get('LOGLEVEL') else 'CRITICAL')
-
-# Set test data path
-TEST_DATA_PATH = '/'.join(os.path.realpath(__file__).split('/')[0:-1]) + '/test_data/'
-
 
 class TestMathOperations(unittest.TestCase):
   
@@ -128,7 +124,6 @@ class TestMathOperations(unittest.TestCase):
         self.assertAlmostEqual(derivative_data_time_point_series[1].data['value_derivative'],-0.2)
         self.assertAlmostEqual(derivative_data_time_point_series[1].data['another_value_derivative'],-2.15)
 
-
         # Test derivative-integral identity with ther data     
         data_time_slot_series = DataTimeSlotSeries()
         data_time_slot_series.append(DataTimeSlot(start=TimePoint(0), end=TimePoint(1), data={'value':0}))
@@ -156,9 +151,9 @@ class TestMathOperations(unittest.TestCase):
         data_time_slot_series.append(DataTimeSlot(start=TimePoint(3), end=TimePoint(4), data={'value':16}))
   
         mavg_data_time_slot_series = mavg(data_time_slot_series, 2)
-        self.assertEqual(mavg_data_time_slot_series[0].data['value_mavg'], 3)
-        self.assertEqual(mavg_data_time_slot_series[1].data['value_mavg'], 6)
-        self.assertEqual(mavg_data_time_slot_series[2].data['value_mavg'], 12)
+        self.assertEqual(mavg_data_time_slot_series[0].data['value_mavg_2'], 3)
+        self.assertEqual(mavg_data_time_slot_series[1].data['value_mavg_2'], 6)
+        self.assertEqual(mavg_data_time_slot_series[2].data['value_mavg_2'], 12)
         self.assertEqual(mavg_data_time_slot_series[0].t, 1)
         self.assertEqual(mavg_data_time_slot_series[1].t, 2)
         self.assertEqual(mavg_data_time_slot_series[2].t, 3)
@@ -209,6 +204,40 @@ class TestMathOperations(unittest.TestCase):
         self.assertEqual(data_time_point_series.avg(key='another_value'), 45.5)
 
 
+class TestSeriesOperations(unittest.TestCase):
+    
+    def test_filter(self):
+
+        test_time_point_series = TimePointSeries(TimePoint(t=60),TimePoint(t=120),TimePoint(t=130))
+
+        # Test from/to filtering
+        self.assertEqual(len(filter(test_time_point_series, from_t=1, to_t=140)),3)
+
+        # Test from/to filtering from the series
+        self.assertEqual(len(test_time_point_series.filter(from_t=1, to_t=140)),3)
+        self.assertEqual(len(test_time_point_series.filter(from_t=61, to_t=140)),2)
+        self.assertEqual(len(test_time_point_series.filter(from_t=61)),2)
+        self.assertEqual(len(test_time_point_series.filter(to_t=61)),1)
+
+        # Test  data
+        data_time_point_series =  DataTimePointSeries(DataTimePoint(t=60, data={'a':1, 'b':2}),
+                                                      DataTimePoint(t=120, data={'a':2, 'b':4}),
+                                                      DataTimePoint(t=180, data={'a':3, 'b':8}))
+
+        # Test get item by string key (filtering on data labels)
+        self.assertEqual(filter(data_time_point_series, 'b')[0].data, {'b': 2})
+
+        # Test get item by string key (filtering on data labels), from the series
+        self.assertEqual(data_time_point_series.filter('a')[0].data, {'a': 1})
+        self.assertEqual(data_time_point_series.filter('a')[1].data, {'a': 2})
+        self.assertEqual(data_time_point_series.filter('a')[2].data, {'a': 3})
+        self.assertEqual(len(data_time_point_series.filter('a')), 3 )
+        
+        # Test that we haven't modified the original series
+        self.assertEqual(data_time_point_series.data_keys(), ['a', 'b'])
+        self.assertEqual(data_time_point_series[1].data['b'], 4)
+
+
     def test_select(self):
     
         # Test data
@@ -221,23 +250,6 @@ class TestMathOperations(unittest.TestCase):
         # Basic select test        
         self.assertEqual(select(data_time_point_series, query='another_value=65')[0].t, 60)
         self.assertEqual(data_time_point_series.select('"another_value"=65')[0].t, 60)
-
-
-class TestSeriesOperations(unittest.TestCase):
-    
-    def test_slice(self):
-
-        test_time_point_series = TimePointSeries(TimePoint(t=60),TimePoint(t=120),TimePoint(t=130))
-
-        # Test the operation
-        self.assertEqual(len(slice(test_time_point_series, from_t=1, to_t=140)),3)
-
-        # Test from the series itself       
-        self.assertEqual(len(test_time_point_series.slice(from_t=1, to_t=140)),3)
-        self.assertEqual(len(test_time_point_series.slice(from_t=61, to_t=140)),2)
-        self.assertEqual(len(test_time_point_series.slice(from_t=61)),2)
-        self.assertEqual(len(test_time_point_series.slice(to_t=61)),1)
-
 
 
 

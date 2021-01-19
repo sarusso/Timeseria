@@ -1,3 +1,4 @@
+from copy import copy, deepcopy
 from .time import dt_from_s, s_from_dt
 from .datastructures import DataTimeSlot, DataTimeSlotSeries, TimePoint, DataTimePointSeries, Series, Slot, Point, PointSeries
 from .utilities import compute_coverage, is_almost_equal, is_close
@@ -282,22 +283,13 @@ class Integral(Operation):
                     # Compute the integral
                     if i == 0:
                         value=0
-                        #prev_value = value
                         prev_right_component = timeseries[i].data[key]
-
                     else:
-
-                        #left_component = timeseries[i].data[key]-prev_right_component
-                        
-                        left_component = (timeseries[i-1].data[key]*2) - prev_right_component #14-6
-                        #right_component = (timeseries[i].data[key]*2) - left_component
-                        
-                        value =  left_component # This is actually a incremente, see below at  value = last_values[key] + value for fixing it
-                         
+                        left_component = (timeseries[i-1].data[key]*2) - prev_right_component
+                        # The "value" below is actually an increment, see below at  value = last_values[key] + value 
+                        value = left_component 
                         prev_right_component = left_component
-                        prev_value = value
 
-                                  
                 # Normalize the cumulative to get the actual integral
                 if normalize:
                     if isinstance(timeseries.resolution, TimeUnit):
@@ -363,7 +355,7 @@ class MAvg(Operation):
         if inplace:
             raise Exception('In-place operation not supported yet (padding support required)')
         
-        postfix='mavg'
+        postfix='mavg_{}'.format(window)
         
         mavg_timeseries = timeseries.__class__()
 
@@ -434,9 +426,9 @@ class Select(Operation):
         return selected 
 
 
-class Slice(Operation):
+class Filter(Operation):
 
-    def __call__(self, series, from_t=None, to_t=None, from_dt=None, to_dt=None):
+    def __call__(self, series, key=None, from_t=None, to_t=None, from_dt=None, to_dt=None):
         if from_dt:
             if from_t is not None:
                 raise Exception('Cannot set both from_t and from_dt')
@@ -450,19 +442,32 @@ class Slice(Operation):
             if from_t >= to_t:
                 raise Exception('Got from >= to')
         
-        slices_series = series.__class__()
+        # Instantiate the filtered series
+        filtered_series = series.__class__()
+        
+        # Filter based on time if from/to are set
         for item in series:
             if from_t is not None and to_t is not None:
                 if item.t >= from_t and item.t <to_t:
-                    slices_series.append(item)
+                    filtered_series.append(item)
             else:
                 if from_t is not None:
                     if item.t >= from_t:
-                        slices_series.append(item) 
+                        filtered_series.append(item) 
                 if to_t is not None:
                     if item.t < to_t:
-                        slices_series.append(item)
-        return slices_series 
+                        filtered_series.append(item)
+                if from_t is None and to_t is None:
+                    # Append everything 
+                    filtered_series.append(item)
+        
+        # Filter based on key if set
+        if key:
+            for i, item in enumerate(filtered_series):
+                filtered_series[i] = copy(item)
+                filtered_series[i]._data = {key: item.data[key]}
+
+        return filtered_series 
 
 
 class Merge(Operation):
@@ -490,7 +495,6 @@ class Merge(Operation):
         length = len(timeseriess[0])
         n_timeseriess = len(timeseriess)
         result_timeseries = timeseriess[0].__class__(unit=resolution)
-        import copy
         
         for i in range(length):
             data = None
@@ -501,7 +505,7 @@ class Merge(Operation):
                 
                 # Data
                 if data is None:
-                    data = copy.deepcopy(timeseriess[j][i].data)
+                    data = deepcopy(timeseriess[j][i].data)
                 else:
                     data.update(timeseriess[j][i].data)
                 
@@ -558,7 +562,7 @@ mavg = MAvg()
 
 # Series manipulation
 merge = Merge()
-slice = Slice()
+filter = Filter()
 select = Select()
 
 
