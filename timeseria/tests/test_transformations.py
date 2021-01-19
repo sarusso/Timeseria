@@ -1,11 +1,9 @@
 import unittest
 import os
-from ..datastructures import Point, TimePoint, DataPoint, DataTimePoint, DataTimeSlotSeries, DataTimeSlot
-from ..datastructures import Series, DataPointSeries, TimePointSeries, DataTimePointSeries
+from ..datastructures import DataTimePoint, DataTimePointSeries
 from ..storages import CSVFileStorage
-#from ..operators import diff, min, slot, Slotter,
 from ..transformations import Resampler, Slotter, detect_dataPoints_validity, unit_to_TimeUnit 
-from ..time import dt, s_from_dt, dt_from_s, dt_from_str
+from ..time import dt, s_from_dt, dt_from_str
 from ..exceptions import InputException
 from ..units import TimeUnit
 
@@ -110,7 +108,6 @@ class TestSlotter(unittest.TestCase):
         with self.assertRaises(InputException):
             unit_to_TimeUnit('NO')
         
-        
 
     def test_detect_dataPoints_validity(self):
         
@@ -186,26 +183,34 @@ class TestSlotter(unittest.TestCase):
         self.assertEqual(str(data_time_slot_series[75].start.dt), str('2019-10-27 02:00:00+01:00'))
         self.assertEqual(str(data_time_slot_series[76].start.dt), str('2019-10-27 03:00:00+01:00'))
         self.assertEqual(data_time_slot_series[76].data['temperature'],230.5)
- 
+
+
+        # Use the time series 7 from 2019,10,24,0,0,0 to 2019,10,31,0,0,0 (Europe/Rome), DST off -> 2 AM repeated
+
         # Work in progress in the following
-        #print('--------------------------------------------')
-        #for item in self.data_time_point_series_6: print(item)
-        #print('--------------------------------------------')
-        #for i, item in enumerate(data_time_slot_series): print(i, item)
-        #print('--------------------------------------------')
-        
-        # Time series from 2019,10,24,0,0,0 to 2019,10,31,0,0,0 (Europe/Rome), DST off -> 2 AM repeated
+        if False:
+            print('--------------------------------------------')
+            for item in self.data_time_point_series_7: print(item)
+            print('--------------------------------------------')
+            for i, item in enumerate(data_time_slot_series): print(i, item)
+            print('--------------------------------------------')
+
+        # This is a "downsampling", and there are data losses and strange values that should not be there.
+        # TODO: fix me!
+        #slotter = Slotter('10m')
         #data_time_slot_series = slotter.process(self.data_time_point_series_7, from_t=1571868600, to_t=1571873400)
         #for item in data_time_slot_series:
         #    print(item)
-        # This is a downsampling, there are data_loss=None.. TOOD: fix me
   
-        # 1-day sloter TODO: add all the "logical" time part, nothing works here...
+        # This is a 1-day slotting over a DST change, and slots have the wrong start time (but are  correct in legth).
+        # TODO: fix me!
         #slotter = Slotter('1D')
-        # Time series from 2019,10,24,0,0,0 to 2019,10,31,0,0,0 (Europe/Rome), DST off -> 2 AM repeated
         #data_time_slot_series = slotter.process(self.data_time_point_series_7)
         #for item in data_time_slot_series:
         #    print(item)
+        
+        # TODO: also test from/to with timezone and epoch.
+        # i.e. 1571868000 will not be recognised as correct Europe/Rome midnight.
  
  
     def test_slot_operations(self):
@@ -233,4 +238,3 @@ class TestSlotter(unittest.TestCase):
         data_time_slot_series = Slotter('600s', default_operation=None, extra_operations=[avg,min,max]).process(data_time_point_series)        
         self.assertEqual(data_time_slot_series[0].data, {'temperature_avg': 161.0, 'humidity_avg': 5.0, 'temperature_min': 156, 'humidity_min': 5, 'temperature_max': 166, 'humidity_max': 5})
 
- 

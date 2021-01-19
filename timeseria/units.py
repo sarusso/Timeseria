@@ -75,6 +75,16 @@ class TimeUnit(Unit):
             if string and (years or months or days or hours or minutes or seconds or microseconds) and ((start is not None) or (end is not None)):
                 raise InputException('Choose between string init and explicit setting of years, months, days, hours etc.')
     
+            # Check types:
+            if not isinstance(years, int): raise InputException('year not of type int (got "{}")'.format(years.__class__.__name__))
+            if not isinstance(weeks, int): raise InputException('weeks not of type int (got "{}")'.format(years.__class__.__name__))
+            if not isinstance(months, int): raise InputException('months not of type int (got "{}")'.format(years.__class__.__name__))
+            if not isinstance(days, int): raise InputException('days not of type int (got "{}")'.format(years.__class__.__name__))
+            if not isinstance(hours, int): raise InputException('hours not of type int (got "{}")'.format(years.__class__.__name__))
+            if not isinstance(minutes, int): raise InputException('minutes not of type int (got "{}")'.format(years.__class__.__name__))
+            if not isinstance(seconds, int): raise InputException('seconds not of type int (got "{}")'.format(years.__class__.__name__))
+            if not isinstance(microseconds, int): raise InputException('microseconds not of type int (got "{}")'.format(years.__class__.__name__))
+
             # Check that both start and end are set if one is set
             if start and not end:
                 raise InputException('You provided the start but not the end')
@@ -116,7 +126,6 @@ class TimeUnit(Unit):
             if not self.years and not self.weeks and not self.months and not self.days and not self.hours and not self.minutes and not self.seconds and not self.microseconds:
                 raise InputException('Detected zero-duration TimeUnit!')
  
-
     # Representation..
     def __repr__(self):
         return self.string
@@ -265,7 +274,7 @@ class TimeUnit(Unit):
             
             else:
 
-                distance_from_time_floor_s = abs(time_s - time_floor_s) # Distance from floot
+                distance_from_time_floor_s = abs(time_s - time_floor_s) # Distance from floor
                 distance_from_time_ceil_s  = abs(time_s - time_ceil_s)  # Distance from ceil
 
                 if distance_from_time_floor_s < distance_from_time_ceil_s:
@@ -309,7 +318,6 @@ class TimeUnit(Unit):
 
         # Return
         return rounded_dt
-
 
     def floor_dt(self, time_dt):
         '''Floor a datetime according to this TimeUnit. Only simple time intervals are supported in this operation'''       
@@ -383,8 +391,6 @@ class TimeUnit(Unit):
         
         # Return
         return time_shifted_dt   
-        
- 
 
     def duration_s(self, start_dt=None):
         '''Get the duration of the interval in seconds'''
@@ -402,8 +408,6 @@ class TimeUnit(Unit):
             end_epoch = s_from_dt(end_dt)
 
             return (end_epoch - start_epoch)
-            
-            raise NotImplementedError('Computing the duration in seconds using a given start_time_dt is not yet supported')
 
         else:
             # Hours, Minutes, Seconds
@@ -417,13 +421,12 @@ class TimeUnit(Unit):
                 time_unit_s = 1/1000000.0 * self.microseconds
                
         return time_unit_s
-        
-    #@property
-    #def duration(self):
-    #    if self.type == 'Calendar':
-    #        raise InputException('Sorry, the duration of a CALENDAR time unit is not defined. use duration_s() providing the starting point.')
-    #    return self.duration_s()
 
+    @property
+    def value(self):
+        if self.type == 'Calendar':
+            raise TypeError('Sorry, the value of a CALENDAR time unit is not defined. use duration_s() providing the starting point.')
+        return self.duration_s()
 
     # Get start/end/center
     def get_start(self, end=None, center=None):

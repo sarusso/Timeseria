@@ -1,6 +1,5 @@
 import unittest
 import os
-from ..exceptions import InputException
 from ..utilities import detect_encoding, compute_coverage, get_periodicity
 from ..datastructures import DataTimePointSeries, DataTimePoint
 from ..time import dt, s_from_dt
@@ -12,6 +11,7 @@ from ..units import TimeUnit
 import logging
 logging.basicConfig(level=os.environ.get('LOGLEVEL') if os.environ.get('LOGLEVEL') else 'CRITICAL')
 
+# Set test data path
 TEST_DATA_PATH = '/'.join(os.path.realpath(__file__).split('/')[0:-1]) + '/test_data/'
 
 
@@ -156,18 +156,3 @@ class TestGetPeriodicity(unittest.TestCase):
 
         self.assertEqual(perdiodicity, 24)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-     

@@ -1,12 +1,8 @@
 import unittest
 import os
-from ..datastructures import Point, TimePoint, DataPoint, DataTimePoint, DataTimeSlotSeries, DataTimeSlot
-from ..datastructures import Series, DataPointSeries, TimePointSeries, DataTimePointSeries
-from ..storages import CSVFileStorage
+from ..datastructures import TimePoint, DataTimePoint, DataTimeSlotSeries, DataTimeSlot
+from ..datastructures import TimePointSeries, DataTimePointSeries
 from ..operations import derivative, integral, diff, csum, min, max, avg, filter, select, mavg
-from ..time import dt, s_from_dt, dt_from_s, dt_from_str
-from ..exceptions import InputException
-from ..units import TimeUnit
 
 # Setup logging
 import logging

@@ -14,9 +14,10 @@ from ..time import dt
 import logging
 logging.basicConfig(level=os.environ.get('LOGLEVEL') if os.environ.get('LOGLEVEL') else 'CRITICAL')
 
+# Test data and temp path 
 TEST_DATA_PATH = '/'.join(os.path.realpath(__file__).split('/')[0:-1]) + '/test_data/'
-
 TEMP_MODELS_DIR = tempfile.TemporaryDirectory().name
+
 
 class TestBaseModelClasses(unittest.TestCase):
 
@@ -193,6 +194,7 @@ class TestReconstructors(unittest.TestCase):
                     self.assertNotEqual(data_time_slot_series_reconstructed[i].data, data_time_slot_series[i].data, 'at position {}'.format(i))
 
 
+
 class TestForecasters(unittest.TestCase):
 
     def setUp(self):
@@ -264,7 +266,6 @@ class TestForecasters(unittest.TestCase):
           
         # TODO: do some actual testing.. not only that "it works"
         forecasted_data_time_point_series  = forecaster.apply(data_time_point_series)
-        
 
 
     def test_ProphetForecaster(self):
@@ -289,9 +290,6 @@ class TestForecasters(unittest.TestCase):
           
         # TODO: do some actual testing.. not only that "it works"
         forecasted_data_time_point_series  = forecaster.apply(data_time_point_series)
-
-
-
 
 
 
@@ -341,9 +339,4 @@ class TestAnomalyDetectors(unittest.TestCase):
           
         # TODO: do some actual testing.. not only that "it works"
         anomaly_data_time_point_series  = anomaly_detector.apply(data_time_point_series)
-
-
-    
-
-
 
