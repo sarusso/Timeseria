@@ -358,6 +358,12 @@ class TestPointSeries(unittest.TestCase):
         self.assertEqual(data_time_point_series.resolution, 86400) # No DST occured
 
 
+        # Test get item by string key (filter on data labels). More testing is done in the operation tests
+        data_time_point_series =  DataTimePointSeries(DataTimePoint(t=60, data={'a':1, 'b':2}))
+        self.assertEqual(data_time_point_series['a'][0].data, {'a': 1})
+
+
+
 class TestUnit(unittest.TestCase):
 
     def test_Unit(self):      
@@ -672,11 +678,9 @@ class TestSlotSeries(unittest.TestCase):
 #                                                     DataTimeSlot(start=TimePoint(t=120), end=TimePoint(t=180), data=24.1),
 #                                                     DataTimeSlot(start=TimePoint(t=180), end=TimePoint(t=240), data=23.1))
 #         print(data_time_slot_series.resolution)        
-        
-        
 
         
-    def test_cannge_timezone_DataTimeSlotSeries(self):
+        # Test change timezone
         from ..time import timezonize
         data_time_slot_series_UTC =  DataTimeSlotSeries(DataTimeSlot(start=TimePoint(t=60),  end=TimePoint(t=120), data=23.8),
                                                         DataTimeSlot(start=TimePoint(t=120), end=TimePoint(t=180), data=24.1),
@@ -687,7 +691,11 @@ class TestSlotSeries(unittest.TestCase):
         self.assertEqual(data_time_slot_series_UTC[0].tz, timezonize('Europe/Rome'))
         self.assertEqual(data_time_slot_series_UTC[0].start.tz, timezonize('Europe/Rome'))
         self.assertEqual(data_time_slot_series_UTC[0].end.tz, timezonize('Europe/Rome'))
-        
+
+    
+        # Test get item by string key (filter on data labels). More testing is done in the operation tests
+        data_time_slot_series =  DataTimeSlotSeries(DataTimeSlot(start=TimePoint(t=60),  end=TimePoint(t=120), data={'a':1, 'b':2}))
+        self.assertEqual(data_time_slot_series['a'][0].data, {'a': 1})
 
 
     

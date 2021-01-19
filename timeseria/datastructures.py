@@ -91,7 +91,8 @@ class Series(list):
         
     # Python slice (i.e [0:35])
     def __getitem__(self, key):
-        if isinstance(key, slice):            
+        if isinstance(key, slice):   
+            # TODO: improve and implement shallow copies please.         
             indices = range(*key.indices(len(self)))
             series = self.__class__()
             for i in indices:
@@ -101,6 +102,9 @@ class Series(list):
             except:
                 pass
             return series
+        elif isinstance(key, str):   
+            # Try filtering on this data key only
+            return self.filter(key)
         else:
             return super(Series, self).__getitem__(key)
 
@@ -109,9 +113,9 @@ class Series(list):
     def duplicate(self):
         return deepcopy(self)
 
-    def slice(self, *args, **kwargs):
-        from .operations import slice as slice_operation
-        return slice_operation(self, *args, **kwargs) 
+    def filter(self, *args, **kwargs):
+        from .operations import filter as filter_operation
+        return filter_operation(self, *args, **kwargs) 
 
     def merge(self, *args, **kwargs):
         from .operations import merge as merge_operation
