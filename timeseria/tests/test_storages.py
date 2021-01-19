@@ -1,7 +1,6 @@
 import unittest
 import os
-from ..datastructures import Point, TimePoint, DataPoint, DataTimePoint
-from ..datastructures import Series, TimePointSeries, DataPointSeries, DataTimePointSeries
+from ..datastructures import DataTimePoint
 from ..storages import CSVFileStorage
 
 # Setup logging
@@ -30,14 +29,12 @@ class TestCSVFileStorage(unittest.TestCase):
         self.assertEqual(data_time_point_series[0].data, [1000,10])
         self.assertEqual(data_time_point_series[-1].data, [1040,14])
  
- 
         # Basic iso8601 multi values no labels and filtering
         storage = CSVFileStorage(TEST_DATA_PATH + '/csv/multi_values_with_labels.csv', data_columns=[2])
         data_time_point_series = storage.get()
         self.assertEqual(len(data_time_point_series), 50)
         self.assertEqual(data_time_point_series[0].data, [10])
         self.assertEqual(data_time_point_series[-1].data, [14])
- 
  
         # Basic iso8601 multi values no labels and filtering and force format
         storage = CSVFileStorage(TEST_DATA_PATH + '/csv/multi_values_with_labels.csv', data_columns=[1], data_format=list)
@@ -46,14 +43,12 @@ class TestCSVFileStorage(unittest.TestCase):
         self.assertEqual(data_time_point_series[0].data, [1000])
         self.assertEqual(data_time_point_series[-1].data, [1040])
 
-
         # Basic iso8601 multi values with labels
         storage = CSVFileStorage(TEST_DATA_PATH + '/csv/multi_values_with_labels.csv')
         data_time_point_series = storage.get()
         self.assertEqual(len(data_time_point_series), 50)
         self.assertEqual(data_time_point_series[0].data, {'flow': 1000.0, 'temp': 10.0})
         self.assertEqual(data_time_point_series[-1].data, {'flow': 1040.0, 'temp': 14.0})
-
 
         # Basic iso8601 multi values with labels
         storage = CSVFileStorage(TEST_DATA_PATH + '/csv/multi_values_with_labels.csv', data_columns=['temp'])
@@ -62,14 +57,12 @@ class TestCSVFileStorage(unittest.TestCase):
         self.assertEqual(data_time_point_series[0].data, {'temp': 10.0})
         self.assertEqual(data_time_point_series[-1].data,{'temp': 14.0})
 
-
         # Basic iso8601 multi values with labels
         storage = CSVFileStorage(TEST_DATA_PATH + '/csv/multi_values_with_labels.csv', data_columns=[1])
         data_time_point_series = storage.get()
         self.assertEqual(len(data_time_point_series), 50)
         self.assertEqual(data_time_point_series[0].data, [1000.0])
         self.assertEqual(data_time_point_series[-1].data, [1040.0])
-
 
 
     def test_CSVFileStorage_errors(self):
@@ -84,27 +77,23 @@ class TestCSVFileStorage(unittest.TestCase):
         with self.assertRaises(Exception):
             CSVFileStorage(TEST_DATA_PATH + '/csv/multi_values_with_labels.csv', date_column = [0])
 
-
         # Test requiring a not existent data column:
         storage = CSVFileStorage(TEST_DATA_PATH + '/csv/multi_values_with_labels.csv', data_columns = ['temp', 'flow_NO'])
         with self.assertRaises(Exception):
             storage.get()
-
-
 
     def test_CSVFileStorage_dirty(self):
 
         # Basic iso8601 with two columns, one for the timestamp and one for the value, no labels, dirty
         storage = CSVFileStorage(TEST_DATA_PATH + '/csv/single_value_no_labels_dirty.csv')
         with self.assertRaises(Exception):
-            data_time_point_series = storage.get()
+            _ = storage.get()
    
         storage = CSVFileStorage(TEST_DATA_PATH + '/csv/single_value_no_labels_dirty.csv', skip_errors=True)
         data_time_point_series = storage.get()       
         self.assertEqual(len(data_time_point_series), 3)
         self.assertEqual(data_time_point_series[0].t, 946684800)
         self.assertEqual(data_time_point_series[0].data, 1000)
-
 
         # Basic iso8601 with two labels, dirty
         storage = CSVFileStorage(TEST_DATA_PATH + '/csv/multi_values_with_labels_dirty.csv', value_separator=';', skip_errors=True)
@@ -115,7 +104,6 @@ class TestCSVFileStorage(unittest.TestCase):
         self.assertEqual(data_time_point_series[2], DataTimePoint(t= 946713600, data={'flow': 1300.0, 'temp': 10.0}))
 
 
- 
     def test_CSVFileStorage_datetimeformats(self):
 
         # Autodetect epoch
@@ -173,3 +161,4 @@ class TestCSVFileStorage(unittest.TestCase):
         self.assertEqual(len(data_time_point_series), 95)
         self.assertEqual(data_time_point_series[0].t, 1197244800)
         self.assertEqual(data_time_point_series[-1].t, 1205798400)
+

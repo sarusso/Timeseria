@@ -1,7 +1,7 @@
 import unittest
 import datetime
 from ..exceptions import InputException
-from ..time import dt, correct_dt_dst, timezonize, s_from_dt, dt_to_str, dt_from_str, change_tz
+from ..time import dt, correct_dt_dst, dt_to_str, dt_from_str, change_tz
 
 
 class TestTime(unittest.TestCase):
@@ -42,10 +42,6 @@ class TestTime(unittest.TestCase):
         date_time = dt(2015,9,25,4,15,0, tzinfo='Europe/Rome')
         self.assertEqual(str(date_time), '2015-09-25 04:15:00+02:00')
 
-        #---------------------
-        # Test border cases
-        #---------------------
-        
         # Not existent time raises
         with self.assertRaises(InputException):
             _ = dt(2015,3,29,2,15,0, tzinfo='Europe/Rome')
@@ -126,11 +122,4 @@ class TestTime(unittest.TestCase):
 
     def tearDown(self):
         pass
-
-
-
-
-
-
-
 

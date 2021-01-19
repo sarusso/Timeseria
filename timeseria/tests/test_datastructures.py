@@ -3,13 +3,10 @@ import datetime
 import os
 import pandas as pd
 
-
 from ..datastructures import Point, TimePoint, DataPoint, DataTimePoint
 from ..datastructures import Slot, TimeSlot, DataSlot, DataTimeSlot
-from ..datastructures import Series
-from ..datastructures import Unit
-from ..datastructures import PointSeries, DataPointSeries, TimePointSeries, DataTimePointSeries
-from ..datastructures import SlotSeries, DataSlotSeries, TimeSlotSeries, DataTimeSlotSeries
+from ..datastructures import Series, SlotSeries, TimePointSeries, TimeSlotSeries, DataSlotSeries
+from ..datastructures import DataTimePointSeries, DataTimeSlotSeries 
 from ..time import UTC, dt
 from ..units import Unit, TimeUnit
 
@@ -19,6 +16,7 @@ logging.basicConfig(level=os.environ.get('LOGLEVEL') if os.environ.get('LOGLEVEL
 
 # Set test data path
 TEST_DATA_PATH = '/'.join(os.path.realpath(__file__).split('/')[0:-1]) + '/test_data/'
+
 
 class TestSeries(unittest.TestCase):
 
@@ -201,7 +199,6 @@ class TestPoints(unittest.TestCase):
 
 class TestPointSeries(unittest.TestCase):
 
-
     def test_TimePointSeries(self):
         
         time_point_serie = TimePointSeries()
@@ -273,6 +270,7 @@ class TestPointSeries(unittest.TestCase):
         
         time_point_serie = TimePointSeries(TimePoint(t=60),TimePoint(t=120),TimePoint(t=130))
         self.assertEqual(time_point_serie._resolution, 'variable')
+
 
     def test_DataPointSeries(self):
         pass
@@ -570,8 +568,7 @@ class TestSlotSeries(unittest.TestCase):
         # Test resolution 
         self.assertEqual(time_slot_series._resolution, Unit(60))
         
-        
- 
+
     def test_DataSlotSeries(self):
         data_slot_series = DataSlotSeries()
         data_slot_series.append(DataSlot(start=Point(1), end=Point(2), data='hello'))
@@ -638,15 +635,15 @@ class TestSlotSeries(unittest.TestCase):
         self.assertEqual(data_time_slot_series[0].unit,TimeUnit('60s'))
         self.assertNotEqual(data_time_slot_series[0].unit, Unit(60))
 
-        # NotImplementedError: Shifting of Calendar intervals not yet implemented
-        #data_time_slot_series = DataTimeSlotSeries()
-        #prev_t    = 1595862221
-        #for _ in range (0, 10):
-        #    t    = prev_t + 60
-        #    data_time_slot_series.append(DataTimeSlot(start=TimePoint(t=t), unit=TimeUnit('1D'), data=[5]))    
-        #    prev_t    = t
-        #self.assertEqual(len(data_time_slot_series),10)
-        #self.assertEqual(data_time_slot_series[0].unit,TimeUnit('1D'))
+        # Time series with calendar time units
+        data_time_slot_series = DataTimeSlotSeries()
+        prev_t    = 1595862221
+        for _ in range (0, 10):
+            t    = prev_t + 86400
+            data_time_slot_series.append(DataTimeSlot(start=TimePoint(t=t), unit=TimeUnit('1D'), data=[5]))    
+            prev_t    = t
+        self.assertEqual(len(data_time_slot_series),10)
+        self.assertEqual(data_time_slot_series[0].unit,TimeUnit('1D'))
 
         # Test creating a time series from a Pandas data frame 
         df = pd.read_csv(TEST_DATA_PATH+'csv/format4.csv', header=0, parse_dates=[0], index_col=0)
@@ -663,23 +660,17 @@ class TestSlotSeries(unittest.TestCase):
         self.assertEqual(data_time_slot_series.df.iloc[0][1],54.9)
 
         # Test resolution
-#         data_time_slot_series =  DataTimeSlotSeries(DataTimeSlot(start=TimePoint(t=60),  end=TimePoint(t=120), data=23.8),
-#                                                     DataTimeSlot(start=TimePoint(t=120), end=TimePoint(t=180), data=24.1),
-#                                                     DataTimeSlot(start=TimePoint(t=180), end=TimePoint(t=240), data=23.1))
-#         print(data_time_slot_series.resolution)
-#         
-#         data_time_slot_series =  DataTimeSlotSeries(DataTimeSlot(start=TimePoint(t=60),  unit=TimeUnit('1m'), data=23.8),
-#                                                     DataTimeSlot(start=TimePoint(t=120), unit=TimeUnit('1m'), data=24.1),
-#                                                     DataTimeSlot(start=TimePoint(t=180), unit=TimeUnit('1m'), data=23.1))
-# 
-#         print(data_time_slot_series.resolution)
-# 
-#         data_time_slot_series =  DataTimeSlotSeries(DataTimeSlot(start=TimePoint(t=60),  end=TimePoint(t=120), data=23.8),
-#                                                     DataTimeSlot(start=TimePoint(t=120), end=TimePoint(t=180), data=24.1),
-#                                                     DataTimeSlot(start=TimePoint(t=180), end=TimePoint(t=240), data=23.1))
-#         print(data_time_slot_series.resolution)        
+        data_time_slot_series =  DataTimeSlotSeries(DataTimeSlot(start=TimePoint(t=60),  end=TimePoint(t=120), data=23.8),
+                                                    DataTimeSlot(start=TimePoint(t=120), end=TimePoint(t=180), data=24.1),
+                                                    DataTimeSlot(start=TimePoint(t=180), end=TimePoint(t=240), data=23.1))
+        self.assertEqual(data_time_slot_series.resolution, Unit(60))
+         
+        data_time_slot_series =  DataTimeSlotSeries(DataTimeSlot(start=TimePoint(t=60),  unit=TimeUnit('1m'), data=23.8),
+                                                    DataTimeSlot(start=TimePoint(t=120), unit=TimeUnit('1m'), data=24.1),
+                                                    DataTimeSlot(start=TimePoint(t=180), unit=TimeUnit('1m'), data=23.1)) 
+        self.assertEqual(data_time_slot_series.resolution, TimeUnit('1m'))
+ 
 
-        
         # Test change timezone
         from ..time import timezonize
         data_time_slot_series_UTC =  DataTimeSlotSeries(DataTimeSlot(start=TimePoint(t=60),  end=TimePoint(t=120), data=23.8),
@@ -696,8 +687,4 @@ class TestSlotSeries(unittest.TestCase):
         # Test get item by string key (filter on data labels). More testing is done in the operation tests
         data_time_slot_series =  DataTimeSlotSeries(DataTimeSlot(start=TimePoint(t=60),  end=TimePoint(t=120), data={'a':1, 'b':2}))
         self.assertEqual(data_time_slot_series['a'][0].data, {'a': 1})
-
-
-    
-
 

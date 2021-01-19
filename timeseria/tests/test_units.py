@@ -1,7 +1,6 @@
 import unittest
-import datetime
 from ..exceptions import InputException
-from ..time import dt, correct_dt_dst, timezonize, s_from_dt, dt_to_str, dt_from_str, change_tz
+from ..time import dt
 from ..units import Unit, TimeUnit
 
 class TestUnits(unittest.TestCase):
@@ -9,20 +8,22 @@ class TestUnits(unittest.TestCase):
     def setUp(self):       
         pass
 
+    def test_Unit(self):
+        
+        with self.assertRaises(InputException):
+            _ = TimeUnit('hi')        
+        
+        unit = Unit(60)
+        self.assertEqual(unit.value, 60)
+
 
     def test_TimeUnit(self):
 
         with self.assertRaises(InputException):
             _ = TimeUnit(60)
         
-        # TODO: I had to comment out this test, find out why..
-        # Complex time intervals are not supported
-        #with self.assertRaises(InputException):
-        #   _ = TimeUnit('15m', '20s')
-        
-        # TODO: test with units
-        #print TimeUnit('1m').value
-        #print TimeSlot(unit=TimeUnit('1m')).unit.value
+        with self.assertRaises(InputException):
+            _ = TimeUnit('15m', '20s')
 
         # Not valid 'q' type
         with self.assertRaises(InputException):
@@ -36,7 +37,7 @@ class TestUnits(unittest.TestCase):
         self.assertEqual(time_unit_2.string, '15m_30s_3u')
         
         time_unit_3 = TimeUnit(days=1)
-        
+
         # Sum with other TimeUnit objects
         self.assertEqual((time_unit_1+time_unit_2+time_unit_3).string, '1D_30m_30s_3u')
 
@@ -54,13 +55,6 @@ class TestUnits(unittest.TestCase):
         self.assertEqual(str(date_time4), '2015-10-25 02:15:00+01:00')
         self.assertEqual(str(date_time5), '2015-10-25 03:15:00+01:00')
 
-        # Test length
-        #self.assertEqual(TimeUnit('15m').length, 900)
-        #self.assertEqual(TimeUnit('1h').length, 3600)
-
-        #with self.assertRaises(Exception):
-        #    TimeUnit('15D').length
-
         # Test type
         self.assertEqual(TimeUnit('15m').type, TimeUnit.PHYSICAL)
         self.assertEqual(TimeUnit('1h').type, TimeUnit.PHYSICAL)
@@ -72,6 +66,15 @@ class TestUnits(unittest.TestCase):
         from ..datastructures import TimePoint
         time_point = TimePoint(60)
         self.assertEqual((time_point+time_unit).t, 3660)
+
+        # Test unit value
+        with self.assertRaises(TypeError):
+            TimeUnit('1D').value
+        with self.assertRaises(TypeError):
+            TimeUnit('2Y').value 
+        self.assertEqual(TimeUnit('1m').value, 60)
+        self.assertEqual(TimeUnit('15m').value, 900)
+        self.assertEqual(TimeUnit('1h').value, 3600)
 
 
     def test_TimeUnit_duration(self):
@@ -170,11 +173,9 @@ class TestUnits(unittest.TestCase):
 
         # Test ceil/floor/round (3 hours-test)
         time_unit = TimeUnit('3h')
-        date_time = dt(1969,12,31,22,0,1, tzinfo='Europe/Rome') # negative epoch
-        
-        # TODO: test fails!! fix me!        
-        #self.assertEqual(time_unit.floor_dt(date_time1), dt(1969,12,31,21,0,0, tzinfo='Europe/Rome'))
-        #self.assertEqual(time_unit.ceil_dt(date_time1), dt(1970,1,1,0,0, tzinfo='Europe/Rome'))
+        date_time = dt(1969,12,31,23,0,1, tzinfo='Europe/Rome') # negative epoch    
+        self.assertEqual(time_unit.floor_dt(date_time), dt(1969,12,31,23,0,0, tzinfo='Europe/Rome'))
+        self.assertEqual(time_unit.ceil_dt(date_time), dt(1970,1,1,2,0, tzinfo='Europe/Rome'))
 
         # Test ceil/floor/round across 1970-1-1 (together with the 2 hours-test, TODO: decouple) 
         time_unit = TimeUnit('2h')
@@ -207,7 +208,6 @@ class TestUnits(unittest.TestCase):
         
         self.assertEqual(time_unit.floor_dt(date_time4), date_time4_rounded)
         self.assertEqual(time_unit.ceil_dt(date_time4), date_time5_rounded)
-
 
         # Test ceil/floor/round with a calendar timeunit and across a DST change
         
@@ -247,26 +247,4 @@ class TestUnits(unittest.TestCase):
 
     def tearDown(self):
         pass
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
