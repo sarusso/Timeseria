@@ -906,6 +906,9 @@ class Forecaster(ParametricModel):
                 forecast_model_results = self.forecast(timeseries = forecast_timeseries, key = key, n=n)
                 if not isinstance(forecast_model_results, list):
                     forecast_timeseries.append(forecast_model_results)
+                # TODO: Do we want to silently handle custom forecast models not supporting multi-step forecasting?
+                #elif len(forecast_model_results) == 1 and n >1:
+                #    raise NotImplementedError('Seems like the forecaster did not implement the multi-step forecast')
                 else:
                     for item in forecast_model_results:
                         forecast_timeseries.append(item)
@@ -919,7 +922,10 @@ class Forecaster(ParametricModel):
     
                     # Add the forecast to the forecasts time series
                     forecast_timeseries.append(forecast_model_results)
-
+        
+        # Do we have missing forecasts?
+        if len(timeseries) + n != len(forecast_timeseries):
+            raise ValueError('There are missing forecasts. If your model does not support multi-step forecasting, raise a NotImplementedError if n>1 and Timeseria will handle it for you.')
 
         # Set serie mark for the forecast and return
         try:
