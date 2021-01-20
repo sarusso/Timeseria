@@ -31,7 +31,7 @@ def unit_to_TimeUnit(unit):
     return time_unit
 
 
-def detect_dataPoints_validity(data_time_point_series):
+def detect_sampling_interval(data_time_point_series):
 
     diffs={}
     prev_data_time_point=None
@@ -239,7 +239,7 @@ class Slotter(Transformation):
         
         # Automatically detect validity if not set
         if validity is None:
-            validity = detect_dataPoints_validity(data_time_point_series)
+            validity = detect_sampling_interval(data_time_point_series)
             logger.info('Auto-detected sampling interval: %ss', validity)
         
 
@@ -556,7 +556,7 @@ class Resampler(Transformation):
         
         # Automatically detect validity if not set
         if validity is None:
-            validity = detect_dataPoints_validity(data_time_point_series)
+            validity = detect_sampling_interval(data_time_point_series)
             logger.info('Auto-detected sampling interval: %ss', validity)
         
 

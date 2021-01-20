@@ -113,7 +113,7 @@ def compute_coverage(data_time_point_series, from_t, to_t, trustme=False, validi
 
 
     # Support vars
-    prev_dataPoint_valid_to_t = None
+    prev_datapoint_valid_to_t = None
     empty_data_time_point_series = True
     missing_coverage = None
     next_processed = False
@@ -156,11 +156,11 @@ def compute_coverage(data_time_point_series, from_t, to_t, trustme=False, validi
         if this_data_time_point.t < from_t:
             
             # Just set the previous Point valid until
-            prev_dataPoint_valid_to_t = this_data_time_point_valid_to_t
+            prev_datapoint_valid_to_t = this_data_time_point_valid_to_t
 
             # If prev point too far, skip it
-            if prev_dataPoint_valid_to_t <= from_t:
-                prev_dataPoint_valid_to_t = None
+            if prev_datapoint_valid_to_t <= from_t:
+                prev_datapoint_valid_to_t = None
 
             continue
 
@@ -191,7 +191,7 @@ def compute_coverage(data_time_point_series, from_t, to_t, trustme=False, validi
             pass
 
         # Okay, now we have all the values we need:
-        # 1) prev_dataPoint_valid_until
+        # 1) prev_datapoint_valid_until
         # 2) this_data_time_point_valid_from
         
         # Also, if we are here it also means that we have valid data
@@ -200,11 +200,11 @@ def compute_coverage(data_time_point_series, from_t, to_t, trustme=False, validi
 
         # Compute coverage
         # TODO: and idea could also to initialize Units and sum them
-        if prev_dataPoint_valid_to_t is None:
+        if prev_datapoint_valid_to_t is None:
             value = this_data_time_point_valid_from_t - from_t
             
         else:
-            value = this_data_time_point_valid_from_t - prev_dataPoint_valid_to_t
+            value = this_data_time_point_valid_from_t - prev_datapoint_valid_to_t
             
         # If for whatever reason the validity regions overlap we don't want to end up in
         # invalidating the coverage calculation by summing negative numbers
@@ -214,20 +214,20 @@ def compute_coverage(data_time_point_series, from_t, to_t, trustme=False, validi
             else:
                 missing_coverage = missing_coverage + value
 
-        # Update previous dataPoint Validity:
-        prev_dataPoint_valid_to_t = this_data_time_point_valid_to_t
+        # Update previous datapoint Validity:
+        prev_datapoint_valid_to_t = this_data_time_point_valid_to_t
         
     #=========================
     #  END cycle over points
     #=========================
 
     # Compute the coverage until the end point
-    if prev_dataPoint_valid_to_t is not None:
-        if to_t > prev_dataPoint_valid_to_t:
+    if prev_datapoint_valid_to_t is not None:
+        if to_t > prev_datapoint_valid_to_t:
             if missing_coverage is not None:
-                missing_coverage += (to_t - prev_dataPoint_valid_to_t)
+                missing_coverage += (to_t - prev_datapoint_valid_to_t)
             else:
-                missing_coverage = (to_t - prev_dataPoint_valid_to_t)
+                missing_coverage = (to_t - prev_datapoint_valid_to_t)
     
     # Convert missing_coverage_s_is in percentage
         

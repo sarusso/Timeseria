@@ -2,7 +2,7 @@ import unittest
 import os
 from ..datastructures import DataTimePoint, DataTimePointSeries
 from ..storages import CSVFileStorage
-from ..transformations import Resampler, Slotter, detect_dataPoints_validity, unit_to_TimeUnit 
+from ..transformations import Resampler, Slotter, detect_sampling_interval, unit_to_TimeUnit 
 from ..time import dt, s_from_dt, dt_from_str
 from ..exceptions import InputException
 from ..units import TimeUnit
@@ -109,20 +109,20 @@ class TestSlotter(unittest.TestCase):
             unit_to_TimeUnit('NO')
         
 
-    def test_detect_dataPoints_validity(self):
+    def test_detect_sampling_interval(self):
         
         data_time_point_series = CSVFileStorage(TEST_DATA_PATH + '/csv/humitemp_short.csv').get()
-        self.assertEqual(detect_dataPoints_validity(data_time_point_series), 61)
+        self.assertEqual(detect_sampling_interval(data_time_point_series), 61)
         
         data_time_point_series = CSVFileStorage(TEST_DATA_PATH + '/csv/shampoo_sales.csv', time_column = 'Month', time_format = '%y-%m').get()
-        self.assertEqual(detect_dataPoints_validity(data_time_point_series), 2678400)
+        self.assertEqual(detect_sampling_interval(data_time_point_series), 2678400)
         # TODO: 2678400/60/60/24 = 31 --> detect month? same for day, week, year?
 
         data_time_point_series = CSVFileStorage(TEST_DATA_PATH + '/csv/temperature.csv').get()
-        self.assertEqual(detect_dataPoints_validity(data_time_point_series), 600)
+        self.assertEqual(detect_sampling_interval(data_time_point_series), 600)
 
         data_time_point_series = CSVFileStorage(TEST_DATA_PATH + '/csv/temp_short_1h.csv').get()
-        self.assertEqual(detect_dataPoints_validity(data_time_point_series), 3600)
+        self.assertEqual(detect_sampling_interval(data_time_point_series), 3600)
 
 
     def test_slot(self):
