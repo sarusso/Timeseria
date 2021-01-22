@@ -7,3 +7,6 @@ class ConsistencyException(Exception):
 
 class NotFittedError(Exception):
     pass
+
+class NonContiguityError(Exception):
+    pass

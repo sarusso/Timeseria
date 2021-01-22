@@ -1,15 +1,20 @@
 Keras==2.1.3
 tensorflow==1.15.2
 matplotlib==2.1.2
-numpy==1.16.0
+numpy==1.19.5
 scikit-image==0.15.0
-scikit-learn==0.19.1
+scikit-learn==0.22
 pandas==0.23.4
 chardet==3.0.4
 convertdate==2.1.2
 lunarcalendar==0.0.9
 holidays==0.10.3
-cython==0.29.21
+cython==0.29.17
 pystan==2.19.1.1
-fbprophet==0.6
 plotly==4.9.0
+requests==2.5.3
+
+# Optional
+fbprophet==0.6      # Facebook's Prophet
+pmdarima==1.8       # AARIMA
+statsmodels==0.12.1 # ARIMA, SARIMAX
