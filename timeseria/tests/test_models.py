@@ -209,14 +209,6 @@ class TestForecasters(unittest.TestCase):
         for i in range(1000):
             step = 60 * 60 * 24
             self.sine_data_time_slot_series_day.append(DataTimeSlot(start=TimePoint(i*step), end=TimePoint((i+1)*step), data={'value':sin(i/10.0)}))
-
-        # Create a day-resolution test DataTimeSlotSeries after the previous one
-        self.sine_data_time_slot_series_day_after = DataTimeSlotSeries()
-        for i in range(1000,1200):
-            step = 60 * 60 * 24
-            self.sine_data_time_slot_series_day_after.append(DataTimeSlot(start=TimePoint(i*step), end=TimePoint((i+1)*step), data={'value':sin(i/10.0)}))
-            
-            
     
     def test_PeriodicAverageForecaster(self):
                  
@@ -287,13 +279,12 @@ class TestForecasters(unittest.TestCase):
 
         # Test the evaluate
         evalation_results = forecaster.evaluate(self.sine_data_time_slot_series_day, limit=10)
-        self.assertAlmostEqual(evalation_results['RMSE'], 0.8576936199824619)
-        self.assertAlmostEqual(evalation_results['MAE'], 0.8505970689283213)
+        self.assertAlmostEqual(evalation_results['RMSE'], 0.8211270888684844)
+        self.assertAlmostEqual(evalation_results['MAE'], 0.809400693526047)
 
         evalation_results = forecaster.evaluate(self.sine_data_time_slot_series_day, limit=1)
-        print(evalation_results)
-        self.assertAlmostEqual(evalation_results['RMSE'], 0.6252845228484403) # For one sample they must be the same
-        self.assertAlmostEqual(evalation_results['MAE'], 0.6252845228484403) # For one sample they must be the same
+        self.assertAlmostEqual(evalation_results['RMSE'], 0.5390915558518541) # For one sample they must be the same
+        self.assertAlmostEqual(evalation_results['MAE'], 0.5390915558518541) # For one sample they must be the same
         
         # Test on Points as well
         data_time_point_series = CSVFileStorage(TEST_DATA_PATH + '/csv/temperature.csv').get(limit=200)
@@ -315,47 +306,77 @@ class TestForecasters(unittest.TestCase):
          
         forecaster.fit(self.sine_data_time_slot_series_day)
         self.assertEqual(len(self.sine_data_time_slot_series_day), 1000)
-  
-        # Can apply the ARIMA model on a time series ending with the same item as the fit one
+
+        # Cannot apply on a time series contiguous with the time series used for the fit
+        with self.assertRaises(NonContiguityError):
+            forecaster.apply(self.sine_data_time_slot_series_day[:-1], n=3)
+    
+        # Can apply on a time series contiguous with the fit one
         sine_data_time_slot_series_day_with_forecast = forecaster.apply(self.sine_data_time_slot_series_day, n=3)
         self.assertEqual(len(sine_data_time_slot_series_day_with_forecast), 1003)
 
-        # Cannot apply the ARIMA model on a time series ending with a different item than the fit one
+        # Cannot evaluate on a time series not contiguous with the time series used for the fit
         with self.assertRaises(NonContiguityError):
-            forecaster.apply(sine_data_time_slot_series_day_with_forecast[:-1], n=3)
-  
-        # Cannot evaluate on a time series ending with the same item as the fit one (TODO: to be implemented? if so, uncomment the following)
-        with self.assertRaises(ValueError):
             forecaster.evaluate(self.sine_data_time_slot_series_day)
-        # Cannot evaluate an ARIMA model on a time series ending with a different item than the fit one *or contiguous with it*
-        #with self.assertRaises(NonContiguityError):
-        #    forecaster.evaluate(self.sine_data_time_slot_series_day[:-3])
 
         # Can evaluate on a time series contiguous with the time series used for the fit
-        evaluation_results = forecaster.evaluate(self.sine_data_time_slot_series_day_after)
-        self.assertAlmostEqual(evaluation_results['RMSE'], 6.902120320735712)
-        self.assertAlmostEqual(evaluation_results['MAE'], 5.924728782847584)
- 
-        # Test the evaluate with a dedicated fit
         forecaster = ARIMAForecaster(p=1,d=1,q=0)
-        forecaster.fit(self.sine_data_time_slot_series_day[0:800])
-                
+        forecaster.fit(self.sine_data_time_slot_series_day[0:800])                 
         evaluation_results = forecaster.evaluate(self.sine_data_time_slot_series_day[800:1000])
-        self.assertAlmostEqual(evaluation_results['RMSE'], 2.70797024348165)
-        self.assertAlmostEqual(evaluation_results['MAE'], 2.525530081137284)
-
+        self.assertAlmostEqual(evaluation_results['RMSE'], 2.7108009033754485)
+        self.assertAlmostEqual(evaluation_results['MAE'], 2.5248923274486983)
+ 
         # Test on Points as well
         data_time_point_series = CSVFileStorage(TEST_DATA_PATH + '/csv/temperature.csv').get(limit=200)
         forecaster = ARIMAForecaster()
         with self.assertRaises(Exception):
             forecaster.fit(data_time_point_series)
-          
+           
         data_time_point_series = Resampler(600).process(data_time_point_series)
         forecaster.fit(data_time_point_series)
-          
+           
         # TODO: do some actual testing.. not only that "it works"
         forecasted_data_time_point_series  = forecaster.apply(data_time_point_series)
 
+
+    def test_AARIMAForecaster(self):
+         
+        # Automatic ARIMA 
+        forecaster = AARIMAForecaster()
+         
+        forecaster.fit(self.sine_data_time_slot_series_day, max_p=2, max_d=1, max_q=2)
+        self.assertEqual(len(self.sine_data_time_slot_series_day), 1000)
+
+        # Cannot apply on a time series contiguous with the time series used for the fit
+        with self.assertRaises(NonContiguityError):
+            forecaster.apply(self.sine_data_time_slot_series_day[:-1], n=3)
+    
+        # Can apply on a time series contiguous with the same item as the fit one
+        sine_data_time_slot_series_day_with_forecast = forecaster.apply(self.sine_data_time_slot_series_day, n=3)
+        self.assertEqual(len(sine_data_time_slot_series_day_with_forecast), 1003)
+
+        # Cannot evaluate on a time series not contiguous with the time series used for the fit
+        with self.assertRaises(NonContiguityError):
+            forecaster.evaluate(self.sine_data_time_slot_series_day)
+
+        # Can evaluate on a time series contiguous with the time series used for the fit
+        forecaster = AARIMAForecaster()
+        forecaster.fit(self.sine_data_time_slot_series_day[0:800], max_p=2, max_d=1, max_q=2)                 
+        evaluation_results = forecaster.evaluate(self.sine_data_time_slot_series_day[800:1000])
+        self.assertAlmostEqual(evaluation_results['RMSE'], 0.7179428895746799)
+        self.assertAlmostEqual(evaluation_results['MAE'], 0.6497934134525981)
+ 
+        # Test on Points as well
+        data_time_point_series = CSVFileStorage(TEST_DATA_PATH + '/csv/temperature.csv').get(limit=200)
+        forecaster = AARIMAForecaster()
+        with self.assertRaises(Exception):
+            forecaster.fit(data_time_point_series)
+           
+        data_time_point_series = Resampler(600).process(data_time_point_series)
+        forecaster.fit(data_time_point_series, max_p=2, max_d=1, max_q=2)
+           
+        # TODO: do some actual testing.. not only that "it works"
+        forecasted_data_time_point_series  = forecaster.apply(data_time_point_series)
 
 
 class TestAnomalyDetectors(unittest.TestCase):
