@@ -153,12 +153,49 @@ class TestCSVFileStorage(unittest.TestCase):
 
 
 
-        # Test only date column and without meaningful timestamp label
+        # Test only date column and without meaningful timestamp label, force points
         storage = CSVFileStorage(TEST_DATA_PATH + '/csv/only_date_no_meaningful_timestamp_label.csv',
-                                 time_format = '%Y-%m-%d')
+                                 time_format = '%Y-%m-%d', item_type='points')
 
         data_time_point_series = storage.get()
         self.assertEqual(len(data_time_point_series), 95)
         self.assertEqual(data_time_point_series[0].t, 1197244800)
         self.assertEqual(data_time_point_series[-1].t, 1205798400)
+
+        # Test only date column and without meaningful timestamp label, let generate slots with interpolated data
+        storage = CSVFileStorage(TEST_DATA_PATH + '/csv/only_date_no_meaningful_timestamp_label.csv',
+                                 time_format = '%Y-%m-%d')
+
+        data_time_slot_series = storage.get()
+        self.assertEqual(len(data_time_slot_series), 100)
+    
+        # Check first
+        self.assertEqual(data_time_slot_series[0].t, 1197244800)
+        
+        # Test correct data loss set and reconstruction 
+        self.assertEqual(data_time_slot_series[52].data_loss, 1)
+        self.assertAlmostEqual(data_time_slot_series[52].data['y'], 8.748874781508915)
+
+        self.assertEqual(data_time_slot_series[80].data_loss, 1)
+        self.assertAlmostEqual(data_time_slot_series[80].data['y'], 7.56004994651234)        
+
+        self.assertEqual(data_time_slot_series[82].data_loss, 1)
+        self.assertAlmostEqual(data_time_slot_series[82].data['y'], 7.444587100634211)  
+
+        self.assertEqual(data_time_slot_series[84].data_loss, 1)
+        self.assertAlmostEqual(data_time_slot_series[84].data['y'], 7.599538949266937)  
+
+        self.assertEqual(data_time_slot_series[85].data_loss, 1)
+        self.assertAlmostEqual(data_time_slot_series[85].data['y'], 7.862140984826253)   
+ 
+        # Check last
+        self.assertEqual(data_time_slot_series[-1].t, 1205798400)
+
+        # Check all others have data_loss = 0
+        for i, item in enumerate(data_time_slot_series):
+            if i not in [52, 80, 82, 84, 85]:
+                self.assertEqual(item.data_loss, 0, 'Failed for i={}'.format(i))
+            else:
+                self.assertEqual(item.data_loss, 1, 'Failed for i={}'.format(i))
+
 
