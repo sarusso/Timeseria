@@ -1,8 +1,9 @@
 import csv
 import re
 from .utilities import detect_encoding
-from .datastructures import DataTimePoint, DataTimePointSeries, DataPointSeries, TimePointSeries, TimePoint, DataPoint
-from .time import s_from_dt, dt_from_str
+from .units import TimeUnit
+from .datastructures import DataTimePoint, DataTimePointSeries, DataPointSeries, TimePointSeries, TimePoint, DataPoint, DataTimeSlot, DataTimeSlotSeries
+from .time import s_from_dt, dt_from_str, dt_from_s, s_from_dt
 import datetime
 from collections import OrderedDict
 
@@ -53,7 +54,7 @@ class CSVFileStorage(object):
     
     def __init__(self, filename_with_path, encoding = 'auto', time_column = 'auto', time_format = 'auto',
                  date_column = None, date_format = None, data_columns = 'all', value_separator=',', line_separator='\n',
-                 skip_errors=False, data_format='auto'):
+                 skip_errors=False, data_format='auto', item_type=None, tz='UTC'):
         ''' Ref to https://docs.python.org/3/library/datetime.html#strftime-and-strptime-format-codes
         for date_format and time_format'''
         
@@ -68,7 +69,10 @@ class CSVFileStorage(object):
         self.time_column = time_column
         self.time_format = time_format
         self.date_column = date_column
-        self.date_format = date_format    
+        self.date_format = date_format 
+        
+        # Time zone
+        self.tz = tz   
         
         # Data
         self.data_columns = data_columns
@@ -80,6 +84,9 @@ class CSVFileStorage(object):
         # Other
         self.skip_errors = skip_errors
         self.data_format = data_format
+        
+        # Item type (that will be forced)
+        self.item_type = item_type
 
         # Check
         if self.time_column is None and self.date_column is None and not self.data_columns:
@@ -114,7 +121,7 @@ class CSVFileStorage(object):
         if not self.encoding:
             self.encofing = detect_encoding(self.filename_with_path, streaming=False)
 
-        data_time_pointSeries = DataTimePointSeries()
+        items = []
 
         # TODO: evaluate rU vs newline='\n'
         with open(self.filename_with_path, 'r', encoding=self.encoding) as csv_file:
@@ -370,9 +377,90 @@ class CSVFileStorage(object):
                 logger.debug('Set data to "%s"', data)
 
                 # Append to the series
-                data_time_pointSeries.append(DataTimePoint(t=t, data=data))
-                    
-        return data_time_pointSeries
+                items.append([t, data])
+        
+        # Detect sampling interval to create right items type (points or slots)
+        from .transformations import detect_sampling_interval
+        
+        sample_timepoints = [TimePoint(t=item[0]) for item in items[0:10]]
+        sample_timeseries = TimePointSeries(*sample_timepoints) # Cut to first ten elements 
+        detected_sampling_interval = detect_sampling_interval(sample_timeseries)
+        
+        # Years
+        if detected_sampling_interval in [86400*365, 886400*366]:
+            item_type = DataTimeSlot
+            unit = TimeUnit('1Y') 
+               
+        # Months
+        elif detected_sampling_interval in [86400*31, 86400*30, 86400*28]:
+            item_type = DataTimeSlot
+            unit = TimeUnit('1M')
+        
+        # Days
+        elif detected_sampling_interval in [3600*24, 3600*23, 3600*25]:
+            item_type = DataTimeSlot
+            unit = TimeUnit('1D')
+        
+        # Weeks still to be implemented in the unit
+        #elif detected_sampling_interval in [3600*24*7, (3600*24*7)-3600, (3600*24*7)+3600]:
+        #    item_type = DataTimeSlot
+        #    unit = TimeUnit('1D')
+        
+        # Else, use points with no unit
+        else:
+            item_type = DataTimePoint
+            unit = None
+        
+        # Do we have to force a specific type?
+        if self.item_type:
+            if self.item_type == 'points':
+                item_type = DataTimePoint
+                unit = None 
+            elif self.item_type == 'slots':
+                item_type = DataTimeSlot
+                unit = TimeUnit('{}s'.format(detected_sampling_interval))
+            else:
+                raise ValueError('Unknown value "{}" for item_type. Accepted types are "points" or "slots".'.format(self.item_type))
+        else:
+            if item_type == DataTimeSlot:
+                logger.info('Assuming {} time unit and creating Slots. Use "item_type=\'points\'" in the storage init if you want Points instead."'.format(unit))
+            #else:
+            #    logger.info('Assuming {} sampling interval and creating {}.'.format(detected_sampling_interval, item_type.__class__.__name__))
+        
+        # Create point or slot series
+        if item_type == DataTimePoint:
+            timeseries = DataTimePointSeries()
+            for item in items:
+                timeseries.append(DataTimePoint(t=item[0], data=item[1])) 
+        else:
+            
+            timeseries = DataTimeSlotSeries()
+            
+            for i, item in enumerate(items):
+                try:
+                    # TODO: use a timezonize() before so that the tz is just a pointer?
+                    timeseries.append(DataTimeSlot(t=item[0], unit=unit, data=item[1], data_loss=0)) #tz=self.tz 
+                except ValueError as e:
+                    # The only ValueError that could (should) arise here is a "Not in succession" error.
+                    missing_timestamps = []
+                    prev_dt = dt_from_s(items[i-1][0], tz=self.tz)
+                    while True:                        
+                        dt = prev_dt + unit
+                        # Note: the equal here is just to prevent endless loops, the check shoudl actally be just an equal     
+                        if s_from_dt(dt) >= item[0]:
+                            # We are arrived, append all the missing items and then the item we originally tried to and break
+                            for j, missing_timestamp in enumerate(missing_timestamps):
+                                # Set data by interpolation
+                                interpolated_data = {data_key: (((items[i][1][data_key]-items[i-1][1][data_key])/(len(missing_timestamps)+1)) * (j+1)) + items[i-1][1][data_key]  for data_key in  items[-1][1] }
+                                timeseries.append(DataTimeSlot(t=missing_timestamp, unit=unit, data=interpolated_data, data_loss=1)) #tz=self.tz
+                            timeseries.append(DataTimeSlot(t=item[0], unit=unit, data=item[1], data_loss=0)) #tz=self.tz
+                            break
+                        
+                        else:
+                            missing_timestamps.append(s_from_dt(dt))
+                        prev_dt = dt
+
+        return timeseries
 
 
 
