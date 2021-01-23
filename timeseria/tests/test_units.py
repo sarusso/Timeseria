@@ -16,6 +16,20 @@ class TestUnits(unittest.TestCase):
         unit = Unit(60)
         self.assertEqual(unit.value, 60)
 
+    def test_Unit_math(self):
+        
+        unit1 = Unit(60)
+        self.assertEqual(unit1+5, 65)
+        self.assertEqual(5+unit1, 65)
+        self.assertEqual(unit1-5, 55)
+        self.assertEqual(5-unit1, -55)        
+        
+        unit2 = Unit(67)
+        self.assertEqual(unit1+unit2, 127)
+        self.assertEqual(unit1-unit2, -7)
+        self.assertEqual(unit2-unit1, 7)
+
+
 
     def test_TimeUnit(self):
 

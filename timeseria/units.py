@@ -27,16 +27,48 @@ class Unit(object):
         if (isinstance(self.value, int) or isinstance(self.value, float)) and (isinstance(other, int) or isinstance(other, float)):
             return self.value + other
 
+        # Sum with another unit with value
+        try:
+            if (isinstance(self.value, int) or isinstance(self.value, float)) and (isinstance(other.value, int) or isinstance(other.value, float)):
+                return self.value + other.value
+        except:
+            pass
+        
+        # Sum with an objects with coordinates (Points, SLots). TODO: maybe re-evaluate this part?
         try:
             if len(other.coordinates) > 1:
                 raise NotImplementedError('Cannot add Units in a multidimensional space')             
-            return other.__class__(other.coordinates[0] + self.value)
+            return other.__class__(self.value + other.coordinates[0])
         except:
             raise NotImplementedError('Don\'t know how to add Units with {}'.format(other.__class__.__name__)) 
     
     def __radd__(self, other):
         return self.__add__(other)
-    
+
+    def __sub__(self, other):
+
+        # Subtract with int or float
+        if (isinstance(self.value, int) or isinstance(self.value, float)) and (isinstance(other, int) or isinstance(other, float)):
+            return self.value - other
+
+        # Subtract with another unit with value
+        try:
+            if (isinstance(self.value, int) or isinstance(self.value, float)) and (isinstance(other.value, int) or isinstance(other.value, float)):
+                return self.value - other.value
+        except:
+            pass
+
+        # Subtract with an objects with coordinates (Points, SLots). TODO: maybe re-evaluate this part?
+        try:
+            if len(other.coordinates) > 1:
+                raise NotImplementedError('Cannot subtract Units in a multidimensional space')             
+            return other.__class__(self.value - other.coordinates[0])
+        except:
+            raise NotImplementedError('Don\'t know how to subtract Units with {}'.format(other.__class__.__name__)) 
+
+    def __rsub__(self, other):
+        return -self.__sub__(other)
+
     def __eq__(self,other):
         if self is other:
             return True
@@ -164,6 +196,12 @@ class TimeUnit(Unit):
    
     def __radd__(self, other):
         return self.__add__(other)
+
+    def __sub__(self, other):
+        raise NotImplementedError('Subtraction is not implemented in TimeUnits yet')
+    
+    def __rsub__(self, other):
+        return -self.__sub__(other)
 
     def __eq__(self, other):
         if type(self) != type(other):
@@ -331,7 +369,7 @@ class TimeUnit(Unit):
         '''Rebase a given datetime to this TimeUnit. Only simple time intervals are supported in this operation'''
         return self.round_dt(time_dt, how='floor')
               
-    def shift_dt(self, time_dt, times=0):
+    def shift_dt(self, time_dt, times=1):
         '''Shift a given datetime of n times of this TimeUnit. Only simple time intervals are supported in this operation'''
         if self.is_composite():
             raise InputException('Sorry, only simple time intervals are supported byt he rebase operation')
@@ -352,7 +390,10 @@ class TimeUnit(Unit):
 
         # Handle calendar time TimeSlot
         elif self.type == self.CALENDAR:
-
+            
+            if times != 1:
+                raise NotImplementedError('Cannot shift calendar time units for times than 1 (got times="{}")'.format(times))
+            
             # Create a TimeDelta object for everything but years and months
             delta = datetime.timedelta(weeks = self.weeks,
                                        days = self.days,
