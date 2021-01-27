@@ -1,6 +1,6 @@
 import unittest
 import os
-from ..datastructures import DataTimePoint
+from ..datastructures import DataTimePoint, DataTimeSlot
 from ..storages import CSVFileStorage
 
 # Setup logging
@@ -152,8 +152,7 @@ class TestCSVFileStorage(unittest.TestCase):
         self.assertEqual(data_time_point_series[-1].t, 1583298000)
 
 
-
-        # Test only date column and without meaningful timestamp label, force points
+        # Test only date column and without meaningful timestamp label (and force points)
         storage = CSVFileStorage(TEST_DATA_PATH + '/csv/only_date_no_meaningful_timestamp_label.csv',
                                  time_format = '%Y-%m-%d', item_type='points')
 
@@ -161,6 +160,10 @@ class TestCSVFileStorage(unittest.TestCase):
         self.assertEqual(len(data_time_point_series), 95)
         self.assertEqual(data_time_point_series[0].t, 1197244800)
         self.assertEqual(data_time_point_series[-1].t, 1205798400)
+
+
+
+    def test_CSVFileStorage_slots_and_timezones(self):
 
         # Test only date column and without meaningful timestamp label, let generate slots with interpolated data
         storage = CSVFileStorage(TEST_DATA_PATH + '/csv/only_date_no_meaningful_timestamp_label.csv',
@@ -198,4 +201,12 @@ class TestCSVFileStorage(unittest.TestCase):
             else:
                 self.assertEqual(item.data_loss, 1, 'Failed for i={}'.format(i))
 
+        # Get on a specific timezone
+        data_time_slot_series = storage.get(tz='Europe/Rome')
+        self.assertTrue(isinstance(data_time_slot_series[0], DataTimeSlot)) # This is kind of useless here
+        self.assertEqual(str(data_time_slot_series.tz), 'Europe/Rome')
 
+        # Force point and get on a specific timezone
+        data_time_point_series = storage.get(tz='Europe/Rome', item_type='points')
+        self.assertTrue(isinstance(data_time_point_series[0], DataTimePoint))
+        self.assertEqual(str(data_time_point_series.tz), 'Europe/Rome')

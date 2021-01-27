@@ -685,13 +685,13 @@ class TimeSlot(Slot):
     __POINT_TYPE__ = TimePoint
 
    
-    def __init__(self, start=None, end=None, unit=None, t=None, dt=None):
+    def __init__(self, start=None, end=None, unit=None, t=None, dt=None, tz=None):
         
         # Handle t and dt shortcuts
         if t:
-            start=TimePoint(t=t)
+            start=TimePoint(t=t, tz=tz)
         if dt:
-            start=TimePoint(dt=dt)
+            start=TimePoint(dt=dt, tz=tz)
         
         if not isinstance(start, self.__POINT_TYPE__):
             raise TypeError('Slot start must be a Point object (got "{}")'.format(start.__class__.__name__))
