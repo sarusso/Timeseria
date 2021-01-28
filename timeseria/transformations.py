@@ -109,13 +109,17 @@ class Slotter(Transformation):
                                           validity = validity)
 
         # If we have to fully reconstruct data
-        if slot_data_loss == 1 and len(data_time_point_series) == 2:
+        if slot_data_loss == 1: 
 
             # Reconstruct (fill_gaps)
             slot_data = {}
             for key in data_time_point_series[0].data.keys():
                 
-                if interpolation_method == 'linear': 
+                # Special case wiht only one datapoint (i.e. beginning or end)
+                if len(data_time_point_series) == 1:
+                    slot_data[key] = data_time_point_series[0].data[key]
+                
+                elif interpolation_method == 'linear': 
                     data_time_point_series[0].t
                     
                     diff = data_time_point_series[1].data[key] - data_time_point_series[0].data[key]
@@ -193,7 +197,7 @@ class Slotter(Transformation):
         return data_time_slot
 
 
-    def _process(self, data_time_point_series, from_t=None, to_t=None, validity=None, force_close_last=False, include_extremes=False, fill_with=None, force_data_loss=None, fill_gaps=True, interpolation_method='linear'):
+    def _process(self, data_time_point_series, from_t=None, from_dt=None, to_t=None, to_dt=None, validity=None, force_close_last=False, include_extremes=False, fill_with=None, force_data_loss=None, fill_gaps=True, interpolation_method='linear'):
         ''' Start the slotting process. If start and/or end are not set, they are set automatically based on first and last points of the sereis'''
 
         if not isinstance(data_time_point_series, DataTimePointSeries):
@@ -206,46 +210,54 @@ class Slotter(Transformation):
             if from_t is not None or to_t is not None:
                 raise ValueError('Setting "include_extremes" is not compatible with giving a from_t or a to_t')
             from_rounding_method = 'floor'
-            to_rounding_method   = 'ceil'        
+            to_rounding_method   = 'ceil' 
+            force_close_last = True       
         else:
             from_rounding_method = 'ceil'
             to_rounding_method   = 'floor'
+            
+        # Move fromt_dt and to:dt to epoch to simplify the following
+        if from_dt is not None:
+            from_t = s_from_dt(from_dt)
+        if to_dt is not None:
+            to_t = s_from_dt(to_dt)
+            # Also force close if we have explicitly set an end
+            force_close_last = True
 
         # Set "from" if not set, otherwise check for consistency # TODO: move to steaming
         if from_t is None:
             from_t = data_time_point_series[0].t
-            from_dt = dt_from_s(from_t)
+            from_dt = dt_from_s(from_t, data_time_point_series.tz)
             # Is the point already rounded to the time unit or do we have to round it ourselves?
             if not from_dt == self.time_unit.round_dt(from_dt):
                 from_dt = self.time_unit.round_dt(from_dt, how=from_rounding_method)
                 from_t  = s_from_dt(from_dt)
         else:
-            from_dt = dt_from_s(from_t)
+            from_dt = dt_from_s(from_t, data_time_point_series.tz)
             if from_dt != self.time_unit.round_dt(from_dt):
                 raise ValueError('Sorry, provided from_t is not consistent with the self.time_unit of "{}" (Got "{}")'.format(self.time_unit, from_t))
 
         # Set "to" if not set, otherwise check for consistency # TODO: move to streaming
         if to_t is None:
             to_t = data_time_point_series[-1].t
-            to_dt = dt_from_s(to_t)
+            to_dt = dt_from_s(to_t, data_time_point_series.tz)
             # Is the point already rounded to the time unit or do we have to round it ourselves?
             if not to_dt == self.time_unit.round_dt(to_dt):
                 to_dt = self.time_unit.round_dt(to_dt, how=to_rounding_method)
                 to_t  = s_from_dt(to_dt)
         else:
-            to_dt = dt_from_s(to_t)
+            to_dt = dt_from_s(to_t, data_time_point_series.tz)
             if to_dt != self.time_unit.round_dt(to_dt):
                 raise ValueError('Sorry, provided to_t is not consistent with the self.time_unit of "{}" (Got "{}")'.format(self.time_unit, to_t))
-        
+            # Also force close if we have explicitly set an end
+            force_close_last = True
+            
         # Automatically detect validity if not set
         if validity is None:
             validity = detect_sampling_interval(data_time_point_series)
             logger.info('Auto-detected sampling interval: %ss', validity)
         
-
-        
-        force_close_last = force_close_last # TODO: set to true if inverting floor and ceil above)
-
+        # Log
         logger.debug('Started slotter from "%s" (%s) to "%s" (%s)', from_dt, from_t, to_dt, to_t)
 
         if from_dt >= to_dt:
@@ -293,7 +305,7 @@ class Slotter(Transformation):
             # TODO: what if we are in streaming mode? add if to_t is not None?
             if data_time_point.t >= to_t:
                 if process_ended:
-                    continue
+                    break
 
             # The following procedure works in general for slots at the beginning and in the middle.
             # The approach is to detect if the current slot is "outdated" and spin a new one if so.
@@ -339,14 +351,17 @@ class Slotter(Transformation):
                                                           fill_gaps = fill_gaps,
                                                           interpolation_method = interpolation_method)
                         
-                        # .. and append results 
-                        data_time_slot_series.append(dataTimeslot)
+                        # .. and append results (unless we are before the first timeseries start point)
+                        if slot_end_t > data_time_point_series[0].t:
+                            data_time_slot_series.append(dataTimeslot)
 
 
                     # Create a new slot. This is where all the "conventional" time logic kicks-in, and where the time zone is required.
                     slot_start_t = slot_end_t
+                    slot_start_dt = dt_from_s(slot_start_t, tz=timezone)
                     slot_end_t   = s_from_dt(dt_from_s(slot_start_t, tz=timezone) + self.time_unit)
-                    
+                    slot_end_dt = dt_from_s(slot_end_t, tz=timezone)
+
                     # Create a new working_serie as part of the "create a new slot" procedure
                     working_serie = DataTimePointSeries()
                     
@@ -354,7 +369,7 @@ class Slotter(Transformation):
                     if prev_data_time_point:
                         working_serie.append(prev_data_time_point)
 
-                    logger.debug('Spinned a new slot (start={}, end={})'.format(dt_from_s(slot_start_t), dt_from_s(slot_end_t)))
+                    logger.debug('Spinned a new slot (start={}, end={})'.format(slot_start_dt, slot_end_dt))
                     
                 # If last slot mark process as completed (and aggregate last slot if necessary)
                 if data_time_point.dt >= to_dt:
@@ -386,9 +401,8 @@ class Slotter(Transformation):
             # ..and save as previous point
             prev_data_time_point =  data_time_point           
 
-
         # Last slots
-        if process_ended and force_close_last: # or method = overset (vs subset that is the standard)
+        if force_close_last:
 
             # 1) Close the last slot and aggreagte it. You should never do it unless you knwo what you are doing
             if working_serie:
@@ -411,7 +425,7 @@ class Slotter(Transformation):
                 data_time_slot_series.append(dataTimeslot)
 
             # 2) Handle missing slots until the requested end (end_dt)
-            # TODO: Implement it. Sure?
+            # TODO: Implement it. Sure? Clashes with the idea of reconstructors..
 
         logger.info('Slotted %s DataTimePoints in %s DataTimeSlots', count, len(data_time_slot_series))
 
@@ -502,8 +516,9 @@ class Resampler(Transformation):
         else:      
             pass
         data_time_point = DataTimePoint(t = (start_t+((end_t-start_t)/2)),
-                                            data  = slot_data,
-                                            data_loss = point_data_loss)
+                                        tz =timezone,
+                                        data  = slot_data,
+                                        data_loss = point_data_loss)
 
         return data_time_point
 
@@ -531,26 +546,26 @@ class Resampler(Transformation):
         # Set "from" if not set, otherwise check for consistency # TODO: move to steaming
         if from_t is None:
             from_t = data_time_point_series[0].t
-            from_dt = dt_from_s(from_t)
+            from_dt = dt_from_s(from_t, tz=data_time_point_series.tz)
             # Is the point already rounded to the time unit or do we have to round it ourselves?
             if not from_dt == self.time_unit.round_dt(from_dt):
                 from_dt = self.time_unit.round_dt(from_dt, how=from_rounding_method)
                 from_t  = s_from_dt(from_dt)
         else:
-            from_dt = dt_from_s(from_t)
+            from_dt = dt_from_s(from_t, tz=data_time_point_series.tz)
             if from_dt != self.time_unit.round_dt(from_dt):
                 raise ValueError('Sorry, provided from_t is not consistent with the self.time_unit of "{}" (Got "{}")'.format(self.time_unit, from_t))
 
         # Set "to" if not set, otherwise check for consistency # TODO: move to streaming
         if to_t is None:
             to_t = data_time_point_series[-1].t
-            to_dt = dt_from_s(to_t)
+            to_dt = dt_from_s(to_t, tz=data_time_point_series.tz)
             # Is the point already rounded to the time unit or do we have to round it ourselves?
             if not to_dt == self.time_unit.round_dt(to_dt):
                 to_dt = self.time_unit.round_dt(to_dt, how=to_rounding_method)
                 to_t  = s_from_dt(to_dt)
         else:
-            to_dt = dt_from_s(to_t)
+            to_dt = dt_from_s(to_t, tz=data_time_point_series.tz)
             if to_dt != self.time_unit.round_dt(to_dt):
                 raise ValueError('Sorry, provided to_t is not consistent with the self.time_unit of "{}" (Got "{}")'.format(self.time_unit, to_t))
         

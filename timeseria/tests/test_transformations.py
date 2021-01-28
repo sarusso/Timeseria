@@ -115,8 +115,7 @@ class TestSlotter(unittest.TestCase):
         self.assertEqual(detect_sampling_interval(data_time_point_series), 61)
         
         data_time_point_series = CSVFileStorage(TEST_DATA_PATH + '/csv/shampoo_sales.csv', time_column = 'Month', time_format = '%y-%m').get()
-        self.assertEqual(detect_sampling_interval(data_time_point_series), 2678400)
-        # TODO: 2678400/60/60/24 = 31 --> detect month? same for day, week, year?
+        self.assertEqual(detect_sampling_interval(data_time_point_series), 2678400)  # 2678400/60/60/24 = 31 Days (the most frequent)
 
         data_time_point_series = CSVFileStorage(TEST_DATA_PATH + '/csv/temperature.csv').get()
         self.assertEqual(detect_sampling_interval(data_time_point_series), 600)
@@ -126,37 +125,45 @@ class TestSlotter(unittest.TestCase):
 
 
     def test_slot(self):
-        
+          
         # Time series from 16:58:00 to 17:32:00 (Europe/Rome), no from/to, extremes excluded (default)
         data_time_slot_series = Slotter('600s').process(self.data_time_point_series_1)        
         self.assertEqual(len(data_time_slot_series), 3)
         self.assertEqual(data_time_slot_series[0].start.dt, dt_from_str('2015-07-04 17:00:00+02:00'))
         self.assertEqual(data_time_slot_series[1].start.dt, dt_from_str('2015-07-04 17:10:00+02:00'))
         self.assertEqual(data_time_slot_series[2].start.dt, dt_from_str('2015-07-04 17:20:00+02:00'))
-     
+         
         # Time series from 16:58:00 to 17:32:00 (Europe/Rome), no from/to, extremes included.
         data_time_slot_series = Slotter('10m').process(self.data_time_point_series_1,  include_extremes = True)
-        self.assertEqual(len(data_time_slot_series), 4)
+        self.assertEqual(len(data_time_slot_series), 5)
         self.assertEqual(data_time_slot_series[0].start.dt, dt_from_str('2015-07-04 16:50:00+02:00'))
         self.assertEqual(data_time_slot_series[1].start.dt, dt_from_str('2015-07-04 17:00:00+02:00'))
         self.assertEqual(data_time_slot_series[2].start.dt, dt_from_str('2015-07-04 17:10:00+02:00'))
         self.assertEqual(data_time_slot_series[3].start.dt, dt_from_str('2015-07-04 17:20:00+02:00'))
-        # TODO: the following missing is a bug..
-        #self.assertEqual(data_time_slot_series[4].start.dt, dt_from_str('2015-07-04 17:30:00+02:00'))
-  
+        # The following is because the include_extremes is set to True
+        self.assertEqual(data_time_slot_series[4].start.dt, dt_from_str('2015-07-04 17:30:00+02:00'))
+        self.assertEqual(data_time_slot_series[4].data_loss, 0.75)
+ 
         # Time series from 16:58:00 to 17:32:00 (Europe/Rome), from 15:50 to 17:40
         data_time_slot_series = Slotter('10m').process(self.data_time_point_series_1,
                                     from_t = s_from_dt(dt_from_str('2015-07-04 16:50:00+02:00')),
                                     to_t   = s_from_dt(dt_from_str('2015-07-04 17:40:00+02:00')))
-  
-        self.assertEqual(len(data_time_slot_series), 4)
+        self.assertEqual(len(data_time_slot_series), 5)
         self.assertEqual(data_time_slot_series[0].start.dt, dt_from_str('2015-07-04 16:50:00+02:00'))
         self.assertEqual(data_time_slot_series[1].start.dt, dt_from_str('2015-07-04 17:00:00+02:00'))
         self.assertEqual(data_time_slot_series[2].start.dt, dt_from_str('2015-07-04 17:10:00+02:00'))
         self.assertEqual(data_time_slot_series[3].start.dt, dt_from_str('2015-07-04 17:20:00+02:00'))
-        # TODO: the following missing is a bug..
-        #self.assertEqual(data_time_slot_series[4].start.dt, dt_from_str('2015-07-04 17:30:00+02:00'))
-   
+        self.assertEqual(data_time_slot_series[4].start.dt, dt_from_str('2015-07-04 17:30:00+02:00'))
+
+        # Time series from 16:58:00 to 17:32:00 (Europe/Rome), from 15:00 to 18:00
+        data_time_slot_series = Slotter('10m').process(self.data_time_point_series_1,
+                                    from_t = s_from_dt(dt_from_str('2015-07-04 15:00:00+02:00')),
+                                    to_t   = s_from_dt(dt_from_str('2015-07-04 18:00:00+02:00')))
+        # Here from and to are capped with the time series data points
+        self.assertEqual(str(data_time_slot_series[0].start.dt), str('2015-07-04 14:50:00+00:00'))
+        self.assertEqual(str(data_time_slot_series[-1].start.dt), str('2015-07-04 15:30:00+00:00'))
+
+
         # Time series from 2019,10,1,1,0,0 to 2019,10,1,6,0,0 (Europe/Rome), validity=15m
         data_time_slot_series = Slotter('1h').process(self.data_time_point_series_6)
         self.assertEqual(len(data_time_slot_series), 4)
@@ -184,17 +191,23 @@ class TestSlotter(unittest.TestCase):
         self.assertEqual(str(data_time_slot_series[76].start.dt), str('2019-10-27 03:00:00+01:00'))
         self.assertEqual(data_time_slot_series[76].data['temperature'],230.5)
 
+        # Time series from 2019,10,24,0,0,0 to 2019,10,31,0,0,0 (Europe/Rome), DST off -> 2 AM repeated
+        data_time_slot_series = Slotter('1D').process(self.data_time_point_series_7)
+        self.assertEqual(len(data_time_slot_series), 6)
+        self.assertEqual(str(data_time_slot_series[0].start.dt), str('2019-10-24 00:00:00+02:00'))
+        self.assertEqual(str(data_time_slot_series[-1].start.dt), str('2019-10-29 00:00:00+01:00')) # Last one not included as right excluded
 
+
+        # Downsampling (downslotting)
+         
         # Use the time series 7 from 2019,10,24,0,0,0 to 2019,10,31,0,0,0 (Europe/Rome), DST off -> 2 AM repeated
-
         # Work in progress in the following
-        if False:
-            print('--------------------------------------------')
-            for item in self.data_time_point_series_7: print(item)
-            print('--------------------------------------------')
-            for i, item in enumerate(data_time_slot_series): print(i, item)
-            print('--------------------------------------------')
-
+        #if False:
+        #    print('--------------------------------------------')
+        #    for item in self.data_time_point_series_7: print(item)
+        #    print('--------------------------------------------')
+        #    for i, item in enumerate(data_time_slot_series): print(i, item)
+        #    print('--------------------------------------------')
         # This is a "downsampling", and there are data losses and strange values that should not be there.
         # TODO: fix me!
         #slotter = Slotter('10m')
