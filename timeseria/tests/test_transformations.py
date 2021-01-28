@@ -227,17 +227,18 @@ class TestSlotter(unittest.TestCase):
  
  
     def test_slot_operations(self):
+        
+        # Import (overloaded) operations
+        from ..operations import min, max, avg, sum
 
+        # Time series from 16:58:00 to 17:32:00 (Europe/Rome)
         data_time_point_series = DataTimePointSeries()
         start_t = 1436022000 - 120
         for i in range(35):
             data_time_point = DataTimePoint(t = start_t + (i*60),
                                             data = {'temperature': 154+i, 'humidity': 5})
             data_time_point_series.append(data_time_point)
-        
-        from ..operations import min, max, avg, sum
-        # Time series from 16:58:00 to 17:32:00 (Europe/Rome), no from/to, extremes excluded (default)
-        
+
         # Add extra operations
         data_time_slot_series = Slotter('600s', extra_operations=[min,max]).process(data_time_point_series)        
         self.assertEqual(data_time_slot_series[0].data, {'temperature': 161.0, 'humidity': 5.0, 'temperature_min': 156, 'humidity_min': 5, 'temperature_max': 166, 'humidity_max': 5})
@@ -250,4 +251,31 @@ class TestSlotter(unittest.TestCase):
         # Only extra operations
         data_time_slot_series = Slotter('600s', default_operation=None, extra_operations=[avg,min,max]).process(data_time_point_series)        
         self.assertEqual(data_time_slot_series[0].data, {'temperature_avg': 161.0, 'humidity_avg': 5.0, 'temperature_min': 156, 'humidity_min': 5, 'temperature_max': 166, 'humidity_max': 5})
+
+        # Time series from 16:58:00 to 17:32:00 (Europe/Rome) with a short (single-slot) gap to be interpolated
+        data_time_point_series = DataTimePointSeries()
+        start_t = 1436022000 - 120
+        for i in range(35):
+            if i < 12 or i > 22:
+                data_time_point = DataTimePoint(t = start_t + (i*60),
+                                                data = {'temperature': 154+i, 'humidity': 5})
+                data_time_point_series.append(data_time_point)
+
+        data_time_slot_series = Slotter('600s', extra_operations=[min,max]).process(data_time_point_series)        
+        self.assertEqual(data_time_slot_series[1].data['temperature_min'], 166.5)
+        
+        # Time series from 16:58:00 to 17:32:00 (Europe/Rome) with a long (multi-slot) gap to be interpolated
+        data_time_point_series = DataTimePointSeries()
+        start_t = 1436022000 - 120
+        for i in range(60):
+            if i < 10 or i >48:
+                data_time_point = DataTimePoint(t = start_t + (i*60),
+                                                data = {'temperature': 154+i, 'humidity': 5})
+                data_time_point_series.append(data_time_point)
+
+        data_time_slot_series = Slotter('600s', extra_operations=[min,max]).process(data_time_point_series)        
+        self.assertEqual(data_time_slot_series[1].data['temperature_min'], 167.75)
+        self.assertEqual(data_time_slot_series[2].data['temperature_min'], 179.5)
+        self.assertEqual(data_time_slot_series[3].data['temperature_min'], 191.25)
+
 

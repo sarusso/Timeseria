@@ -1,6 +1,6 @@
 from .time import dt_from_s, s_from_dt
 from .datastructures import DataTimeSlot, DataTimeSlotSeries, TimePoint, DataTimePointSeries, DataTimePoint
-from .utilities import compute_data_loss, is_almost_equal, is_close
+from .utilities import compute_data_loss, is_almost_equal
 from .operations import avg
 from .units import TimeUnit
 
@@ -104,9 +104,9 @@ class Slotter(Transformation):
 
         # Compute data_loss
         slot_data_loss = compute_data_loss(data_time_point_series,
-                                          from_t   = start_t,
-                                          to_t     = end_t,
-                                          validity = validity)
+                                           from_t   = start_t,
+                                           to_t     = end_t,
+                                           validity = validity)
 
         # If we have to fully reconstruct data
         if slot_data_loss == 1: 
@@ -115,29 +115,13 @@ class Slotter(Transformation):
             slot_data = {}
             for key in data_time_point_series[0].data.keys():
                 
-                # Special case wiht only one datapoint (i.e. beginning or end)
-                if len(data_time_point_series) == 1:
-                    slot_data[key] = data_time_point_series[0].data[key]
+                # Set data as None, will be interpolated afterwards
+                slot_data[key] = None
                 
-                elif interpolation_method == 'linear': 
-                    data_time_point_series[0].t
-                    
-                    diff = data_time_point_series[1].data[key] - data_time_point_series[0].data[key]
-                    delta_t = data_time_point_series[1].t - data_time_point_series[0].t
-                    ratio = diff/delta_t
-                    mid_t = start_t + (end_t-start_t)
-                    
-                    slot_data[key] = data_time_point_series[0].data[key] + ((mid_t - data_time_point_series[0].t) * ratio)
-
-                elif interpolation_method == 'uniform':
-                    slot_data[key] = (data_time_point_series[0].data[key] + data_time_point_series[1].data[key]) /2
-                else:
-                    raise Exception('Unknown interpolation method "{}"'.format(interpolation_method))
-            
-                # Trick for extra ops
+                # handle also extra ops
                 if self.extra_operations:
                     for extra_operation in self.extra_operations:
-                        slot_data['{}_{}'.format(key, extra_operation.label)] = slot_data[key]
+                        slot_data['{}_{}'.format(key, extra_operation.label)] = None
 
         else:
  
@@ -197,7 +181,8 @@ class Slotter(Transformation):
         return data_time_slot
 
 
-    def _process(self, data_time_point_series, from_t=None, from_dt=None, to_t=None, to_dt=None, validity=None, force_close_last=False, include_extremes=False, fill_with=None, force_data_loss=None, fill_gaps=True, interpolation_method='linear'):
+    def _process(self, data_time_point_series, from_t=None, from_dt=None, to_t=None, to_dt=None, validity=None, force_close_last=False,
+                 include_extremes=False, fill_with=None, force_data_loss=None, fill_gaps=True, interpolation_method='linear'):
         ''' Start the slotting process. If start and/or end are not set, they are set automatically based on first and last points of the sereis'''
 
         if not isinstance(data_time_point_series, DataTimePointSeries):
@@ -270,6 +255,8 @@ class Slotter(Transformation):
         working_serie      = DataTimePointSeries()
         process_ended      = False
         data_time_slot_series  = DataTimeSlotSeries()
+        slots_to_be_interpolated = []
+        last_no_full_data_loss_slot = None
 
         # Set timezone
         timezone  = data_time_point_series.tz
@@ -338,25 +325,60 @@ class Slotter(Transformation):
                         logger.debug('working_serie first point dt: %s', working_serie[0].dt)
                         logger.debug('working_serie last point dt: %s', working_serie[-1].dt)
 
-                        
                         # Compute slot...
-                        dataTimeslot = self._compute_slot(working_serie,
-                                                          unit     = self.time_unit,
-                                                          start_t  = slot_start_t,
-                                                          end_t    = slot_end_t,
-                                                          validity = validity,
-                                                          timezone = timezone,
-                                                          fill_with = fill_with,
-                                                          force_data_loss = force_data_loss,
-                                                          fill_gaps = fill_gaps,
-                                                          interpolation_method = interpolation_method)
+                        data_time_slot = self._compute_slot(working_serie,
+                                                            unit     = self.time_unit,
+                                                            start_t  = slot_start_t,
+                                                            end_t    = slot_end_t,
+                                                            validity = validity,
+                                                            timezone = timezone,
+                                                            fill_with = fill_with,
+                                                            force_data_loss = force_data_loss,
+                                                            fill_gaps = fill_gaps,
+                                                            interpolation_method = interpolation_method)
                         
                         # .. and append results (unless we are before the first timeseries start point)
                         if slot_end_t > data_time_point_series[0].t:
-                            data_time_slot_series.append(dataTimeslot)
+                            if data_time_slot.data_loss == 1.0:
+                                # if data loss is full, append to slot to the slots to be interpolated
+                                slots_to_be_interpolated.append(data_time_slot)
+                            else:
+                                # If we have slots to be intepolated
+                                if slots_to_be_interpolated:
+                                    for i, slot_to_be_interpolated in enumerate(slots_to_be_interpolated):
+
+                                        # Prepare for interpolated data
+                                        interpolated_data = {}
+
+                                        # Computed interpolated data
+                                        if interpolation_method == 'linear': 
+                                            for data_key in data_time_slot_series.data_keys():                                                
+                                                interpolated_data[data_key] = ((((data_time_slot.data[data_key] - last_no_full_data_loss_slot.data[data_key]) /
+                                                                                 (len(slots_to_be_interpolated) + 1) ) * (i+1))  + last_no_full_data_loss_slot.data[data_key])
+    
+                                        elif interpolation_method == 'uniform':
+                                            for data_key in data_time_slot_series.data_keys():                                                
+                                                interpolated_data[data_key] = (((data_time_slot.data[data_key] - last_no_full_data_loss_slot.data[data_key]) / 2) 
+                                                                                + last_no_full_data_loss_slot.data[data_key])
+                                           
+                                        else:
+                                            raise Exception('Unknown interpolation method "{}"'.format(interpolation_method))
+
+                                        # Add interpolated data
+                                        slot_to_be_interpolated._data = interpolated_data
+                                        data_time_slot_series.append(slot_to_be_interpolated)
+                                        
+                                    # Reset the "buffer"
+                                    slots_to_be_interpolated = []
+
+                                # Append this slot to the time series
+                                data_time_slot_series.append(data_time_slot)
+                                
+                                # ... and set this slot as the last with no full data loss
+                                last_no_full_data_loss_slot = data_time_slot
 
 
-                    # Create a new slot. This is where all the "conventional" time logic kicks-in, and where the time zone is required.
+                    # Create a new slot. This is where all the "calendar" time unit logic kicks-in, and where the time zone is required.
                     slot_start_t = slot_end_t
                     slot_start_dt = dt_from_s(slot_start_t, tz=timezone)
                     slot_end_t   = s_from_dt(dt_from_s(slot_start_t, tz=timezone) + self.time_unit)
@@ -378,19 +400,19 @@ class Slotter(Transformation):
                     if data_time_point.dt == to_dt:
                         
                         # Compute slot...
-                        dataTimeslot = self._compute_slot(working_serie,
-                                                          unit     = self.time_unit, 
-                                                          start_t  = slot_start_t,
-                                                          end_t    = slot_end_t,
-                                                          validity = validity,
-                                                          timezone = timezone,
-                                                          fill_with = fill_with,
-                                                          force_data_loss = force_data_loss,
-                                                          fill_gaps = fill_gaps,
-                                                          interpolation_method = interpolation_method)
+                        data_time_slot = self._compute_slot(working_serie,
+                                                            unit     = self.time_unit, 
+                                                            start_t  = slot_start_t,
+                                                            end_t    = slot_end_t,
+                                                            validity = validity,
+                                                            timezone = timezone,
+                                                            fill_with = fill_with,
+                                                            force_data_loss = force_data_loss,
+                                                            fill_gaps = fill_gaps,
+                                                            interpolation_method = interpolation_method)
                         
                         # .. and append results 
-                        data_time_slot_series.append(dataTimeslot)
+                        data_time_slot_series.append(data_time_slot)
 
                     process_ended = True
                     
@@ -410,19 +432,19 @@ class Slotter(Transformation):
                 logger.debug('This slot (start={}, end={}) is closed, now aggregating it..'.format(slot_start_t, slot_end_t))
       
                 # Compute slot...
-                dataTimeslot = self._compute_slot(working_serie,
-                                                  unit     = self.time_unit, 
-                                                  start_t  = slot_start_t,
-                                                  end_t    = slot_end_t,
-                                                  validity = validity,
-                                                  timezone = timezone,
-                                                  fill_with = fill_with,
-                                                  force_data_loss = force_data_loss,
-                                                  fill_gaps = fill_gaps,
-                                                  interpolation_method = interpolation_method)
+                data_time_slot = self._compute_slot(working_serie,
+                                                    unit     = self.time_unit, 
+                                                    start_t  = slot_start_t,
+                                                    end_t    = slot_end_t,
+                                                    validity = validity,
+                                                    timezone = timezone,
+                                                    fill_with = fill_with,
+                                                    force_data_loss = force_data_loss,
+                                                    fill_gaps = fill_gaps,
+                                                    interpolation_method = interpolation_method)
                 
                 # .. and append results 
-                data_time_slot_series.append(dataTimeslot)
+                data_time_slot_series.append(data_time_slot)
 
             # 2) Handle missing slots until the requested end (end_dt)
             # TODO: Implement it. Sure? Clashes with the idea of reconstructors..
