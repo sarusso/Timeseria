@@ -201,7 +201,7 @@ class Slotter(Transformation):
             from_rounding_method = 'ceil'
             to_rounding_method   = 'floor'
             
-        # Move fromt_dt and to:dt to epoch to simplify the following
+        # Move fromt_dt and to_dt to epoch to simplify the following
         if from_dt is not None:
             from_t = s_from_dt(from_dt)
         if to_dt is not None:
@@ -475,58 +475,74 @@ class Resampler(Transformation):
 
         # Compute data_loss
         point_data_loss = compute_data_loss(data_time_point_series,
-                                         from_t   = start_t,
-                                         to_t     = end_t,
-                                         validity = validity)
+                                            from_t   = start_t,
+                                            to_t     = end_t,
+                                            validity = validity)
+        
+        # If we have to fully reconstruct data
+        if point_data_loss == 1: 
 
-        # If we have to reconstruct data
-        if point_data_loss == 1 and len(data_time_point_series) == 2:
-            
-            if not fill_gaps:
-                return None
-            
-            else:
-                # Reconstruct (fill_gaps)
-                slot_data = {}
-                for key in data_time_point_series[0].data.keys():
-                    
-                    if interpolation_method == 'linear':               
-                        diff = data_time_point_series[1].data[key] - data_time_point_series[0].data[key]
-                        delta_t = data_time_point_series[1].t - data_time_point_series[0].t
-                        ratio = diff/delta_t
-                        mid_t = start_t + (end_t-start_t)
-                        
-                        slot_data[key] = data_time_point_series[0].data[key] + ((mid_t - data_time_point_series[0].t) * ratio)
-                    
+            # Reconstruct (fill_gaps)
+            slot_data = {}
+            for key in data_time_point_series[0].data.keys():
+                
+                # Special case with only one datapoint (i.e. beginning or end)
+                if len(data_time_point_series) == 1:
+                    slot_data[key] = data_time_point_series[0].data[key]
+                
+                else:   
+                
+                    prev_point = data_time_point_series[0]
+                    next_point = data_time_point_series[1]
+                
+                    if interpolation_method == 'linear': 
+                        diff = next_point.data[key] - prev_point.data[key]
+                        delta_t = next_point.t - prev_point.t
+                        ratio = diff / delta_t
+                        point_t = start_t + (unit.duration_s() /2)
+                        slot_data[key] = prev_point.data[key] + ((point_t - prev_point.t) * ratio)
+    
                     elif interpolation_method == 'uniform':
-                        slot_data[key] = (data_time_point_series[0].data[key] + data_time_point_series[1].data[key]) /2
+                        slot_data[key] = (prev_point.data[key] + next_point.data[key]) /2
+                   
                     else:
                         raise Exception('Unknown interpolation method "{}"'.format(interpolation_method))
-                
-        else:
 
-            # Compute data
-            keys = None
-            avgs = {}
-            count=0
+        else:
+ 
+            # TODO: unroll the following before the compute slot call
+            slot_timeseries = DataTimePointSeries()
+            prev_point = None
+            next_point = None
             for data_time_point in data_time_point_series:
-                if (data_time_point.t+(validity/2)) < start_t:
+                # TODO: better check the math here. We use >= and <= because, since we are basically comparing intervals,
+                #       the "right" excluded rule is excluded by comparing right with left and then left with right.
+                if (data_time_point.t+(validity/2)) <= start_t:
+                    prev_point = data_time_point
                     continue
                 if (data_time_point.t-(validity/2)) >= end_t:
-                    continue  
-                count+=1
-                if not keys:
-                    keys=data_time_point.data.keys()
-                for key in keys:
-                    if key not in avgs:
-                        avgs[key] = 0
-                    avgs[key] += data_time_point.data[key]
-            
+                    next_point = data_time_point
+                    continue
+                slot_timeseries.append(data_time_point)
+
+            # Keys shortcut
+            keys = data_time_point_series.data_keys()
+
+            logger.debug('Slot timeseries: %s', slot_timeseries)
+
+            # Compute sample averages data
+            avgs = avg(slot_timeseries, prev_point=prev_point, next_point=next_point)
+                            
             # Do we have a 100% and a fill_with?
             if fill_with is not None and point_data_loss == 1:
                 slot_data = {key:fill_with for key in keys}                
             else:
-                slot_data = {key:avgs[key]/count for key in keys}
+
+                if isinstance(avgs, dict):
+                    slot_data = {key:avgs[key] for key in keys}
+                else:
+                    slot_data = {keys[0]: avgs}
+                    
 
         # Do we have a force data_loss? #TODO: do not compute data_loss if fill_with not present and force_data_loss 
         if force_data_loss is not None:
@@ -537,16 +553,17 @@ class Resampler(Transformation):
             data_time_point = None
         else:      
             pass
+
         data_time_point = DataTimePoint(t = (start_t+((end_t-start_t)/2)),
-                                        tz =timezone,
+                                        tz = timezone,
                                         data  = slot_data,
                                         data_loss = point_data_loss)
 
         return data_time_point
 
 
-    def _process(self, data_time_point_series, from_t=None, to_t=None, validity=None,
-                 force_close_last=False, include_extremes=False, fill_with=None,
+    def _process(self, data_time_point_series, from_t=None, to_t=None, from_dt=None, to_dt=None,
+                 validity=None, force_close_last=True, include_extremes=False, fill_with=None,
                  force_data_loss=None, fill_gaps=True, interpolation_method='linear'):
         ''' Start the slotting process. If start and/or end are not set, they are set automatically based on first and last points of the sereis'''
 
@@ -565,6 +582,14 @@ class Resampler(Transformation):
             from_rounding_method = 'ceil'
             to_rounding_method   = 'floor'
 
+        # Move fromt_dt and to_dt to epoch to simplify the following
+        if from_dt is not None:
+            from_t = s_from_dt(from_dt)
+        if to_dt is not None:
+            to_t = s_from_dt(to_dt)
+            # Also force close if we have explicitly set an end
+            force_close_last = True
+
         # Set "from" if not set, otherwise check for consistency # TODO: move to steaming
         if from_t is None:
             from_t = data_time_point_series[0].t
@@ -577,7 +602,7 @@ class Resampler(Transformation):
             from_dt = dt_from_s(from_t, tz=data_time_point_series.tz)
             if from_dt != self.time_unit.round_dt(from_dt):
                 raise ValueError('Sorry, provided from_t is not consistent with the self.time_unit of "{}" (Got "{}")'.format(self.time_unit, from_t))
-
+        
         # Set "to" if not set, otherwise check for consistency # TODO: move to streaming
         if to_t is None:
             to_t = data_time_point_series[-1].t
@@ -590,15 +615,18 @@ class Resampler(Transformation):
             to_dt = dt_from_s(to_t, tz=data_time_point_series.tz)
             if to_dt != self.time_unit.round_dt(to_dt):
                 raise ValueError('Sorry, provided to_t is not consistent with the self.time_unit of "{}" (Got "{}")'.format(self.time_unit, to_t))
-        
+
+        # Move the start back of half and the end forward of
+        # half unit as well, as the point will be in the center
+        from_t = from_t - (self.time_unit.duration_s() /2)
+        from_dt = dt_from_s(from_t, data_time_point_series.tz)
+        to_t = to_t + (self.time_unit.duration_s() /2)
+        to_dt = dt_from_s(to_t, data_time_point_series.tz)
+
         # Automatically detect validity if not set
         if validity is None:
             validity = detect_sampling_interval(data_time_point_series)
             logger.info('Auto-detected sampling interval: %ss', validity)
-        
-
-        
-        force_close_last = force_close_last # TODO: set to true if inverting floor and ceil above)
 
         logger.debug('Started slotter from "%s" (%s) to "%s" (%s)', from_dt, from_t, to_dt, to_t)
 
@@ -677,6 +705,7 @@ class Resampler(Transformation):
   
                         logger.debug('This slot (start={}, end={}) is closed, now aggregating it..'.format(slot_start_t, slot_end_t))
                         
+                        logger.debug('working_serie len: %s', len(working_serie))
                         logger.debug('working_serie first point dt: %s', working_serie[0].dt)
                         logger.debug('working_serie  last point dt: %s', working_serie[-1].dt)
 
@@ -695,6 +724,7 @@ class Resampler(Transformation):
                         
                         # .. and append results
                         if dataTimePoint:
+                            logger.debug('Computed datapoint: %s',dataTimePoint )
                             resampled_data_time_point_series.append(dataTimePoint)
 
 
@@ -744,7 +774,7 @@ class Resampler(Transformation):
 
 
         # Last slots
-        if process_ended and force_close_last: # or method = overset (vs subset that is the standard)
+        if force_close_last:
 
             # 1) Close the last slot and aggreagte it. You should never do it unless you knwo what you are doing
             if working_serie:

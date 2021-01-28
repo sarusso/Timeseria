@@ -15,6 +15,35 @@ logging.basicConfig(level=os.environ.get('LOGLEVEL') if os.environ.get('LOGLEVEL
 TEST_DATA_PATH = '/'.join(os.path.realpath(__file__).split('/')[0:-1]) + '/test_data/'
 
 
+class TestUtilities(unittest.TestCase):
+
+    def test_unit_to_TimeUnit(self):
+        
+        unit_to_TimeUnit('1h')
+        unit_to_TimeUnit(TimeUnit('1h'))
+        
+        with self.assertRaises(InputException):
+            unit_to_TimeUnit('NO')
+        
+
+    def test_detect_sampling_interval(self):
+        
+        data_time_point_series = CSVFileStorage(TEST_DATA_PATH + '/csv/humitemp_short.csv').get()
+        self.assertEqual(detect_sampling_interval(data_time_point_series), 61)
+        
+        data_time_point_series = CSVFileStorage(TEST_DATA_PATH + '/csv/shampoo_sales.csv', time_column = 'Month', time_format = '%y-%m').get()
+        self.assertEqual(detect_sampling_interval(data_time_point_series), 2678400)  # 2678400/60/60/24 = 31 Days (the most frequent)
+
+        data_time_point_series = CSVFileStorage(TEST_DATA_PATH + '/csv/temperature.csv').get()
+        self.assertEqual(detect_sampling_interval(data_time_point_series), 600)
+
+        data_time_point_series = CSVFileStorage(TEST_DATA_PATH + '/csv/temp_short_1h.csv').get()
+        self.assertEqual(detect_sampling_interval(data_time_point_series), 3600)
+
+
+
+
+
 class TestSlotter(unittest.TestCase):
 
     def setUp(self):       
@@ -98,30 +127,6 @@ class TestSlotter(unittest.TestCase):
                 self.data_time_point_series_7.append(data_time_point)
             slider_dt = slider_dt + time_unit
             count += 1
-
-
-    def test_unit_to_TimeUnit(self):
-        
-        unit_to_TimeUnit('1h')
-        unit_to_TimeUnit(TimeUnit('1h'))
-        
-        with self.assertRaises(InputException):
-            unit_to_TimeUnit('NO')
-        
-
-    def test_detect_sampling_interval(self):
-        
-        data_time_point_series = CSVFileStorage(TEST_DATA_PATH + '/csv/humitemp_short.csv').get()
-        self.assertEqual(detect_sampling_interval(data_time_point_series), 61)
-        
-        data_time_point_series = CSVFileStorage(TEST_DATA_PATH + '/csv/shampoo_sales.csv', time_column = 'Month', time_format = '%y-%m').get()
-        self.assertEqual(detect_sampling_interval(data_time_point_series), 2678400)  # 2678400/60/60/24 = 31 Days (the most frequent)
-
-        data_time_point_series = CSVFileStorage(TEST_DATA_PATH + '/csv/temperature.csv').get()
-        self.assertEqual(detect_sampling_interval(data_time_point_series), 600)
-
-        data_time_point_series = CSVFileStorage(TEST_DATA_PATH + '/csv/temp_short_1h.csv').get()
-        self.assertEqual(detect_sampling_interval(data_time_point_series), 3600)
 
 
     def test_slot(self):
@@ -279,3 +284,110 @@ class TestSlotter(unittest.TestCase):
         self.assertEqual(data_time_slot_series[3].data['temperature_min'], 191.25)
 
 
+
+class TestResampler(unittest.TestCase):
+
+
+    def test_resample(self):
+        
+        # Time series from 16:58:00 to 17:32:00 (Europe/Rome)
+        data_time_point_series = DataTimePointSeries()
+        start_t = 1436022000 - 120
+        for i in range(35):
+            data_time_point = DataTimePoint(t = start_t + (i*60),
+                                            tz='Europe/Rome',
+                                            data = {'temperature': 154+i})
+            data_time_point_series.append(data_time_point)
+ 
+        data_time_slot_series = Resampler('600s').process(data_time_point_series)        
+ 
+        self.assertEqual(str(data_time_slot_series[0].dt), '2015-07-04 17:00:00+02:00')
+        self.assertAlmostEqual(data_time_slot_series[0].data_loss, 0.25)
+        self.assertEqual(data_time_slot_series[0].data['temperature'], 157.5)
+         
+        self.assertEqual(str(data_time_slot_series[1].dt), '2015-07-04 17:10:00+02:00')
+        self.assertAlmostEqual(data_time_slot_series[1].data_loss, 0.0)
+        self.assertEqual(data_time_slot_series[1].data['temperature'], 166.0)
+         
+        self.assertEqual(str(data_time_slot_series[3].dt), '2015-07-04 17:30:00+02:00')
+        self.assertAlmostEqual(data_time_slot_series[3].data_loss, 0.25)
+        self.assertEqual(data_time_slot_series[3].data['temperature'], 184.5)
+ 
+     
+        # Time series from 15:00:00 to 15:37:00 (UTC)
+        data_time_point_series = DataTimePointSeries()
+        start_t = 1436022000
+        for i in range(38):
+            data_time_point = DataTimePoint(t = start_t + (i*60),
+                                            data = {'temperature': 154+i})
+            data_time_point_series.append(data_time_point)
+ 
+ 
+        data_time_slot_series = Resampler('600s').process(data_time_point_series)
+         
+        self.assertEqual(str(data_time_slot_series[0].dt), '2015-07-04 15:00:00+00:00')
+        self.assertAlmostEqual(data_time_slot_series[0].data_loss, 0.45)
+        self.assertEqual(data_time_slot_series[0].data['temperature'], 156.5)
+         
+        self.assertEqual(str(data_time_slot_series[1].dt), '2015-07-04 15:10:00+00:00')
+        self.assertAlmostEqual(data_time_slot_series[1].data_loss, 0.0)
+        self.assertEqual(data_time_slot_series[1].data['temperature'], 164.0)
+         
+        self.assertEqual(str(data_time_slot_series[4].dt), '2015-07-04 15:40:00+00:00')
+        self.assertAlmostEqual(data_time_slot_series[4].data_loss, 0.85)
+        self.assertEqual(data_time_slot_series[4].data['temperature'], 189.5)        
+         
+ 
+        # Time series from 15:00:00 to 15:20:00 (UTC)
+        data_time_point_series = DataTimePointSeries()
+        start_t = 0 #1436022000
+        for i in range(20):
+            if i < 8 or i > 12:
+                data_time_point = DataTimePoint(t = start_t + (i*60),
+                                                data = {'temperature': 154+i})
+                data_time_point_series.append(data_time_point)
+ 
+        # Re-sample as is
+        data_time_slot_series = Resampler('1m').process(data_time_point_series)        
+        self.assertEqual(len(data_time_slot_series), 20)
+         
+        # Original points
+        self.assertEqual(data_time_slot_series[0].data_loss, 0)
+        self.assertEqual(data_time_slot_series[0].data['temperature'], 154)
+        self.assertEqual(data_time_slot_series[1].data_loss, 0)
+        self.assertEqual(data_time_slot_series[1].data['temperature'], 155)
+        self.assertEqual(data_time_slot_series[19].data_loss, 0)
+        self.assertEqual(data_time_slot_series[19].data['temperature'], 173)
+ 
+        # Reconstructed (interpolated) points
+        self.assertEqual(data_time_slot_series[8].data_loss, 1)
+        self.assertEqual(data_time_slot_series[8].data['temperature'], 162)
+        self.assertEqual(data_time_slot_series[9].data_loss, 1)
+        self.assertEqual(data_time_slot_series[9].data['temperature'], 163)
+        self.assertEqual(data_time_slot_series[12].data_loss, 1)
+        self.assertEqual(data_time_slot_series[12].data['temperature'], 166)
+
+
+# TODO: Check up-sampling. In particular, check correct linear interpolation when there is data loss vs. when there isn't.
+
+#         # Time series from 15:00:00 to 15:20:00 (UTC)
+#         data_time_point_series = DataTimePointSeries()
+#         start_t = 0 #1436022000
+#         for i in range(20):
+#             if i < 8 or i > 12:
+#                 data_time_point = DataTimePoint(t = start_t + (i*60),
+#                                                 data = {'temperature': 154+i})
+#                 data_time_point_series.append(data_time_point)
+# 
+#         for item in data_time_point_series:
+#             print(item)
+#         print('-----')
+#         
+#         #  Upsampling
+#         data_time_slot_series = Resampler('20s').process(data_time_point_series)        
+#         print(data_time_slot_series)
+#         for item in data_time_slot_series:
+#             print(item)
+#         
+#         self.assertEqual(len(data_time_slot_series), 120)
+         
