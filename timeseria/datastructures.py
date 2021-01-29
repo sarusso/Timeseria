@@ -831,18 +831,21 @@ class TimeSlotSeries(SlotSeries):
 
     def append(self, item):
         
-        # Check for the same time zone
-        try:
-            if self.tz != item.tz:
+        if not self.tz:
+            # If no timezone set, use the item one's
+            self._tz = item.tz
+            
+        else:
+            # Else, check for the same time zone
+            if self._tz != item.tz:
                 raise ValueError('Cannot add items on different time zones (I have "{}" and you tried to add "{}")'.format(self.tz, item.start.tz))
-        except AttributeError:
-            self.tz = item.tz
+
         super(TimeSlotSeries, self).append(item)
         
     def change_timezone(self, new_timezone):
         for time_slot in self:
             time_slot.change_timezone(new_timezone)
-        self.tz = time_slot.tz
+        self._tz = time_slot.tz
 
     @property
     def resolution(self):
@@ -855,6 +858,14 @@ class TimeSlotSeries(SlotSeries):
         #        return unit_to_TimeUnit(self._resolution)
         #    except:
         #        return self._resolution
+
+    @property
+    def tz(self):
+        try:
+            return self._tz
+        except AttributeError:
+            return None
+
 
 
 class DataSlotSeries(SlotSeries):
