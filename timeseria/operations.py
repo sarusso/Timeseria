@@ -428,7 +428,7 @@ class Select(Operation):
 
 class Filter(Operation):
 
-    def __call__(self, series, key=None, from_t=None, to_t=None, from_dt=None, to_dt=None):
+    def __call__(self, series, data_key=None, from_t=None, to_t=None, from_dt=None, to_dt=None):
         if from_dt:
             if from_t is not None:
                 raise Exception('Cannot set both from_t and from_dt')
@@ -461,11 +461,11 @@ class Filter(Operation):
                     # Append everything 
                     filtered_series.append(item)
         
-        # Filter based on key if set
-        if key:
+        # Filter based on data key if set
+        if data_key:
             for i, item in enumerate(filtered_series):
                 filtered_series[i] = copy(item)
-                filtered_series[i]._data = {key: item.data[key]}
+                filtered_series[i]._data = {data_key: item.data[data_key]}
 
         return filtered_series 
 

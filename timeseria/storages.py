@@ -54,10 +54,10 @@ class CSVFileStorage(object):
     
     def __init__(self, filename_with_path, encoding = 'auto', time_column = 'auto', time_format = 'auto',
                  date_column = None, date_format = None, data_columns = 'all', value_separator=',', line_separator='\n',
-                 skip_errors=False, data_format='auto', item_type=None, tz='UTC'):
+                 skip_errors=False, data_format='auto', type=None, tz='UTC'):
         ''' Ref to https://docs.python.org/3/library/datetime.html#strftime-and-strptime-format-codes
         for date_format and time_format'''
-        
+
         # File & encoding
         self.filename_with_path = filename_with_path
         if encoding == 'auto':
@@ -85,8 +85,8 @@ class CSVFileStorage(object):
         self.skip_errors = skip_errors
         self.data_format = data_format
         
-        # Item type (that will be forced)
-        self.item_type = item_type
+        # Set item type (that will be forced)
+        self.item_type = type
 
         # Check
         if self.time_column is None and self.date_column is None and not self.data_columns:
@@ -102,7 +102,7 @@ class CSVFileStorage(object):
             raise ValueError('data_columns argument must be a list (got "{}")'.format(self.data_columns.__class__.__name__))
 
 
-    def get(self, limit=None, tz=None, item_type=None):
+    def get(self, limit=None, tz=None, type=None):
 
         # Line counter
         line_number=0
@@ -116,6 +116,9 @@ class CSVFileStorage(object):
         
         data_column_indexes = None
         data_column_labels = None
+
+        # Item type shortcut
+        item_type = type
 
         # Detect encoding if not set
         if not self.encoding:
@@ -427,11 +430,11 @@ class CSVFileStorage(object):
                 item_type = DataTimeSlot
                 unit = TimeUnit('{}s'.format(detected_sampling_interval))
             else:
-                raise ValueError('Unknown value "{}" for item_type. Accepted types are "points" or "slots".'.format(self.item_type))
+                raise ValueError('Unknown value "{}" for type. Accepted types are "points" or "slots".'.format(self.item_type))
         else:
             # Log the type and unit we detected 
             if detected_item_type == DataTimeSlot:
-                logger.info('Assuming {} time unit and creating Slots. Use "item_type=\'points\'" if you want Points instead."'.format(detected_unit))
+                logger.info('Assuming {} time unit and creating Slots. Use type=\'points\' if you want Points instead.'.format(detected_unit))
             #else:
             #    logger.info('Assuming {} sampling interval and creating {}.'.format(detected_sampling_interval, item_type.__class__.__name__))
             

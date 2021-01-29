@@ -154,7 +154,7 @@ class TestCSVFileStorage(unittest.TestCase):
 
         # Test only date column and without meaningful timestamp label (and force points)
         storage = CSVFileStorage(TEST_DATA_PATH + '/csv/only_date_no_meaningful_timestamp_label.csv',
-                                 time_format = '%Y-%m-%d', item_type='points')
+                                 time_format = '%Y-%m-%d', type='points')
 
         data_time_point_series = storage.get()
         self.assertEqual(len(data_time_point_series), 95)
@@ -207,6 +207,6 @@ class TestCSVFileStorage(unittest.TestCase):
         self.assertEqual(str(data_time_slot_series.tz), 'Europe/Rome')
 
         # Force point and get on a specific timezone
-        data_time_point_series = storage.get(tz='Europe/Rome', item_type='points')
+        data_time_point_series = storage.get(tz='Europe/Rome', type='points')
         self.assertTrue(isinstance(data_time_point_series[0], DataTimePoint))
         self.assertEqual(str(data_time_point_series.tz), 'Europe/Rome')
