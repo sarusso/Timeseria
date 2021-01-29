@@ -283,6 +283,18 @@ class TestSlotter(unittest.TestCase):
         self.assertEqual(data_time_slot_series[2].data['temperature_min'], 179.5)
         self.assertEqual(data_time_slot_series[3].data['temperature_min'], 191.25)
 
+        # Re-slotting with the same time unit as the original points
+        data_time_slot_series = Slotter('60s').process(data_time_point_series)
+
+        #  Upsampling (upslotting) not supported yet
+        data_time_slot_series = Slotter('60s').process(data_time_point_series)
+        with self.assertRaises(ValueError):    
+            data_time_slot_series = Slotter('30s').process(data_time_point_series)        
+        
+        # TODO: directly load a day-resolution time series in this test
+        data_time_slot_series = Resampler(86400).process(self.data_time_point_series_7)
+        with self.assertRaises(ValueError):    
+            Slotter('1h').process(data_time_slot_series)
 
 
 class TestResampler(unittest.TestCase):
@@ -338,9 +350,9 @@ class TestResampler(unittest.TestCase):
         self.assertEqual(data_time_slot_series[4].data['temperature'], 189.5)        
          
  
-        # Time series from 15:00:00 to 15:20:00 (UTC)
+        # Time series from 00:00 to 00:19 (UTC) 
         data_time_point_series = DataTimePointSeries()
-        start_t = 0 #1436022000
+        start_t = 0
         for i in range(20):
             if i < 8 or i > 12:
                 data_time_point = DataTimePoint(t = start_t + (i*60),
@@ -368,26 +380,19 @@ class TestResampler(unittest.TestCase):
         self.assertEqual(data_time_slot_series[12].data['temperature'], 166)
 
 
-# TODO: Check up-sampling. In particular, check correct linear interpolation when there is data loss vs. when there isn't.
+        # Time series from 00:00 to 00:19 (UTC) with missing data in the middle
+        data_time_point_series = DataTimePointSeries()
+        start_t = 0
+        for i in range(20):
+            if i < 8 or i > 12:
+                data_time_point = DataTimePoint(t = start_t + (i*60),
+                                                data = {'temperature': 154+i})
+                data_time_point_series.append(data_time_point)
 
-#         # Time series from 15:00:00 to 15:20:00 (UTC)
-#         data_time_point_series = DataTimePointSeries()
-#         start_t = 0 #1436022000
-#         for i in range(20):
-#             if i < 8 or i > 12:
-#                 data_time_point = DataTimePoint(t = start_t + (i*60),
-#                                                 data = {'temperature': 154+i})
-#                 data_time_point_series.append(data_time_point)
-# 
-#         for item in data_time_point_series:
-#             print(item)
-#         print('-----')
-#         
-#         #  Upsampling
-#         data_time_slot_series = Resampler('20s').process(data_time_point_series)        
-#         print(data_time_slot_series)
-#         for item in data_time_slot_series:
-#             print(item)
-#         
-#         self.assertEqual(len(data_time_slot_series), 120)
+        #  Upsampling not supported yet
+        with self.assertRaises(ValueError):
+            data_time_slot_series = Resampler('20s').process(data_time_point_series)        
+        
+        # When implementing it, remember about check correct linear interpolation when there is data loss vs. when there isn't,
+        # and that all the prev-next math has to be correctly taken into account together with computing the right data loss.
          

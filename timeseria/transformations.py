@@ -182,7 +182,7 @@ class Slotter(Transformation):
 
 
     def _process(self, data_time_point_series, from_t=None, from_dt=None, to_t=None, to_dt=None, validity=None, force_close_last=False,
-                 include_extremes=False, fill_with=None, force_data_loss=None, fill_gaps=True, interpolation_method='linear'):
+                 include_extremes=False, fill_with=None, force_data_loss=None, fill_gaps=True, interpolation_method='linear', force=False):
         ''' Start the slotting process. If start and/or end are not set, they are set automatically based on first and last points of the sereis'''
 
         if not isinstance(data_time_point_series, DataTimePointSeries):
@@ -241,7 +241,14 @@ class Slotter(Transformation):
         if validity is None:
             validity = detect_sampling_interval(data_time_point_series)
             logger.info('Auto-detected sampling interval: %ss', validity)
-        
+
+        # Check if not upslotting (with some tolerance)
+        if not force:
+            # TODO: this check is super-weak. Will fail in loads of edge cases, i.e. months slotted in 30 days.
+            unit_duration_s = self.time_unit.duration_s(data_time_point_series[0].dt)
+            if validity > (unit_duration_s * 1.1):
+                raise ValueError('Upslotting not supported yet (slotter unit: {}; detected time series sampling interval: {})'.format(unit_duration_s, validity))
+            
         # Log
         logger.debug('Started slotter from "%s" (%s) to "%s" (%s)', from_dt, from_t, to_dt, to_t)
 
@@ -564,7 +571,7 @@ class Resampler(Transformation):
 
     def _process(self, data_time_point_series, from_t=None, to_t=None, from_dt=None, to_dt=None,
                  validity=None, force_close_last=True, include_extremes=False, fill_with=None,
-                 force_data_loss=None, fill_gaps=True, interpolation_method='linear'):
+                 force_data_loss=None, fill_gaps=True, interpolation_method='linear', force=False):
         ''' Start the slotting process. If start and/or end are not set, they are set automatically based on first and last points of the sereis'''
 
         if not isinstance(data_time_point_series, DataTimePointSeries):
@@ -627,6 +634,11 @@ class Resampler(Transformation):
         if validity is None:
             validity = detect_sampling_interval(data_time_point_series)
             logger.info('Auto-detected sampling interval: %ss', validity)
+
+        # Check if not upsamplimg (with some tolearance):
+        if not force:
+            if validity > (self.time_unit.duration_s() * 1.10):
+                raise ValueError('Upsampling not supported yet (resampler unit: {}; detected time series sampling interval: {})'.format(self.time_unit, validity))
 
         logger.debug('Started slotter from "%s" (%s) to "%s" (%s)', from_dt, from_t, to_dt, to_t)
 
