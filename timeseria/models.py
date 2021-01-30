@@ -465,6 +465,11 @@ class Reconstructor(ParametricModel):
               
                     # Append next
                     #timeseries_to_reconstruct.append(copy.deepcopy(timeseries[i+steps_round]))
+                    
+                    # Do we have a 1-point only timeseries? If so, manually set the resolution
+                    # as otherwise it would be not defined. # TODO: does it make sense?
+                    if len(timeseries_to_reconstruct) == 1:
+                        timeseries_to_reconstruct._resolution = timeseries._resolution
 
                     # Apply model inplace
                     self._apply(timeseries_to_reconstruct, inplace=True)
@@ -483,7 +488,7 @@ class Reconstructor(ParametricModel):
                         logger.warning('No limit set in the evaluation with a quite long time series, this could take some time.')
                         warned=True
                         
-                if processed_samples < limit:
+                if limit and processed_samples < limit:
                     logger.warning('The evaluation limit is set to "{}" but I have only "{}" samples for "{}" steps'.format(limit, processed_samples, steps_round))
 
                 if not reconstructed_values:

@@ -168,6 +168,7 @@ class TestReconstructors(unittest.TestCase):
          
         # TODO: do some actual testing.. not only that "it works"
         reconstructed_data_time_point_series  = periodic_average_reconstructor.apply(data_time_point_series)
+        periodic_average_reconstructor.evaluate(data_time_point_series)
         
 
     def test_ProphetReconstructor(self):

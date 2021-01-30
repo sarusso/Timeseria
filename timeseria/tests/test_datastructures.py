@@ -270,7 +270,12 @@ class TestPointSeries(unittest.TestCase):
         
         time_point_serie = TimePointSeries(TimePoint(t=60),TimePoint(t=120),TimePoint(t=130))
         self.assertEqual(time_point_serie._resolution, 'variable')
-
+        
+        time_point_serie = TimePointSeries(TimePoint(t=60),TimePoint(t=120),TimePoint(t=180))
+        self.assertEqual(time_point_serie.duplicate().resolution, 60)
+        self.assertEqual(time_point_serie[0:2].resolution, 60)
+        
+        
 
     def test_DataPointSeries(self):
         pass
