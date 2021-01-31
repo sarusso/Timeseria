@@ -485,6 +485,13 @@ class DataPointSeries(PointSeries):
             except AttributeError:
                 return list(range(len(self[0].data)))
 
+    def remove_data_loss(self):
+        new_series = self.duplicate()
+        for item in new_series:
+            item._data_loss = None
+        return new_series
+
+
 
 class DataTimePointSeries(DataPointSeries, TimePointSeries):
     '''A series of DataTimePoint where each item is guaranteed to carry the same data type and to be ordered'''
@@ -902,6 +909,12 @@ class DataSlotSeries(SlotSeries):
                 return list(self[0].data.keys())
             except AttributeError:
                 return list(range(len(self[0].data)))
+
+    def remove_data_loss(self):
+        new_series = self.duplicate()
+        for item in new_series:
+            item._data_loss = None
+        return new_series
 
 
 class DataTimeSlotSeries(DataSlotSeries, TimeSlotSeries):
