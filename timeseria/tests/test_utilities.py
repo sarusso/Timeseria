@@ -143,6 +143,13 @@ class TestComputeCoverage(unittest.TestCase):
         self.assertAlmostEqual(coverage, (0.5))
 
 
+        # Now test that if we have points with data losses already, this is taken into account.
+        # TODO: add some better testing here...
+        resampled_timeseries = self.data_time_point_series_5.resample(60)
+        coverage = compute_coverage(data_time_point_series  = resampled_timeseries,
+                                    from_t = 1436022300, to_t = 1436022600, validity=60) 
+        self.assertAlmostEqual(coverage, (0.6))
+
 
 class TestGetPeriodicity(unittest.TestCase):
 
