@@ -4,7 +4,7 @@ from chardet.universaldetector import UniversalDetector
 from numpy import fft
 from scipy.signal import find_peaks
 from .time import dt_from_s
-from .exceptions import InputException
+from .exceptions import InputException, ConsistencyException
 from datetime import datetime
 from .time import s_from_dt
 
@@ -54,17 +54,34 @@ def set_from_t_and_to_t(from_dt, to_dt, from_t, to_t):
 def item_is_in_range(item, from_t, to_t):
     # TODO: maybe use a custom iterator for looping over time series items? 
     # see https://stackoverflow.com/questions/6920206/sending-stopiteration-to-for-loop-from-outside-of-the-iterator
-    if from_t is not None and to_t is not None and from_t > to_t:
-        if item.end.t <= to_t:
+    from .datastructures import Point, Slot
+    if isinstance(item, Slot):
+        if from_t is not None and to_t is not None and from_t > to_t:
+            if item.end.t <= to_t:
+                return True
+            if item.start.t >= from_t:
+                return True
+        else:     
+            if from_t is not None and item.start.t < from_t:
+                return False
+            if to_t is not None and item.end.t > to_t:
+                raise StopIteration
             return True
-        if item.start.t >= from_t:
-            return True
-    else:     
-        if from_t is not None and item.start.t < from_t:
-            return False
-        if to_t is not None and item.end.t > to_t:
-            raise StopIteration
-        return True
+    elif isinstance(item, Point):
+        if from_t is not None and to_t is not None and from_t > to_t:
+            if item.t <= to_t:
+                return True
+            if item.t >= from_t:
+                return True
+        else:     
+            if from_t is not None and item.t < from_t:
+                return False
+            if to_t is not None and item.t > to_t:
+                raise StopIteration
+            return True    
+    else:
+        raise ConsistencyException('Got unknown type "{}'.format(item.__class__.__name__))
+        
 
 
 def detect_encoding(filename, streaming=False):
