@@ -466,6 +466,14 @@ class Filter(Operation):
             for i, item in enumerate(filtered_series):
                 filtered_series[i] = copy(item)
                 filtered_series[i]._data = {data_key: item.data[data_key]}
+        
+        # Re-set reference data as well
+        try:
+            filtered_series.item_data_reference
+        except AttributeError:
+            pass
+        else:
+            filtered_series.item_data_reference = filtered_series[0].data
 
         return filtered_series 
 
