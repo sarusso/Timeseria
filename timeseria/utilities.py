@@ -20,7 +20,12 @@ def is_numerical(item):
         return True
     if isinstance(item, int):
         return True
-    return False
+    try:
+        # Handle pandas-like data types (i.e. int64)
+        item + 1
+        return True
+    except:
+        return False
 
 
 def set_from_t_and_to_t(from_dt, to_dt, from_t, to_t):
@@ -213,6 +218,15 @@ def compute_coverage(data_time_point_series, from_t, to_t, trustme=False, validi
                 missing_coverage = value
             else:
                 missing_coverage = missing_coverage + value
+            
+        # Take into account point data loss as well
+        if this_data_time_point.data_loss:
+            point_validity = (this_data_time_point_valid_to_t-this_data_time_point_valid_from_t)
+            point_missing_coverage = this_data_time_point.data_loss * point_validity
+            if missing_coverage is not None:
+                missing_coverage += point_missing_coverage
+            else:
+                missing_coverage = point_missing_coverage
 
         # Update previous datapoint Validity:
         prev_datapoint_valid_to_t = this_data_time_point_valid_to_t
