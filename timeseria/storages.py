@@ -102,7 +102,7 @@ class CSVFileStorage(object):
             raise ValueError('data_columns argument must be a list (got "{}")'.format(self.data_columns.__class__.__name__))
 
 
-    def get(self, limit=None, tz=None, type=None):
+    def get(self, limit=None, tz=None, type=None, sort=False):
 
         # Line counter
         line_number=0
@@ -382,12 +382,16 @@ class CSVFileStorage(object):
                 # Append to the series
                 items.append([t, data])
 
+        autodetect_item_type = False
+
         # Set item type if forced
         if not item_type and self.item_type:
             item_type = self.item_type
 
         # Otherwise, auto-detect
         if not item_type or item_type=='slots':
+    
+            autodetect_item_type = True
     
             # Detect sampling interval to create right item type (points or slots)
             from .transformations import detect_sampling_interval
@@ -422,7 +426,7 @@ class CSVFileStorage(object):
                 detected_unit = None
             
         # Do we have to force a specific type?
-        if item_type:
+        if not autodetect_item_type:
             if item_type == 'points':
                 item_type = DataTimePoint
                 unit = None 
@@ -452,8 +456,17 @@ class CSVFileStorage(object):
         # Create point or slot series
         if item_type == DataTimePoint:
             timeseries = DataTimePointSeries()
+            if sort:
+                from operator import itemgetter
+                items = sorted(items, key=itemgetter(0))
             for item in items:
-                timeseries.append(DataTimePoint(t=item[0], data=item[1], tz=tz)) 
+                try:
+                    timeseries.append(DataTimePoint(t=item[0], data=item[1], tz=tz))
+                except Exception as e:
+                    if self.skip_errors:
+                        logger.error(e)
+                    else:
+                        raise e from None
         else:
             
             timeseries = DataTimeSlotSeries()
