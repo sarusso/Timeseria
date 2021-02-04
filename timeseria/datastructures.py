@@ -349,6 +349,7 @@ class DataPoint(Point):
         except AttributeError:
             return None
 
+
 class DataTimePoint(DataPoint, TimePoint):
     pass
 
@@ -592,10 +593,44 @@ class DataTimePointSeries(DataPointSeries, TimePointSeries):
             else:
                 aggregate_by = None
             return aggregate_by
+        
+    @property
+    def autodetected_sampling_interval(self):
+        try:
+            return self._autodetected_sampling_interval
+        except AttributeError:
+            from .transformations import detect_sampling_interval
+            self._autodetected_sampling_interval = detect_sampling_interval(self)
+            return self._autodetected_sampling_interval
+    
+    @property
+    def resolution_string(self):
+        if self.resolution != 'variable':
+            resolution_as_str = str(self.resolution)
+            if resolution_as_str.endswith('.0'):
+                resolution_as_str = resolution_as_str[:-2]
+            # Friendlier name. TODO: improve me... maybe use the TimeUnit directly? Or guess..
+            if resolution_as_str == '60':
+                resolution_as_str = '1m'
+            elif resolution_as_str == '600':
+                resolution_as_str = '10m'
+            elif resolution_as_str == '3600':
+                resolution_as_str = '1h'
+            else:
+                resolution_as_str = '{}s'.format(resolution_as_str)
+            resolution_string = '{} resolution'.format(resolution_as_str)
+        else:
+            autodetected_sampling_interval_as_str = str(self.autodetected_sampling_interval)
+            if autodetected_sampling_interval_as_str.endswith('.0'):
+                # TODO: use a friendlier resolution here as well, as above?
+                autodetected_sampling_interval_as_str = autodetected_sampling_interval_as_str[:-2] 
+            resolution_string = 'variable resolution (~{}s)'.format(autodetected_sampling_interval_as_str)
+        return resolution_string
 
     def __repr__(self):
         if len(self):
-            return 'Time series of #{} points, from point @ {} ({}) to point @ {} ({})'.format(len(self), self[0].t, self[0].dt, self[-1].t, self[-1].dt)
+
+            return 'Time series of #{} points at {}, from point @ {} ({}) to point @ {} ({})'.format(len(self), self.resolution_string, self[0].t, self[0].dt, self[-1].t, self[-1].dt)
         else:
             return 'Time series of #0 points'
 

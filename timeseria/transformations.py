@@ -239,8 +239,8 @@ class Slotter(Transformation):
             
         # Automatically detect validity if not set
         if validity is None:
-            validity = detect_sampling_interval(data_time_point_series)
-            logger.info('Auto-detected sampling interval: %ss', validity)
+            validity = data_time_point_series.autodetected_sampling_interval
+            logger.info('Using auto-detected sampling interval: %ss', validity)
 
         # Check if not upslotting (with some tolerance)
         if not force:
@@ -632,8 +632,8 @@ class Resampler(Transformation):
 
         # Automatically detect validity if not set
         if validity is None:
-            validity = detect_sampling_interval(data_time_point_series)
-            logger.info('Auto-detected sampling interval: %ss', validity)
+            validity = data_time_point_series.autodetected_sampling_interval
+            logger.info('Using auto-detected sampling interval: %ss', validity)
 
         # Check if not upsamplimg (with some tolearance):
         if not force:

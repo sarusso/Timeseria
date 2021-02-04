@@ -421,9 +421,9 @@ def dygraphs_plot(serie, aggregate_by, log_js=False, show_data_loss=True, show_f
     else:
         if isinstance(serie, DataTimePointSeries):
             if aggregate_by:
-                title = 'Time series of #{} points, aggregated by {}'.format(len(serie), aggregate_by)
+                title = 'Time series of #{} points at {}, aggregated by {}'.format(len(serie), serie.resolution_string, aggregate_by)
             else:
-                title = 'Time series of #{} points'.format(len(serie))
+                title = 'Time series of #{} points at {}'.format(len(serie), serie.resolution_string)
              
         elif isinstance(serie, DataTimeSlotSeries):
             if aggregate_by:
