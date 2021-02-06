@@ -164,7 +164,6 @@ class Series(list):
         from .operations import mavg as mavg_operation
         return mavg_operation(self, *args, **kwargs)  
 
-
     # Transformation-based operations
     def slot(self, *args, **kwargs):
         from .transformations import Slotter
@@ -176,6 +175,64 @@ class Series(list):
         from .transformations import Resampler
         resampler = Resampler(*args, **kwargs)
         return resampler.process(self)  
+
+    # Indexes
+    @property
+    def indexes(self):
+        # TODO: this approach does not allow for custom-defined indexes.
+        #       Maybe move indexes from item attributes to a dictionary?
+        if not self:
+            return []
+        else:
+            _indexes = []
+
+            # Do we have data reconstructed indexes?
+            try:
+                if self[0].data_reconstructed is not None:
+                    _indexes.append('data_reconstructed')
+            except AttributeError:
+                pass
+
+            # Do we have data loss indexes?
+            try:
+                if self[0].data_loss is not None:
+                    _indexes.append('data_loss')
+            except AttributeError:
+                pass
+
+            # Do we have an anomaly index?
+            try:
+                if self[0].anomaly is not None:
+                    _indexes.append('anomaly')
+            except AttributeError:
+                pass
+
+            # Do we have a forecasted index?
+            try:
+                if self[0].forecasted is not None:
+                    _indexes.append('forecasted')
+            except AttributeError:
+                pass
+            
+            return _indexes
+
+    @property
+    def mark(self):
+        try:
+            return self._mark
+        except AttributeError:
+            return None
+
+    @mark.setter
+    def mark(self, value):
+        # Check valid mark
+        if not isinstance(value, (list, tuple)):
+            raise TypeError('Series mark must be a list or tuple')
+        if not len(value) == 2:
+            raise ValueError('Series mark must be a list or tuple of two elements')    
+        self._mark = value
+
+
 
 #======================
 #  Points
@@ -346,6 +403,13 @@ class DataPoint(Point):
     def data_loss(self):
         try:
             return self._data_loss
+        except AttributeError:
+            return None
+
+    @property
+    def data_reconstructed(self):
+        try:
+            return self._data_reconstructed
         except AttributeError:
             return None
 

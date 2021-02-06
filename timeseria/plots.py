@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 ''' Note: the code in this module is spaghetti-code, and there are no tests. A major refactoring is required.'''
 
-INDEX_METRICS = ['anomaly']
+render_mark_as_index = False
 
 #=================
 #   Utilities
@@ -49,7 +49,7 @@ def to_dg_time(dt):
         return 'new Date(Date.UTC({}, {}, {}, {}, {}, {}))'.format(dt.year, dt.month-1, dt.day, dt.hour, dt.minute, dt.second)
 
 
-def to_dg_data(serie, aggregate_by=0, plot_data_loss=False, plot_data_reconstructed=False, serie_mark=None):
+def to_dg_data(serie, aggregate_by=0):
     '''{% for timestamp,value in metric_data.items %}{{timestamp}},{{value}}\n{%endfor%}}'''
     
     dg_data=''
@@ -59,7 +59,7 @@ def to_dg_data(serie, aggregate_by=0, plot_data_loss=False, plot_data_reconstruc
     global_min = None
     global_max = None
     
-    if serie_mark:
+    if serie.mark:
         serie_mark_start_t = s_from_dt(serie.mark[0])
         serie_mark_end_t = s_from_dt(serie.mark[1])
 
@@ -79,19 +79,17 @@ def to_dg_data(serie, aggregate_by=0, plot_data_loss=False, plot_data_reconstruc
             data_sums = [0 for key in keys]
             data_mins = [None for key in keys]
             data_maxs = [None for key in keys]
-            data_loss = None
-            data_reconstructed = None
+            index_sums = [0 for index in serie.indexes]
+            
 
+        #====================
+        #  Aggregation
+        #====================        
         if aggregate_by:
 
+            # Set first timestamp
             if first_t is None:
-                if isinstance(serie, DataTimePointSeries):
-                    first_t = item.t
-                elif isinstance(serie, DataTimeSlotSeries):
-                    first_t = item.start.t
-            
-            # Prepare to exclude index metrics from the min/max computation
-            index_metrics_positions = []
+                first_t = item.t
                   
             # Define data
             if keys:
@@ -100,32 +98,30 @@ def to_dg_data(serie, aggregate_by=0, plot_data_loss=False, plot_data_reconstruc
                     if key is None:
                         datas.append(item.data)
                     else:
-                        if key in INDEX_METRICS:
-                            index_metrics_positions.append(j) 
                         datas.append(item.data[key])
-
             else:
-                datas=[item.data]
+                datas = [item.data]
             
+            
+            # Loop over data keys, including the "None" key if we have no keys (float data), and add data
             for j, data in enumerate(datas):
                 
                 # Sum
                 data_sums[j] += data
                 
-                if j not in index_metrics_positions:
-                    # Global min
-                    if global_min is None:
-                        global_min = data
-                    else:
-                        if data < global_min:
-                            global_min = data                
-                    
-                    # Global max
-                    if global_max is None:
+                # Global min
+                if global_min is None:
+                    global_min = data
+                else:
+                    if data < global_min:
+                        global_min = data                
+                
+                # Global max
+                if global_max is None:
+                    global_max = data
+                else:
+                    if data > global_max:
                         global_max = data
-                    else:
-                        if data > global_max:
-                            global_max = data
 
                 # Min
                 if data_mins[j] is None:
@@ -140,87 +136,61 @@ def to_dg_data(serie, aggregate_by=0, plot_data_loss=False, plot_data_reconstruc
                 else:
                     if data > data_maxs[j]:
                         data_maxs[j] = data
-            
-            #if isinstance(serie, DataTimeSlotSeries):
-            # Data loss
-            if item.data_loss is not None:
-                if data_loss is None:
-                    data_loss = 0
-                data_loss += item.data_loss 
-            
-            # Data reconstructed
-            if plot_data_reconstructed:
-                if item._data_reconstructed is not None:
-                    if data_reconstructed is None:
-                        data_reconstructed = 0
-                    data_reconstructed += item._data_reconstructed
-    
+
+            # Loop over series indexes and add data
+            for j, index in enumerate(serie.indexes):
+                # TODO: plot only some indexes, now we plot all of them
+                try:
+                    index_value = getattr(item, index)
+                    if index_value is not None:
+                        index_sums[j] += index_value
+                except AttributeError:
+                    pass
+
             # Dump aggregated data?
             if (i!=0)  and ((i % aggregate_by)==0):
                 if isinstance(serie, DataTimePointSeries):
                     last_t = item.t
                 elif isinstance(serie, DataTimeSlotSeries):
                     last_t = item.end.t
-                t = first_t + ((last_t-first_t) /2)
+                aggregation_t = first_t + ((last_t-first_t) /2)
                 data_part=''
+                
+                # Data
                 for i, key in enumerate(keys):
                     avg = data_sums[i]/aggregate_by
-                    if i  in index_metrics_positions:
-                        data_part+='[{},{},{}],'.format( 0, avg, avg)
+                    #if i  in index_metrics_positions:
+                    #    data_part+='[{},{},{}],'.format( 0, avg, avg)
+                    #else:
+                    data_part+='[{},{},{}],'.format( data_mins[i], avg, data_maxs[i])
+
+                # Indexes
+                for i, index in enumerate(serie.indexes):
+                    if index_sums[i] is not None:
+                        data_part+='[0,{0},{0}],'.format(index_sums[i]/aggregate_by)
                     else:
-                        data_part+='[{},{},{}],'.format( data_mins[i], avg, data_maxs[i])
+                        data_part+='[,,],'
 
                 # Do we have a mark?
-                if serie_mark:
-                    if item.start.t >= serie_mark_start_t and item.end.t < serie_mark_end_t:
-                        # Plot data reconstructed
-                        if plot_data_reconstructed:
-                            data_part+='[0,{0},{0}],'.format(data_reconstructed/aggregate_by)                   
-                        # Plot data loss
-                        if plot_data_loss:
-                            if data_loss is not None:
-                                data_part+='[0,{0},{0}],'.format(data_loss/aggregate_by)
-                            else:
-                                data_part+='[,,],'
-                                    
+                if serie.mark and render_mark_as_index:
+                    if item.start.t >= serie_mark_start_t and item.end.t < serie_mark_end_t:                                    
                         # Add the (active) mark
                         data_part+='[0,1,1],'
-                        
                     else:
-                        # Plot data reconstructed
-                        if plot_data_reconstructed:
-                            data_part+='[0,{0},{0}],'.format(data_reconstructed/aggregate_by)  
-                        # Plot data loss
-                        if plot_data_loss:
-                            if data_loss is not None:
-                                data_part+='[0,{0},{0}],'.format(data_loss/aggregate_by)
-                            else:
-                                data_part+='[,,],'
-                            
                         # Add the (inactive) mark
                         data_part+='[0,0,0],'
-                            
-                else:
-                    # Plot data reconstructed
-                    if plot_data_reconstructed:
-                        data_part+='[0,{0},{0}],'.format(data_reconstructed/aggregate_by)  
-                    # Plot data loss
-                    if plot_data_loss:
-                        if data_loss is not None:
-                            data_part+='[0,{0},{0}],'.format(data_loss/aggregate_by)
-                        else:
-                            data_part+=','
-
+                
                 # Remove last comma
-                data_part=data_part[0:-1]
-                dg_data+='[{},{}],'.format(to_dg_time(dt_from_s(t, tz=item.tz)), data_part)
+                data_part = data_part[0:-1]
+                
+                # Add to dg_data
+                dg_data += '[{},{}],'.format(to_dg_time(dt_from_s(aggregation_t, tz=item.tz)), data_part)
                 
                 # Reset averages
                 data_sums = [0 for key in keys]
                 data_mins = [None for key in keys]
                 data_maxs = [None for key in keys]
-                data_loss = None
-                data_reconstructed = None
+                index_sums = [0 for index in serie.indexes]
                 first_t = None
 
         #====================
@@ -228,7 +198,7 @@ def to_dg_data(serie, aggregate_by=0, plot_data_loss=False, plot_data_reconstruc
         #====================
         else:
                     
-            # Loop over all the keys, including the "None" key if we have no keys (float data)
+            # Loop over data keys, including the "None" key if we have no keys (float data), and add data
             data_part=''
             for key in keys:
                 if key is None:
@@ -238,136 +208,46 @@ def to_dg_data(serie, aggregate_by=0, plot_data_loss=False, plot_data_reconstruc
 
                 data_part += '{},'.format(data)   #item.data
                 
-                # Exclude some special stuff from the min/max computation
-
-                if key not in INDEX_METRICS:
-
-                    # Global min
-                    if global_min is None:
-                        global_min = data
-                    else:
-                        if data < global_min:
-                            global_min = data                
-                    
-                    # Global max
-                    if global_max is None:
+                # Global min
+                if global_min is None:
+                    global_min = data
+                else:
+                    if data < global_min:
+                        global_min = data                
+                
+                # Global max
+                if global_max is None:
+                    global_max = data
+                else:
+                    if data > global_max:
                         global_max = data
-                    else:
-                        if data > global_max:
-                            global_max = data
                 
-
-            if isinstance(serie, DataTimePointSeries):
-                t = item.t
-
-                # Do we have a mark?
-                if serie_mark:
- 
-                    if item.t >= serie_mark_start_t and item.t < serie_mark_end_t:
-                        # Plot data reconstructed
-                        if plot_data_reconstructed:
-                            if item._data_reconstructed is None:
-                                data_part+=','
-                            else:
-                                data_part+='{},'.format(item._data_reconstructed)
-                        # Plot data data loss
-                        if plot_data_loss:
-                            if item.data_loss is None:
-                                data_part+=','
-                            else:
-                                data_part+='{},'.format(item.data_loss)
-                        data_part+='1,'
-                        
+            # Loop over series indexes and add data
+            for index in serie.indexes:
+                # TODO: plot only some indexes, now we plot all of them
+                try:
+                    index_value = getattr(item, index)
+                    if index_value is not None:
+                        data_part+='{},'.format(index_value)
                     else:
-                        # Plot data reconstructed
-                        if plot_data_reconstructed:
-                            if item._data_reconstructed is None:
-                                data_part+=','
-                            else:
-                                data_part+='{},'.format(item._data_reconstructed)
-                        # Plot data loss
-                        if plot_data_loss:
-                            if item.data_loss is None:
-                                data_part+=','
-                            else:
-                                data_part+='{},'.format(item.data_loss)                        
-                        data_part+='0,'
+                        data_part+=','
+                except AttributeError:
+                    data_part+=','
+
+            # Do we have a mark?
+            if serie.mark and render_mark_as_index:
+                if item.t >= serie_mark_start_t and item.t < serie_mark_end_t:
+                    # Add the (active) mark
+                    data_part+='1,'
                 else:
-                    # Plot data reconstructed
-                    if plot_data_reconstructed:
-                        if item._data_reconstructed is None:
-                            data_part+=','
-                        else:
-                            data_part+='{},'.format(item._data_reconstructed)
-                    # Plot data loss
-                    if plot_data_loss:
-                        if item.data_loss is None:
-                            data_part+=','
-                        else:
-                            data_part+='{},'.format(item.data_loss)
+                    # Add the (inactive) mark
+                    data_part+='0,'
 
-                        
-                    
-            
-            
-            elif isinstance(serie, DataTimeSlotSeries):
-                t = item.start.t
-
-                # Do we have a mark?
-                if serie_mark:
- 
-                    if item.start.t >= serie_mark_start_t and item.end.t < serie_mark_end_t:
-                        # Plot data reconstructed
-                        if plot_data_reconstructed:
-                            if item._data_reconstructed is None:
-                                data_part+=','
-                            else:
-                                data_part+='{},'.format(item._data_reconstructed)
-                        # Plot data loss
-                        if plot_data_loss:
-                            if item.data_loss is None:
-                                data_part+=','
-                            else:
-                                data_part+='{},'.format(item.data_loss)
-                        data_part+='1,'
-                        
-                    else:
-                        # Plot data reconstructed
-                        if plot_data_reconstructed:
-                            if item._data_reconstructed is None:
-                                data_part+=','
-                            else:
-                                data_part+='{},'.format(item._data_reconstructed)
-                        # Plot data loss
-                        if plot_data_loss:
-                            if item.data_loss is None:
-                                data_part+=','
-                            else:
-                                data_part+='{},'.format(item.data_loss)
-
-                                                
-                        data_part+='0,'
-                else:
-                    if isinstance(serie, DataTimeSlotSeries):
-                        # Plot data reconstructed
-                        if plot_data_reconstructed:
-                            if item._data_reconstructed is None:
-                                data_part+=','
-                            else:
-                                data_part+='{},'.format(item._data_reconstructed)
-                        # Plot data loss
-                        if plot_data_loss:
-                            if item.data_loss is None:
-                                data_part+=','
-                            else:
-                                data_part+='{},'.format(item.data_loss)                          
-                
             # Remove last comma
             data_part = data_part[0:-1]
 
-
-
-            dg_data+='[{},{}],'.format(to_dg_time(dt_from_s(t, tz=item.tz)), data_part)
+            # Add to dg_data
+            dg_data += '[{},{}],'.format(to_dg_time(dt_from_s(item.t, tz=item.tz)), data_part)
 
     if dg_data.endswith(','):
         dg_data = dg_data[0:-1]
@@ -444,29 +324,14 @@ def dygraphs_plot(serie, aggregate_by, log_js=False, show_data_loss=True, show_f
     graph_div_id  = graph_id + '_plotarea'
     legend_div_id = graph_id + '_legend'
 
-    # Mark to use?
-    try:
-        if show_forecasted and serie.mark:
-            if not isinstance(serie.mark, (list, tuple)):
-                raise TypeError('Series mark must be a list or tuple')
-            if not len(serie.mark) == 2:
-                raise ValueError('Series mark must be a list or tuple of two elements')
-            if not isinstance(serie.mark[0], datetime.datetime):
-                raise TypeError('Series marks must be datetime objects')
-            if not isinstance(serie.mark[1], datetime.datetime):
-                raise TypeError('Series marks must be datetime objects')
-            logger.info('Found data forecast mark and showing it')
-            serie_mark=True
-            serie_mark_html = '<span style="background:rgba(255, 255, 102, .6);">&nbsp;forecast&nbsp;</span>'
-            serie_mark_html_off = '<span style="background:rgba(255, 255, 102, .2);">&nbsp;forecast&nbsp;</span>'
-        else:
-            serie_mark=False
-            serie_mark_html=''
-            serie_mark_html_off = ''
-    except AttributeError:
-        serie_mark=False
-        serie_mark_html = ''
-        serie_mark_html_off=''
+    # Do we have to show a series mark?
+    if serie.mark:
+        logger.info('Found series mark and showing it')
+        serie_mark_html = '<span style="background:rgba(255, 255, 102, .6);">&nbsp;mark&nbsp;</span>'
+        serie_mark_html_off = '<span style="background:rgba(255, 255, 102, .2);">&nbsp;mark&nbsp;</span>'
+    else:
+        serie_mark_html=''
+        serie_mark_html_off = ''
 
     # Dygraphs javascript
     dygraphs_javascript = """
@@ -497,7 +362,7 @@ function legendFormatter(data) {
           if (html !== '') html += sepLines ? '<br/>' : ' ';
           
 
-          if ((series.label=='data_reconstructed') || (series.label=='data_loss') || (series.label=='anomaly')){
+          if ((series.label=='data_reconstructed') || (series.label=='data_loss') || (series.label=='forecasted') || (series.label=='anomaly')){
               html += "<span style='margin-left:15px; background: " + series.color + ";'>&nbsp;" + series.labelHTML + "&nbsp</span>, ";
           }
           else {
@@ -511,11 +376,11 @@ function legendFormatter(data) {
         return html;
       }
 
-      // Find out if we have a forcast
-      mark_as_forecast = false
+      // Find out if we have an active mark
+      mark_active = false
       for (var i = 0; i < data.series.length; i++) {
         if ( data.series[i].label=='data_mark' && data.series[i].y==1 )  {
-           mark_as_forecast = true;
+           mark_active = true;
         }
       }
 
@@ -523,11 +388,10 @@ function legendFormatter(data) {
       html = '""" + legend_pre + """' + data.xHTML + ' (""" + str(serie.tz)+ """):';
       for (var i = 0; i < data.series.length; i++) {
         
-        var mark_as_forecast = false;
+        var mark_active = false;
         
         if ( data.series[i].label=='data_mark' && data.series[i].y==1 )  {
-           mark_as_forecast = true;
-           console.log('forecast')
+           mark_active = true;
         }
                  
         var series = data.series[i];
@@ -553,7 +417,7 @@ function legendFormatter(data) {
         */
         
         //decoration = ' style="background-color: #fcf8b0"'
-        if ((series.label=='data_reconstructed') || (series.label=='data_loss') || (series.label=='anomaly')){
+        if ((series.label=='data_reconstructed') || (series.label=='data_loss') || (series.label=='forecasted') || (series.label=='anomaly')){
             html += "<span" + decoration + "> <span style='background: " + series.color + ";'>&nbsp" + series.labelHTML + "&nbsp</span>:&#160;" + series.yHTML*100 + "%</span>, ";
         
         }
@@ -565,7 +429,7 @@ function legendFormatter(data) {
       // Remove last comma and space
       html = html.substring(0, html.length - 2);
       
-      if (mark_as_forecast) {
+      if (mark_active) {
           html += ' &nbsp;"""+ serie_mark_html +"""'
       }
       //else {
@@ -594,34 +458,19 @@ function legendFormatter(data) {
     else:
         labels='value'
 
-    data_reconstructed_indexes = False
-    data_loss_indexes          = False
-    #if isinstance(serie, DataTimeSlotSeries):
-    # Do we have data reconstructed or losses indexes?
-    try:
-        if serie[0]._data_reconstructed is not None:
-            data_reconstructed_indexes = True
-    except:
-        data_reconstructed_indexes = False
-    if serie[0].data_loss is not None:
-        data_loss_indexes = True
+    # Handle series indexes
+    for index in serie.indexes:
+        labels+=',{}'.format(index)
 
-    plot_data_reconstructed = False
-    plot_data_loss = False
-    if show_data_reconstructed and data_reconstructed_indexes:
-        logger.info('Found data reconstruction index and showing it')
-        labels+=',data_reconstructed'
-        plot_data_reconstructed = True
-    if show_data_loss and data_loss_indexes:
-        labels+=',data_loss'
-        plot_data_loss = True
-    if serie_mark:
+    # Handle series mark (as index)
+    if serie.mark and render_mark_as_index:
         labels+=',data_mark'
     
-        
+    # Prepare labels string list for Dygraphs
     labels_list = ['Timestamp'] + labels.split(',')
 
-    global_min, global_max, dg_data = to_dg_data(serie, aggregate_by, plot_data_loss=plot_data_loss, plot_data_reconstructed=plot_data_reconstructed, serie_mark=serie_mark)
+    # Get series data in Dygraphs format (and aggregate if too much data and find global min and max)
+    global_min, global_max, dg_data = to_dg_data(serie, aggregate_by)
     if global_max != global_min:
         plot_min = str(global_min-((global_max-global_min)*0.1))
         plot_max = str(global_max+((global_max-global_min)*0.1))
@@ -681,6 +530,8 @@ axes: {
 },
 animatedZooms: true,"""
 
+    # Define colors in case of an aggregated plot and not.
+    # Must be differentiated due different transparency policy by Dygraphs
     if aggregate_by:
         # Alpha is for the legend
         rgba_value_red    = 'rgba(255,128,128,0.4)'
@@ -696,16 +547,15 @@ animatedZooms: true,"""
         fill_alpha_value  = 0.5  # Alpha for the area (will not be used for rgba_value_orange)
         fill_alpha_value_orange = 0.6
         
-    rgba_value_yellow = 'rgba(255, 255, 102, 1)'
+    rgba_value_yellow = 'rgba(255, 255, 102, 0.6)'
     rgba_value_darkorange = 'rgba(255, 140, 0, 0.7)'
     
-    
-    # Special series
+    # Special series start
     dygraphs_javascript += """
      series: {"""
     
-    if show_data_reconstructed and data_reconstructed_indexes:
-        # Add data reconstructed special serie
+    # Data reconstructed index series
+    if 'data_reconstructed' in serie.indexes:
         dygraphs_javascript += """
        'data_reconstructed': {
          //customBars: false, // Does not work?
@@ -717,8 +567,9 @@ animatedZooms: true,"""
          fillAlpha: """+str(fill_alpha_value_orange)+""",            // This alpha is used for the area
          color: '"""+rgba_value_orange+"""'
        },"""
-       
-    if show_data_loss and data_loss_indexes:
+    
+    # Data loss index series
+    if 'data_loss' in serie.indexes:
         # Add data loss special serie
         dygraphs_javascript += """
        'data_loss': {
@@ -732,15 +583,37 @@ animatedZooms: true,"""
          fillAlpha: """+str(fill_alpha_value)+""",  // This alpha is used for the area 
          color: '"""+rgba_value_red+"""'            // Alpha here is used for the legend 
        },"""
-    
-    # Add all series to be included in the miniplot,
-    for label in serie.data_keys():
+
+    # Data forecasted index series
+    if 'forecasted' in serie.indexes:
         dygraphs_javascript += """
-           '"""+str(label)+"""': {
-             showInRangeSelector:true
-           },"""     
-    
-    # Add data mark and anomalay series
+       'forecasted': {
+         //customBars: false, // Does not work?
+         axis: 'y2',
+         //stepPlot: true,
+         drawPoints: false,
+         strokeWidth: 0,
+         highlightCircleSize:0,
+         fillGraph: true,
+         fillAlpha: """+str(fill_alpha_value)+""",  // This alpha is used for the area 
+         color: '"""+rgba_value_yellow+"""'            // Alpha here is used for the legend 
+       },"""
+
+    # Add anomaly index series
+    if 'anomaly' in serie.indexes:
+        dygraphs_javascript += """
+        'anomaly': {
+         //customBars: false, // Does not work?
+         axis: 'y2',
+         drawPoints: false,
+         strokeWidth: 0,
+         highlightCircleSize:0,
+         fillGraph: true,
+         fillAlpha: 0.6,  // This alpha is used for the area
+         color: '"""+rgba_value_darkorange+"""'     // Alpha here is used for the legend 
+       },"""
+   
+    # Add data mark index series
     dygraphs_javascript += """
        'data_mark': {
          //customBars: false, // Does not work?
@@ -751,35 +624,36 @@ animatedZooms: true,"""
          fillGraph: true,
          fillAlpha: """+str(fill_alpha_value)+""",  // This alpha is used for the area
          color: '"""+rgba_value_yellow+"""'         // Alpha here is used for the legend 
-       },
-       'anomaly': {
-         //customBars: false, // Does not work?
-         axis: 'y2',
-         drawPoints: false,
-         strokeWidth: 0,
-         highlightCircleSize:0,
-         fillGraph: true,
-         fillAlpha: 0.6,  // This alpha is used for the area
-         color: '"""+rgba_value_darkorange+"""'     // Alpha here is used for the legend 
-       },
-     },
-    """
-    
-    # Force "original" Dygraph color.
-    labels_excluding_index_metrics= 0
-    if True: #isinstance(serie, DataTimeSlotSeries):    
-        for key in serie.data_keys():
-            if key not in INDEX_METRICS:
-                labels_excluding_index_metrics +=1
-                    
-        if labels_excluding_index_metrics <=1:
-            dygraphs_javascript += """colors: ['rgb(0,128,128)'],""" 
+       },"""
 
-    # Plotting series mark is disabled for now as we use the data_mark series instead
-    if serie_mark and False:            
+    # Add all non-index series to be included in the miniplot
+    for label in serie.data_keys():
+        dygraphs_javascript += """
+           '"""+str(label)+"""': {
+             showInRangeSelector:true
+           },"""     
+    
+    # Special series end
+    dygraphs_javascript += """
+     },"""
+
+    # Force "original" Dygraph color if only one data series           
+    if len(serie.data_keys()) <=1:
+        dygraphs_javascript += """colors: ['rgb(0,128,128)'],""" 
+
+    # Handle series mark (only if not handled as an index)
+    if serie.mark and not render_mark_as_index:
+ 
+        # Check that we know how to use this mark
+        if not isinstance(serie.mark[0], datetime.datetime):
+            raise TypeError('Series marks must be datetime objects')
+        if not isinstance(serie.mark[1], datetime.datetime):
+            raise TypeError('Series marks must be datetime objects')            
+           
         # Convert the mark to fake epoch milliseconds
         mark_start = utckfake_s_from_dt(serie.mark[0])*1000
         mark_end   = utckfake_s_from_dt(serie.mark[1])*1000
+         
         # Add js code
         dygraphs_javascript  += 'underlayCallback: function(canvas, area, g) {'
         dygraphs_javascript += 'var bottom_left = g.toDomCoords({}, -20);'.format(mark_start)

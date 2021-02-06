@@ -794,7 +794,7 @@ class Forecaster(ParametricModel):
                     # any window, the point data will be ignored and just used for its timestamp
                     forecast_timeseries = timeseries.__class__()
                     
-                    # TODO: it should not be required do check .resolution type!
+                    # TODO: it should not be required to check .resolution type!
                     if isinstance(timeseries[0], Point):
                         if isinstance(timeseries.resolution, TimeUnit):
                             forecast_timeseries.append(timeseries[0].__class__(dt = timeseries[0].dt - timeseries.resolution,
@@ -879,7 +879,19 @@ class Forecaster(ParametricModel):
                         # Create the time series where to apply the forecast
                         forecast_timeseries = timeseries.__class__()
                         for j in range(original_forecast_timeseries_boundaries_start, original_forecast_timeseries_boundaries_end):
-                            forecast_timeseries.append(timeseries[j])
+
+                            if isinstance(timeseries[0], Point):
+                                forecast_timeseries.append(timeseries[0].__class__(t = timeseries[j].t,
+                                                                                   tz = timeseries[j].tz,
+                                                                                   data = timeseries[j].data))                        
+                            elif isinstance(timeseries[0], Slot):
+                                forecast_timeseries.append(timeseries[0].__class__(start = timeseries[j].start,
+                                                                                   end   = timeseries[j].end,
+                                                                                   unit  = timeseries[j].unit,
+                                                                                   data  = timeseries[j].data))                           
+                            
+                            # This would lead to add the forecasted index to the original data (and we don't want it)
+                            #forecast_timeseries.append(timeseries[j])
      
                         # Apply the forecasting model
                         self._apply(forecast_timeseries, n=steps_round, inplace=True)
@@ -987,6 +999,10 @@ class Forecaster(ParametricModel):
         else:
             forecast_timeseries = timeseries.duplicate()
         
+        # Add the forecast index
+        for item in forecast_timeseries:
+            item.forecasted = 0
+        
         # Call model forecasting logic
         try:
             forecast_model_results = self.forecast(timeseries = forecast_timeseries, key = key, n=n)
@@ -997,6 +1013,7 @@ class Forecaster(ParametricModel):
             #    raise NotImplementedError('Seems like the forecaster did not implement the multi-step forecast')
             else:
                 for item in forecast_model_results:
+                    item.forecasted = 1
                     forecast_timeseries.append(item)
 
         except NotImplementedError:
@@ -1006,6 +1023,9 @@ class Forecaster(ParametricModel):
                 # Call the forecast only on the last point
                 forecast_model_results = self.forecast(timeseries = forecast_timeseries, key = key, n=1)
 
+                # Add forecasted index
+                forecast_model_results.forecasted = 1
+
                 # Add the forecast to the forecasts time series
                 forecast_timeseries.append(forecast_model_results)
     
@@ -1013,13 +1033,13 @@ class Forecaster(ParametricModel):
         if input_timeseries_len + n != len(forecast_timeseries):
             raise ValueError('There are missing forecasts. If your model does not support multi-step forecasting, raise a NotImplementedError if n>1 and Timeseria will handle it for you.')
 
-        # Set serie mark for the forecast and return
-        try:
-            # Handle items
-            forecast_timeseries.mark = [forecast_timeseries[-n].dt, forecast_timeseries[-1].end.dt]
-        except AttributeError:
-            # Handle points TODO: should be dt-(resolution/2) and dt+(resolution/2)
-            forecast_timeseries.mark = [forecast_timeseries[-n].dt, forecast_timeseries[-1].dt]
+        # Set serie mark for the forecast and return (old approach)
+        #try:
+        #    # Handle items
+        #    forecast_timeseries.mark = [forecast_timeseries[-n].dt, forecast_timeseries[-1].end.dt]
+        #except AttributeError:
+        #    # Handle points TODO: should be dt-(resolution/2) and dt+(resolution/2)
+        #    forecast_timeseries.mark = [forecast_timeseries[-n].dt, forecast_timeseries[-1].dt]
                 
         if not inplace:
             return forecast_timeseries
@@ -1528,12 +1548,12 @@ class PeriodicAverageAnomalyDetector(AnomalyDetector):
                 if AE > self.AE_threshold:
                     if logs:
                         logger.info('Detected anomaly for item starting @ {} ({}) with AE="{:.3f}..."'.format(item.t, item.dt, AE))
-                    item.data['anomaly'.format(key)] = 1
+                    item.anomaly = 1
                     if details:
                         item.data['AE_{}'.format(key)] = AE
                         item.data['predicted_{}'.format(key)] = predicted
                 else:
-                    item.data['anomaly'.format(key)] = 0
+                    item.anomaly = 0
                     if details:
                         item.data['AE_{}'.format(key)] = AE
                         item.data['predicted_{}'.format(key)] = predicted
