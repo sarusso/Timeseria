@@ -49,7 +49,7 @@ def to_dg_time(dt):
         return 'new Date(Date.UTC({}, {}, {}, {}, {}, {}))'.format(dt.year, dt.month-1, dt.day, dt.hour, dt.minute, dt.second)
 
 
-def to_dg_data(serie, aggregate_by=0):
+def to_dg_data(serie,  indexes_to_plot, aggregate_by=0):
     '''{% for timestamp,value in metric_data.items %}{{timestamp}},{{value}}\n{%endfor%}}'''
     
     dg_data=''
@@ -79,7 +79,7 @@ def to_dg_data(serie, aggregate_by=0):
             data_sums = [0 for key in keys]
             data_mins = [None for key in keys]
             data_maxs = [None for key in keys]
-            index_sums = [0 for index in serie.indexes]
+            index_sums = [0 for index in indexes_to_plot]
             
 
         #====================
@@ -138,7 +138,7 @@ def to_dg_data(serie, aggregate_by=0):
                         data_maxs[j] = data
 
             # Loop over series indexes and add data
-            for j, index in enumerate(serie.indexes):
+            for j, index in enumerate(indexes_to_plot):
                 # TODO: plot only some indexes, now we plot all of them
                 try:
                     index_value = getattr(item, index)
@@ -165,7 +165,7 @@ def to_dg_data(serie, aggregate_by=0):
                     data_part+='[{},{},{}],'.format( data_mins[i], avg, data_maxs[i])
 
                 # Indexes
-                for i, index in enumerate(serie.indexes):
+                for i, index in enumerate(indexes_to_plot):
                     if index_sums[i] is not None:
                         data_part+='[0,{0},{0}],'.format(index_sums[i]/aggregate_by)
                     else:
@@ -190,7 +190,7 @@ def to_dg_data(serie, aggregate_by=0):
                 data_sums = [0 for key in keys]
                 data_mins = [None for key in keys]
                 data_maxs = [None for key in keys]
-                index_sums = [0 for index in serie.indexes]
+                index_sums = [0 for index in indexes_to_plot]
                 first_t = None
 
         #====================
@@ -223,7 +223,7 @@ def to_dg_data(serie, aggregate_by=0):
                         global_max = data
                 
             # Loop over series indexes and add data
-            for index in serie.indexes:
+            for index in indexes_to_plot:
                 # TODO: plot only some indexes, now we plot all of them
                 try:
                     index_value = getattr(item, index)
@@ -259,7 +259,7 @@ def to_dg_data(serie, aggregate_by=0):
 #  Dygraphs plot
 #=================
 
-def dygraphs_plot(serie, aggregate_by, log_js=False, show_data_loss=True, show_forecasted=True, show_data_reconstructed=False):
+def dygraphs_plot(serie, aggregate_by, log_js=False, indexes=None):
     '''Plot a data_time_pointSeries in Jupyter using Dugraph. Based on the work here: https://www.stefaanlippens.net/jupyter-custom-d3-visualization.html'''
     from IPython.display import display, Javascript, HTML
     
@@ -459,7 +459,23 @@ function legendFormatter(data) {
         labels='value'
 
     # Handle series indexes
-    for index in serie.indexes:
+    if indexes is None:
+        # Plot alls eries indexes
+        indexes_to_plot = serie.indexes
+    else:
+        # Check that the indexes are of the right type and that are present in the series indexes
+        indexes_to_plot = []
+        if not isinstance(indexes, list):
+            raise TypeError('The "indexes" argument must be a list')
+        for index in indexes:
+            if not isinstance(index, str):
+                raise TypeError('The "indexes" list items must be string (got type "{}")'.format(index.__class__.__name__))
+            if not index in serie.indexes:
+                raise ValueError('The index "{}" is not present in the series indexes ({})'.format(index, serie.indexes))
+            indexes_to_plot.append(index)
+    
+    # Set index labels
+    for index in indexes_to_plot:
         labels+=',{}'.format(index)
 
     # Handle series mark (as index)
@@ -470,7 +486,7 @@ function legendFormatter(data) {
     labels_list = ['Timestamp'] + labels.split(',')
 
     # Get series data in Dygraphs format (and aggregate if too much data and find global min and max)
-    global_min, global_max, dg_data = to_dg_data(serie, aggregate_by)
+    global_min, global_max, dg_data = to_dg_data(serie, indexes_to_plot, aggregate_by)
     if global_max != global_min:
         plot_min = str(global_min-((global_max-global_min)*0.1))
         plot_max = str(global_max+((global_max-global_min)*0.1))
@@ -555,7 +571,7 @@ animatedZooms: true,"""
      series: {"""
     
     # Data reconstructed index series
-    if 'data_reconstructed' in serie.indexes:
+    if 'data_reconstructed' in indexes_to_plot:
         dygraphs_javascript += """
        'data_reconstructed': {
          //customBars: false, // Does not work?
@@ -569,7 +585,7 @@ animatedZooms: true,"""
        },"""
     
     # Data loss index series
-    if 'data_loss' in serie.indexes:
+    if 'data_loss' in indexes_to_plot:
         # Add data loss special serie
         dygraphs_javascript += """
        'data_loss': {
@@ -585,7 +601,7 @@ animatedZooms: true,"""
        },"""
 
     # Data forecasted index series
-    if 'forecasted' in serie.indexes:
+    if 'forecasted' in indexes_to_plot:
         dygraphs_javascript += """
        'forecasted': {
          //customBars: false, // Does not work?
@@ -600,7 +616,7 @@ animatedZooms: true,"""
        },"""
 
     # Add anomaly index series
-    if 'anomaly' in serie.indexes:
+    if 'anomaly' in indexes_to_plot:
         dygraphs_javascript += """
         'anomaly': {
          //customBars: false, // Does not work?
