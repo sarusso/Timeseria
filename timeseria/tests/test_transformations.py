@@ -296,6 +296,67 @@ class TestSlotter(unittest.TestCase):
         with self.assertRaises(ValueError):    
             Slotter('1h').process(data_time_slot_series)
 
+    def test_slot_indexes(self):
+        
+        # Import (overloaded) operations
+        from ..operations import min, max, avg, sum
+
+        # Time series from 16:58:00 to 17:32:00 (Europe/Rome)
+        data_time_point_series = DataTimePointSeries()
+        start_t = 1436022000 - 120
+        for i in range(35):
+            if i > 10 and i < 15:
+                anomaly = 0.25
+                forecasted = 0
+                data_reconstructed = 1
+                data_loss = 1
+            elif i > 20:
+                anomaly = None 
+                forecasted = 1
+                data_reconstructed = 0
+                data_loss = None
+            else:
+                anomaly = 0 
+                forecasted = 0
+                data_reconstructed = 0
+                data_loss = 0.1
+                
+            data_time_point = DataTimePoint(t = start_t + (i*60),
+                                            data = {'temperature': 154+i, 'humidity': 5},
+                                            data_loss = data_loss
+                                            )
+            # Add extra indexes as if something operated on the time series
+            data_time_point.anomaly = anomaly
+            data_time_point.forecasted = forecasted
+            data_time_point._data_reconstructed = data_reconstructed
+            
+            # Append
+            data_time_point_series.append(data_time_point)
+                
+        # This is an indirect test of the series indexes. TODO: move it away.
+        self.assertEqual(data_time_point_series.indexes, ['data_reconstructed', 'data_loss', 'anomaly', 'forecasted'])
+        
+        # Slot the time series
+        slotted_data_time_point_series = Slotter('600s').process(data_time_point_series)
+
+        # Check that we have all the indexes
+        self.assertEqual(slotted_data_time_point_series.indexes, ['data_reconstructed', 'data_loss', 'anomaly', 'forecasted'])
+
+        # Check indexes math
+        self.assertAlmostEqual(slotted_data_time_point_series[0].anomaly, 0.045454545454545456)
+        self.assertAlmostEqual(slotted_data_time_point_series[0].data_reconstructed, 0.18181818181818182)
+        self.assertAlmostEqual(slotted_data_time_point_series[0].forecasted, 0)
+        
+        self.assertAlmostEqual(slotted_data_time_point_series[1].anomaly, 0.08333333333333333)
+        self.assertAlmostEqual(slotted_data_time_point_series[1].data_reconstructed, 0.2727272727272727)
+        self.assertAlmostEqual(slotted_data_time_point_series[1].forecasted, 0.18181818181818182)
+
+        self.assertEqual(slotted_data_time_point_series[2].anomaly, None)
+        self.assertAlmostEqual(slotted_data_time_point_series[2].data_reconstructed, 0)
+        self.assertEqual(slotted_data_time_point_series[2].forecasted, 1.0)
+
+        self.assertEqual(slotted_data_time_point_series[2].data_loss, 0) # NO, why?
+
 
 class TestResampler(unittest.TestCase):
 

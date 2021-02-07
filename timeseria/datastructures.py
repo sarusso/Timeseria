@@ -188,29 +188,37 @@ class Series(list):
 
             # Do we have data reconstructed indexes?
             try:
-                if self[0].data_reconstructed is not None:
-                    _indexes.append('data_reconstructed')
+                for item in self:
+                    if item.data_reconstructed is not None:
+                        _indexes.append('data_reconstructed')
+                        break
             except AttributeError:
                 pass
 
             # Do we have data loss indexes?
             try:
-                if self[0].data_loss is not None:
-                    _indexes.append('data_loss')
+                for item in self:
+                    if item.data_loss is not None:
+                        _indexes.append('data_loss')
+                        break
             except AttributeError:
                 pass
 
             # Do we have an anomaly index?
             try:
-                if self[0].anomaly is not None:
-                    _indexes.append('anomaly')
+                for item in self:
+                    if item.anomaly is not None:
+                        _indexes.append('anomaly')
+                        break
             except AttributeError:
                 pass
 
             # Do we have a forecasted index?
             try:
-                if self[0].forecasted is not None:
-                    _indexes.append('forecasted')
+                for item in self:
+                    if item.forecasted is not None:
+                        _indexes.append('forecasted')
+                        break
             except AttributeError:
                 pass
             

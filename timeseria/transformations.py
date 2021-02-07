@@ -100,7 +100,7 @@ class Slotter(Transformation):
         self.extra_operations=extra_operations
 
 
-    def _compute_slot(self, data_time_point_series, unit, start_t, end_t, validity, timezone, fill_with, force_data_loss, fill_gaps, interpolation_method):
+    def _compute_slot(self, data_time_point_series, unit, start_t, end_t, validity, timezone, fill_with, force_data_loss, fill_gaps, interpolation_method, series_indexes):
 
         # Compute data_loss
         slot_data_loss = compute_data_loss(data_time_point_series,
@@ -108,36 +108,40 @@ class Slotter(Transformation):
                                            to_t     = end_t,
                                            validity = validity)
 
+        # TODO: unroll the following before the compute slot call
+        slot_timeseries = DataTimePointSeries()
+        prev_point = None
+        next_point = None
+        for data_time_point in data_time_point_series:
+            if (data_time_point.t+(validity/2)) < start_t:
+                prev_point = data_time_point
+                continue
+            if (data_time_point.t-(validity/2)) >= end_t:
+                next_point = data_time_point
+                continue
+            slot_timeseries.append(data_time_point)
+
+
         # If we have to fully reconstruct data
+        # TODO: we have a huge conceputal problem here: if data_loss is 1 but due to poitn data
+        #       loses (maybe even reconstructed) and not entirely missing points, we should
+        #       actually compute as if not a full data loss. Double check this.
         if slot_data_loss == 1: 
 
-            # Reconstruct (fill_gaps)
+            # Reconstruct (fill gaps)
             slot_data = {}
             for key in data_time_point_series[0].data.keys():
                 
                 # Set data as None, will be interpolated afterwards
                 slot_data[key] = None
                 
-                # handle also extra ops
+                # Handle also extra ops
                 if self.extra_operations:
                     for extra_operation in self.extra_operations:
                         slot_data['{}_{}'.format(key, extra_operation.label)] = None
 
         else:
  
-            # TODO: unroll the following before the compute slot call
-            slot_timeseries = DataTimePointSeries()
-            prev_point = None
-            next_point = None
-            for data_time_point in data_time_point_series:
-                if (data_time_point.t+(validity/2)) < start_t:
-                    prev_point = data_time_point
-                    continue
-                if (data_time_point.t-(validity/2)) >= end_t:
-                    next_point = data_time_point
-                    continue
-                slot_timeseries.append(data_time_point)
-
             # Keys shortcut
             keys = data_time_point_series.data_keys()
 
@@ -177,7 +181,43 @@ class Slotter(Transformation):
                                       unit  = unit,
                                       data  = slot_data,
                                       data_loss = slot_data_loss)
+
+        # Now handle indexes
+        for index in series_indexes:
+            if slot_timeseries:
+                if index == 'data_loss':
+                    continue
+                index_sum = 0
+                index_count = 0
+                for item in slot_timeseries:
+                    
+                    # Get index value
+                    try:
+                        index_value = getattr(item, index)
+                    except:
+                        slotted_index_value = None
+                    else:
+                        if index_value is not None:
+                            index_count += 1
+                            index_sum += index_value
         
+                # Compute the slotted index value (if there were indexes not None)
+                if index_count > 1:
+                    slotted_index_value = index_sum/index_count
+                else:
+                    slotted_index_value = None
+    
+            else:
+                slotted_index_value = None
+
+            # Set the index. Handle special case for data_reconstructed
+            if index == 'data_reconstructed':
+                setattr(data_time_slot, '_data_reconstructed', slotted_index_value)
+            else:
+                setattr(data_time_slot, index, slotted_index_value)                
+        
+                    
+        # Return the slot
         return data_time_slot
 
 
@@ -272,6 +312,9 @@ class Slotter(Transformation):
         # Counters
         count = 0
 
+        # Indexes
+        series_indexes = data_time_point_series.indexes
+
         # Now go trough all the data in the time series        
         for data_time_point in data_time_point_series:
 
@@ -342,7 +385,8 @@ class Slotter(Transformation):
                                                             fill_with = fill_with,
                                                             force_data_loss = force_data_loss,
                                                             fill_gaps = fill_gaps,
-                                                            interpolation_method = interpolation_method)
+                                                            interpolation_method = interpolation_method,
+                                                            series_indexes = series_indexes)
                         
                         # .. and append results (unless we are before the first timeseries start point)
                         if slot_end_t > data_time_point_series[0].t:
@@ -416,7 +460,8 @@ class Slotter(Transformation):
                                                             fill_with = fill_with,
                                                             force_data_loss = force_data_loss,
                                                             fill_gaps = fill_gaps,
-                                                            interpolation_method = interpolation_method)
+                                                            interpolation_method = interpolation_method,
+                                                            series_indexes = series_indexes)
                         
                         # .. and append results 
                         data_time_slot_series.append(data_time_slot)
@@ -448,7 +493,8 @@ class Slotter(Transformation):
                                                     fill_with = fill_with,
                                                     force_data_loss = force_data_loss,
                                                     fill_gaps = fill_gaps,
-                                                    interpolation_method = interpolation_method)
+                                                    interpolation_method = interpolation_method,
+                                                    series_indexes = series_indexes)
                 
                 # .. and append results 
                 data_time_slot_series.append(data_time_slot)
