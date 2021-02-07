@@ -714,8 +714,9 @@ define('"""+graph_id+"""', ['dgenv'], function (Dygraph) {
     
     # Load Dygraphs Javascript and html code    
     display(Javascript(rendering_javascript))
-    display(HTML('<div style="height:34px; margin-left:0px; margin-top:10px"><div id="{}" style="width:100%"></div></div>'.format(legend_div_id)))
-    display(HTML('<div id="{}" style="width:100%; margin-right:0px"></div>'.format(graph_div_id)))
+    display(HTML('''<div style="height:36px; padding:0; margin-left:0px; margin-top:10px">
+                    <div id="'''+legend_div_id+'''" style="width:100%"></div></div>
+                    <div id="'''+graph_div_id+'''" style="width:100%; margin-right:0px"></div>'''))
 
     # Render the graph (this is the "entrypoint")
     display(Javascript("""
