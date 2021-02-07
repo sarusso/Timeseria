@@ -546,23 +546,24 @@ axes: {
 },
 animatedZooms: true,"""
 
-    # Define colors in case of an aggregated plot and not.
-    # Must be differentiated due different transparency policy by Dygraphs
-    if aggregate_by:
-        # Alpha is for the legend
-        rgba_value_red    = 'rgba(255,128,128,0.4)'
-        rgba_value_gray   = 'rgba(240,240,240,0.5)'
-        rgba_value_orange = 'rgba(235, 156, 56,1.0)'
-        fill_alpha_value  = 0.31 # 31 Alpha for the area (will not be used for rgba_value_orange)
-        fill_alpha_value_orange = 0.6
+    # Define colors in case of an aggregated plot and not. Has to be
+    # differentiated due different transparency policies in Dygraphs
+    if aggregate_by:        
+        rgba_value_red    = 'rgba(255,128,128,0.4)'   # Alpha is for the legend
+        rgba_value_gray   = 'rgba(240,240,240,0.5)'   # Alpha is for the legend
+        rgba_value_orange = 'rgba(235, 156, 56,1.0)'  # Alpha is for the legend
+        fill_alpha_value  = 0.31                      # Alpha for the area 
     else:
-        # Alpha is for the legend
-        rgba_value_red    = 'rgba(255,128,128,0.4)' 
-        rgba_value_gray   = 'rgba(240,240,240,0.5)'
-        rgba_value_orange = 'rgba(245, 193, 130,0.8)'
-        fill_alpha_value  = 0.5  # Alpha for the area (will not be used for rgba_value_orange)
-        fill_alpha_value_orange = 0.6
-        
+        rgba_value_red    = 'rgba(255,128,128,0.4)'   # Alpha is for the legend
+        rgba_value_gray   = 'rgba(240,240,240,0.5)'   # Alpha is for the legend
+        rgba_value_orange = 'rgba(245, 193, 130,0.8)' # Alpha is for the legend
+        fill_alpha_value  = 0.5                       # Alpha for the area
+
+    # Fixed fill alpha value
+    fill_alpha_value_fixed = 0.6
+
+    # Fixed colors
+    rgba_alpha_violet = 'rgba(227, 168, 237, 0.5)'   #  235, 179, 245 | 227, 156, 240
     rgba_value_yellow = 'rgba(255, 255, 102, 0.6)'
     rgba_value_darkorange = 'rgba(255, 140, 0, 0.7)'
     
@@ -580,8 +581,8 @@ animatedZooms: true,"""
          strokeWidth: 0,
          highlightCircleSize:0,
          fillGraph: true,
-         fillAlpha: """+str(fill_alpha_value_orange)+""",            // This alpha is used for the area
-         color: '"""+rgba_value_orange+"""'
+         fillAlpha: """+str(fill_alpha_value_fixed)+""",   // This alpha is used for the area
+         color: '"""+rgba_alpha_violet+"""'                // Alpha here is used for the legend 
        },"""
     
     # Data loss index series
@@ -612,7 +613,7 @@ animatedZooms: true,"""
          highlightCircleSize:0,
          fillGraph: true,
          fillAlpha: """+str(fill_alpha_value)+""",  // This alpha is used for the area 
-         color: '"""+rgba_value_yellow+"""'            // Alpha here is used for the legend 
+         color: '"""+rgba_value_yellow+"""'         // Alpha here is used for the legend 
        },"""
 
     # Add anomaly index series
@@ -625,8 +626,8 @@ animatedZooms: true,"""
          strokeWidth: 0,
          highlightCircleSize:0,
          fillGraph: true,
-         fillAlpha: 0.6,  // This alpha is used for the area
-         color: '"""+rgba_value_darkorange+"""'     // Alpha here is used for the legend 
+         fillAlpha: """+str(fill_alpha_value_fixed)+""",  // This alpha is used for the area
+         color: '"""+rgba_value_darkorange+"""'          // Alpha here is used for the legend 
        },"""
    
     # Add data mark index series
@@ -713,7 +714,7 @@ define('"""+graph_id+"""', ['dgenv'], function (Dygraph) {
     
     # Load Dygraphs Javascript and html code    
     display(Javascript(rendering_javascript))
-    display(HTML('<div style="height:20px; margin-left:0px"><div id="{}" style="width:100%"></div></div>'.format(legend_div_id)))
+    display(HTML('<div style="height:34px; margin-left:0px; margin-top:10px"><div id="{}" style="width:100%"></div></div>'.format(legend_div_id)))
     display(HTML('<div id="{}" style="width:100%; margin-right:0px"></div>'.format(graph_div_id)))
 
     # Render the graph (this is the "entrypoint")
