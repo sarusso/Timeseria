@@ -1001,7 +1001,7 @@ class Forecaster(ParametricModel):
         
         # Add the forecast index
         for item in forecast_timeseries:
-            item.forecasted = 0
+            item.forecast = 0
         
         # Call model forecasting logic
         try:
@@ -1013,7 +1013,7 @@ class Forecaster(ParametricModel):
             #    raise NotImplementedError('Seems like the forecaster did not implement the multi-step forecast')
             else:
                 for item in forecast_model_results:
-                    item.forecasted = 1
+                    item.forecast = 1
                     forecast_timeseries.append(item)
 
         except NotImplementedError:
@@ -1024,7 +1024,7 @@ class Forecaster(ParametricModel):
                 forecast_model_results = self.forecast(timeseries = forecast_timeseries, key = key, n=1)
 
                 # Add forecasted index
-                forecast_model_results.forecasted = 1
+                forecast_model_results.forecast = 1
 
                 # Add the forecast to the forecasts time series
                 forecast_timeseries.append(forecast_model_results)

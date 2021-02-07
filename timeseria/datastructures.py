@@ -213,11 +213,11 @@ class Series(list):
             except AttributeError:
                 pass
 
-            # Do we have a forecasted index?
+            # Do we have a forecast index?
             try:
                 for item in self:
-                    if item.forecasted is not None:
-                        _indexes.append('forecasted')
+                    if item.forecast is not None:
+                        _indexes.append('forecast')
                         break
             except AttributeError:
                 pass

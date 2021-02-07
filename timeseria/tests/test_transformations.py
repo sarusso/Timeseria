@@ -307,17 +307,17 @@ class TestSlotter(unittest.TestCase):
         for i in range(35):
             if i > 10 and i < 15:
                 anomaly = 0.25
-                forecasted = 0
+                forecast = 0
                 data_reconstructed = 1
                 data_loss = 1
             elif i > 20:
                 anomaly = None 
-                forecasted = 1
+                forecast = 1
                 data_reconstructed = 0
                 data_loss = None
             else:
                 anomaly = 0 
-                forecasted = 0
+                forecast = 0
                 data_reconstructed = 0
                 data_loss = 0.1
                 
@@ -327,33 +327,33 @@ class TestSlotter(unittest.TestCase):
                                             )
             # Add extra indexes as if something operated on the time series
             data_time_point.anomaly = anomaly
-            data_time_point.forecasted = forecasted
+            data_time_point.forecast = forecast
             data_time_point._data_reconstructed = data_reconstructed
             
             # Append
             data_time_point_series.append(data_time_point)
                 
         # This is an indirect test of the series indexes. TODO: move it away.
-        self.assertEqual(data_time_point_series.indexes, ['data_reconstructed', 'data_loss', 'anomaly', 'forecasted'])
+        self.assertEqual(data_time_point_series.indexes, ['data_reconstructed', 'data_loss', 'anomaly', 'forecast'])
         
         # Slot the time series
         slotted_data_time_point_series = Slotter('600s').process(data_time_point_series)
 
         # Check that we have all the indexes
-        self.assertEqual(slotted_data_time_point_series.indexes, ['data_reconstructed', 'data_loss', 'anomaly', 'forecasted'])
+        self.assertEqual(slotted_data_time_point_series.indexes, ['data_reconstructed', 'data_loss', 'anomaly', 'forecast'])
 
         # Check indexes math
         self.assertAlmostEqual(slotted_data_time_point_series[0].anomaly, 0.045454545454545456)
         self.assertAlmostEqual(slotted_data_time_point_series[0].data_reconstructed, 0.18181818181818182)
-        self.assertAlmostEqual(slotted_data_time_point_series[0].forecasted, 0)
+        self.assertAlmostEqual(slotted_data_time_point_series[0].forecast, 0)
         
         self.assertAlmostEqual(slotted_data_time_point_series[1].anomaly, 0.08333333333333333)
         self.assertAlmostEqual(slotted_data_time_point_series[1].data_reconstructed, 0.2727272727272727)
-        self.assertAlmostEqual(slotted_data_time_point_series[1].forecasted, 0.18181818181818182)
+        self.assertAlmostEqual(slotted_data_time_point_series[1].forecast, 0.18181818181818182)
 
         self.assertEqual(slotted_data_time_point_series[2].anomaly, None)
         self.assertAlmostEqual(slotted_data_time_point_series[2].data_reconstructed, 0)
-        self.assertEqual(slotted_data_time_point_series[2].forecasted, 1.0)
+        self.assertEqual(slotted_data_time_point_series[2].forecast, 1.0)
 
         self.assertEqual(slotted_data_time_point_series[2].data_loss, 0) # NO, why?
 

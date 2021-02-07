@@ -362,7 +362,7 @@ function legendFormatter(data) {
           if (html !== '') html += sepLines ? '<br/>' : ' ';
           
 
-          if ((series.label=='data_reconstructed') || (series.label=='data_loss') || (series.label=='forecasted') || (series.label=='anomaly')){
+          if ((series.label=='data_reconstructed') || (series.label=='data_loss') || (series.label=='forecast') || (series.label=='anomaly')){
               html += "<span style='margin-left:15px; background: " + series.color + ";'>&nbsp;" + series.labelHTML + "&nbsp</span>, ";
           }
           else {
@@ -417,7 +417,7 @@ function legendFormatter(data) {
         */
         
         //decoration = ' style="background-color: #fcf8b0"'
-        if ((series.label=='data_reconstructed') || (series.label=='data_loss') || (series.label=='forecasted') || (series.label=='anomaly')){
+        if ((series.label=='data_reconstructed') || (series.label=='data_loss') || (series.label=='forecast') || (series.label=='anomaly')){
             html += "<span" + decoration + "> <span style='background: " + series.color + ";'>&nbsp" + series.labelHTML + "&nbsp</span>:&#160;" + series.yHTML*100 + "%</span>, ";
         
         }
@@ -601,10 +601,10 @@ animatedZooms: true,"""
          color: '"""+rgba_value_red+"""'            // Alpha here is used for the legend 
        },"""
 
-    # Data forecasted index series
-    if 'forecasted' in indexes_to_plot:
+    # Data forecast index series
+    if 'forecast' in indexes_to_plot:
         dygraphs_javascript += """
-       'forecasted': {
+       'forecast': {
          //customBars: false, // Does not work?
          axis: 'y2',
          //stepPlot: true,
@@ -627,7 +627,7 @@ animatedZooms: true,"""
          highlightCircleSize:0,
          fillGraph: true,
          fillAlpha: """+str(fill_alpha_value_fixed)+""",  // This alpha is used for the area
-         color: '"""+rgba_value_darkorange+"""'          // Alpha here is used for the legend 
+         color: '"""+rgba_value_darkorange+"""'           // Alpha here is used for the legend 
        },"""
    
     # Add data mark index series
