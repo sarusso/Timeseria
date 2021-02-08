@@ -100,13 +100,36 @@ class Slotter(Transformation):
         self.extra_operations=extra_operations
 
 
-    def _compute_slot(self, data_time_point_series, unit, start_t, end_t, validity, timezone, fill_with, force_data_loss, fill_gaps, interpolation_method, series_indexes):
+    def _compute_slot(self, data_time_point_series, unit, start_t, end_t, validity, timezone, fill_with, force_data_loss, fill_gaps, interpolation_method, series_indexes, first_last):
 
         # Compute data_loss
-        slot_data_loss = compute_data_loss(data_time_point_series,
-                                           from_t   = start_t,
-                                           to_t     = end_t,
-                                           validity = validity)
+        slot_data_loss = None
+        
+        # Data loss from missing coverage
+        if data_time_point_series.resolution == 'variable' or first_last:
+            slot_data_loss = compute_data_loss(data_time_point_series,
+                                                from_t   = start_t,
+                                                to_t     = end_t,
+                                                validity = validity)
+        
+        # Data loss from previousily computed data losses
+        if data_time_point_series.resolution != 'variable':
+            # Take into account point data loss as well
+            missing_coverage = None
+            for this_data_time_point in data_time_point_series:
+                if this_data_time_point.data_loss:
+                    point_missing_coverage = this_data_time_point.data_loss * validity
+                    if missing_coverage is not None:
+                        missing_coverage += point_missing_coverage
+                    else:
+                        missing_coverage = point_missing_coverage
+
+            if missing_coverage is not None:
+                if slot_data_loss is not None:
+                    slot_data_loss += float(missing_coverage) / ( end_t - start_t)
+                else:
+                    slot_data_loss = float(missing_coverage) / ( end_t - start_t)
+
 
         # TODO: unroll the following before the compute slot call
         slot_timeseries = DataTimePointSeries()
@@ -386,7 +409,8 @@ class Slotter(Transformation):
                                                             force_data_loss = force_data_loss,
                                                             fill_gaps = fill_gaps,
                                                             interpolation_method = interpolation_method,
-                                                            series_indexes = series_indexes)
+                                                            series_indexes = series_indexes,
+                                                            first_last = True if count==1 else False)
                         
                         # .. and append results (unless we are before the first timeseries start point)
                         if slot_end_t > data_time_point_series[0].t:
@@ -461,7 +485,8 @@ class Slotter(Transformation):
                                                             force_data_loss = force_data_loss,
                                                             fill_gaps = fill_gaps,
                                                             interpolation_method = interpolation_method,
-                                                            series_indexes = series_indexes)
+                                                            series_indexes = series_indexes,
+                                                            first_last = True)
                         
                         # .. and append results 
                         data_time_slot_series.append(data_time_slot)
@@ -494,7 +519,8 @@ class Slotter(Transformation):
                                                     force_data_loss = force_data_loss,
                                                     fill_gaps = fill_gaps,
                                                     interpolation_method = interpolation_method,
-                                                    series_indexes = series_indexes)
+                                                    series_indexes = series_indexes,
+                                                    first_last = True)
                 
                 # .. and append results 
                 data_time_slot_series.append(data_time_slot)

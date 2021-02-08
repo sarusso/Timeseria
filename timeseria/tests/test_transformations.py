@@ -355,7 +355,7 @@ class TestSlotter(unittest.TestCase):
         self.assertAlmostEqual(slotted_data_time_point_series[2].data_reconstructed, 0)
         self.assertEqual(slotted_data_time_point_series[2].forecast, 1.0)
 
-        self.assertEqual(slotted_data_time_point_series[2].data_loss, 0) # NO, why?
+        self.assertEqual(slotted_data_time_point_series[2].data_loss, None)
 
 
 class TestResampler(unittest.TestCase):

@@ -212,6 +212,8 @@ def compute_coverage(data_time_point_series, from_t, to_t, trustme=False, validi
             # Normal operation mode
             pass
 
+        
+
         # Okay, now we have all the values we need:
         # 1) prev_datapoint_valid_until
         # 2) this_data_time_point_valid_from
@@ -235,15 +237,6 @@ def compute_coverage(data_time_point_series, from_t, to_t, trustme=False, validi
                 missing_coverage = value
             else:
                 missing_coverage = missing_coverage + value
-            
-        # Take into account point data loss as well
-        if this_data_time_point.data_loss:
-            point_validity = (this_data_time_point_valid_to_t-this_data_time_point_valid_from_t)
-            point_missing_coverage = this_data_time_point.data_loss * point_validity
-            if missing_coverage is not None:
-                missing_coverage += point_missing_coverage
-            else:
-                missing_coverage = point_missing_coverage
 
         # Update previous datapoint Validity:
         prev_datapoint_valid_to_t = this_data_time_point_valid_to_t
