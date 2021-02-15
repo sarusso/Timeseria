@@ -355,7 +355,9 @@ class TestSlotter(unittest.TestCase):
         self.assertAlmostEqual(slotted_data_time_point_series[2].data_reconstructed, 0)
         self.assertEqual(slotted_data_time_point_series[2].forecast, 1.0)
 
-        self.assertEqual(slotted_data_time_point_series[2].data_loss, None)
+        # The following is re-computed from missing coverage only, and not marked as None.
+        # See the compute_data_loss function fore more details and some more comments.
+        self.assertEqual(slotted_data_time_point_series[2].data_loss, 0) 
 
 
 class TestResampler(unittest.TestCase):

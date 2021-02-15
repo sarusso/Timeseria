@@ -277,8 +277,34 @@ def compute_coverage(data_time_point_series, from_t, to_t, trustme=False, validi
     return coverage
 
 
-def compute_data_loss(data_time_point_series, from_t, to_t, trustme=False, validity=None, validity_placement='center'):
-    return 1-compute_coverage(data_time_point_series, from_t, to_t, trustme, validity, validity_placement)
+def compute_data_loss(data_time_point_series, from_t, to_t, series_resolution, validity,
+                      validity_placement='center', first_last=False, trustme=False):
+    
+    # Data loss from missing coverage. Computing it useless if the series has no 'variable' resolution, 
+    # however, if removed, it is still to be applied for the first and last item as on the borders there
+    # still may be  data losses. 
+    if series_resolution == 'variable' or first_last:
+        data_loss_from_missing_coverage = 1 - compute_coverage(data_time_point_series, from_t, to_t, trustme, validity, validity_placement)
+    else:
+        data_loss_from_missing_coverage = 0
+
+    # Data loss from previously computed data losses
+    data_loss_from_previously_computed = 0
+    for this_data_time_point in data_time_point_series:
+        if this_data_time_point.data_loss:
+            # Add, rescaling the data loss with respect to the from/to 
+            data_loss_from_previously_computed += this_data_time_point.data_loss * (validity/( to_t - from_t))
+    
+    # Compute total data loss    
+    data_loss = data_loss_from_missing_coverage + data_loss_from_previously_computed
+    
+    # The next step is controversial, as it will cause to abuse the "None" data losses that 
+    # are only used for the forecasts at the moment. TODO: what do we want to do here?
+    #if series_resolution != 'variable' and not data_loss:
+    #    data_loss = None
+
+    # Return
+    return data_loss
 
 
 #==============================
