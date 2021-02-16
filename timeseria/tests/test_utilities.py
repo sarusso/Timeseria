@@ -159,6 +159,12 @@ class TestComputeCoverage(unittest.TestCase):
                                       from_t = 30, to_t = 60, validity=10, series_resolution=data_time_point_series.resolution) 
         self.assertAlmostEqual(data_loss, 0.5)
 
+        # Tets also from ana ctually resampled tiem series
+        resampled_timeseries = self.data_time_point_series_5.resample(60)
+        data_loss = compute_data_loss(data_time_point_series  = resampled_timeseries,
+                                    from_t = 1436022300, to_t = 1436022600, validity=60, series_resolution=self.data_time_point_series_5) 
+        self.assertAlmostEqual(data_loss, 0.4)
+
 
 class TestGetPeriodicity(unittest.TestCase):
 

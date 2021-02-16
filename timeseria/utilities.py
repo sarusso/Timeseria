@@ -291,13 +291,29 @@ def compute_data_loss(data_time_point_series, from_t, to_t, series_resolution, v
     # Data loss from previously computed data losses
     data_loss_from_previously_computed = 0
     for this_data_time_point in data_time_point_series:
+
         if this_data_time_point.data_loss:
-            # Add, rescaling the data loss with respect to the from/to 
-            data_loss_from_previously_computed += this_data_time_point.data_loss * (validity/( to_t - from_t))
-    
+
+            # Skip points not to be taken dinto account
+            if this_data_time_point.t + (validity/2) < from_t:
+                continue
+            if this_data_time_point.t - (validity/2) >= to_t:
+                continue
+            
+            # Compute the contribution of this point data loss.
+            if (this_data_time_point.t < from_t)  and this_data_time_point.t + (validity/2) >= from_t:
+                this_validity = (this_data_time_point.t + (validity/2)) - from_t
+            elif (this_data_time_point.t > to_t)  and this_data_time_point.t + (validity/2) < to_t:
+                this_validity = to_t - (this_data_time_point.t + (validity/2))
+            else:
+                this_validity = validity
+            
+            # Now add, rescaling the data loss with respect to the validity and from/to 
+            data_loss_from_previously_computed += this_data_time_point.data_loss * (this_validity/( to_t - from_t))
+
     # Compute total data loss    
     data_loss = data_loss_from_missing_coverage + data_loss_from_previously_computed
-    
+
     # The next step is controversial, as it will cause to abuse the "None" data losses that 
     # are only used for the forecasts at the moment. TODO: what do we want to do here?
     #if series_resolution != 'variable' and not data_loss:
