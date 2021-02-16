@@ -1,6 +1,6 @@
 import unittest
 import os
-from ..utilities import detect_encoding, compute_coverage, get_periodicity
+from ..utilities import detect_encoding, compute_coverage, compute_data_loss, get_periodicity
 from ..datastructures import DataTimePointSeries, DataTimePoint
 from ..time import dt, s_from_dt
 from ..storages import CSVFileStorage
@@ -143,12 +143,27 @@ class TestComputeCoverage(unittest.TestCase):
         self.assertAlmostEqual(coverage, (0.5))
 
 
-        # Now test that if we have points with data losses already, this is taken into account.
+    def test_compute_data_loss(self):
+
+        # Everything is the same as the compute coverage *except* when we have data losses 
+        # already present which have to be taken into account as well
+
         # TODO: add some better testing here...
+        data_time_point_series = DataTimePointSeries()
+        data_time_point_series.append(DataTimePoint(t = 20, data = {'temperature': 23}, data_loss=0))
+        data_time_point_series.append(DataTimePoint(t = 30, data = {'temperature': 23}, data_loss=0))
+        data_time_point_series.append(DataTimePoint(t = 40, data = {'temperature': 23}, data_loss=0.5))
+        data_time_point_series.append(DataTimePoint(t = 60, data = {'temperature': 23}, data_loss=0))
+        data_time_point_series.append(DataTimePoint(t = 70, data = {'temperature': 23}, data_loss=0))
+        data_loss = compute_data_loss(data_time_point_series  = data_time_point_series,
+                                      from_t = 30, to_t = 60, validity=10, series_resolution=data_time_point_series.resolution) 
+        self.assertAlmostEqual(data_loss, 0.5)
+
+        # Tets also from ana ctually resampled tiem series
         resampled_timeseries = self.data_time_point_series_5.resample(60)
-        coverage = compute_coverage(data_time_point_series  = resampled_timeseries,
-                                    from_t = 1436022300, to_t = 1436022600, validity=60) 
-        self.assertAlmostEqual(coverage, (0.6))
+        data_loss = compute_data_loss(data_time_point_series  = resampled_timeseries,
+                                    from_t = 1436022300, to_t = 1436022600, validity=60, series_resolution=self.data_time_point_series_5) 
+        self.assertAlmostEqual(data_loss, 0.4)
 
 
 class TestGetPeriodicity(unittest.TestCase):

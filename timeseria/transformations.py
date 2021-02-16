@@ -100,44 +100,50 @@ class Slotter(Transformation):
         self.extra_operations=extra_operations
 
 
-    def _compute_slot(self, data_time_point_series, unit, start_t, end_t, validity, timezone, fill_with, force_data_loss, fill_gaps, interpolation_method):
+    def _compute_slot(self, data_time_point_series, unit, start_t, end_t, validity, timezone, fill_with, force_data_loss, fill_gaps, interpolation_method, series_indexes, series_resolution, first_last):
 
         # Compute data_loss
         slot_data_loss = compute_data_loss(data_time_point_series,
                                            from_t   = start_t,
                                            to_t     = end_t,
-                                           validity = validity)
+                                           series_resolution = series_resolution,
+                                           validity = validity,
+                                           first_last = first_last)
+
+        # TODO: unroll the following before the compute slot call
+        slot_timeseries = DataTimePointSeries()
+        prev_point = None
+        next_point = None
+        for data_time_point in data_time_point_series:
+            if (data_time_point.t+(validity/2)) < start_t:
+                prev_point = data_time_point
+                continue
+            if (data_time_point.t-(validity/2)) >= end_t:
+                next_point = data_time_point
+                continue
+            slot_timeseries.append(data_time_point)
+
 
         # If we have to fully reconstruct data
-        if slot_data_loss == 1: 
+        # TODO: we have a huge conceputal problem here if checkong on the slot_data_loss:
+        #       if data_loss is 1 but due to point data loses (maybe even reconstructed)
+        #       and not entirely missing points, we should actually compute as if not a full data loss.
+        if not slot_timeseries: # slot_data_loss == 1: 
 
-            # Reconstruct (fill_gaps)
+            # Reconstruct (fill gaps)
             slot_data = {}
             for key in data_time_point_series[0].data.keys():
                 
                 # Set data as None, will be interpolated afterwards
                 slot_data[key] = None
                 
-                # handle also extra ops
+                # Handle also extra ops
                 if self.extra_operations:
                     for extra_operation in self.extra_operations:
                         slot_data['{}_{}'.format(key, extra_operation.label)] = None
 
         else:
  
-            # TODO: unroll the following before the compute slot call
-            slot_timeseries = DataTimePointSeries()
-            prev_point = None
-            next_point = None
-            for data_time_point in data_time_point_series:
-                if (data_time_point.t+(validity/2)) < start_t:
-                    prev_point = data_time_point
-                    continue
-                if (data_time_point.t-(validity/2)) >= end_t:
-                    next_point = data_time_point
-                    continue
-                slot_timeseries.append(data_time_point)
-
             # Keys shortcut
             keys = data_time_point_series.data_keys()
 
@@ -177,7 +183,43 @@ class Slotter(Transformation):
                                       unit  = unit,
                                       data  = slot_data,
                                       data_loss = slot_data_loss)
+
+        # Now handle indexes
+        for index in series_indexes:
+            if slot_timeseries:
+                if index == 'data_loss':
+                    continue
+                index_sum = 0
+                index_count = 0
+                for item in slot_timeseries:
+                    
+                    # Get index value
+                    try:
+                        index_value = getattr(item, index)
+                    except:
+                        slotted_index_value = None
+                    else:
+                        if index_value is not None:
+                            index_count += 1
+                            index_sum += index_value
         
+                # Compute the slotted index value (if there were indexes not None)
+                if index_count > 0:
+                    slotted_index_value = index_sum/index_count
+                else:
+                    slotted_index_value = None
+    
+            else:
+                slotted_index_value = None
+
+            # Set the index. Handle special case for data_reconstructed
+            if index == 'data_reconstructed':
+                setattr(data_time_slot, '_data_reconstructed', slotted_index_value)
+            else:
+                setattr(data_time_slot, index, slotted_index_value)                
+        
+                    
+        # Return the slot
         return data_time_slot
 
 
@@ -271,6 +313,11 @@ class Slotter(Transformation):
        
         # Counters
         count = 0
+        first = True
+
+        # Indexes
+        series_indexes = data_time_point_series.indexes
+        series_resolution = data_time_point_series.resolution
 
         # Now go trough all the data in the time series        
         for data_time_point in data_time_point_series:
@@ -342,7 +389,14 @@ class Slotter(Transformation):
                                                             fill_with = fill_with,
                                                             force_data_loss = force_data_loss,
                                                             fill_gaps = fill_gaps,
-                                                            interpolation_method = interpolation_method)
+                                                            interpolation_method = interpolation_method,
+                                                            series_indexes = series_indexes,
+                                                            series_resolution = series_resolution,
+                                                            first_last = first)
+
+                        # Set first to false
+                        if first:
+                            first = False
                         
                         # .. and append results (unless we are before the first timeseries start point)
                         if slot_end_t > data_time_point_series[0].t:
@@ -416,7 +470,10 @@ class Slotter(Transformation):
                                                             fill_with = fill_with,
                                                             force_data_loss = force_data_loss,
                                                             fill_gaps = fill_gaps,
-                                                            interpolation_method = interpolation_method)
+                                                            interpolation_method = interpolation_method,
+                                                            series_indexes = series_indexes,
+                                                            series_resolution = series_resolution,
+                                                            first_last = True)
                         
                         # .. and append results 
                         data_time_slot_series.append(data_time_slot)
@@ -448,7 +505,10 @@ class Slotter(Transformation):
                                                     fill_with = fill_with,
                                                     force_data_loss = force_data_loss,
                                                     fill_gaps = fill_gaps,
-                                                    interpolation_method = interpolation_method)
+                                                    interpolation_method = interpolation_method,
+                                                    series_indexes = series_indexes,
+                                                    series_resolution = series_resolution,
+                                                    first_last = True)
                 
                 # .. and append results 
                 data_time_slot_series.append(data_time_slot)
@@ -478,16 +538,34 @@ class Resampler(Transformation):
         if self.time_unit.is_calendar():
             raise ValueError('Sorry, calendar time units are not supported by the Resampler (got "{}"). Use the Slotter instead.'.format(self.time_unit))
 
-    def _compute_resampled_point(self, data_time_point_series, unit, start_t, end_t, validity, timezone, fill_with, force_data_loss, fill_gaps, interpolation_method):
 
-        # Compute data_loss
+    def _compute_resampled_point(self, data_time_point_series, unit, start_t, end_t, validity, timezone, fill_with, force_data_loss, fill_gaps, interpolation_method, series_indexes, series_resolution, first_last):
+
+        # Compute data_loss        
         point_data_loss = compute_data_loss(data_time_point_series,
                                             from_t   = start_t,
                                             to_t     = end_t,
-                                            validity = validity)
+                                            series_resolution = series_resolution,
+                                            validity = validity,
+                                            first_last = first_last)
         
+        # TODO: unroll the following before the compute resampled point call
+        interval_timeseries = DataTimePointSeries()
+        prev_point = None
+        next_point = None
+        for data_time_point in data_time_point_series:
+            # TODO: better check the math here. We use >= and <= because, since we are basically comparing intervals,
+            #       the "right" excluded rule is excluded by comparing right with left and then left with right.
+            if (data_time_point.t+(validity/2)) <= start_t:
+                prev_point = data_time_point
+                continue
+            if (data_time_point.t-(validity/2)) >= end_t:
+                next_point = data_time_point
+                continue
+            interval_timeseries.append(data_time_point)
+
         # If we have to fully reconstruct data
-        if point_data_loss == 1: 
+        if not interval_timeseries: #point_data_loss == 1: 
 
             # Reconstruct (fill_gaps)
             slot_data = {}
@@ -516,29 +594,14 @@ class Resampler(Transformation):
                         raise Exception('Unknown interpolation method "{}"'.format(interpolation_method))
 
         else:
- 
-            # TODO: unroll the following before the compute slot call
-            slot_timeseries = DataTimePointSeries()
-            prev_point = None
-            next_point = None
-            for data_time_point in data_time_point_series:
-                # TODO: better check the math here. We use >= and <= because, since we are basically comparing intervals,
-                #       the "right" excluded rule is excluded by comparing right with left and then left with right.
-                if (data_time_point.t+(validity/2)) <= start_t:
-                    prev_point = data_time_point
-                    continue
-                if (data_time_point.t-(validity/2)) >= end_t:
-                    next_point = data_time_point
-                    continue
-                slot_timeseries.append(data_time_point)
 
             # Keys shortcut
             keys = data_time_point_series.data_keys()
 
-            logger.debug('Slot timeseries: %s', slot_timeseries)
+            logger.debug('Slot timeseries: %s', interval_timeseries)
 
             # Compute sample averages data
-            avgs = avg(slot_timeseries, prev_point=prev_point, next_point=next_point)
+            avgs = avg(interval_timeseries, prev_point=prev_point, next_point=next_point)
                             
             # Do we have a 100% and a fill_with?
             if fill_with is not None and point_data_loss == 1:
@@ -555,17 +618,54 @@ class Resampler(Transformation):
         if force_data_loss is not None:
             point_data_loss = force_data_loss
         
-        # Create the DataTimePoint if we have data_loss
-        if not point_data_loss:
-            data_time_point = None
-        else:      
-            pass
+#         # Create the DataTimePoint if we have data_loss
+#         if not point_data_loss:
+#             data_time_point = None
+#         else:      
+#             pass
 
+        # Create the data time point
         data_time_point = DataTimePoint(t = (start_t+((end_t-start_t)/2)),
                                         tz = timezone,
                                         data  = slot_data,
                                         data_loss = point_data_loss)
 
+
+        # Now handle indexes
+        for index in series_indexes:
+            if interval_timeseries:
+                if index == 'data_loss':
+                    continue
+                index_sum = 0
+                index_count = 0
+                for item in interval_timeseries:
+                    
+                    # Get index value
+                    try:
+                        index_value = getattr(item, index)
+                    except:
+                        new_point_index_value = None
+                    else:
+                        if index_value is not None:
+                            index_count += 1
+                            index_sum += index_value
+        
+                # Compute the new index value (if there were indexes not None)
+                if index_count > 0:
+                    new_point_index_value = index_sum/index_count
+                else:
+                    new_point_index_value = None
+    
+            else:
+                new_point_index_value = None
+                
+            # Set the index. Handle special case for data_reconstructed
+            if index == 'data_reconstructed':
+                setattr(data_time_point, '_data_reconstructed', new_point_index_value)
+            else:
+                setattr(data_time_point, index, new_point_index_value)                
+
+        # Return
         return data_time_point
 
 
@@ -659,6 +759,11 @@ class Resampler(Transformation):
        
         # Counters
         count = 0
+        first = True
+
+        # Indexes
+        series_indexes = data_time_point_series.indexes
+        series_resolution = data_time_point_series.resolution
 
         # Now go trough all the data in the time series        
         for data_time_point in data_time_point_series:
@@ -732,7 +837,13 @@ class Resampler(Transformation):
                                                                       fill_with = fill_with,
                                                                       force_data_loss = force_data_loss,
                                                                       fill_gaps = fill_gaps,
-                                                                      interpolation_method = interpolation_method)
+                                                                      interpolation_method = interpolation_method,
+                                                                      series_indexes = series_indexes,
+                                                                      series_resolution = series_resolution,
+                                                                      first_last = first)
+                        # Set first to false
+                        if first:
+                            first = False
                         
                         # .. and append results
                         if dataTimePoint:
@@ -769,7 +880,10 @@ class Resampler(Transformation):
                                                                       fill_with = fill_with,
                                                                       force_data_loss = force_data_loss,
                                                                       fill_gaps = fill_gaps,
-                                                                      interpolation_method = interpolation_method)
+                                                                      interpolation_method = interpolation_method,
+                                                                      series_indexes = series_indexes,
+                                                                      series_resolution = series_resolution,
+                                                                      first_last = True)
                         
                         # .. and append results
                         if dataTimePoint:
@@ -803,7 +917,10 @@ class Resampler(Transformation):
                                                               fill_with = fill_with,
                                                               force_data_loss = force_data_loss,
                                                               fill_gaps = fill_gaps,
-                                                              interpolation_method = interpolation_method)
+                                                              interpolation_method = interpolation_method,
+                                                              series_indexes = series_indexes,
+                                                              series_resolution = series_resolution,
+                                                              first_last = True)
                 
                 # .. and append results
                 if dataTimePoint:

@@ -410,7 +410,7 @@ class TestAnomalyDetectors(unittest.TestCase):
         # Count how many anomalies were detected
         anomalies_count = 0
         for slot in result_time_series:
-            if slot.data['anomaly']:
+            if slot.anomaly:
                 anomalies_count += 1
         self.assertEqual(anomalies_count, 9)
 

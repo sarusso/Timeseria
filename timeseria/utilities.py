@@ -212,6 +212,8 @@ def compute_coverage(data_time_point_series, from_t, to_t, trustme=False, validi
             # Normal operation mode
             pass
 
+        
+
         # Okay, now we have all the values we need:
         # 1) prev_datapoint_valid_until
         # 2) this_data_time_point_valid_from
@@ -235,15 +237,6 @@ def compute_coverage(data_time_point_series, from_t, to_t, trustme=False, validi
                 missing_coverage = value
             else:
                 missing_coverage = missing_coverage + value
-            
-        # Take into account point data loss as well
-        if this_data_time_point.data_loss:
-            point_validity = (this_data_time_point_valid_to_t-this_data_time_point_valid_from_t)
-            point_missing_coverage = this_data_time_point.data_loss * point_validity
-            if missing_coverage is not None:
-                missing_coverage += point_missing_coverage
-            else:
-                missing_coverage = point_missing_coverage
 
         # Update previous datapoint Validity:
         prev_datapoint_valid_to_t = this_data_time_point_valid_to_t
@@ -284,8 +277,50 @@ def compute_coverage(data_time_point_series, from_t, to_t, trustme=False, validi
     return coverage
 
 
-def compute_data_loss(data_time_point_series, from_t, to_t, trustme=False, validity=None, validity_placement='center'):
-    return 1-compute_coverage(data_time_point_series, from_t, to_t, trustme, validity, validity_placement)
+def compute_data_loss(data_time_point_series, from_t, to_t, series_resolution, validity,
+                      validity_placement='center', first_last=False, trustme=False):
+    
+    # Data loss from missing coverage. Computing it useless if the series has no 'variable' resolution, 
+    # however, if removed, it is still to be applied for the first and last item as on the borders there
+    # still may be  data losses. 
+    if series_resolution == 'variable' or first_last:
+        data_loss_from_missing_coverage = 1 - compute_coverage(data_time_point_series, from_t, to_t, trustme, validity, validity_placement)
+    else:
+        data_loss_from_missing_coverage = 0
+
+    # Data loss from previously computed data losses
+    data_loss_from_previously_computed = 0
+    for this_data_time_point in data_time_point_series:
+
+        if this_data_time_point.data_loss:
+
+            # Skip points not to be taken dinto account
+            if this_data_time_point.t + (validity/2) < from_t:
+                continue
+            if this_data_time_point.t - (validity/2) >= to_t:
+                continue
+            
+            # Compute the contribution of this point data loss.
+            if (this_data_time_point.t < from_t)  and this_data_time_point.t + (validity/2) >= from_t:
+                this_validity = (this_data_time_point.t + (validity/2)) - from_t
+            elif (this_data_time_point.t > to_t)  and this_data_time_point.t + (validity/2) < to_t:
+                this_validity = to_t - (this_data_time_point.t + (validity/2))
+            else:
+                this_validity = validity
+            
+            # Now add, rescaling the data loss with respect to the validity and from/to 
+            data_loss_from_previously_computed += this_data_time_point.data_loss * (this_validity/( to_t - from_t))
+
+    # Compute total data loss    
+    data_loss = data_loss_from_missing_coverage + data_loss_from_previously_computed
+
+    # The next step is controversial, as it will cause to abuse the "None" data losses that 
+    # are only used for the forecasts at the moment. TODO: what do we want to do here?
+    #if series_resolution != 'variable' and not data_loss:
+    #    data_loss = None
+
+    # Return
+    return data_loss
 
 
 #==============================
