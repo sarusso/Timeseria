@@ -204,7 +204,7 @@ class Slotter(Transformation):
                             index_sum += index_value
         
                 # Compute the slotted index value (if there were indexes not None)
-                if index_count > 1:
+                if index_count > 0:
                     slotted_index_value = index_sum/index_count
                 else:
                     slotted_index_value = None
@@ -644,26 +644,26 @@ class Resampler(Transformation):
                     try:
                         index_value = getattr(item, index)
                     except:
-                        slotted_index_value = None
+                        new_point_index_value = None
                     else:
                         if index_value is not None:
                             index_count += 1
                             index_sum += index_value
         
-                # Compute the slotted index value (if there were indexes not None)
-                if index_count > 1:
-                    slotted_index_value = index_sum/index_count
+                # Compute the new index value (if there were indexes not None)
+                if index_count > 0:
+                    new_point_index_value = index_sum/index_count
                 else:
-                    slotted_index_value = None
+                    new_point_index_value = None
     
             else:
-                slotted_index_value = None
-
+                new_point_index_value = None
+                
             # Set the index. Handle special case for data_reconstructed
             if index == 'data_reconstructed':
-                setattr(data_time_point, '_data_reconstructed', slotted_index_value)
+                setattr(data_time_point, '_data_reconstructed', new_point_index_value)
             else:
-                setattr(data_time_point, index, slotted_index_value)                
+                setattr(data_time_point, index, new_point_index_value)                
 
         # Return
         return data_time_point
