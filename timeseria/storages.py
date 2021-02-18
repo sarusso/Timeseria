@@ -54,7 +54,7 @@ class CSVFileStorage(object):
     
     def __init__(self, filename_with_path, encoding = 'auto', time_column = 'auto', time_format = 'auto',
                  date_column = None, date_format = None, data_columns = 'all', value_separator=',', line_separator='\n',
-                 skip_errors=False, data_format='auto', type=None, tz='UTC'):
+                 skip_errors=False, data_format='auto', item_type=None, tz='UTC'):
         ''' Ref to https://docs.python.org/3/library/datetime.html#strftime-and-strptime-format-codes
         for date_format and time_format'''
 
@@ -86,7 +86,7 @@ class CSVFileStorage(object):
         self.data_format = data_format
         
         # Set item type (that will be forced)
-        self.item_type = type
+        self.item_type = item_type
 
         # Check
         if self.time_column is None and self.date_column is None and not self.data_columns:
@@ -102,7 +102,7 @@ class CSVFileStorage(object):
             raise ValueError('data_columns argument must be a list (got "{}")'.format(self.data_columns.__class__.__name__))
 
 
-    def get(self, limit=None, tz=None, type=None, sort=False):
+    def get(self, limit=None, tz=None, item_type=None, sort=False):
 
         # Line counter
         line_number=0
@@ -116,9 +116,6 @@ class CSVFileStorage(object):
         
         data_column_indexes = None
         data_column_labels = None
-
-        # Item type shortcut
-        item_type = type
 
         # Detect encoding if not set
         if not self.encoding:
@@ -420,11 +417,32 @@ class CSVFileStorage(object):
             #    detected_item_type = DataTimeSlot
             #    detected_unit = TimeUnit('1D')
             
-            # Else, use points with no unit
+            # Else, use points with no unit if we were not using slots
             else:
-                detected_item_type = DataTimePoint
-                detected_unit = None
-            
+                if item_type!='slots':
+                    detected_item_type = DataTimePoint
+                    detected_unit = None
+                else:
+                    # TODO: "detected_item_type" is not a nice name here, the
+                    # code in the following should use item_type if forced..
+                    detected_item_type = DataTimeSlot
+
+                    # Can we auto-detect unit? TODO: can we standardize this? Check also in the entire codebase..
+                    if detected_sampling_interval == 3600:
+                        detected_unit = TimeUnit('1h')                    
+                    elif detected_sampling_interval == 1800:
+                        detected_unit = TimeUnit('30m')
+                    elif detected_sampling_interval == 900:
+                        detected_unit = TimeUnit('15m')
+                    elif detected_sampling_interval == 600:
+                        detected_unit = TimeUnit('10m')                                             
+                    elif detected_sampling_interval == 300:
+                        detected_unit = TimeUnit('5m') 
+                    elif detected_sampling_interval == 60:
+                        detected_unit = TimeUnit('1m') 
+                    else:
+                        detected_unit = TimeUnit('{}s'.format(detected_sampling_interval)) 
+                        
         # Do we have to force a specific type?
         if not autodetect_item_type:
             if item_type == 'points':
@@ -438,7 +456,10 @@ class CSVFileStorage(object):
         else:
             # Log the type and unit we detected 
             if detected_item_type == DataTimeSlot:
-                logger.info('Assuming {} time unit and creating Slots. Use type=\'points\' if you want Points instead.'.format(detected_unit))
+                if item_type:
+                    logger.info('Assuming {} time unit and creating Slots.'.format(detected_unit))                
+                else:
+                    logger.info('Assuming {} time unit and creating Slots. Use item_type=\'points\' if you want Points instead.'.format(detected_unit))
             #else:
             #    logger.info('Assuming {} sampling interval and creating {}.'.format(detected_sampling_interval, item_type.__class__.__name__))
             
