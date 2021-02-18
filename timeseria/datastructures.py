@@ -385,10 +385,13 @@ class DataPoint(Point):
             self._data = kwargs.pop('data')
         except KeyError:
             raise Exception('A DataPoint requires a special "data" argument (got only "{}")'.format(kwargs))
-
-        data_loss = kwargs.pop('data_loss', None)
-        if data_loss is not None:
-            self._data_loss=data_loss
+        
+        try:
+            data_loss = kwargs.pop('data_loss')
+        except KeyError:
+            pass
+        else:
+            self._data_loss = data_loss
         
         super(DataPoint, self).__init__(*args, **kwargs)
 
@@ -860,9 +863,12 @@ class DataSlot(Slot):
         except KeyError:
             raise Exception('A DataSlot requires a special "data" argument (got only "{}")'.format(kwargs))
 
-        data_loss = kwargs.pop('data_loss', None)
-        if data_loss is not None:
-            self._data_loss=data_loss
+        try:
+            data_loss = kwargs.pop('data_loss')
+        except KeyError:
+            pass
+        else:
+            self._data_loss = data_loss
 
         super(DataSlot, self).__init__(**kwargs)
 
