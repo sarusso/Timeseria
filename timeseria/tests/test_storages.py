@@ -221,3 +221,14 @@ class TestCSVFileStorage(unittest.TestCase):
         self.assertEqual(data_time_point_series[0].start.t, 1546477200)
         self.assertEqual(data_time_point_series[-1].start.t, 1546833600)
 
+
+    def test_CSVFileStorage_no_data(self):
+        storage = CSVFileStorage(TEST_DATA_PATH + '/csv/no_data.csv')
+        from ..exceptions import NoDataException
+        with self.assertRaises(NoDataException):
+            storage.get()
+
+
+
+
+

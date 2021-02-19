@@ -10,3 +10,6 @@ class NotFittedError(Exception):
 
 class NonContiguityError(Exception):
     pass
+
+class NoDataException(Exception):
+    pass

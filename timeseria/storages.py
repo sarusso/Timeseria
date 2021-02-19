@@ -5,6 +5,7 @@ from .units import TimeUnit
 from .datastructures import DataTimePoint, DataTimePointSeries, DataPointSeries, TimePointSeries, TimePoint, DataPoint, DataTimeSlot, DataTimeSlotSeries
 from .time import s_from_dt, dt_from_str, dt_from_s, s_from_dt, timezonize
 import datetime
+from .exceptions import NoDataException
 from collections import OrderedDict
 
 # Setup logging
@@ -379,6 +380,12 @@ class CSVFileStorage(object):
                 # Append to the series
                 items.append([t, data])
 
+
+        # Were e able to read something?
+        if not items:
+            raise NoDataException('Cannot read any data!')
+        
+        # Support var
         autodetect_item_type = False
 
         # Set item type if forced
@@ -394,7 +401,7 @@ class CSVFileStorage(object):
             from .transformations import detect_sampling_interval
             
             sample_timepoints = [TimePoint(t=item[0]) for item in items[0:10]]
-            sample_timeseries = TimePointSeries(*sample_timepoints) # Cut to first ten elements 
+            sample_timeseries = TimePointSeries(*sample_timepoints) # Cut to first ten elements
             detected_sampling_interval = detect_sampling_interval(sample_timeseries)
             
             # Years
