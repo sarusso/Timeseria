@@ -2,9 +2,9 @@ import unittest
 import os
 import tempfile
 from math import sin
-from ..datastructures import DataTimeSlotSeries, DataTimeSlot, TimePoint, DataTimePoint
+from ..datastructures import DataTimeSlotSeries, DataTimeSlot, TimePoint, DataTimePoint, DataTimePointSeries
 from ..models import Model, ParametricModel
-from ..models import PeriodicAverageReconstructor, PeriodicAverageForecaster, ProphetForecaster, ProphetReconstructor, ARIMAForecaster, AARIMAForecaster
+from ..models import PeriodicAverageReconstructor, PeriodicAverageForecaster, ProphetForecaster, ProphetReconstructor, ARIMAForecaster, AARIMAForecaster, LSTMForecaster
 from ..exceptions import NotFittedError, NonContiguityError
 from ..storages import CSVFileStorage
 from ..transformations import Slotter, Resampler
@@ -378,6 +378,22 @@ class TestForecasters(unittest.TestCase):
            
         # TODO: do some actual testing.. not only that "it works"
         forecasted_data_time_point_series  = forecaster.apply(data_time_point_series)
+
+
+    def test_LSTMForecaster(self):
+
+        # Create a minute-resolution test DataTimeSlotSeries
+        sine_data_time_slot_series_minute = DataTimeSlotSeries()
+        for i in range(10):
+            sine_data_time_slot_series_minute.append(DataTimeSlot(start=TimePoint(i*60), end=TimePoint((i+1)*60), data={'value':sin(i/10.0)}))
+
+        forecaster = LSTMForecaster()
+        forecaster.fit(sine_data_time_slot_series_minute)
+        predicted_value = forecaster.predict(sine_data_time_slot_series_minute)['value']
+        
+        self.assertTrue(predicted_value>0.5)
+        self.assertTrue(predicted_value<1)
+        
 
 
 class TestAnomalyDetectors(unittest.TestCase):
