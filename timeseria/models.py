@@ -4,7 +4,7 @@ import uuid
 import copy
 import statistics
 from .datastructures import DataTimeSlotSeries, DataTimeSlot, TimePoint, DataTimePointSeries, DataTimePoint, Slot, Point
-from .exceptions import NotFittedError, NonContiguityError
+from .exceptions import NotFittedError, NonContiguityError, InputException
 from .utilities import get_periodicity, is_numerical, set_from_t_and_to_t, item_is_in_range, check_timeseries
 from .time import now_t, dt_from_s, s_from_dt
 from datetime import timedelta, datetime
@@ -154,7 +154,15 @@ and optionally a fit() method if the parameters are to be learnt form data.'''
         if path:
             with open(path+'/data.json', 'r') as f:
                 self.data = json.loads(f.read())         
-            self.fitted=True
+            self.fitted = True
+            
+            # Resolution as TimeUnit
+            try:
+                self.data['resolution'] = TimeUnit(self.data['resolution'])
+            except InputException:
+                # TODO: load as generic unit and make __eq__ work with both Units and TimeUnits?
+                self.data['resolution'] = TimeUnit('{}s'.format(int(float(self.data['resolution']))))
+                
         else:
             if not id:
                 id = str(uuid.uuid4())
@@ -163,6 +171,29 @@ and optionally a fit() method if the parameters are to be learnt form data.'''
 
         super(ParametricModel, self).__init__()
 
+    
+    def _check_resolution(self, data):
+        
+        # TODO: Fix this mess.. Make the .resolution behavior consistent!
+        if self.data['resolution'] == data.resolution:
+            return True
+        try:
+            if self.data['resolution'].value == data.resolution.duration_s():
+                return True
+        except:
+            pass
+        try:
+            if self.data['resolution'].duration_s() == data.resolution.value:
+                return True
+        except:
+            pass
+        try:
+            if self.data['resolution'].duration_s() == data.resolution:
+                return True
+        except:
+            pass
+        return False
+                
 
     def predict(self, data, *args, **kwargs):
 
@@ -175,6 +206,9 @@ and optionally a fit() method if the parameters are to be learnt form data.'''
             raise NotFittedError()
 
         check_timeseries(data)
+
+        if not self._check_resolution(data):
+            raise ValueError('This model is fitted on "{}" resolution data, while your data has "{}" resolution.'.format(self.data['resolution'], data.resolution))
         
         return self._predict(data, *args, **kwargs)
 
@@ -190,6 +224,9 @@ and optionally a fit() method if the parameters are to be learnt form data.'''
             raise NotFittedError()
 
         check_timeseries(data)
+
+        if not self._check_resolution(data):
+            raise ValueError('This model is fitted on "{}" resolution data, while your data has "{}" resolution.'.format(self.data['resolution'], data.resolution))
         
         return self._apply(data, *args, **kwargs)
 
@@ -222,13 +259,27 @@ and optionally a fit() method if the parameters are to be learnt form data.'''
 
         self.data['fitted_at'] = now_t()
         self.fitted = True
+        self.data['resolution'] = data.resolution
+
+            
         return fit_output
 
         
     def save(self, path):
-        # TODO: dump and enforce the resolution as well?
+
         if not self.fitted:
             raise NotFittedError()
+
+        # Dump as string representation fit data resolution, always in seconds if except if in calendar units
+        try:
+            if self.data['resolution'].type == TimeUnit.CALENDAR:
+                self.data['resolution'] = str(self.data['resolution'])
+            else:
+                self.data['resolution'] = str(self.data['resolution'].duration_s())
+        except AttributeError:
+            self.data['resolution'] = str(self.data['resolution'])
+        
+        # Prepare model dir and dump data as json
         model_dir = '{}/{}'.format(path, self.data['id'])
         os.makedirs(model_dir)
         model_data_file = '{}/data.json'.format(model_dir)
