@@ -1,7 +1,7 @@
 import unittest
 import os
 import tempfile
-from math import sin
+from math import sin, cos
 from ..datastructures import DataTimeSlotSeries, DataTimeSlot, TimePoint, DataTimePoint, DataTimePointSeries
 from ..models import Model, ParametricModel
 from ..models import PeriodicAverageReconstructor, PeriodicAverageForecaster, ProphetForecaster, ProphetReconstructor, ARIMAForecaster, AARIMAForecaster, LSTMForecaster
@@ -402,6 +402,21 @@ class TestForecasters(unittest.TestCase):
         # Test using another feature
         LSTMForecaster(features=['values','diffs']).fit(sine_data_time_slot_series_minute)
 
+
+    def test_LSTMForecaster_multivariate(self):
+        
+        # Create a minute-resolution test DataTimeSlotSeries
+        sine_data_time_slot_series_minute = DataTimeSlotSeries()
+        for i in range(10):
+            sine_data_time_slot_series_minute.append(DataTimeSlot(start=TimePoint(i*60), end=TimePoint((i+1)*60), data={'sin':sin(i/10.0), 'cos':cos(i/10.0)}))
+
+        forecaster = LSTMForecaster()
+        forecaster.fit(sine_data_time_slot_series_minute)
+        predicted_data = forecaster.predict(sine_data_time_slot_series_minute)
+        
+        self.assertTrue('sin' in predicted_data)
+        self.assertTrue('cos' in predicted_data)
+        
         
 
 class TestAnomalyDetectors(unittest.TestCase):

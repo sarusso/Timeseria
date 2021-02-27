@@ -1503,10 +1503,10 @@ class NeuralNetModel(Model):
         return window_datapoints
     
     @staticmethod
-    def to_target_values_vector(timeseries, window, forecast_n, target_data_key):
+    def to_target_values_vector(timeseries, window, forecast_n):
         '''Compute target values vector'''
     
-        key = timeseries.data_keys()[0]
+        data_keys = timeseries.data_keys()
     
         targets = []
         for i, _ in enumerate(timeseries):
@@ -1518,9 +1518,10 @@ class NeuralNetModel(Model):
             # Add forecast target value(s)
             row = []
             for j in range(forecast_n):
-                row.append(timeseries[i+j].data[key])
+                for data_key in data_keys:
+                    row.append(timeseries[i+j].data[data_key])
             targets.append(row)
-                
+
         return targets
 
     @staticmethod
@@ -1621,7 +1622,7 @@ class LSTMForecaster(Forecaster, NeuralNetModel):
         # Move to "matrix" of windows plus "vector" of targets data representation. Or, in other words:
         # window_datapoints is a list of lists (matrix) where each nested list (row) is a list of window datapoints.
         window_datapoints_matrix = self.to_window_datapoints_matrix(timeseries_normalized, window=self.window, forecast_n=1)
-        target_values_vector = self.to_target_values_vector(timeseries_normalized, window=self.window, forecast_n=1, target_data_key=target_data_key)
+        target_values_vector = self.to_target_values_vector(timeseries_normalized, window=self.window, forecast_n=1)
 
         # Compute window features
         window_features = []
@@ -1632,11 +1633,12 @@ class LSTMForecaster(Forecaster, NeuralNetModel):
 
         # Obtain the number of features based on compute_window_features() output
         features_per_window_item = len(window_features[0][0])
+        output_dimension = len(target_values_vector[0])
         
         # Create the model
         model = Sequential()
         model.add(LSTM(self.neurons, input_shape=(self.window, features_per_window_item)))
-        model.add(Dense(1)) # The output 
+        model.add(Dense(output_dimension)) 
         model.compile(loss='mean_squared_error', optimizer='adam')
 
         # Fit
@@ -1677,16 +1679,21 @@ class LSTMForecaster(Forecaster, NeuralNetModel):
 
         # Perform the predict and set prediction data
         yhat = self.model.predict(array([window_features]), verbose=verbose)
-        predicted_value = yhat[0][0]
+
+        predicted_data = {}
+        for i, data_key in enumerate(self.data_keys):
+            
+            # Get the prediction
+            predicted_value_normalized = yhat[0][i]
         
-        # De-normalize
-        predicted_value = (predicted_value*(self.max_values[self.data_keys[0]] - self.min_values[self.data_keys[0]])) + self.min_values[self.data_keys[0]]
-        
-        # Set prediction data
-        predicted_data = {self.data_keys[0]: predicted_value}
+            # De-normalize
+            predicted_value = (predicted_value_normalized*(self.max_values[data_key] - self.min_values[data_key])) + self.min_values[data_key]
+            
+            # Append to prediction data
+            predicted_data[data_key] = predicted_value
 
         # Return
-        return  predicted_data
+        return predicted_data
 
 
 
