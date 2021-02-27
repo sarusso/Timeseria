@@ -416,7 +416,29 @@ class TestForecasters(unittest.TestCase):
         
         self.assertTrue('sin' in predicted_data)
         self.assertTrue('cos' in predicted_data)
+
+
+    def test_LSTMForecaster_save_load(self):
         
+        # Create a minute-resolution test DataTimeSlotSeries
+        sine_data_time_slot_series_minute = DataTimeSlotSeries()
+        for i in range(10):
+            sine_data_time_slot_series_minute.append(DataTimeSlot(start=TimePoint(i*60), end=TimePoint((i+1)*60), data={'sin':sin(i/10.0), 'cos':cos(i/10.0)}))
+
+        forecaster = LSTMForecaster()
+        forecaster.fit(sine_data_time_slot_series_minute)
+        
+        # Save
+        model_dir = forecaster.save(TEMP_MODELS_DIR)
+
+        # Load
+        loaded_forecaster = LSTMForecaster(path=model_dir)
+        
+        # Predict from the loaded model 
+        predicted_data = loaded_forecaster.predict(sine_data_time_slot_series_minute)
+        
+        self.assertTrue('sin' in predicted_data)
+        self.assertTrue('cos' in predicted_data)   
         
 
 class TestAnomalyDetectors(unittest.TestCase):

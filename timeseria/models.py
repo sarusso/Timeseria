@@ -15,6 +15,7 @@ from numpy import array
 from math import sqrt
 from copy import deepcopy
 from collections import OrderedDict
+import shutil
 
 # Keras and sklearn
 from keras.models import Sequential
@@ -22,6 +23,7 @@ from keras.layers import Dense
 from keras.layers import LSTM
 from keras.layers import Dropout
 from keras import optimizers
+from keras.models import load_model as load_keras_model
 from sklearn.metrics import mean_squared_error
 from sklearn.preprocessing import MinMaxScaler
 
@@ -1473,7 +1475,29 @@ class AARIMAForecaster(Forecaster):
 
 
 
-class NeuralNetModel(Model):
+class KerasModel(Model):
+
+    def __init__(self, path=None, id=None):
+        
+        super(KerasModel, self).__init__(path=path, id=id)
+
+        if path:
+            self.keras_model = load_keras_model('{}/keras_model'.format(path))
+
+
+    def save(self, path):
+
+        # Save the parameters (the "data") property
+        model_dir = super(KerasModel, self).save(path)
+
+        # Now save the Keras model itself
+        try:
+            self.keras_model.save('{}/keras_model'.format(model_dir))
+        except Exception as e:
+            shutil.rmtree(model_dir)
+            raise e
+        return model_dir
+
 
     @staticmethod
     def to_windows(timeseries):
@@ -1567,9 +1591,20 @@ class NeuralNetModel(Model):
         return window_features
 
 
-class LSTMForecaster(Forecaster, NeuralNetModel):
 
-    def __init__(self, window=None, features=None, neurons=128):
+class LSTMForecaster(KerasModel, Forecaster):
+
+    def __init__(self, path=None, id=None, window=None, features=None, neurons=128, keras_model=None):
+
+        super(LSTMForecaster, self).__init__(path=path, id=id)
+        
+        # Did the init load a model?
+        try:
+            if self.fitted:
+                # If so, no need to proceed
+                return
+        except AttributeError:
+            pass
         
         if not window:
             logger.info('Using default window size of 3')
@@ -1578,12 +1613,14 @@ class LSTMForecaster(Forecaster, NeuralNetModel):
         if not features:
             logger.info('Using default features: values')
             features = ['values']
-                    
-        self.window = window
-        self.neurons = neurons
-        self.features = features
         
-        super(LSTMForecaster, self).__init__()
+        # Set window, neurons, features
+        self.data['window'] = window
+        self.data['neurons'] = neurons
+        self.data['features'] = features
+        
+        # Set external model architecture if any
+        self.keras_model = keras_model
 
 
     def _fit(self, timeseries, from_t=None, to_t=None, from_dt=None, to_dt=None, verbose=False, epochs=30):
@@ -1599,11 +1636,7 @@ class LSTMForecaster(Forecaster, NeuralNetModel):
 
         # Data keys shortcut
         data_keys = timeseries.data_keys()
-        
-        # Set forecaster target data key
-        # TODO: how to hanle this..?
-        target_data_key = timeseries.data_keys()[0]
-        
+
         # Set min and max
         min_values = timeseries.min()
         max_values = timeseries.max()
@@ -1622,35 +1655,34 @@ class LSTMForecaster(Forecaster, NeuralNetModel):
 
         # Move to "matrix" of windows plus "vector" of targets data representation. Or, in other words:
         # window_datapoints is a list of lists (matrix) where each nested list (row) is a list of window datapoints.
-        window_datapoints_matrix = self.to_window_datapoints_matrix(timeseries_normalized, window=self.window, forecast_n=1)
-        target_values_vector = self.to_target_values_vector(timeseries_normalized, window=self.window, forecast_n=1)
+        window_datapoints_matrix = self.to_window_datapoints_matrix(timeseries_normalized, window=self.data['window'], forecast_n=1)
+        target_values_vector = self.to_target_values_vector(timeseries_normalized, window=self.data['window'], forecast_n=1)
 
         # Compute window features
         window_features = []
         for window_datapoints in window_datapoints_matrix:
             window_features.append(self.compute_window_features(window_datapoints,
                                                                 data_keys = data_keys,
-                                                                features=self.features))
+                                                                features=self.data['features']))
 
         # Obtain the number of features based on compute_window_features() output
         features_per_window_item = len(window_features[0][0])
         output_dimension = len(target_values_vector[0])
         
-        # Create the model
-        model = Sequential()
-        model.add(LSTM(self.neurons, input_shape=(self.window, features_per_window_item)))
-        model.add(Dense(output_dimension)) 
-        model.compile(loss='mean_squared_error', optimizer='adam')
+        # Create the default model architeture if not given in the init
+        if not self.keras_model:
+            self.keras_model = Sequential()
+            self.keras_model.add(LSTM(self.data['neurons'], input_shape=(self.data['window'], features_per_window_item)))
+            self.keras_model.add(Dense(output_dimension)) 
+            self.keras_model.compile(loss='mean_squared_error', optimizer='adam')
 
         # Fit
-        model.fit(array(window_features), array(target_values_vector), epochs=epochs, verbose=verbose)
+        self.keras_model.fit(array(window_features), array(target_values_vector), epochs=epochs, verbose=verbose)
         
-        # Store internally
-        self.model = model
-        self.target_data_key = target_data_key
-        self.min_values = min_values
-        self.max_values = max_values
-        self.data_keys = data_keys
+        # Store data
+        self.data['min_values'] = min_values
+        self.data['max_values'] = max_values
+        self.data['data_keys'] = data_keys
 
 
     def _predict(self, timeseries, n=1, key=None, verbose=False):
@@ -1665,7 +1697,7 @@ class LSTMForecaster(Forecaster, NeuralNetModel):
             verbose=0
 
         # Get the window if we were given a longer timeseries
-        window_timeseries = timeseries[-self.window:]
+        window_timeseries = timeseries[-self.data['window']:]
         
         # Duplicate so that we ae free to normalize in-place at the next step
         window_timeseries = window_timeseries.duplicate()
@@ -1673,22 +1705,22 @@ class LSTMForecaster(Forecaster, NeuralNetModel):
         # Normalize window data
         for datapoint in window_timeseries:
             for data_key in datapoint.data:
-                datapoint.data[data_key] = (datapoint.data[data_key] - self.min_values[data_key]) / (self.max_values[data_key] - self.min_values[data_key])
+                datapoint.data[data_key] = (datapoint.data[data_key] - self.data['min_values'][data_key]) / (self.data['max_values'][data_key] - self.data['min_values'][data_key])
 
         # Compute window features
-        window_features = self.compute_window_features(window_timeseries, data_keys=self.data_keys, features=self.features)
+        window_features = self.compute_window_features(window_timeseries, data_keys=self.data['data_keys'], features=self.data['features'])
 
         # Perform the predict and set prediction data
-        yhat = self.model.predict(array([window_features]), verbose=verbose)
+        yhat = self.keras_model.predict(array([window_features]), verbose=verbose)
 
         predicted_data = {}
-        for i, data_key in enumerate(self.data_keys):
+        for i, data_key in enumerate(self.data['data_keys']):
             
             # Get the prediction
             predicted_value_normalized = yhat[0][i]
         
             # De-normalize
-            predicted_value = (predicted_value_normalized*(self.max_values[data_key] - self.min_values[data_key])) + self.min_values[data_key]
+            predicted_value = (predicted_value_normalized*(self.data['max_values'][data_key] - self.data['min_values'][data_key])) + self.data['min_values'][data_key]
             
             # Append to prediction data
             predicted_data[data_key] = predicted_value
