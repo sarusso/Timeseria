@@ -996,11 +996,12 @@ class Forecaster(ParametricModel):
         except KeyError:
             pass
 
-        if len(timeseries.data_keys()) > 1:
-            raise NotImplementedError('Multivariate time series are not yet supported')
-
-        # Set data key     
-        key = timeseries.data_keys()[0]
+        # Set data key if only one key (for models not supporting multivariate)
+        data_keys = timeseries.data_keys()
+        if len(data_keys) > 1:
+            key = None
+        else:
+            key = data_keys[0]
         
         input_timeseries_len = len(timeseries)
  
@@ -1057,7 +1058,7 @@ class Forecaster(ParametricModel):
             return None
 
 
-    def forecast(self, timeseries, key, n=1, forecast_start=None):
+    def forecast(self, timeseries, key=None, n=1, forecast_start=None):
 
         # Set forecast starting item
         if forecast_start is not None:
