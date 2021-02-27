@@ -391,10 +391,18 @@ class TestForecasters(unittest.TestCase):
         forecaster.fit(sine_data_time_slot_series_minute)
         predicted_value = forecaster.predict(sine_data_time_slot_series_minute)['value']
         
+        # Give some tolerance
         self.assertTrue(predicted_value>0.5)
-        self.assertTrue(predicted_value<1)
+        self.assertTrue(predicted_value<1.1)
         
+        # Not-existent features
+        with self.assertRaises(ValueError):
+            forecaster.fit(sine_data_time_slot_series_minute, features=['values','not_existent_feature'])
 
+        # Test using another feature
+        forecaster.fit(sine_data_time_slot_series_minute, features=['values','diffs'])
+
+        
 
 class TestAnomalyDetectors(unittest.TestCase):
 

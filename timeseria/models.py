@@ -14,6 +14,7 @@ from pandas import DataFrame
 from numpy import array
 from math import sqrt
 from copy import deepcopy
+from collections import OrderedDict
 
 # Keras and sklearn
 from keras.models import Sequential
@@ -1470,117 +1471,114 @@ class AARIMAForecaster(Forecaster):
         return [{key: value} for value in self.model.predict(n)]
 
 
-def to_df_matrix_data(timeseries, window_datapoints, forecast_datapoints, encoder=None):
-    '''Create train and test datasets'''
-    import pandas as pd
 
-    prev_values = []
-    matrix = []
-    for i, _ in enumerate(timeseries):
-        if i <  window_datapoints:
-            continue
-        if i == len(timeseries)-forecast_datapoints:
-            break
-        
-        row = []
-        
-        # Add window values (features)
-        for j in range(window_datapoints):
-            row.append([timeseries[i-window_datapoints+j].t])
+class NeuralNetModel(Model):
+
+    @staticmethod
+    def to_windows(timeseries):
+        '''Compute window data values'''
+        key = timeseries.data_keys()[0]
+        window_data_values = []
+        for item in timeseries:
+            window_data_values.append(item.data[key])
+        return window_data_values
             
-        # Add forecast target value
-        for j in range(forecast_datapoints):
-            row.append(timeseries[i+j].t)
-            
-        matrix.append(row)
+    @staticmethod
+    def to_window_datapoints_matrix(timeseries, window, forecast_n, encoder=None):
+        '''Compute window datapoints matrix'''
     
-    # To Pandas
-    matrix_df = pd.DataFrame(matrix)
-    
-    # Add column names
-    col_names = []
-    for i in range(window_datapoints):
-        col_names.append('window features h({})'.format(i))
-    for i in range(forecast_datapoints):
-        col_names.append('forecast ({})'.format(i))
-    matrix_df.columns = col_names
-
-    #print(matrix_df)
-
-    return matrix_df
-
-
-def to_windows(timeseries):
-    '''Compute window data values'''
-    key = timeseries.data_keys()[0]
-    window_data_values = []
-    for item in timeseries:
-        window_data_values.append(item.data[key])
-    return window_data_values
-        
-
-def to_window_datapoints_matrix(timeseries, window, forecast_n, encoder=None):
-    '''Compute window datapoints matrix'''
-
-    window_datapoints = []
-    for i, _ in enumerate(timeseries):
-        if i <  window:
-            continue
-        if i == len(timeseries)-forecast_n:
-            break
+        window_datapoints = []
+        for i, _ in enumerate(timeseries):
+            if i <  window:
+                continue
+            if i == len(timeseries)-forecast_n:
+                break
+                    
+            # Add window values
+            row = []
+            for j in range(window):
+                row.append(timeseries[i-window+j])
+            window_datapoints.append(row)
                 
-        # Add window values
-        row = []
-        for j in range(window):
-            row.append(timeseries[i-window+j])
-        window_datapoints.append(row)
+        return window_datapoints
+    
+    @staticmethod
+    def to_target_values_vector(timeseries, window, forecast_n, target_data_key):
+        '''Compute target values vector'''
+    
+        key = timeseries.data_keys()[0]
+    
+        targets = []
+        for i, _ in enumerate(timeseries):
+            if i <  window:
+                continue
+            if i == len(timeseries)-forecast_n:
+                break
             
-    return window_datapoints
+            # Add forecast target value(s)
+            row = []
+            for j in range(forecast_n):
+                row.append(timeseries[i+j].data[key])
+            targets.append(row)
+                
+        return targets
 
+    @staticmethod
+    def compute_window_features(window_datapoints, data_keys, features):
 
-def to_target_values_vector(timeseries, window, forecast_n, target_data_key):
-    '''Compute target values vector'''
-
-    key = timeseries.data_keys()[0]
-
-    targets = []
-    for i, _ in enumerate(timeseries):
-        if i <  window:
-            continue
-        if i == len(timeseries)-forecast_n:
-            break
+        available_features = ['values', 'diffs', 'hours']
+        for feature in features:
+            if feature not in available_features:
+                raise ValueError('Unknown feature "{}"'.format(feature))
         
-        # Add forecast target value(s)
-        row = []
-        for j in range(forecast_n):
-            row.append(timeseries[i+j].data[key])
-        targets.append(row)
+        window_features=[]
+
+        for i in range(len(window_datapoints)):
             
-    return targets
+            datapoint_features = []
+            
+            # 1) datapoint values (for all keys)
+            if 'values' in features:
+                for data_key in data_keys:
+                    datapoint_features.append(window_datapoints[i].data[data_key])
+                            
+            # 2) Compute diffs on normalized datapoints
+            if 'diffs' in features:
+                for data_key in data_keys:
+                    if i ==0:
+                        diff = window_datapoints[1].data[data_key] - window_datapoints[0].data[data_key]
+                    elif i == len(window_datapoints)-1:
+                        diff = window_datapoints[-1].data[data_key] - window_datapoints[-2].data[data_key]
+                    else:
+                        diff = (window_datapoints[i+1].data[data_key] - window_datapoints[i-1].data[data_key]) /2
+                    if diff == 0:
+                        diff = 1
+                    datapoint_features.append(diff)
+
+            # 3) Hour (normlized)
+            if 'hours' in features:
+                datapoint_features.append(window_datapoints[i].dt.hour/24)
+                
+            # Now append to the window features
+            window_features.append(datapoint_features)
+
+        return window_features
 
 
-
-def compute_window_features(window_datapoints, target_data_key):
-    window_features=[]
-    for datapoint in window_datapoints:
-        datapoint_features=[]
-        datapoint_features.append(datapoint.data[target_data_key])
-        window_features.append(datapoint_features)
-    return window_features
+class LSTMForecaster(Forecaster, NeuralNetModel):
 
 
-class LSTMForecaster(Forecaster):
+    def _fit(self, timeseries, window=None, dst_affected=False, from_t=None, to_t=None, from_dt=None, to_dt=None, verbose=False, epochs=30, features=None):
 
-  
-    def _fit(self, timeseries, window=None, dst_affected=False, from_t=None, to_t=None, from_dt=None, to_dt=None, verbose=False):
-
+        # Set default window
         if not window:
             logger.info('Using default window size of 3')
             window = 3
+        if not features:
+            logger.info('Using default features: values')
+            features = ['values']
 
-        if len(timeseries.data_keys()) > 1:
-            raise NotImplementedError('Multivariate time series are not yet supported')
-
+        # Set from and to
         from_t, to_t = set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
 
         # Set verbose switch
@@ -1591,26 +1589,43 @@ class LSTMForecaster(Forecaster):
 
         # Define nnet
         neurons = 128
-
-        # Set forecaster target data key
-        target_data_key = timeseries.data_keys()[0]
-
-        # Move to "matrix" of windows plus "vector" of targets data representation
-        window_datapoints_matrix = to_window_datapoints_matrix(timeseries, window=window, forecast_n=1)
-        target_values_vector = to_target_values_vector(timeseries, window=window, forecast_n=1, target_data_key=target_data_key)
         
-        # window_datapoints is a list of lists (matrix) where each nested list (row) is a list of window datapoints.
-        # TODO: compute features before this split?
+        # TODO: neurons and window in init
 
+        # Data keys shortcut
+        data_keys = timeseries.data_keys()
+        
+        # Set forecaster target data key
+        # TODO: how to hanle this..?
+        target_data_key = timeseries.data_keys()[0]
+        
+        # Set min and max
+        min_values = timeseries.min()
+        max_values = timeseries.max()
+        
+        # Fix some debeatable behaviour
+        if not isinstance(min_values, dict):
+            min_values = {timeseries.data_keys()[0]:min_values}
+        if not isinstance(max_values, dict):
+            max_values = {timeseries.data_keys()[0]:max_values}
+        
+        # Normalize data
+        timeseries_normalized = timeseries.duplicate()
+        for datapoint in timeseries_normalized:
+            for data_key in datapoint.data:
+                datapoint.data[data_key] = (datapoint.data[data_key] - min_values[data_key]) / (max_values[data_key] - min_values[data_key])
+
+        # Move to "matrix" of windows plus "vector" of targets data representation. Or, in other words:
+        # window_datapoints is a list of lists (matrix) where each nested list (row) is a list of window datapoints.
+        window_datapoints_matrix = self.to_window_datapoints_matrix(timeseries_normalized, window=window, forecast_n=1)
+        target_values_vector = self.to_target_values_vector(timeseries_normalized, window=window, forecast_n=1, target_data_key=target_data_key)
 
         # Compute window features
         window_features = []
         for window_datapoints in window_datapoints_matrix:
-            window_features.append(compute_window_features(window_datapoints, target_data_key=target_data_key))
-        #print('============')
-        #print(windows)
-        #print(window_features)
-        #print('============')
+            window_features.append(self.compute_window_features(window_datapoints,
+                                                                data_keys = data_keys,
+                                                                features=features))
 
         # Obtain the number of features based on compute_window_features() output
         features_per_window_item = len(window_features[0][0])
@@ -1622,53 +1637,55 @@ class LSTMForecaster(Forecaster):
         model.compile(loss='mean_squared_error', optimizer='adam')
 
         # Fit
-        model.fit(array(window_features), array(target_values_vector), epochs=30, verbose=0)
+        model.fit(array(window_features), array(target_values_vector), epochs=epochs, verbose=verbose)
         
         # Store internally
         self.model = model
         self.window = window
         self.target_data_key = target_data_key
+        self.min_values = min_values
+        self.max_values = max_values
+        self.data_keys = data_keys
+        self.features = features
 
 
-
-    def _predict(self, timeseries, n=1, key=None):
+    def _predict(self, timeseries, n=1, key=None, verbose=False):
 
         if n>1:
             raise NotImplementedError('This forecaster does not support multi-step predictions.')
 
-        # Set data key
-        if not key:
-            if len(timeseries.data_keys()) > 1:
-                raise Exception('Multivariate time series require to have the key of the prediction specified')
-            key=timeseries.data_keys()[0]
+        # Set verbose switch
+        if verbose:
+            verbose=1
+        else:
+            verbose=0
 
         # Get the window if we were given a longer timeseries
         window_timeseries = timeseries[-self.window:]
+        
+        # Duplicate so that we ae free to normalize in-place at the next step
+        window_timeseries = window_timeseries.duplicate()
+        
+        # Normalize window data
+        for datapoint in window_timeseries:
+            for data_key in datapoint.data:
+                datapoint.data[data_key] = (datapoint.data[data_key] - self.min_values[data_key]) / (self.max_values[data_key] - self.min_values[data_key])
 
         # Compute window features
-        window_features = compute_window_features(window_timeseries, target_data_key=self.target_data_key)
-
-        #print('----------wf-------')
-        #print(window_features)
+        window_features = self.compute_window_features(window_timeseries, data_keys=self.data_keys, features=self.features)
 
         # Perform the predict and set prediction data
-        yhat = self.model.predict(array([window_features]), verbose=0)
-        predicted_data = {key: yhat[0][0]}
+        yhat = self.model.predict(array([window_features]), verbose=verbose)
+        predicted_value = yhat[0][0]
+        
+        # De-normalize
+        predicted_value = (predicted_value*(self.max_values[self.data_keys[0]] - self.min_values[self.data_keys[0]])) + self.min_values[self.data_keys[0]]
+        
+        # Set prediction data
+        predicted_data = {self.data_keys[0]: predicted_value}
 
         # Return
         return  predicted_data
-
-    
-    def _plot_averages(self, timeseries, **kwargs):      
-        averages_timeseries = copy.deepcopy(timeseries)
-        for item in averages_timeseries:
-            value = self.data['averages'][get_periodicity_index(item, averages_timeseries._resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])]
-            if not value:
-                value = 0
-            item.data['average'] =value 
-        averages_timeseries.plot(**kwargs)
-
-
 
 
 
