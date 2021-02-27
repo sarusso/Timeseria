@@ -32,6 +32,11 @@ from sklearn.preprocessing import MinMaxScaler
 import logging
 logger = logging.getLogger(__name__)
 
+# Suppress TensorFlow warnings as default behavior
+import tensorflow as tf
+tf.logging.set_verbosity(tf.logging.ERROR)
+
+
 HARD_DEBUG = False
 
 
