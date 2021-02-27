@@ -1567,16 +1567,24 @@ class NeuralNetModel(Model):
 
 class LSTMForecaster(Forecaster, NeuralNetModel):
 
-
-    def _fit(self, timeseries, window=None, dst_affected=False, from_t=None, to_t=None, from_dt=None, to_dt=None, verbose=False, epochs=30, features=None):
-
-        # Set default window
+    def __init__(self, window=None, features=None, neurons=128):
+        
         if not window:
             logger.info('Using default window size of 3')
             window = 3
+       
         if not features:
             logger.info('Using default features: values')
             features = ['values']
+                    
+        self.window = window
+        self.neurons = neurons
+        self.features = features
+        
+        super(LSTMForecaster, self).__init__()
+
+
+    def _fit(self, timeseries, from_t=None, to_t=None, from_dt=None, to_dt=None, verbose=False, epochs=30):
 
         # Set from and to
         from_t, to_t = set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
@@ -1586,11 +1594,6 @@ class LSTMForecaster(Forecaster, NeuralNetModel):
             verbose=1
         else:
             verbose=0
-
-        # Define nnet
-        neurons = 128
-        
-        # TODO: neurons and window in init
 
         # Data keys shortcut
         data_keys = timeseries.data_keys()
@@ -1617,22 +1620,22 @@ class LSTMForecaster(Forecaster, NeuralNetModel):
 
         # Move to "matrix" of windows plus "vector" of targets data representation. Or, in other words:
         # window_datapoints is a list of lists (matrix) where each nested list (row) is a list of window datapoints.
-        window_datapoints_matrix = self.to_window_datapoints_matrix(timeseries_normalized, window=window, forecast_n=1)
-        target_values_vector = self.to_target_values_vector(timeseries_normalized, window=window, forecast_n=1, target_data_key=target_data_key)
+        window_datapoints_matrix = self.to_window_datapoints_matrix(timeseries_normalized, window=self.window, forecast_n=1)
+        target_values_vector = self.to_target_values_vector(timeseries_normalized, window=self.window, forecast_n=1, target_data_key=target_data_key)
 
         # Compute window features
         window_features = []
         for window_datapoints in window_datapoints_matrix:
             window_features.append(self.compute_window_features(window_datapoints,
                                                                 data_keys = data_keys,
-                                                                features=features))
+                                                                features=self.features))
 
         # Obtain the number of features based on compute_window_features() output
         features_per_window_item = len(window_features[0][0])
         
         # Create the model
         model = Sequential()
-        model.add(LSTM(neurons, input_shape=(window, features_per_window_item)))
+        model.add(LSTM(self.neurons, input_shape=(self.window, features_per_window_item)))
         model.add(Dense(1)) # The output 
         model.compile(loss='mean_squared_error', optimizer='adam')
 
@@ -1641,12 +1644,10 @@ class LSTMForecaster(Forecaster, NeuralNetModel):
         
         # Store internally
         self.model = model
-        self.window = window
         self.target_data_key = target_data_key
         self.min_values = min_values
         self.max_values = max_values
         self.data_keys = data_keys
-        self.features = features
 
 
     def _predict(self, timeseries, n=1, key=None, verbose=False):

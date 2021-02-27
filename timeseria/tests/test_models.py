@@ -397,10 +397,10 @@ class TestForecasters(unittest.TestCase):
         
         # Not-existent features
         with self.assertRaises(ValueError):
-            forecaster.fit(sine_data_time_slot_series_minute, features=['values','not_existent_feature'])
+            LSTMForecaster(features=['values','not_existent_feature']).fit(sine_data_time_slot_series_minute)
 
         # Test using another feature
-        forecaster.fit(sine_data_time_slot_series_minute, features=['values','diffs'])
+        LSTMForecaster(features=['values','diffs']).fit(sine_data_time_slot_series_minute)
 
         
 
