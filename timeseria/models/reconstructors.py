@@ -47,6 +47,10 @@ from .base import get_periodicity_index, mean_absolute_percentage_error
 
 class Reconstructor(TimeSeriesParametricModel):
 
+    def _predict(self, *args, **kwargs):
+        raise NotImplementedError('Reconstructors can be used only from the apply() method.') from None
+
+
     def _apply(self, timeseries, remove_data_loss=False, data_loss_threshold=1, inplace=False):
         logger.debug('Using data_loss_threshold="%s"', data_loss_threshold)
 
