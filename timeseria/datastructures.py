@@ -557,7 +557,7 @@ class DataPointSeries(PointSeries):
         else:
             # TODO: can we optimize here? Computing them once and then serving them does not work if someone changes data keys...
             try:
-                return list(self[0].data.keys())
+                return sorted(list(self[0].data.keys()))
             except AttributeError:
                 return list(range(len(self[0].data)))
 
@@ -1019,7 +1019,7 @@ class DataSlotSeries(SlotSeries):
         else:
             # TODO: can we optimize here? Computing them once and then serving them does not work if someone changes data keys...
             try:
-                return list(self[0].data.keys())
+                return sorted(list(self[0].data.keys()))
             except AttributeError:
                 return list(range(len(self[0].data)))
 
