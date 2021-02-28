@@ -12,7 +12,7 @@ holidays==0.10.3
 cython==0.29.17
 pystan==2.19.1.1
 plotly==4.9.0
-requests==2.5.3
+requests==2.20.0
 h5py==2.10.0
 
 # Optional
