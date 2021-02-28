@@ -545,6 +545,7 @@ class KerasModel(Model):
         
         super(KerasModel, self).__init__(path=path, id=id)
 
+        # If loaded, load the Keras model as well
         if path:
             self.keras_model = load_keras_model('{}/keras_model'.format(path))
 
