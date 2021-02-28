@@ -3,8 +3,11 @@ import os
 import tempfile
 from math import sin, cos
 from ..datastructures import DataTimeSlotSeries, DataTimeSlot, TimePoint, DataTimePoint, DataTimePointSeries
-from ..models import Model, ParametricModel
-from ..models import PeriodicAverageReconstructor, PeriodicAverageForecaster, ProphetForecaster, ProphetReconstructor, ARIMAForecaster, AARIMAForecaster, LSTMForecaster
+from ..models import Model, ParametricModel, TimeSeriesParametricModel
+from ..models import PeriodicAverageReconstructor, PeriodicAverageForecaster, PeriodicAverageAnomalyDetector
+from ..models import ProphetForecaster, ProphetReconstructor
+from ..models import ARIMAForecaster, AARIMAForecaster
+from ..models import LSTMForecaster
 from ..exceptions import NotFittedError, NonContiguityError
 from ..storages import CSVFileStorage
 from ..transformations import Slotter, Resampler
@@ -23,12 +26,17 @@ class TestBaseModelClasses(unittest.TestCase):
 
     def test_Model(self):
         model = Model()
-        
+
+
     def test_ParametricModel(self):
+        # TODO: decouple from the TimeSeriesParametricModel test below
+        parametric_model = ParametricModel()
         
+  
+    def test_TimeSeriesParametricModel(self):
         
         # Define a trainable model mock
-        class ParametricModelMock(ParametricModel):            
+        class ParametricModelMock(TimeSeriesParametricModel):            
             def _fit(self, *args, **kwargs):
                 pass 
             def _evaluate(self, *args, **kwargs):
@@ -457,8 +465,6 @@ class TestAnomalyDetectors(unittest.TestCase):
 
 
     def test_PeriodicAverageAnomalyDetector(self):
-
-        from ..models import PeriodicAverageAnomalyDetector
         
         anomaly_detector = PeriodicAverageAnomalyDetector()
         

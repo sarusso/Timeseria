@@ -5,7 +5,8 @@ import copy
 import statistics
 from .datastructures import DataTimeSlotSeries, DataTimeSlot, TimePoint, DataTimePointSeries, DataTimePoint, Slot, Point
 from .exceptions import NotFittedError, NonContiguityError, InputException
-from .utilities import get_periodicity, is_numerical, set_from_t_and_to_t, item_is_in_range, check_timeseries
+from .utilities import get_periodicity, is_numerical, set_from_t_and_to_t, item_is_in_range
+from .utilities import check_timeseries, check_resolution, check_data_keys
 from .time import now_t, dt_from_s, s_from_dt
 from datetime import timedelta, datetime
 from sklearn.metrics import mean_squared_error, mean_absolute_error
@@ -121,8 +122,6 @@ class Model(object):
             self._predict
         except AttributeError:
             raise NotImplementedError('Predicting from this model is not implemented')
-
-        check_timeseries(data)
         
         return self._predict(data, *args, **kwargs)
 
@@ -132,8 +131,6 @@ class Model(object):
             self._apply
         except AttributeError:
             raise NotImplementedError('Applying this model is not implemented')
-
-        check_timeseries(data)
         
         return self._apply(data, *args, **kwargs)
 
@@ -143,8 +140,6 @@ class Model(object):
             self._evaluate
         except AttributeError:
             raise NotImplementedError('Evaluating this model is not implemented')
-
-        check_timeseries(data)
         
         return self._evaluate(data, *args, **kwargs)
 
@@ -161,13 +156,6 @@ and optionally a fit() method if the parameters are to be learnt form data.'''
                 self.data = json.loads(f.read())         
             self.fitted = True
             
-            # Resolution as TimeUnit
-            try:
-                self.data['resolution'] = TimeUnit(self.data['resolution'])
-            except InputException:
-                # TODO: load as generic unit and make __eq__ work with both Units and TimeUnits?
-                self.data['resolution'] = TimeUnit('{}s'.format(int(float(self.data['resolution']))))
-                
         else:
             if not id:
                 id = str(uuid.uuid4())
@@ -176,30 +164,22 @@ and optionally a fit() method if the parameters are to be learnt form data.'''
 
         super(ParametricModel, self).__init__()
 
-    
-    def _check_resolution(self, data):
-        
-        # TODO: Fix this mess.. Make the .resolution behavior consistent!
-        if self.data['resolution'] == data.resolution:
-            return True
-        try:
-            if self.data['resolution'].value == data.resolution.duration_s():
-                return True
-        except:
-            pass
-        try:
-            if self.data['resolution'].duration_s() == data.resolution.value:
-                return True
-        except:
-            pass
-        try:
-            if self.data['resolution'].duration_s() == data.resolution:
-                return True
-        except:
-            pass
-        return False
-                
 
+    def save(self, path):
+
+        if not self.fitted:
+            raise NotFittedError()
+
+        # Prepare model dir and dump data as json
+        model_dir = '{}/{}'.format(path, self.data['id'])
+        os.makedirs(model_dir)
+        model_data_file = '{}/data.json'.format(model_dir)
+        with open(model_data_file, 'w') as f:
+            f.write(json.dumps(self.data))
+        logger.info('Saved model with id "%s" in "%s"', self.data['id'], model_dir)
+        return model_dir
+
+    
     def predict(self, data, *args, **kwargs):
 
         try:
@@ -210,11 +190,6 @@ and optionally a fit() method if the parameters are to be learnt form data.'''
         if not self.fitted:
             raise NotFittedError()
 
-        check_timeseries(data)
-
-        if not self._check_resolution(data):
-            raise ValueError('This model is fitted on "{}" resolution data, while your data has "{}" resolution.'.format(self.data['resolution'], data.resolution))
-        
         return self._predict(data, *args, **kwargs)
 
 
@@ -228,11 +203,6 @@ and optionally a fit() method if the parameters are to be learnt form data.'''
         if not self.fitted:
             raise NotFittedError()
 
-        check_timeseries(data)
-
-        if not self._check_resolution(data):
-            raise ValueError('This model is fitted on "{}" resolution data, while your data has "{}" resolution.'.format(self.data['resolution'], data.resolution))
-        
         return self._apply(data, *args, **kwargs)
 
 
@@ -245,63 +215,156 @@ and optionally a fit() method if the parameters are to be learnt form data.'''
 
         if not self.fitted:
             raise NotFittedError()
-        
-        check_timeseries(data)
-        
+                
         return self._evaluate(data, *args, **kwargs)
 
 
-    def fit(self, data, *args, **kwargs):
+    def fit(self, *args, **kwargs):
 
         try:
             self._fit
         except AttributeError:
             raise NotImplementedError('Fitting this model is not implemented')
-
-        check_timeseries(data)
         
-        fit_output = self._fit(data, *args, **kwargs)
+        fit_output = self._fit(*args, **kwargs)
 
         self.data['fitted_at'] = now_t()
         self.fitted = True
-        self.data['resolution'] = data.resolution
 
-            
         return fit_output
 
-        
-    def save(self, path):
 
-        if not self.fitted:
-            raise NotFittedError()
+    def cross_validate(self, *args, **kwargs):
 
-        # Dump as string representation fit data resolution, always in seconds if except if in calendar units
         try:
-            if self.data['resolution'].type == TimeUnit.CALENDAR:
-                self.data['resolution'] = str(self.data['resolution'])
-            else:
-                self.data['resolution'] = str(self.data['resolution'].duration_s())
+            self._cross_validate
         except AttributeError:
-            self.data['resolution'] = str(self.data['resolution'])
+            raise NotImplementedError('Cross-validating this model is not implemented')
+
+        return self._cross_validate(*args, **kwargs)
+
+
+    @property
+    def id(self):
+        return self.data['id']
+
+
+
+class TimeSeriesParametricModel(ParametricModel):
+    
+    def __init__(self, *args, **kwargs):
+
+        # Call parent init
+        super(TimeSeriesParametricModel, self).__init__(*args, **kwargs)
+
+        # If the model has been loaded, convert resolution as TimeUnit
+        if self.fitted:
+            try:
+                self.data['resolution'] = TimeUnit(self.data['resolution'])
+            except InputException:
+                # TODO: load as generic unit and make __eq__ work with both Units and TimeUnits?
+                self.data['resolution'] = TimeUnit('{}s'.format(int(float(self.data['resolution']))))
+
+
+    def save(self, *args, **kwargs):
+
+        # If fitted, handle resolution. If not fitted, the parent save will raise.
+        if self.fitted:
         
-        # Prepare model dir and dump data as json
-        model_dir = '{}/{}'.format(path, self.data['id'])
-        os.makedirs(model_dir)
-        model_data_file = '{}/data.json'.format(model_dir)
-        with open(model_data_file, 'w') as f:
-            f.write(json.dumps(self.data))
-        logger.info('Saved model with id "%s" in "%s"', self.data['id'], model_dir)
-        return model_dir
+            # Save original data resolution (Unit or TimeUnit Object)
+            or_resolution = self.data['resolution']
+    
+            # Dump as string representation fit data resolution, always in seconds if except if in calendar units
+            try:
+                if self.data['resolution'].type == TimeUnit.CALENDAR:
+                    self.data['resolution'] = str(self.data['resolution'])
+                else:
+                    self.data['resolution'] = str(self.data['resolution'].duration_s())
+            except AttributeError:
+                self.data['resolution'] = str(self.data['resolution'])
+            
+        # Call parent save
+        save_output  = super(TimeSeriesParametricModel, self).save(*args, **kwargs)
+        
+        # Set back original data resolution
+        self.data['resolution'] = or_resolution
+        
+        # Return output
+        return save_output
 
 
-    def cross_validate(self, data, *args, **kwargs):
+    def fit(self, timeseries, *args, **kwargs):
+        
+        # Check timeseries
+        check_timeseries(timeseries)
+        
+        # Call parent fit
+        fit_output = super(TimeSeriesParametricModel, self).fit(timeseries, *args, **kwargs)
+        
+        # Set timeseries resolution
+        self.data['resolution'] = timeseries.resolution
+        
+        # Set timeseries data keys
+        self.data['data_keys'] = timeseries.data_keys()
+
+        # Return output
+        return fit_output
+
+
+    def predict(self, timeseries, *args, **kwargs):
+        
+        # Check timeseries and its resolution
+        check_timeseries(timeseries)
+        
+        # If fitted, check resolution and keys. If not fitted, the parent init will raise.
+        if self.fitted:
+            check_resolution(timeseries, self.data['resolution'])
+            check_data_keys(timeseries, self.data['data_keys'])
+                
+        # Call parent predict and return output
+        return super(TimeSeriesParametricModel, self).predict(timeseries, *args, **kwargs)
+
+
+    def evaluate(self, timeseries, *args, **kwargs):
+        
+        # Check timeseries and its resolution
+        check_timeseries(timeseries)
+        
+        # If fitted, check resolution. If not fitted, the parent init will raise.
+        if self.fitted:
+            check_resolution(timeseries, self.data['resolution'])
+                
+        # Call parent evaluate and return output
+        return super(TimeSeriesParametricModel, self).evaluate(timeseries, *args, **kwargs)
+
+
+    def apply(self, timeseries, *args, **kwargs):
+        
+        # Check timeseries
+        check_timeseries(timeseries)
+        
+        # If fitted, check resolution. If not fitted, the parent init will raise.
+        if self.fitted:
+            check_resolution(timeseries, self.data['resolution'])
+        
+        # Call parent apply and return output
+        return super(TimeSeriesParametricModel, self).apply(timeseries, *args, **kwargs)
+
+
+    def _cross_validate(self, data, *args, **kwargs):
+
         try:
             self._evaluate
         except AttributeError:
-            raise NotImplementedError('Evaluating this model is not implemented')
+            raise NotImplementedError('Evaluating this model is not implemented, cannot cross-validate')
 
+        # Check timeseries
         check_timeseries(data)
-
+        
+        # If fitted, check resolution. If not fitted, the parent init will raise.
+        if self.fitted:
+            check_resolution(data, self.data['resolution'])
+        
         # Decouple fit from validate args
         fit_kwargs = {}
         evaluate_kwargs = {}
@@ -374,17 +437,12 @@ and optionally a fit() method if the parameters are to be learnt form data.'''
         return results
 
 
-    @property
-    def id(self):
-        return self.data['id']
-
-
 
 #======================
 # Data Reconstruction
 #======================
 
-class Reconstructor(ParametricModel):
+class Reconstructor(TimeSeriesParametricModel):
 
     def _apply(self, timeseries, remove_data_loss=False, data_loss_threshold=1, inplace=False):
         logger.debug('Using data_loss_threshold="%s"', data_loss_threshold)
@@ -725,7 +783,7 @@ class PeriodicAverageReconstructor(Reconstructor):
 
 
 
-class ProphetModel(ParametricModel):
+class ProphetModel(TimeSeriesParametricModel):
 
     @classmethod
     def remove_timezone(cls, dt):
@@ -812,7 +870,21 @@ class ProphetReconstructor(Reconstructor, ProphetModel):
 #  Forecasters
 #======================
 
-class Forecaster(ParametricModel):
+class Forecaster(TimeSeriesParametricModel):
+
+    def predict(self, timeseries, *args, **kwargs):
+ 
+        # Check if the input timeseries is shorter than the window, if any.
+        # However, nearly all forecasters use windows, at least of one point.
+        try:
+            if len(timeseries) < self.data['window']:
+                raise ValueError('The timeseries length ({}) is shorter than the model window ({}), it must be at least equal.'.format(len(timeseries), self.data['window']))
+        except KeyError:
+            pass
+        
+        # Call parent predict
+        return super(Forecaster, self).predict(timeseries, *args, **kwargs)
+
 
     def _evaluate(self, timeseries, steps='auto', limit=None, plots=False, metrics=['RMSE', 'MAE'], details=False, from_t=None, to_t=None, from_dt=None, to_dt=None):
 
@@ -1048,19 +1120,7 @@ class Forecaster(ParametricModel):
 
     def _apply(self, timeseries, n=1, inplace=False):
 
-        try:
-            if len(timeseries) < self.data['window']:
-                raise ValueError('The timeseries length ({}) is shorter than the model window ({}), it must be at least equal.'.format(len(timeseries), self.data['window']))
-        except KeyError:
-            pass
 
-        # Set data key if only one key (for models not supporting multivariate)
-        data_keys = timeseries.data_keys()
-        if len(data_keys) > 1:
-            key = None
-        else:
-            key = data_keys[0]
-        
         input_timeseries_len = len(timeseries)
  
         if inplace:
@@ -1074,12 +1134,9 @@ class Forecaster(ParametricModel):
         
         # Call model forecasting logic
         try:
-            forecast_model_results = self.forecast(timeseries = forecast_timeseries, key = key, n=n)
+            forecast_model_results = self.forecast(timeseries = forecast_timeseries, n=n)
             if not isinstance(forecast_model_results, list):
                 forecast_timeseries.append(forecast_model_results)
-            # TODO: Do we want to silently handle custom forecast models not supporting multi-step forecasting?
-            #elif len(forecast_model_results) == 1 and n >1:
-            #    raise NotImplementedError('Seems like the forecaster did not implement the multi-step forecast')
             else:
                 for item in forecast_model_results:
                     item.forecast = 1
@@ -1090,7 +1147,7 @@ class Forecaster(ParametricModel):
             for _ in range(n):
     
                 # Call the forecast only on the last point
-                forecast_model_results = self.forecast(timeseries = forecast_timeseries, key = key, n=1)
+                forecast_model_results = self.forecast(timeseries = forecast_timeseries, n=1)
 
                 # Add forecasted index
                 forecast_model_results.forecast = 1
@@ -1101,22 +1158,14 @@ class Forecaster(ParametricModel):
         # Do we have missing forecasts?
         if input_timeseries_len + n != len(forecast_timeseries):
             raise ValueError('There are missing forecasts. If your model does not support multi-step forecasting, raise a NotImplementedError if n>1 and Timeseria will handle it for you.')
-
-        # Set serie mark for the forecast and return (old approach)
-        #try:
-        #    # Handle items
-        #    forecast_timeseries.mark = [forecast_timeseries[-n].dt, forecast_timeseries[-1].end.dt]
-        #except AttributeError:
-        #    # Handle points TODO: should be dt-(resolution/2) and dt+(resolution/2)
-        #    forecast_timeseries.mark = [forecast_timeseries[-n].dt, forecast_timeseries[-1].dt]
-                
+ 
         if not inplace:
             return forecast_timeseries
         else:
             return None
 
 
-    def forecast(self, timeseries, key=None, n=1, forecast_start=None):
+    def forecast(self, timeseries, n=1, forecast_start=None):
 
         # Set forecast starting item
         if forecast_start is not None:
@@ -1127,19 +1176,14 @@ class Forecaster(ParametricModel):
         # Handle forecast start
         if forecast_start is not None:
             try:
-                predicted_data = self._predict(timeseries=timeseries,
-                                               key=key,
-                                               n=n,
-                                               forecast_start = forecast_start)
+                predicted_data = self.predict(timeseries=timeseries, n=n, forecast_start=forecast_start)
             except TypeError as e:
                 if 'unexpected keyword argument' and  'forecast_start' in str(e):
                     raise NotImplementedError('The model does not support the "forecast_start" parameter, cannot proceed')           
                 else:
                     raise
         else:
-            predicted_data = self._predict(timeseries=timeseries,
-                                           key=key,
-                                           n=n)
+            predicted_data = self.predict(timeseries=timeseries, n=n)
                 
         # List of predictions or single prediction?
         if isinstance(predicted_data,list):
@@ -1236,17 +1280,11 @@ class PeriodicAverageForecaster(Forecaster):
         logger.debug('Processed %s items', processed)
 
 
-    def _predict(self, timeseries, n=1, key=None, forecast_start=None):
-
-        #if n>1:
-        #    raise NotImplementedError('This forecaster does not support multi-step predictions.')
-
-        # Set data key
-        if not key:
-            if len(timeseries.data_keys()) > 1:
-                raise Exception('Multivariate time series require to have the key of the prediction specified')
-            key=timeseries.data_keys()[0]
-                    
+    def _predict(self, timeseries, n=1, forecast_start=None):
+      
+        # Univariate is enforced by the fit
+        key = self.data['data_keys'][0]
+      
         # Set forecast starting item
         if forecast_start is None:
             forecast_start = len(timeseries) - 1
@@ -1315,7 +1353,7 @@ It works best with time series that have strong seasonal effects and several sea
 Prophet is robust to missing data and shifts in the trend, and typically handles outliers well. 
 '''
 
-    def _fit(self, timeseries, key=None, from_t=None, to_t=None, from_dt=None, to_dt=None):
+    def _fit(self, timeseries, from_t=None, to_t=None, from_dt=None, to_dt=None):
 
         if len(timeseries.data_keys()) > 1:
             raise Exception('Multivariate time series are not yet supported')
@@ -1339,12 +1377,9 @@ Prophet is robust to missing data and shifts in the trend, and typically handles
         self.data['window'] = 0
 
 
-    def _predict(self, timeseries, n=1, key=None):
+    def _predict(self, timeseries, n=1):
 
-        if not key and len(timeseries.data_keys()) > 1:
-            raise Exception('Multivariate time series are not yet supported')
-        if not key:
-            key = timeseries.data_keys()[0]
+        key = self.data['data_keys'][0]
 
         # Prepare a dataframe with all the timestamps to forecast
         last_item    = timeseries[-1]
@@ -1436,15 +1471,13 @@ class ARIMAForecaster(Forecaster, ARIMAModel):
         super(ARIMAForecaster, self).__init__()
 
 
-    def _fit(self, timeseries, key=None):
+    def _fit(self, timeseries):
 
         import statsmodels.api as sm
 
-        # Set data key
-        if not key:
-            if len(timeseries.data_keys()) > 1:
-                raise Exception('Multivariate time series require to have the key of the prediction specified')
-            key=timeseries.data_keys()[0]
+        if len(timeseries.data_keys()) > 1:
+            raise Exception('Multivariate time series require to have the key of the prediction specified')
+        key=timeseries.data_keys()[0]
                             
         data = array(timeseries.df[key])
         
@@ -1459,13 +1492,9 @@ class ARIMAForecaster(Forecaster, ARIMAModel):
         self.data['window'] = 0
         
         
-    def _predict(self, timeseries, n=1, key=None):
+    def _predict(self, timeseries, n=1):
 
-        # Set data key
-        if not key:
-            if len(timeseries.data_keys()) > 1:
-                raise Exception('Multivariate time series require to have the key of the prediction specified')
-            key=timeseries.data_keys()[0]
+        key = self.data['data_keys'][0]
 
         # Chack that we are applying on a time series ending with the same datapoint where the fit timeseries was
         if self.fit_timeseries[-1].t != timeseries[-1].t:
@@ -1478,15 +1507,13 @@ class ARIMAForecaster(Forecaster, ARIMAModel):
 
 class AARIMAForecaster(Forecaster):
 
-    def _fit(self, timeseries, key=None, **kwargs):
+    def _fit(self, timeseries, **kwargs):
         
         import pmdarima as pm
 
-        # Set data key
-        if not key:
-            if len(timeseries.data_keys()) > 1:
-                raise Exception('Multivariate time series require to have the key of the prediction specified')
-            key=timeseries.data_keys()[0]
+        if len(timeseries.data_keys()) > 1:
+            raise Exception('Multivariate time series require to have the key of the prediction specified')
+        key=timeseries.data_keys()[0]
                             
         data = array(timeseries.df[key])
 
@@ -1514,13 +1541,9 @@ class AARIMAForecaster(Forecaster):
         self.data['window'] = 0
         
 
-    def _predict(self, timeseries, n=1, key=None):
+    def _predict(self, timeseries, n=1):
 
-        # Set data key
-        if not key:
-            if len(timeseries.data_keys()) > 1:
-                raise Exception('Multivariate time series require to have the key of the prediction specified')
-            key=timeseries.data_keys()[0]
+        key = self.data['data_keys'][0]
 
         # Chack that we are applying on a time series ending with the same datapoint where the fit timeseries was
         if self.fit_timeseries[-1].t != timeseries[-1].t:
@@ -1738,10 +1761,9 @@ class LSTMForecaster(KerasModel, Forecaster):
         # Store data
         self.data['min_values'] = min_values
         self.data['max_values'] = max_values
-        self.data['data_keys'] = data_keys
 
 
-    def _predict(self, timeseries, n=1, key=None, verbose=False):
+    def _predict(self, timeseries, n=1, verbose=False):
 
         if n>1:
             raise NotImplementedError('This forecaster does not support multi-step predictions.')
@@ -1790,7 +1812,7 @@ class LSTMForecaster(KerasModel, Forecaster):
 #  Anomaly detectors
 #======================
 
-class AnomalyDetector(ParametricModel):
+class AnomalyDetector(TimeSeriesParametricModel):
     pass
 
 
@@ -1800,10 +1822,7 @@ class PeriodicAverageAnomalyDetector(AnomalyDetector):
 
         # Call model predict logic and compare with the actual data
         actual    = timeseries[i].data[key]
-        predicted = self.forecaster.predict(timeseries,
-                                            n=1,
-                                            key=key,
-                                            forecast_start = i-1)[0][key]
+        predicted = self.forecaster.predict(timeseries, n=1, forecast_start = i-1)[0][key]
         
         return (actual, predicted)
 
@@ -1813,7 +1832,6 @@ class PeriodicAverageAnomalyDetector(AnomalyDetector):
         if len(timeseries.data_keys()) > 1:
             raise NotImplementedError('Multivariate time series are not yet supported')
         
-    
         # Fit a forecaster               
         forecaster = PeriodicAverageForecaster()
         
