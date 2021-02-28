@@ -399,6 +399,15 @@ class Forecaster(TimeSeriesParametricModel):
 #=========================
 
 class PeriodicAverageForecaster(Forecaster):
+
+    def __init__(self, path=None, id=None):
+        
+        super(PeriodicAverageForecaster, self).__init__(path=path, id=id)
+
+        # If loaded (fitted), convert the average dict keys back to integers
+        if self.fitted:
+            self.data['averages'] = {int(key):value for key, value in self.data['averages'].items()}
+
         
     def _fit(self, timeseries, window=None, periodicity=None, dst_affected=False, from_t=None, to_t=None, from_dt=None, to_dt=None):
 

@@ -64,6 +64,32 @@ class ForecasterAnomalyDetector(AnomalyDetector):
         raise NotImplementedError('No forecaster set for this model. Please review your code.')
 
 
+    def __init__(self, path=None, id=None):
+        
+        super(ForecasterAnomalyDetector, self).__init__(path=path, id=id)
+
+        # Load the forecaster as nested model if we have loaded the model
+        if self.fitted:
+            # Note: the forecaster_id is the nested folder where the forecaster is saved
+            forecaster_dir = path+'/'+self.data['forecaster_id']
+            self.forecaster = self.forecaster_class(forecaster_dir)
+
+
+    def save(self, path):
+
+        # First, get the id of the forecaster and add it to the data
+        self.data['forecaster_id'] = self.forecaster.data['id']
+        
+        # Then, save the anomaly detection model
+        model_dir = super(ForecasterAnomalyDetector, self).save(path)
+
+        # Finally, save the forecaster as nested model
+        self.forecaster.save(model_dir)
+
+        # Return the model dir
+        return model_dir
+
+
     def __get_actual_and_predicted(self, timeseries, i, key, forecaster_window):
 
         # Call model predict logic and compare with the actual data
@@ -122,7 +148,7 @@ class ForecasterAnomalyDetector(AnomalyDetector):
         logger.info('Using {} standard deviations as anomaly threshold: {}'.format(stdevs, stdev*stdevs))
         
         # Set AE-based threshold
-        self.AE_threshold = stdev*stdevs
+        self.data['AE_threshold'] = stdev*stdevs
 
 
     def _apply(self, timeseries, inplace=False, details=False, logs=False):
@@ -149,7 +175,7 @@ class ForecasterAnomalyDetector(AnomalyDetector):
                 AE = abs(actual-predicted)
                 
                 item = deepcopy(item)
-                if AE > self.AE_threshold:
+                if AE > self.data['AE_threshold']:
                     if logs:
                         logger.info('Detected anomaly for item starting @ {} ({}) with AE="{:.3f}..."'.format(item.t, item.dt, AE))
                     item.anomaly = 1

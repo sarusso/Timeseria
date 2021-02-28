@@ -276,6 +276,22 @@ class TestForecasters(unittest.TestCase):
         forecasted_data_time_point_series  = forecaster.apply(data_time_point_series)
 
 
+    def test_PeriodicAverageForecaster_save_load(self):
+        
+        forecaster = PeriodicAverageForecaster()
+        
+        forecaster.fit(self.sine_data_time_slot_series_minute, periodicity=63)
+        
+        model_dir = forecaster.save(TEMP_MODELS_DIR)
+        
+        loaded_forecaster = PeriodicAverageForecaster(model_dir)
+        
+        self.assertEqual(forecaster.data['averages'], loaded_forecaster.data['averages'])
+
+        forecasted_data_time_point_series  = loaded_forecaster.apply(self.sine_data_time_slot_series_minute)
+
+
+
     def test_ProphetForecaster(self):
          
         forecaster = ProphetForecaster()
@@ -493,4 +509,20 @@ class TestAnomalyDetectors(unittest.TestCase):
           
         # TODO: do some actual testing.. not only that "it works"
         anomaly_data_time_point_series  = anomaly_detector.apply(data_time_point_series)
+
+
+    def test_PeriodicAverageAnomalyDetector_save_load(self):
+        
+        anomaly_detector = PeriodicAverageAnomalyDetector()
+        
+        anomaly_detector.fit(self.sine_data_time_slot_series_minute, periodicity=63)
+        
+        model_dir = anomaly_detector.save(TEMP_MODELS_DIR)
+        
+        loaded_anomaly_detector = PeriodicAverageAnomalyDetector(model_dir)
+        
+        self.assertEqual(anomaly_detector.data['AE_threshold'], loaded_anomaly_detector.data['AE_threshold'])
+        self.assertEqual(anomaly_detector.forecaster.data['averages'], loaded_anomaly_detector.forecaster.data['averages'])
+
+        result_time_series = loaded_anomaly_detector.apply(self.sine_data_time_slot_series_minute)
 
