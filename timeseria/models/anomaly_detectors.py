@@ -31,7 +31,7 @@ from sklearn.preprocessing import MinMaxScaler
 # Base models and utilities
 from .base import TimeSeriesParametricModel, ProphetModel, ARIMAModel, KerasModel
 from .base import get_periodicity_index, mean_absolute_percentage_error
-from .forecasters import PeriodicAverageForecaster
+from .forecasters import PeriodicAverageForecaster, LSTMForecaster
 
 # Setup logging
 import logging
@@ -47,15 +47,22 @@ tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 #=============================
 
 class AnomalyDetector(TimeSeriesParametricModel):
-    pass
+    
+    def _predict(self, *args, **kwargs):
+        raise NotImplementedError('Anomaly detectors can be used only from the apply() method.') from None
 
 
 
 #=============================
-# P. Average Anomaly detector
+# Forecaster Anomaly detector
 #=============================
 
-class PeriodicAverageAnomalyDetector(AnomalyDetector):
+class ForecasterAnomalyDetector(AnomalyDetector):
+
+    @property
+    def forecaster_class(self):
+        raise NotImplementedError('No forecaster set for this model. Please review your code.')
+
 
     def __get_actual_and_predicted(self, timeseries, i, key, forecaster_window):
 
@@ -71,12 +78,11 @@ class PeriodicAverageAnomalyDetector(AnomalyDetector):
         if len(timeseries.data_keys()) > 1:
             raise NotImplementedError('Multivariate time series are not yet supported')
         
-        # Fit a forecaster               
-        forecaster = PeriodicAverageForecaster()
+        # Initialize the forecaster              
+        self.forecaster = self.forecaster_class()
         
-        # Fit and save
-        forecaster.fit(timeseries, *args, **kwargs)
-        self.forecaster = forecaster
+        # Fit the forecaster
+        self.forecaster.fit(timeseries, *args, **kwargs)
         
         # Evaluate the forecaster for one step ahead and get AEs
         AEs = []
@@ -142,4 +148,38 @@ class PeriodicAverageAnomalyDetector(AnomalyDetector):
                 result_timeseries.append(item)
         
         return result_timeseries 
+
+
+
+#=============================
+# P. Average Anomaly detector
+#=============================
+
+class PeriodicAverageAnomalyDetector(ForecasterAnomalyDetector):
+
+    forecaster_class = PeriodicAverageForecaster
+
+
+
+#=============================
+# LSTM Anomaly detector
+#=============================
+
+
+#class LSTMAnomalyDetector(ForecasterAnomalyDetector):
+#
+#    forecaster_class = LSTMForecaster
+
+
+
+
+
+
+
+
+
+
+
+
+
 
