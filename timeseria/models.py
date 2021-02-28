@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 
 # Suppress TensorFlow warnings as default behavior
 import tensorflow as tf
-tf.logging.set_verbosity(tf.logging.ERROR)
+tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 
 
 HARD_DEBUG = False
