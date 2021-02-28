@@ -340,7 +340,7 @@ def is_almost_equal(one, two):
 # Check timeseries
 #==============================
 
-def check_timeseries(timeseries):
+def check_timeseries(timeseries, resolution=None):
     # Import here or you will end up with cyclic imports
     from .datastructures import DataTimePointSeries, DataTimeSlotSeries 
     if isinstance(timeseries, DataTimePointSeries):
@@ -353,6 +353,42 @@ def check_timeseries(timeseries):
 
     if not timeseries:
         raise ValueError('A non-empty time series is required')
+
+def check_resolution(timeseries, resolution):
+    
+    def _check_resolution(timeseries, resolution):
+        # TODO: Fix this mess.. Make the .resolution behavior consistent!
+        if resolution == timeseries.resolution:
+            return True
+        try:
+            if resolution.value == timeseries.resolution.duration_s():
+                return True
+        except:
+            pass
+        try:
+            if resolution.duration_s() == timeseries.resolution.value:
+                return True
+        except:
+            pass
+        try:
+            if resolution.duration_s() == timeseries.resolution:
+                return True
+        except:
+            pass
+        return False
+            
+    # Check timeseries resolution
+    if not _check_resolution(timeseries, resolution):
+        raise ValueError('This model is fitted on "{}" resolution data, while your data has "{}" resolution.'.format(resolution, timeseries.resolution))
+
+
+def check_data_keys(timeseries, keys):
+    timeseries_data_keys = timeseries.data_keys()
+    if len(timeseries_data_keys) != len(keys):
+        raise ValueError('This model is fitted on {} data keys, while your data has {} data keys.'.format(len(keys), len(timeseries_data_keys)))
+    if timeseries_data_keys != keys:
+        # TODO: logger.warning?
+        raise ValueError('This model is fitted on "{}" data keys, while your data has "{}" data keys.'.format(keys, timeseries_data_keys))
 
 
 #==============================
