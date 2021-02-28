@@ -7,7 +7,7 @@ A time series processing library. Provides modules for data cleaning, resampling
 
 Timeseria also tries to address and solve by design all those annoying things which are often left as a detail but that actually cause massive amounts of time wasted - as data losses, non-uniform sampling rates, differences between time-slotted data and punctual observations, variable time units, timezones, DST changes and so on.
 
-You can get started by reading the [quickstart](https://sarusso.github.io/Timeseria/Welcome.html), or you can run it interactively in Binder using the button below (once the environment is ready, open the "Welcome" notebook).
+You can get started by reading the [quickstart](https://sarusso.github.io/Timeseria/Quickstart.html) or the [welcome tutorial](https://sarusso.github.io/Timeseria/Welcome.html). Or you can run them interactively in Binder using the button below (once the environment is ready, open the "Quickstart" or "Welcome" notebooks).
 
 Examples are provided in the [Timeseria-notebooks](https://github.com/sarusso/Timeseria-notebooks) repository, and are accessible in Binder as well, ready to be played with.
 
