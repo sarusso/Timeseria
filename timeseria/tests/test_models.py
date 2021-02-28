@@ -1,10 +1,10 @@
 import unittest
 import os
 import tempfile
-from math import sin
-from ..datastructures import DataTimeSlotSeries, DataTimeSlot, TimePoint, DataTimePoint
+from math import sin, cos
+from ..datastructures import DataTimeSlotSeries, DataTimeSlot, TimePoint, DataTimePoint, DataTimePointSeries
 from ..models import Model, ParametricModel
-from ..models import PeriodicAverageReconstructor, PeriodicAverageForecaster, ProphetForecaster, ProphetReconstructor, ARIMAForecaster, AARIMAForecaster
+from ..models import PeriodicAverageReconstructor, PeriodicAverageForecaster, ProphetForecaster, ProphetReconstructor, ARIMAForecaster, AARIMAForecaster, LSTMForecaster
 from ..exceptions import NotFittedError, NonContiguityError
 from ..storages import CSVFileStorage
 from ..transformations import Slotter, Resampler
@@ -379,6 +379,67 @@ class TestForecasters(unittest.TestCase):
         # TODO: do some actual testing.. not only that "it works"
         forecasted_data_time_point_series  = forecaster.apply(data_time_point_series)
 
+
+    def test_LSTMForecaster(self):
+
+        # Create a minute-resolution test DataTimeSlotSeries
+        sine_data_time_slot_series_minute = DataTimeSlotSeries()
+        for i in range(10):
+            sine_data_time_slot_series_minute.append(DataTimeSlot(start=TimePoint(i*60), end=TimePoint((i+1)*60), data={'value':sin(i/10.0)}))
+
+        forecaster = LSTMForecaster()
+        forecaster.fit(sine_data_time_slot_series_minute)
+        predicted_value = forecaster.predict(sine_data_time_slot_series_minute)['value']
+        
+        # Give some tolerance
+        self.assertTrue(predicted_value>0.5)
+        self.assertTrue(predicted_value<1.1)
+        
+        # Not-existent features
+        with self.assertRaises(ValueError):
+            LSTMForecaster(features=['values','not_existent_feature']).fit(sine_data_time_slot_series_minute)
+
+        # Test using another feature
+        LSTMForecaster(features=['values','diffs']).fit(sine_data_time_slot_series_minute)
+
+
+    def test_LSTMForecaster_multivariate(self):
+        
+        # Create a minute-resolution test DataTimeSlotSeries
+        sine_data_time_slot_series_minute = DataTimeSlotSeries()
+        for i in range(10):
+            sine_data_time_slot_series_minute.append(DataTimeSlot(start=TimePoint(i*60), end=TimePoint((i+1)*60), data={'sin':sin(i/10.0), 'cos':cos(i/10.0)}))
+
+        forecaster = LSTMForecaster()
+        forecaster.fit(sine_data_time_slot_series_minute)
+        predicted_data = forecaster.predict(sine_data_time_slot_series_minute)
+        
+        self.assertTrue('sin' in predicted_data)
+        self.assertTrue('cos' in predicted_data)
+
+
+    def test_LSTMForecaster_save_load(self):
+        
+        # Create a minute-resolution test DataTimeSlotSeries
+        sine_data_time_slot_series_minute = DataTimeSlotSeries()
+        for i in range(10):
+            sine_data_time_slot_series_minute.append(DataTimeSlot(start=TimePoint(i*60), end=TimePoint((i+1)*60), data={'sin':sin(i/10.0), 'cos':cos(i/10.0)}))
+
+        forecaster = LSTMForecaster()
+        forecaster.fit(sine_data_time_slot_series_minute)
+        
+        # Save
+        model_dir = forecaster.save(TEMP_MODELS_DIR)
+
+        # Load
+        loaded_forecaster = LSTMForecaster(path=model_dir)
+        
+        # Predict from the loaded model 
+        predicted_data = loaded_forecaster.predict(sine_data_time_slot_series_minute)
+        
+        self.assertTrue('sin' in predicted_data)
+        self.assertTrue('cos' in predicted_data)   
+        
 
 class TestAnomalyDetectors(unittest.TestCase):
 

@@ -4,7 +4,7 @@ import uuid
 import copy
 import statistics
 from .datastructures import DataTimeSlotSeries, DataTimeSlot, TimePoint, DataTimePointSeries, DataTimePoint, Slot, Point
-from .exceptions import NotFittedError, NonContiguityError
+from .exceptions import NotFittedError, NonContiguityError, InputException
 from .utilities import get_periodicity, is_numerical, set_from_t_and_to_t, item_is_in_range, check_timeseries
 from .time import now_t, dt_from_s, s_from_dt
 from datetime import timedelta, datetime
@@ -14,11 +14,28 @@ from pandas import DataFrame
 from numpy import array
 from math import sqrt
 from copy import deepcopy
+from collections import OrderedDict
+import shutil
+
+# Keras and sklearn
+from keras.models import Sequential
+from keras.layers import Dense
+from keras.layers import LSTM
+from keras.layers import Dropout
+from keras import optimizers
+from keras.models import load_model as load_keras_model
+from sklearn.metrics import mean_squared_error
+from sklearn.preprocessing import MinMaxScaler
 
 
 # Setup logging
 import logging
 logger = logging.getLogger(__name__)
+
+# Suppress TensorFlow warnings as default behavior
+import tensorflow as tf
+tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
+
 
 HARD_DEBUG = False
 
@@ -142,7 +159,15 @@ and optionally a fit() method if the parameters are to be learnt form data.'''
         if path:
             with open(path+'/data.json', 'r') as f:
                 self.data = json.loads(f.read())         
-            self.fitted=True
+            self.fitted = True
+            
+            # Resolution as TimeUnit
+            try:
+                self.data['resolution'] = TimeUnit(self.data['resolution'])
+            except InputException:
+                # TODO: load as generic unit and make __eq__ work with both Units and TimeUnits?
+                self.data['resolution'] = TimeUnit('{}s'.format(int(float(self.data['resolution']))))
+                
         else:
             if not id:
                 id = str(uuid.uuid4())
@@ -151,6 +176,29 @@ and optionally a fit() method if the parameters are to be learnt form data.'''
 
         super(ParametricModel, self).__init__()
 
+    
+    def _check_resolution(self, data):
+        
+        # TODO: Fix this mess.. Make the .resolution behavior consistent!
+        if self.data['resolution'] == data.resolution:
+            return True
+        try:
+            if self.data['resolution'].value == data.resolution.duration_s():
+                return True
+        except:
+            pass
+        try:
+            if self.data['resolution'].duration_s() == data.resolution.value:
+                return True
+        except:
+            pass
+        try:
+            if self.data['resolution'].duration_s() == data.resolution:
+                return True
+        except:
+            pass
+        return False
+                
 
     def predict(self, data, *args, **kwargs):
 
@@ -163,6 +211,9 @@ and optionally a fit() method if the parameters are to be learnt form data.'''
             raise NotFittedError()
 
         check_timeseries(data)
+
+        if not self._check_resolution(data):
+            raise ValueError('This model is fitted on "{}" resolution data, while your data has "{}" resolution.'.format(self.data['resolution'], data.resolution))
         
         return self._predict(data, *args, **kwargs)
 
@@ -178,6 +229,9 @@ and optionally a fit() method if the parameters are to be learnt form data.'''
             raise NotFittedError()
 
         check_timeseries(data)
+
+        if not self._check_resolution(data):
+            raise ValueError('This model is fitted on "{}" resolution data, while your data has "{}" resolution.'.format(self.data['resolution'], data.resolution))
         
         return self._apply(data, *args, **kwargs)
 
@@ -210,13 +264,27 @@ and optionally a fit() method if the parameters are to be learnt form data.'''
 
         self.data['fitted_at'] = now_t()
         self.fitted = True
+        self.data['resolution'] = data.resolution
+
+            
         return fit_output
 
         
     def save(self, path):
-        # TODO: dump and enforce the resolution as well?
+
         if not self.fitted:
             raise NotFittedError()
+
+        # Dump as string representation fit data resolution, always in seconds if except if in calendar units
+        try:
+            if self.data['resolution'].type == TimeUnit.CALENDAR:
+                self.data['resolution'] = str(self.data['resolution'])
+            else:
+                self.data['resolution'] = str(self.data['resolution'].duration_s())
+        except AttributeError:
+            self.data['resolution'] = str(self.data['resolution'])
+        
+        # Prepare model dir and dump data as json
         model_dir = '{}/{}'.format(path, self.data['id'])
         os.makedirs(model_dir)
         model_data_file = '{}/data.json'.format(model_dir)
@@ -986,11 +1054,12 @@ class Forecaster(ParametricModel):
         except KeyError:
             pass
 
-        if len(timeseries.data_keys()) > 1:
-            raise NotImplementedError('Multivariate time series are not yet supported')
-
-        # Set data key     
-        key = timeseries.data_keys()[0]
+        # Set data key if only one key (for models not supporting multivariate)
+        data_keys = timeseries.data_keys()
+        if len(data_keys) > 1:
+            key = None
+        else:
+            key = data_keys[0]
         
         input_timeseries_len = len(timeseries)
  
@@ -1047,7 +1116,7 @@ class Forecaster(ParametricModel):
             return None
 
 
-    def forecast(self, timeseries, key, n=1, forecast_start=None):
+    def forecast(self, timeseries, key=None, n=1, forecast_start=None):
 
         # Set forecast starting item
         if forecast_start is not None:
@@ -1459,6 +1528,261 @@ class AARIMAForecaster(Forecaster):
 
         # Return the predicion. We need the [0] to access yhat, other indexes are erorrs etc.
         return [{key: value} for value in self.model.predict(n)]
+
+
+
+class KerasModel(Model):
+
+    def __init__(self, path=None, id=None):
+        
+        super(KerasModel, self).__init__(path=path, id=id)
+
+        if path:
+            self.keras_model = load_keras_model('{}/keras_model'.format(path))
+
+
+    def save(self, path):
+
+        # Save the parameters (the "data") property
+        model_dir = super(KerasModel, self).save(path)
+
+        # Now save the Keras model itself
+        try:
+            self.keras_model.save('{}/keras_model'.format(model_dir))
+        except Exception as e:
+            shutil.rmtree(model_dir)
+            raise e
+        return model_dir
+
+
+    @staticmethod
+    def to_windows(timeseries):
+        '''Compute window data values'''
+        key = timeseries.data_keys()[0]
+        window_data_values = []
+        for item in timeseries:
+            window_data_values.append(item.data[key])
+        return window_data_values
+            
+    @staticmethod
+    def to_window_datapoints_matrix(timeseries, window, forecast_n, encoder=None):
+        '''Compute window datapoints matrix'''
+    
+        window_datapoints = []
+        for i, _ in enumerate(timeseries):
+            if i <  window:
+                continue
+            if i == len(timeseries)-forecast_n:
+                break
+                    
+            # Add window values
+            row = []
+            for j in range(window):
+                row.append(timeseries[i-window+j])
+            window_datapoints.append(row)
+                
+        return window_datapoints
+    
+    @staticmethod
+    def to_target_values_vector(timeseries, window, forecast_n):
+        '''Compute target values vector'''
+    
+        data_keys = timeseries.data_keys()
+    
+        targets = []
+        for i, _ in enumerate(timeseries):
+            if i <  window:
+                continue
+            if i == len(timeseries)-forecast_n:
+                break
+            
+            # Add forecast target value(s)
+            row = []
+            for j in range(forecast_n):
+                for data_key in data_keys:
+                    row.append(timeseries[i+j].data[data_key])
+            targets.append(row)
+
+        return targets
+
+    @staticmethod
+    def compute_window_features(window_datapoints, data_keys, features):
+
+        available_features = ['values', 'diffs', 'hours']
+        for feature in features:
+            if feature not in available_features:
+                raise ValueError('Unknown feature "{}"'.format(feature))
+        
+        window_features=[]
+
+        for i in range(len(window_datapoints)):
+            
+            datapoint_features = []
+            
+            # 1) datapoint values (for all keys)
+            if 'values' in features:
+                for data_key in data_keys:
+                    datapoint_features.append(window_datapoints[i].data[data_key])
+                            
+            # 2) Compute diffs on normalized datapoints
+            if 'diffs' in features:
+                for data_key in data_keys:
+                    if i ==0:
+                        diff = window_datapoints[1].data[data_key] - window_datapoints[0].data[data_key]
+                    elif i == len(window_datapoints)-1:
+                        diff = window_datapoints[-1].data[data_key] - window_datapoints[-2].data[data_key]
+                    else:
+                        diff = (window_datapoints[i+1].data[data_key] - window_datapoints[i-1].data[data_key]) /2
+                    if diff == 0:
+                        diff = 1
+                    datapoint_features.append(diff)
+
+            # 3) Hour (normlized)
+            if 'hours' in features:
+                datapoint_features.append(window_datapoints[i].dt.hour/24)
+                
+            # Now append to the window features
+            window_features.append(datapoint_features)
+
+        return window_features
+
+
+
+class LSTMForecaster(KerasModel, Forecaster):
+
+    def __init__(self, path=None, id=None, window=None, features=None, neurons=128, keras_model=None):
+
+        super(LSTMForecaster, self).__init__(path=path, id=id)
+        
+        # Did the init load a model?
+        try:
+            if self.fitted:
+                # If so, no need to proceed
+                return
+        except AttributeError:
+            pass
+        
+        if not window:
+            logger.info('Using default window size of 3')
+            window = 3
+       
+        if not features:
+            logger.info('Using default features: values')
+            features = ['values']
+        
+        # Set window, neurons, features
+        self.data['window'] = window
+        self.data['neurons'] = neurons
+        self.data['features'] = features
+        
+        # Set external model architecture if any
+        self.keras_model = keras_model
+
+
+    def _fit(self, timeseries, from_t=None, to_t=None, from_dt=None, to_dt=None, verbose=False, epochs=30):
+
+        # Set from and to
+        from_t, to_t = set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
+
+        # Set verbose switch
+        if verbose:
+            verbose=1
+        else:
+            verbose=0
+
+        # Data keys shortcut
+        data_keys = timeseries.data_keys()
+
+        # Set min and max
+        min_values = timeseries.min()
+        max_values = timeseries.max()
+        
+        # Fix some debeatable behaviour
+        if not isinstance(min_values, dict):
+            min_values = {timeseries.data_keys()[0]:min_values}
+        if not isinstance(max_values, dict):
+            max_values = {timeseries.data_keys()[0]:max_values}
+        
+        # Normalize data
+        timeseries_normalized = timeseries.duplicate()
+        for datapoint in timeseries_normalized:
+            for data_key in datapoint.data:
+                datapoint.data[data_key] = (datapoint.data[data_key] - min_values[data_key]) / (max_values[data_key] - min_values[data_key])
+
+        # Move to "matrix" of windows plus "vector" of targets data representation. Or, in other words:
+        # window_datapoints is a list of lists (matrix) where each nested list (row) is a list of window datapoints.
+        window_datapoints_matrix = self.to_window_datapoints_matrix(timeseries_normalized, window=self.data['window'], forecast_n=1)
+        target_values_vector = self.to_target_values_vector(timeseries_normalized, window=self.data['window'], forecast_n=1)
+
+        # Compute window features
+        window_features = []
+        for window_datapoints in window_datapoints_matrix:
+            window_features.append(self.compute_window_features(window_datapoints,
+                                                                data_keys = data_keys,
+                                                                features=self.data['features']))
+
+        # Obtain the number of features based on compute_window_features() output
+        features_per_window_item = len(window_features[0][0])
+        output_dimension = len(target_values_vector[0])
+        
+        # Create the default model architeture if not given in the init
+        if not self.keras_model:
+            self.keras_model = Sequential()
+            self.keras_model.add(LSTM(self.data['neurons'], input_shape=(self.data['window'], features_per_window_item)))
+            self.keras_model.add(Dense(output_dimension)) 
+            self.keras_model.compile(loss='mean_squared_error', optimizer='adam')
+
+        # Fit
+        self.keras_model.fit(array(window_features), array(target_values_vector), epochs=epochs, verbose=verbose)
+        
+        # Store data
+        self.data['min_values'] = min_values
+        self.data['max_values'] = max_values
+        self.data['data_keys'] = data_keys
+
+
+    def _predict(self, timeseries, n=1, key=None, verbose=False):
+
+        if n>1:
+            raise NotImplementedError('This forecaster does not support multi-step predictions.')
+
+        # Set verbose switch
+        if verbose:
+            verbose=1
+        else:
+            verbose=0
+
+        # Get the window if we were given a longer timeseries
+        window_timeseries = timeseries[-self.data['window']:]
+        
+        # Duplicate so that we ae free to normalize in-place at the next step
+        window_timeseries = window_timeseries.duplicate()
+        
+        # Normalize window data
+        for datapoint in window_timeseries:
+            for data_key in datapoint.data:
+                datapoint.data[data_key] = (datapoint.data[data_key] - self.data['min_values'][data_key]) / (self.data['max_values'][data_key] - self.data['min_values'][data_key])
+
+        # Compute window features
+        window_features = self.compute_window_features(window_timeseries, data_keys=self.data['data_keys'], features=self.data['features'])
+
+        # Perform the predict and set prediction data
+        yhat = self.keras_model.predict(array([window_features]), verbose=verbose)
+
+        predicted_data = {}
+        for i, data_key in enumerate(self.data['data_keys']):
+            
+            # Get the prediction
+            predicted_value_normalized = yhat[0][i]
+        
+            # De-normalize
+            predicted_value = (predicted_value_normalized*(self.data['max_values'][data_key] - self.data['min_values'][data_key])) + self.data['min_values'][data_key]
+            
+            # Append to prediction data
+            predicted_data[data_key] = predicted_value
+
+        # Return
+        return predicted_data
 
 
 
