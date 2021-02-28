@@ -68,10 +68,27 @@ class ForecasterAnomalyDetector(AnomalyDetector):
 
         # Call model predict logic and compare with the actual data
         actual    = timeseries[i].data[key]
-        predicted = self.forecaster.predict(timeseries, n=1, forecast_start = i-1)[0][key]
+        
+        try:
+            # Try the optimized predict call (which just use the data as-is)
+            prediction = self.forecaster.predict(timeseries, n=1, forecast_start = i-1)
+            
+        except TypeError as e:
+            if '_predict() got an unexpected keyword argument \'forecast_start\'' in str(e):
+                # Otherwise, create on the fly a slice of the time series for the window.
+                # Datapoints are only linked, not copied - so this is just a minor overhead.
+                window_timeseries = timeseries[i-forecaster_window:i]
+                prediction = self.forecaster.predict(window_timeseries, n=1)
+            else:
+                raise e
+
+        # TODO: this is because of forecasters not supporting multi-step forecasts.
+        if not isinstance(prediction, list):
+            predicted = prediction[key]
+        else:
+            predicted = prediction[0][key]
         
         return (actual, predicted)
-
 
     def _fit(self, timeseries, *args, stdevs=3, **kwargs):
 
@@ -158,28 +175,5 @@ class ForecasterAnomalyDetector(AnomalyDetector):
 class PeriodicAverageAnomalyDetector(ForecasterAnomalyDetector):
 
     forecaster_class = PeriodicAverageForecaster
-
-
-
-#=============================
-# LSTM Anomaly detector
-#=============================
-
-
-#class LSTMAnomalyDetector(ForecasterAnomalyDetector):
-#
-#    forecaster_class = LSTMForecaster
-
-
-
-
-
-
-
-
-
-
-
-
 
 
