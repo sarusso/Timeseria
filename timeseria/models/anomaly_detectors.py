@@ -64,7 +64,7 @@ class ForecasterAnomalyDetector(AnomalyDetector):
         raise NotImplementedError('No forecaster set for this model. Please review your code.')
 
 
-    def __init__(self, path=None, id=None):
+    def __init__(self, path=None, id=None, **kwargs):
         
         super(ForecasterAnomalyDetector, self).__init__(path=path, id=id)
 
@@ -73,7 +73,10 @@ class ForecasterAnomalyDetector(AnomalyDetector):
             # Note: the forecaster_id is the nested folder where the forecaster is saved
             forecaster_dir = path+'/'+self.data['forecaster_id']
             self.forecaster = self.forecaster_class(forecaster_dir)
-
+        else:
+            # Initialize the forecaster              
+            self.forecaster = self.forecaster_class(**kwargs)
+            
 
     def save(self, path):
 
@@ -120,10 +123,7 @@ class ForecasterAnomalyDetector(AnomalyDetector):
 
         if len(timeseries.data_keys()) > 1:
             raise NotImplementedError('Multivariate time series are not yet supported')
-        
-        # Initialize the forecaster              
-        self.forecaster = self.forecaster_class()
-        
+
         # Fit the forecaster
         self.forecaster.fit(timeseries, *args, **kwargs)
         
@@ -148,10 +148,12 @@ class ForecasterAnomalyDetector(AnomalyDetector):
         logger.info('Using {} standard deviations as anomaly threshold: {}'.format(stdevs, stdev*stdevs))
         
         # Set AE-based threshold
+        self.data['stdev'] = stdev
+        self.data['stdevs'] = stdevs
         self.data['AE_threshold'] = stdev*stdevs
 
 
-    def _apply(self, timeseries, inplace=False, details=False, logs=False):
+    def _apply(self, timeseries, inplace=False, details=False, logs=False, stdevs=None):
         
         if inplace:
             raise Exception('Anomaly detection cannot be run inplace')
@@ -175,18 +177,29 @@ class ForecasterAnomalyDetector(AnomalyDetector):
                 AE = abs(actual-predicted)
                 
                 item = deepcopy(item)
-                if AE > self.data['AE_threshold']:
+                
+                if stdevs:
+                    AE_threshold =  self.data['stdev'] * stdevs 
+                else:
+                    AE_threshold =  self.data['stdev'] * self.data['stdevs'] 
+                    
+                if AE > AE_threshold: 
                     if logs:
                         logger.info('Detected anomaly for item starting @ {} ({}) with AE="{:.3f}..."'.format(item.t, item.dt, AE))
                     item.anomaly = 1
-                    if details:
-                        item.data['AE_{}'.format(key)] = AE
-                        item.data['predicted_{}'.format(key)] = predicted
                 else:
                     item.anomaly = 0
-                    if details:
+                
+                # Add details?
+                if details:
+                    if isinstance(details, list):
+                        if 'AE' in details:
+                            item.data['AE_{}'.format(key)] = AE
+                        if 'predicted' in details:
+                            item.data['{}_predicted'.format(key)] = predicted
+                    else:
                         item.data['AE_{}'.format(key)] = AE
-                        item.data['predicted_{}'.format(key)] = predicted
+                        item.data['{}_predicted'.format(key)] = predicted
 
                 result_timeseries.append(item)
         
