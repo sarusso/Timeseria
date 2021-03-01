@@ -7,7 +7,7 @@ setup(name='timeseria',
       description='A time series processing library',
       author='Stefano Alberto Russo',
       author_email='stefano.russo@gmail.com',
-      packages=['timeseria','timeseria.tests'],
+      packages=['timeseria','timeseria.tests', 'timeseria.models'],
       package_data={
           'timeseria': ['static/css/*.css', 'static/js/*.js'],
           'timeseria.tests': ['test_data/csv/*.csv']
