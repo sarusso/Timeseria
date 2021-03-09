@@ -77,16 +77,15 @@ class ForecasterAnomalyDetector(AnomalyDetector):
             # Initialize the forecaster              
             self.forecaster = self.forecaster_class(**kwargs)
             
-
+        # Finally, set the id of the forecaster in the data
+        self.data['forecaster_id'] = self.forecaster.data['id']
+            
     def save(self, path):
 
-        # First, get the id of the forecaster and add it to the data
-        self.data['forecaster_id'] = self.forecaster.data['id']
-        
-        # Then, save the anomaly detection model
+        # Save the anomaly detection model
         model_dir = super(ForecasterAnomalyDetector, self).save(path)
 
-        # Finally, save the forecaster as nested model
+        # ..and save the forecaster as nested model
         self.forecaster.save(model_dir)
 
         # Return the model dir
