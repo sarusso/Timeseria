@@ -39,3 +39,7 @@ pip-delete-this-directory.txt
 # Mac
 .DS_Store
 ._.DS_Store
+
+# Sphinx
+docs/_build
+docs/timeseria.*
