@@ -1,5 +1,4 @@
 import unittest
-from ..exceptions import InputException
 from ..time import dt
 from ..units import Unit, TimeUnit
 
@@ -10,7 +9,7 @@ class TestUnits(unittest.TestCase):
 
     def test_Unit(self):
         
-        with self.assertRaises(InputException):
+        with self.assertRaises(ValueError):
             _ = TimeUnit('hi')        
         
         unit = Unit(60)
@@ -33,14 +32,14 @@ class TestUnits(unittest.TestCase):
 
     def test_TimeUnit(self):
 
-        with self.assertRaises(InputException):
+        with self.assertRaises(TypeError):
             _ = TimeUnit(60)
         
-        with self.assertRaises(InputException):
+        with self.assertRaises(ValueError):
             _ = TimeUnit('15m', '20s')
 
         # Not valid 'q' type
-        with self.assertRaises(InputException):
+        with self.assertRaises(ValueError):
             _ = TimeUnit('15q')
 
         # String init
@@ -155,7 +154,7 @@ class TestUnits(unittest.TestCase):
         time_unit = TimeUnit('1D_3h_5m')
         date_time = dt(2015,1,1,16,37,14, tzinfo='Europe/Rome')
         
-        with self.assertRaises(InputException):
+        with self.assertRaises(ValueError):
             _ = time_unit.floor_dt(date_time)
 
         # Test in ceil/floor/round normal conditions (hours)

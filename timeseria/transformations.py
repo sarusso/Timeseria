@@ -1,6 +1,9 @@
+# -*- coding: utf-8 -*-
+"""Series transformations as slotting and resampling."""
+
 from .time import dt_from_s, s_from_dt
 from .datastructures import DataTimeSlot, DataTimeSlotSeries, TimePoint, DataTimePointSeries, DataTimePoint
-from .utilities import compute_data_loss, is_almost_equal
+from .utilities import compute_data_loss, unit_to_TimeUnit
 from .operations import avg
 from .units import TimeUnit
 
@@ -8,79 +11,20 @@ from .units import TimeUnit
 import logging
 logger = logging.getLogger(__name__)
 
-HARD_DEBUG = False
-
-#========================== 
-#  Utilities
-#==========================
-
-def unit_to_TimeUnit(unit):
-    if isinstance(unit, TimeUnit):
-        time_unit = unit
-    elif isinstance(unit, int):
-        time_unit = TimeUnit(seconds=unit)
-    elif isinstance(unit, float):
-        if int(str(unit).split('.')[1]) != 0:
-            raise ValueError('Cannot process decimal seconds yet')
-        time_unit = TimeUnit(seconds=unit)
-    elif isinstance(unit, str):
-        time_unit = TimeUnit(unit)
-        unit = time_unit
-    else:
-        raise ValueError('Unknown unit type "{}"'.format(unit.__class__.__name__))
-    return time_unit
-
-
-def detect_sampling_interval(data_time_point_series):
-
-    diffs={}
-    prev_data_time_point=None
-    for data_time_point in data_time_point_series:
-        if prev_data_time_point is not None:
-            diff = data_time_point.t - prev_data_time_point.t
-            if diff not in diffs:
-                diffs[diff] = 1
-            else:
-                diffs[diff] +=1
-        prev_data_time_point = data_time_point
-    
-    # Iterate until the diffs are not too spread, then pick the maximum.
-    i=0
-    while is_almost_equal(len(diffs), len(data_time_point_series)):
-        or_diffs=diffs
-        diffs={}
-        for diff in or_diffs:
-            diff=round(diff)
-            if diff not in diffs:
-                diffs[diff] = 1
-            else:
-                diffs[diff] +=1            
-        
-        if i > 10:
-            raise Exception('Cannot automatically detect original resolution')
-    
-    most_common_diff_total = 0
-    most_common_diff = None
-    for diff in diffs:
-        if diffs[diff] > most_common_diff_total:
-            most_common_diff_total = diffs[diff]
-            most_common_diff = diff
-    return(most_common_diff)
-
-
 
 #==========================
 #  Base Transformation
 #==========================
 
 class Transformation(object):
+    """Base transformation class."""
     
     @classmethod
     def __str__(cls):
         return '{} transformation'.format(cls.__name__.replace('Operator',''))
 
     def process(self, *args, **kwargs):
-        return self._process(*args, **kwargs)
+        raise NotImplementedError('This transformation is not implemented.')
 
 
 #==========================
@@ -88,6 +32,7 @@ class Transformation(object):
 #==========================
 
 class Slotter(Transformation):
+    """Slotter transformation."""
 
     def __init__(self, unit, default_operation=avg, extra_operations=None):
         if isinstance(unit, int):
@@ -140,7 +85,7 @@ class Slotter(Transformation):
                 # Handle also extra ops
                 if self.extra_operations:
                     for extra_operation in self.extra_operations:
-                        slot_data['{}_{}'.format(key, extra_operation.label)] = None
+                        slot_data['{}_{}'.format(key, extra_operation.__name__)] = None
 
         else:
  
@@ -169,9 +114,9 @@ class Slotter(Transformation):
                     extra_operation_data = extra_operation(slot_timeseries, prev_point=prev_point, next_point=next_point)
                     if isinstance(extra_operation_data, dict):
                         for result_key in extra_operation_data:
-                            slot_data['{}_{}'.format(result_key, extra_operation.label)] = extra_operation_data[result_key]
+                            slot_data['{}_{}'.format(result_key, extra_operation.__name__)] = extra_operation_data[result_key]
                     else:
-                        slot_data['{}_{}'.format(keys[0], extra_operation.label)] = extra_operation_data
+                        slot_data['{}_{}'.format(keys[0], extra_operation.__name__)] = extra_operation_data
 
         # Do we have a force data_loss? #TODO: do not compute data_loss if fill_with not present and force_data_loss 
         if force_data_loss is not None:
@@ -223,9 +168,9 @@ class Slotter(Transformation):
         return data_time_slot
 
 
-    def _process(self, data_time_point_series, from_t=None, from_dt=None, to_t=None, to_dt=None, validity=None, force_close_last=False,
+    def process(self, data_time_point_series, from_t=None, from_dt=None, to_t=None, to_dt=None, validity=None, force_close_last=False,
                  include_extremes=False, fill_with=None, force_data_loss=None, fill_gaps=True, interpolation_method='linear', force=False):
-        ''' Start the slotting process. If start and/or end are not set, they are set automatically based on first and last points of the sereis'''
+        """Start the slotting process. If start and/or end are not set, they are set automatically based on first and last points of the series."""
 
         if not isinstance(data_time_point_series, DataTimePointSeries):
             raise TypeError('Can process only DataTimePointSeries, got "{}"'.format(data_time_point_series.__class__.__name__))
@@ -526,7 +471,7 @@ class Slotter(Transformation):
 #==========================
 
 class Resampler(Transformation):
-
+    """Resampler transformation."""
 
     def __init__(self, unit):
         if isinstance(unit, int):
@@ -669,10 +614,11 @@ class Resampler(Transformation):
         return data_time_point
 
 
-    def _process(self, data_time_point_series, from_t=None, to_t=None, from_dt=None, to_dt=None,
+    def process(self, data_time_point_series, from_t=None, to_t=None, from_dt=None, to_dt=None,
                  validity=None, force_close_last=True, include_extremes=False, fill_with=None,
                  force_data_loss=None, fill_gaps=True, interpolation_method='linear', force=False):
-        ''' Start the slotting process. If start and/or end are not set, they are set automatically based on first and last points of the sereis'''
+        """Start the resampling process. If start and/or end are not set, they are set automatically
+        based on first and last points of the series"""
 
         if not isinstance(data_time_point_series, DataTimePointSeries):
             raise TypeError('Can process only DataTimePointSeries, got "{}"'.format(data_time_point_series.__class__.__name__))

@@ -1,6 +1,6 @@
 import unittest
 import os
-from ..utilities import detect_encoding, compute_coverage, compute_data_loss, get_periodicity
+from ..utilities import detect_encoding, compute_coverage, compute_data_loss, get_periodicity, detect_sampling_interval, unit_to_TimeUnit
 from ..datastructures import DataTimePointSeries, DataTimePoint
 from ..time import dt, s_from_dt
 from ..storages import CSVFileStorage
@@ -177,4 +177,37 @@ class TestGetPeriodicity(unittest.TestCase):
         perdiodicity = get_periodicity(univariate_1h_data_time_slot_series)
 
         self.assertEqual(perdiodicity, 24)
+
+
+
+class TestTimeUnitConversion(unittest.TestCase):
+    
+    def test_unit_to_TimeUnit(self):
+        
+        unit_to_TimeUnit('1h')
+        unit_to_TimeUnit(TimeUnit('1h'))
+        
+        with self.assertRaises(ValueError):
+            unit_to_TimeUnit('NO')
+        
+
+class TestDetectSamplingInterval(unittest.TestCase):
+
+    def test_detect_sampling_interval(self):
+        
+        data_time_point_series = CSVFileStorage(TEST_DATA_PATH + '/csv/humitemp_short.csv').get()
+        self.assertEqual(detect_sampling_interval(data_time_point_series), 61)
+        
+        data_time_point_series = CSVFileStorage(TEST_DATA_PATH + '/csv/shampoo_sales.csv', time_column = 'Month', time_format = '%y-%m').get()
+        self.assertEqual(detect_sampling_interval(data_time_point_series), 2678400)  # 2678400/60/60/24 = 31 Days (the most frequent)
+
+        data_time_point_series = CSVFileStorage(TEST_DATA_PATH + '/csv/temperature.csv').get()
+        self.assertEqual(detect_sampling_interval(data_time_point_series), 600)
+
+        data_time_point_series = CSVFileStorage(TEST_DATA_PATH + '/csv/temp_short_1h.csv').get()
+        self.assertEqual(detect_sampling_interval(data_time_point_series), 3600)
+
+
+
+
 

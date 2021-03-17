@@ -42,4 +42,4 @@ pip-delete-this-directory.txt
 
 # Sphinx
 docs/_build
-docs/timeseria.*
+

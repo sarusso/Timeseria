@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-
+"""Provides base data structures: Points, Slots and Series with all their specializations."""
+
 from .time import s_from_dt , dt_from_s, UTC, timezonize
 from .units import Unit, TimeUnit
 from .utilities import is_close
@@ -10,10 +13,6 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-HARD_DEBUG = False
-
-AGGREGATE_THRESHOLD = 10000
-
 #======================
 #  Generic Series
 #======================
@@ -21,6 +20,7 @@ AGGREGATE_THRESHOLD = 10000
 class Series(list):
     '''A list of items coming one after another where every item is guaranteed to be of the same type and in an order or succession.'''
 
+    # 1,2,3 are in order. 1,3,8 are in order. 1,8,3 re not in order.
     # 5,6,7 are integer succession. 5.3, 5.4, 5.5 are too in a succesisons. 5,6,8 are not in a succession. 
     # a group or a number of related or similar things, events, etc., arranged or occurring in temporal, spatial, or other order or succession; sequence.
 
@@ -40,7 +40,8 @@ class Series(list):
         self._title = None
 
     def append(self, item):
-        if HARD_DEBUG: logger.debug('Checking %s', item)
+        """Append an item to the series"""
+        # logger.debug('Checking %s', item)
         
         # Set type if not already done
         if not self.__TYPE__:
@@ -120,9 +121,6 @@ class Series(list):
     def merge(self, *args, **kwargs):
         from .operations import merge as merge_operation
         return merge_operation(self, *args, **kwargs)
-    
-    def extend(self, orher):
-        raise NotImplementedError
 
     def select(self, *args, **kwargs):
         from .operations import select as select_operation
@@ -241,12 +239,65 @@ class Series(list):
         self._mark = value
 
 
+    # Inherited methods to be edited
+    def pop(self, i=None):
+        """
+        Remove the item at the end of the series, and return it. The `i` index is kept for interface
+        compatibility, but if specified must be the index corresponding to the last element.
+        """  
+        if i and i != len(self):
+            raise NotImplementedError('Cannot pop an item in the middle')
+        super(Series, self).pop(i)
+
+    
+    def clear(self):
+        """Remove all items from the series. Equivalent to del a[:]."""
+        super(Series, self).clear()
+
+        
+    def index(self, x, start=None, end=None):
+        """
+        Return zero-based index in the series of the item whose value is equal to x.
+        Raises a ValueError if there is no such item.
+
+        The optional arguments start and end are interpreted as in the slice notation and are
+        used to limit the search to a particular subsequence of the list. The returned index is
+        computed relative to the beginning of the full sequence rather than the start argument.
+        """
+        super(Series, self).index(x, start, end)
+
+
+    def copy(self):
+        """Return a shallow copy of the list."""
+        
+
+    # Inherited methods to be disabled
+
+    def remove(self):
+        """Disabled (removing is not compatible with a succession)."""
+
+    def insert(self, i, x):
+        """Disabled (inserting is not compatible with a succession)."""
+
+    def extend(self):
+        """Disabled, use the `merge` instead."""
+
+    def count(self, x):
+        """Disabled (there is only one item)."""
+
+    def sort(self, key=None, reverse=False):
+        """Disabled (sorting is already guaranteed)."""
+
+    def reverse(self):
+        """Disabled (reversing is not compatible with an ordering)."""
+
 
 #======================
 #  Points
 #======================
 
-class Point(object):
+class Point():
+    """A generic point."""
 
     def __init__(self, *args):
         if not args:
@@ -289,6 +340,7 @@ class Point(object):
 
 
 class TimePoint(Point):
+    """A point in the time dimension."""
     
     def __init__(self, *args, **kwargs):
 
@@ -367,19 +419,11 @@ class TimePoint(Point):
         return '{} @ {} ({})'.format(self.__class__.__name__, self.t, self.dt)
         # return '{} @ t={} ({})'.format(self.__class__.__name__, self.t, self.dt)
     
-    
-    # Tricks to make them behave as slots
-    #@property
-    #def start(self):
-    #    return self
-    
-    #@property
-    #def end(self):
-    #    return self
-
 
 
 class DataPoint(Point):
+    """A point that carries some data."""
+    
     def __init__(self, *args, **kwargs):
         try:
             self._data = kwargs.pop('data')
@@ -426,6 +470,7 @@ class DataPoint(Point):
 
 
 class DataTimePoint(DataPoint, TimePoint):
+    """A point that carries some data in the time dimension."""
     pass
 
     # NOTE: the __repr__ used is from the DataPoint above, which in turn uses the TimePoint one.
@@ -436,11 +481,12 @@ class DataTimePoint(DataPoint, TimePoint):
 #======================
 
 class PointSeries(Series):
+    """A series of generic points, where each item is guaranteed to be ordered."""
     __TYPE__ = Point
 
 
 class TimePointSeries(PointSeries):
-    '''A series of TimePoints where each item is guaranteed to be ordered'''
+    """A series of points in time, where each item is guaranteed to be ordered."""
 
     __TYPE__ = TimePoint
 
@@ -462,7 +508,7 @@ class TimePointSeries(PointSeries):
             # This is to support the deepcopy, otherwise the original prev_t will be used
             if len(self)>0:
                 
-                if HARD_DEBUG: logger.debug('Checking time ordering for t="%s" (prev_t="%s")', item.t, self.prev_t)
+                # logger.debug('Checking time ordering for t="%s" (prev_t="%s")', item.t, self.prev_t)
                 if item.t < self.prev_t:
                     raise ValueError('Time t="{}" is out of order (prev t="{}")'.format(item.t, self.prev_t))
                 
@@ -525,14 +571,14 @@ class TimePointSeries(PointSeries):
     
 
 class DataPointSeries(PointSeries):
-    '''A series of DataPoints where each item is guaranteed to carry the same data type'''
+    """A series of data points, where each item is guaranteed to be ordered and to carry the same data type."""
 
     __TYPE__ = DataPoint
 
     # Check data compatibility
     def append(self, item):
         try:
-            if HARD_DEBUG: logger.debug('Checking data compatibility: %s ', item.data)
+            # logger.debug('Checking data compatibility: %s ', item.data)
             #if item.data is None and self.accept_None:
             #    pass
             #else:
@@ -546,7 +592,7 @@ class DataPointSeries(PointSeries):
                     raise ValueError('Got different data keys: {} vs {}'.format(self.item_data_reference.keys(), item.data.keys()))
             
         except AttributeError:
-            if HARD_DEBUG: logger.debug('Setting data reference: %s', item.data)
+            # logger.debug('Setting data reference: %s', item.data)
             self.item_data_reference = item.data
             
         super(DataPointSeries, self).append(item)
@@ -570,7 +616,7 @@ class DataPointSeries(PointSeries):
 
 
 class DataTimePointSeries(DataPointSeries, TimePointSeries):
-    '''A series of DataTimePoint where each item is guaranteed to carry the same data type and to be ordered'''
+    """A series of data points in time, where each item is guaranteed to be ordered and to carry the same data type."""
 
     __TYPE__ = DataTimePoint
 
@@ -615,6 +661,8 @@ class DataTimePointSeries(DataPointSeries, TimePointSeries):
 
     @property
     def df(self):
+        """The time series as a Pandas DataFrame object"""
+
         data_keys = self.data_keys()
         
         if self[0].data_loss is not None:
@@ -637,44 +685,22 @@ class DataTimePointSeries(DataPointSeries, TimePointSeries):
         df = df.set_index('Timestamp')
         return df
         
-    def plot(self, engine='dg', **kwargs):
-        if 'aggregate' in kwargs:
-            if kwargs['aggregate'] is False:
-                aggregate_by = None
-            else:
-                aggregate_by = self.plot_aggregate_by
-            kwargs.pop('aggregate')
-        else:
-            if 'aggregate_by' in kwargs:
-                aggregate_by =  kwargs.pop('aggregate_by')
-            else:
-                aggregate_by = self.plot_aggregate_by
+    def plot(self, engine='dg', *args, **kwargs):
         if engine=='mp':
             from .plots import matplotlib_plot
-            matplotlib_plot(self)
+            matplotlib_plot(self, *args, **kwargs)
         elif engine=='dg':
             from .plots import dygraphs_plot
-            dygraphs_plot(self, aggregate_by=aggregate_by, **kwargs)
+            dygraphs_plot(self, *args, **kwargs)
         else:
-            raise Exception('Unknown plotting engine "{}'.format(engine))
-
-    @property
-    def plot_aggregate_by(self):
-        try:
-            return self._plot_aggregate_by
-        except AttributeError:
-            if len(self)  > AGGREGATE_THRESHOLD:
-                aggregate_by = 10**len(str(int(len(self)/float(AGGREGATE_THRESHOLD))))
-            else:
-                aggregate_by = None
-            return aggregate_by
+            raise ValueError('Unknown plotting engine "{}'.format(engine))
         
     @property
     def autodetected_sampling_interval(self):
         try:
             return self._autodetected_sampling_interval
         except AttributeError:
-            from .transformations import detect_sampling_interval
+            from .utilities import detect_sampling_interval
             self._autodetected_sampling_interval = detect_sampling_interval(self)
             return self._autodetected_sampling_interval
     
@@ -714,8 +740,9 @@ class DataTimePointSeries(DataPointSeries, TimePointSeries):
 #  Slots
 #======================
 
-class Slot(object):
-    
+class Slot():
+    """A generic slot."""
+
     __POINT_TYPE__ = Point
     
     def __init__(self, start, end=None, unit=None):
@@ -798,6 +825,7 @@ class Slot(object):
 
 
 class TimeSlot(Slot):
+    """A slot in the time dimension."""
 
     __POINT_TYPE__ = TimePoint
 
@@ -857,6 +885,8 @@ class TimeSlot(Slot):
 
 
 class DataSlot(Slot):
+    """A slot that carries some data."""
+
     def __init__(self, **kwargs):
         try:
             self._data = kwargs.pop('data')
@@ -900,7 +930,8 @@ class DataSlot(Slot):
 
 
 class DataTimeSlot(DataSlot, TimeSlot):
-    
+    """A slot that carries some data in the time dimension."""
+
     def __repr__(self):
         #if self.data_loss is not None:
         #    return '{} @ t=[{},{}] ([{},{}]) with data={} and data_loss={}'.format(self.__class__.__name__, self.start.t, self.end.t, self.start.dt, self.end.dt, self.data, self.data_loss)
@@ -919,6 +950,8 @@ class DataTimeSlot(DataSlot, TimeSlot):
 #======================
 
 class SlotSeries(Series):
+    """A series of generic slots, where each item is guaranteed to be in succession."""
+    
     __TYPE__ = Slot
 
     def append(self, item):
@@ -945,8 +978,8 @@ class SlotSeries(Series):
 
 
 class TimeSlotSeries(SlotSeries):
-    '''A series of TimeSlots where each item is guaranteed to be ordered'''
-
+    """A series of slots in time, where each item is guaranteed to be in succession."""
+    
     __TYPE__ = TimeSlot
 
     def append(self, item):
@@ -989,7 +1022,7 @@ class TimeSlotSeries(SlotSeries):
 
 
 class DataSlotSeries(SlotSeries):
-    '''A series of DataSlots where each item is guaranteed to carry the same data type'''
+    """A series of data slots, where each item is guaranteed to be in succession and to carry the same data type."""
 
     __TYPE__ = DataSlot
 
@@ -1031,7 +1064,7 @@ class DataSlotSeries(SlotSeries):
 
 
 class DataTimeSlotSeries(DataSlotSeries, TimeSlotSeries):
-    '''A series of DataTimeSlots where each item is guaranteed to carry the same data type and to be ordered'''
+    """A series of data slots in time, where each item is guaranteed to be in succession and to carry the same data type."""
 
     __TYPE__ = DataTimeSlot
 
@@ -1100,6 +1133,7 @@ class DataTimeSlotSeries(DataSlotSeries, TimeSlotSeries):
 
     @property
     def df(self):
+        '''The time series as a Pandas DataFrame object'''
         data_keys = self.data_keys()
         
         if self[0].data_loss is not None:
@@ -1122,41 +1156,15 @@ class DataTimeSlotSeries(DataSlotSeries, TimeSlotSeries):
         df = df.set_index('Timestamp')
         return df
 
-    def plot(self, engine='dg', **kwargs):
-        if 'aggregate' in kwargs:
-            if kwargs['aggregate'] is False:
-                aggregate_by = None
-            else:
-                aggregate_by = self.plot_aggregate_by
-            kwargs.pop('aggregate')
-        else:
-            if 'aggregate_by' in kwargs:
-                aggregate_by =  kwargs.pop('aggregate_by')
-            else:
-                aggregate_by = self.plot_aggregate_by
+    def plot(self, engine='dg', *args, **kwargs):
         if engine=='mp':
             from .plots import matplotlib_plot
-            matplotlib_plot(self)
+            matplotlib_plot(self, *args, **kwargs)
         elif engine=='dg':
             from .plots import dygraphs_plot
-            dygraphs_plot(self, aggregate_by=aggregate_by, **kwargs)
+            dygraphs_plot(self, *args, **kwargs)
         else:
             raise Exception('Unknown plotting engine "{}'.format(engine))
-
-    @property
-    def plot_aggregate_by(self):
-        # By default do not aggregate
-        #return None
-        
-        # Aggregate if more than AGGREGATE_THRESHOLD slots
-        try:
-            return self._plot_aggregate_by
-        except AttributeError:
-            if len(self)  > AGGREGATE_THRESHOLD:
-                aggregate_by = 10**len(str(int(len(self)/float(AGGREGATE_THRESHOLD))))
-            else:
-                aggregate_by = None
-            return aggregate_by
 
     def __repr__(self):
         if len(self):

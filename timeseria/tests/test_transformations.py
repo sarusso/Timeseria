@@ -1,10 +1,8 @@
 import unittest
 import os
 from ..datastructures import DataTimePoint, DataTimePointSeries
-from ..storages import CSVFileStorage
-from ..transformations import Resampler, Slotter, detect_sampling_interval, unit_to_TimeUnit 
+from ..transformations import Resampler, Slotter 
 from ..time import dt, s_from_dt, dt_from_str
-from ..exceptions import InputException
 from ..units import TimeUnit
 
 # Setup logging
@@ -13,36 +11,6 @@ logging.basicConfig(level=os.environ.get('LOGLEVEL') if os.environ.get('LOGLEVEL
 
 # Set test data path
 TEST_DATA_PATH = '/'.join(os.path.realpath(__file__).split('/')[0:-1]) + '/test_data/'
-
-
-class TestUtilities(unittest.TestCase):
-
-    def test_unit_to_TimeUnit(self):
-        
-        unit_to_TimeUnit('1h')
-        unit_to_TimeUnit(TimeUnit('1h'))
-        
-        with self.assertRaises(InputException):
-            unit_to_TimeUnit('NO')
-        
-
-    def test_detect_sampling_interval(self):
-        
-        data_time_point_series = CSVFileStorage(TEST_DATA_PATH + '/csv/humitemp_short.csv').get()
-        self.assertEqual(detect_sampling_interval(data_time_point_series), 61)
-        
-        data_time_point_series = CSVFileStorage(TEST_DATA_PATH + '/csv/shampoo_sales.csv', time_column = 'Month', time_format = '%y-%m').get()
-        self.assertEqual(detect_sampling_interval(data_time_point_series), 2678400)  # 2678400/60/60/24 = 31 Days (the most frequent)
-
-        data_time_point_series = CSVFileStorage(TEST_DATA_PATH + '/csv/temperature.csv').get()
-        self.assertEqual(detect_sampling_interval(data_time_point_series), 600)
-
-        data_time_point_series = CSVFileStorage(TEST_DATA_PATH + '/csv/temp_short_1h.csv').get()
-        self.assertEqual(detect_sampling_interval(data_time_point_series), 3600)
-
-
-
-
 
 class TestSlotter(unittest.TestCase):
 

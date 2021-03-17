@@ -33,7 +33,11 @@ release = 'v0.1.0-pre'
 # ones.
 extensions = ['sphinx.ext.autodoc', 'sphinx.ext.coverage', 'sphinx.ext.napoleon', 'sphinx.ext.autosummary']
 autodoc_default_flags = ['members']
-autosummary_generate = True
+autosummary_generate = False
+autodoc_default_options = {
+    'member-order': 'bysource',
+    'special-members': '__call__'
+}
 
 
 # Add any paths that contain templates here, relative to this directory.
@@ -57,6 +61,7 @@ html_theme = 'sphinx_rtd_theme'
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
+
 
 
 def setup(app):

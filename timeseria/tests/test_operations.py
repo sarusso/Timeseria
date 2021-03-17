@@ -3,10 +3,24 @@ import os
 from ..datastructures import TimePoint, DataTimePoint, DataTimeSlotSeries, DataTimeSlot
 from ..datastructures import TimePointSeries, DataTimePointSeries
 from ..operations import derivative, integral, diff, csum, min, max, avg, filter, select, mavg
+from ..operations import Operation
 
 # Setup logging
 import logging
 logging.basicConfig(level=os.environ.get('LOGLEVEL') if os.environ.get('LOGLEVEL') else 'CRITICAL')
+
+class TestBaseOpertions(unittest.TestCase):
+    
+    def test_base(self):
+        
+        operation_from_callable = Operation()
+        self.assertEqual(operation_from_callable.__name__, 'operation')
+                
+        def operation_as_function(data):
+            pass
+        
+        self.assertEqual(operation_as_function.__name__, 'operation_as_function')
+        
 
 class TestMathOperations(unittest.TestCase):
   

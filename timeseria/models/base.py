@@ -1,33 +1,19 @@
+# -*- coding: utf-8 -*-
+"""Provides base model classes."""
+
 import os
 import json
 import uuid
-import copy
 import statistics
-from ..datastructures import DataTimeSlotSeries, DataTimeSlot, TimePoint, DataTimePointSeries, DataTimePoint, Slot, Point
-from ..exceptions import NotFittedError, NonContiguityError, InputException
-from ..utilities import get_periodicity, is_numerical, set_from_t_and_to_t, item_is_in_range
-from ..utilities import check_timeseries, check_resolution, check_data_keys
-from ..time import now_t, dt_from_s, s_from_dt
-from datetime import timedelta, datetime
-from sklearn.metrics import mean_squared_error, mean_absolute_error
-from ..units import Unit, TimeUnit
+from ..exceptions import NotFittedError
+from ..utilities import check_timeseries, check_resolution, check_data_keys, item_is_in_range
+from ..time import now_s, dt_from_s
+from ..units import TimeUnit
 from pandas import DataFrame
-from numpy import array
-from math import sqrt
-from copy import deepcopy
-from collections import OrderedDict
 import shutil
 
-# Keras and sklearn
-from keras.models import Sequential
-from keras.layers import Dense
-from keras.layers import LSTM
-from keras.layers import Dropout
-from keras import optimizers
+# Keras
 from keras.models import load_model as load_keras_model
-from sklearn.metrics import mean_squared_error
-from sklearn.preprocessing import MinMaxScaler
-
 
 # Setup logging
 import logging
@@ -36,72 +22,6 @@ logger = logging.getLogger(__name__)
 # Suppress TensorFlow warnings as default behavior
 import tensorflow as tf
 tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
-
-
-HARD_DEBUG = False
-
-
-#======================
-#  Utility functions
-#======================
-
-def mean_absolute_percentage_error(list1, list2):
-    '''Computes the MAPE, list 1 are true values, list2 arepredicted values'''
-    if len(list1) != len(list2):
-        raise ValueError('Lists have different lengths, cannot continue')
-    p_error_sum = 0
-    for i in range(len(list1)):
-        p_error_sum += abs((list1[i] - list2[i])/list1[i])
-    return p_error_sum/len(list1)
-
-
-def get_periodicity_index(item, resolution, periodicity, dst_affected=False):
-
-    # Handle specific cases
-    if isinstance(resolution, TimeUnit):  
-        resolution_s = resolution.duration_s(item.dt)
-    elif isinstance(resolution, Unit):  
-        if isinstance(resolution.value, list):
-            raise NotImplementedError('Sorry, periodicty in multi-dimensional spaces are not defined')
-        resolution_s = resolution.value
-    else:
-        if isinstance(resolution, list):
-            raise NotImplementedError('Sorry, periodicty in multi-dimensional spaces are not defined')
-        resolution_s = resolution
-
-    # Compute periodicity index
-    if not dst_affected:
-    
-        # Get index based on item timestamp, normalized to unit, modulus periodicity
-        periodicity_index =  int(item.t / resolution_s) % periodicity
-    
-    else:
-
-        # Get periodicity based on the datetime
-        
-        # Do we have an active DST?  
-        dst_timedelta = item.dt.dst()
-        
-        if dst_timedelta.days == 0 and dst_timedelta.seconds == 0:
-            # No DST
-            periodicity_index = int(item.t / resolution_s) % periodicity
-        
-        else:
-            # DST
-            if dst_timedelta.days != 0:
-                raise Exception('Don\'t know how to handle DST with days timedelta = "{}"'.format(dst_timedelta.days))
-
-            if resolution_s > 3600:
-                raise Exception('Sorry, this time series has not enough resolution to account for DST effects (resolution_s="{}", must be below 3600 seconds)'.format(resolution_s))
-            
-            # Get DST offset in seconds 
-            dst_offset_s = dst_timedelta.seconds # 3600 usually
-
-            # Compute the periodicity index
-            periodicity_index = (int((item.t + dst_offset_s) / resolution_s) % periodicity)
-
-    return periodicity_index
-
 
 
 #======================
@@ -117,6 +37,7 @@ class Model(object):
 
     
     def predict(self, data, *args, **kwargs):
+        """Call te model predict logic"""
         try:
             self._predict
         except AttributeError:
@@ -149,9 +70,10 @@ class Model(object):
 #=========================
 
 class ParametricModel(Model):
-    '''A stateful model with parameters, or a (partly) black-box model. Parameters can be set manually or learnt (fitted) from data.
-On top of the predict(), apply() and evaluate() methods it provides a save() method to store the parameters of the model,
-and optionally a fit() method if the parameters are to be learnt form data.'''
+    """A stateful model with parameters, or a (partly) black-box model. Parameters can be set manually
+    or learnt (fitted) from data. On top of the predict(), apply() and evaluate() methods it provides
+    a save() method to store the parameters of the model, and optionally a fit() method if the parameters
+    are to be learnt form data."""
     
     def __init__(self, path=None, id=None):
         
@@ -232,7 +154,7 @@ and optionally a fit() method if the parameters are to be learnt form data.'''
         
         fit_output = self._fit(*args, **kwargs)
 
-        self.data['fitted_at'] = now_t()
+        self.data['fitted_at'] = now_s()
         self.fitted = True
 
         return fit_output
@@ -255,17 +177,19 @@ and optionally a fit() method if the parameters are to be learnt form data.'''
 
 
 class TimeSeriesParametricModel(ParametricModel):
+    """A parametric model specifically designed to work with time series data. In particular,
+    it ensures resolution and data keys consistency between methods and save/load operations.""" 
     
-    def __init__(self, *args, **kwargs):
+    def __init__(self, path=None, id=None):
 
         # Call parent init
-        super(TimeSeriesParametricModel, self).__init__(*args, **kwargs)
+        super(TimeSeriesParametricModel, self).__init__(path, id)
 
         # If the model has been loaded, convert resolution as TimeUnit
         if self.fitted:
             try:
                 self.data['resolution'] = TimeUnit(self.data['resolution'])
-            except InputException:
+            except ValueError:
                 # TODO: load as generic unit and make __eq__ work with both Units and TimeUnits?
                 self.data['resolution'] = TimeUnit('{}s'.format(int(float(self.data['resolution']))))
 
@@ -447,6 +371,8 @@ class TimeSeriesParametricModel(ParametricModel):
 #=========================
 
 class ProphetModel(TimeSeriesParametricModel):
+    '''Class to wrap some common logic for Prophet-based models.'''
+
 
     @classmethod
     def remove_timezone(cls, dt):
@@ -490,7 +416,7 @@ class ProphetModel(TimeSeriesParametricModel):
 #=========================
 
 class ARIMAModel():
-    '''Class to wrap some common ARIMA-based models'''
+    '''Class to wrap some common logic for ARIMA-based models.'''
     
     def get_start_end_indexes(self, timeseries, n):
 
@@ -539,7 +465,9 @@ class ARIMAModel():
 #  Base Keras model
 #=========================
 
-class KerasModel(Model):
+class KerasModel(ParametricModel):
+    '''Class to wrap some common logic for Keras-based models.'''
+
 
     def __init__(self, path=None, id=None):
         
@@ -566,16 +494,17 @@ class KerasModel(Model):
 
     @staticmethod
     def to_windows(timeseries):
-        '''Compute window data values'''
+        '''Compute window data values from a time series.'''
         key = timeseries.data_keys()[0]
         window_data_values = []
         for item in timeseries:
             window_data_values.append(item.data[key])
         return window_data_values
-            
+
+        
     @staticmethod
     def to_window_datapoints_matrix(timeseries, window, forecast_n, encoder=None):
-        '''Compute window datapoints matrix'''
+        '''Compute window datapoints matrix from a time series.'''
     
         window_datapoints = []
         for i, _ in enumerate(timeseries):
@@ -591,10 +520,11 @@ class KerasModel(Model):
             window_datapoints.append(row)
                 
         return window_datapoints
+
     
     @staticmethod
     def to_target_values_vector(timeseries, window, forecast_n):
-        '''Compute target values vector'''
+        '''Compute target values vector from a time series.'''
     
         data_keys = timeseries.data_keys()
     
@@ -614,8 +544,20 @@ class KerasModel(Model):
 
         return targets
 
+
     @staticmethod
     def compute_window_features(window_datapoints, data_keys, features):
+        """Compute features from a list of window data points (or slots).
+        
+        Args:
+            window_datapoints (list): The list with the data points (or slots)
+            data_keys(dict): the keys of the point (or slot) data.
+            features(list): the list of the features to compute.
+                Supported values are:
+                ``values`` (use the data values), 
+                ``diffs``  (use the diffs between the values), and 
+                ``hours``  (use the hours of the timestamp).
+        """
 
         available_features = ['values', 'diffs', 'hours']
         for feature in features:
@@ -636,7 +578,7 @@ class KerasModel(Model):
             # 2) Compute diffs on normalized datapoints
             if 'diffs' in features:
                 for data_key in data_keys:
-                    if i ==0:
+                    if i == 0:
                         diff = window_datapoints[1].data[data_key] - window_datapoints[0].data[data_key]
                     elif i == len(window_datapoints)-1:
                         diff = window_datapoints[-1].data[data_key] - window_datapoints[-2].data[data_key]

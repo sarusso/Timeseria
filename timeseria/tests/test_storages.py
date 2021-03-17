@@ -97,7 +97,7 @@ class TestCSVFileStorage(unittest.TestCase):
 
         # Basic iso8601 with two labels, dirty
         storage = CSVFileStorage(TEST_DATA_PATH + '/csv/multi_values_with_labels_dirty.csv', value_separator=';', skip_errors=True)
-        data_time_point_series = storage.get()        
+        data_time_point_series = storage.get()      
         self.assertEqual(len(data_time_point_series), 3)
         self.assertEqual(data_time_point_series[0], DataTimePoint(t= 946688400, data={'flow': 1010.0, 'temp': 11.0}))
         self.assertEqual(data_time_point_series[1], DataTimePoint(t= 946706400, data={'flow': 1100.0, 'temp': 10.7}))

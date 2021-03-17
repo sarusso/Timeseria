@@ -1,21 +1,23 @@
+# -*- coding: utf-8 -*-
+"""Operations on the series, returning both scalar and other series."""
+
 from copy import copy, deepcopy
-from .time import dt_from_s, s_from_dt
-from .datastructures import DataTimeSlot, DataTimeSlotSeries, TimePoint, DataTimePointSeries, Series, Slot, Point, PointSeries
-from .utilities import compute_coverage, is_almost_equal, is_close
+from .time import s_from_dt
+from .datastructures import Series, Slot, Point, PointSeries
+from .utilities import is_close
 from .units import TimeUnit, Unit
 
 # Setup logging
 import logging
 logger = logging.getLogger(__name__)
 
-HARD_DEBUG = False
-
 
 #=======================
 #  Base Operation class
 #=======================
 
-class Operation(object):
+class Operation():
+    """Generic operation class (callable object)."""
 
     @classmethod
     def __str__(cls):
@@ -23,24 +25,34 @@ class Operation(object):
     
     @classmethod
     def __repr__(cls):
-        return cls.__str__()
+        return '{}'.format(cls.__name__.lower())
+    
+    def __call__(self, *args, **kwargs):
+        raise NotImplementedError('No operation logic implemented.')
+    
+    @property
+    def __name__(self):
+        return self.__class__.__name__.lower()
 
 
-# types
-class OperationTypes():
-    SCALAR=1
-    SERIES=2
+class ScalarOperation(Operation):
+    """An operation operating on a series and returning a scalar (callable object)."""
+    pass
+
+
+class SeriesOperation(Operation):
+    """An operation operating on a series and returning a series (callable object)."""
+    pass
 
 
 #=======================
-#  Scalar result
+#  Scalar Operations
 #=======================
 
-class Max(Operation):
-
-    type = OperationTypes.SCALAR
-    label = 'max'
-
+class Max(ScalarOperation):
+    """Maximum operation (callable object). Comes also pre-instantiated as the ``max()``
+    function in the same module (accessible as ``timeseria.operations.max``)."""
+    
     def __init__(self):
         self.built_in_max = max
     
@@ -66,10 +78,9 @@ class Max(Operation):
                 return mins
 
 
-class Min(Operation):
-
-    type = OperationTypes.SCALAR
-    label = 'min'
+class Min(ScalarOperation):
+    """Minimum operation (callable object). Comes also pre-instantiated as the ``min()``
+    function in the same module (accessible as ``timeseria.operations.min``)."""
     
     def __init__(self):
         self.built_in_min = min
@@ -96,10 +107,8 @@ class Min(Operation):
                 return mins
 
 
-class Avg(Operation):
-    
-    type = OperationTypes.SCALAR
-    label = 'avg'
+class Avg(ScalarOperation):
+    """Average operation (callable object)."""
     
     def __call__(self, arg, key=None, **kwargs):
         if not isinstance(arg, Series):
@@ -124,11 +133,9 @@ class Avg(Operation):
                 return avgs
 
 
-class WAvg(Operation):
+class WAvg(ScalarOperation):
+    """Weighted average operation (callable object)."""
 
-    type = OperationTypes.SCALAR
-    label = 'wavg'
-    
     def __call__(self, series, prev_point=None, next_point=None):
         raise NotImplementedError('Weighted Average is not yet implemented')
         #keys = None
@@ -147,11 +154,9 @@ class WAvg(Operation):
         #return new_avgs
 
 
-class Sum(Operation):
+class Sum(ScalarOperation):
+    """Sum operation (callable object)."""
 
-    type = OperationTypes.SCALAR
-    label = 'sum'
-    
     def __init__(self):
         self.built_in_sum = sum
     
@@ -173,11 +178,11 @@ class Sum(Operation):
 
 
 #=======================
-#  Series result
+#  Series operations
 #=======================
 
-class Derivative(Operation):
-    ''' Derivative operation. Must operate on a fixed resolution time series'''
+class Derivative(SeriesOperation):
+    """Derivative operation (callable object). Must operate on a fixed resolution time series"""
     
     def __call__(self, timeseries, inplace=False, normalize=True, diffs=False):
         
@@ -251,8 +256,8 @@ class Derivative(Operation):
             return der_timeseries
 
 
-class Integral(Operation):
-    ''' Integral operation. Must operate on a fixed resolution time series'''
+class Integral(SeriesOperation):
+    """Integral operation (callable object). Must operate on a fixed resolution time series."""
     
     def __call__(self, timeseries, inplace=False, normalize=True, c=0):
         
@@ -337,15 +342,19 @@ class Integral(Operation):
 
 
 class Diff(Derivative):
+    """Incremental differences operation (callable object)."""
     def __call__(self, timeseries, inplace=False):
         return super(Diff, self).__call__(timeseries, inplace=inplace, normalize=False, diffs=True)
 
 
 class CSum(Integral):
+    """Cumulative sum operation (callable object)."""
     def __call__(self, timeseries, inplace=False, offset=0):
         return super(CSum, self).__call__(timeseries, inplace=inplace, normalize=False, c=offset)
 
-class MAvg(Operation):
+
+class MAvg(SeriesOperation):
+    """Moving average operation (callable object)."""
 
     def __call__(self, timeseries, window, inplace=False):
 
@@ -369,7 +378,7 @@ class MAvg(Operation):
 
             for key in data_keys:
  
-                # Compute the movign averge
+                # Compute the moving average
                 value_sum = 0
                 for j in range(i-window+1,i+1):
                     value_sum += timeseries[j].data[key]
@@ -390,12 +399,8 @@ class MAvg(Operation):
         return mavg_timeseries
 
 
-#=======================
-#  Series manipulation
-#=======================
-
-class Select(Operation):
-    '''Select items of the series given an SQL-like queries'''
+class Select(SeriesOperation):
+    """Select operation (callable object). Selects items of the series given SQL-like queries."""
     
     def __call__(self, series, query, *args, **kwargs):
 
@@ -426,7 +431,8 @@ class Select(Operation):
         return selected 
 
 
-class Filter(Operation):
+class Filter(SeriesOperation):
+    """Filter a series (callable object)."""
 
     def __call__(self, series, data_key=None, from_t=None, to_t=None, from_dt=None, to_dt=None):
         if from_dt:
@@ -478,7 +484,8 @@ class Filter(Operation):
         return filtered_series 
 
 
-class Merge(Operation):
+class Merge(SeriesOperation):
+    """Merge two or more series (callable object)."""
     
     def __call__(self, *timeseriess):
         
@@ -545,21 +552,18 @@ class Merge(Operation):
 
 
 
-
-
-
 #========================
 # Instantiate operations
 #========================
 
-# Scalar result
+# Scalar operations
 min = Min()
 max = Max()
 avg = Avg()
 wavg = WAvg()
 sum = Sum()
 
-# Series result
+# Series operations
 derivative = Derivative()
 integral = Integral()
 
@@ -567,17 +571,7 @@ diff = Diff()
 csum = CSum()
 mavg = MAvg()
 
-
-# Series manipulation
 merge = Merge()
 filter = Filter()
 select = Select()
-
-
-
-
-
-
-
-
 

@@ -1,36 +1,24 @@
-import os
-import json
-import uuid
+# -*- coding: utf-8 -*-
+"""Forecasting models."""
+
 import copy
-import statistics
-from ..datastructures import DataTimeSlotSeries, DataTimeSlot, TimePoint, DataTimePointSeries, DataTimePoint, Slot, Point
-from ..exceptions import NotFittedError, NonContiguityError, InputException
-from ..utilities import get_periodicity, is_numerical, set_from_t_and_to_t, item_is_in_range
-from ..utilities import check_timeseries, check_resolution, check_data_keys
-from ..time import now_t, dt_from_s, s_from_dt
-from datetime import timedelta, datetime
-from sklearn.metrics import mean_squared_error, mean_absolute_error
+from ..datastructures import DataTimeSlot, TimePoint, DataTimePoint, Slot, Point
+from ..exceptions import NonContiguityError
+from ..utilities import get_periodicity, get_periodicity_index, set_from_t_and_to_t, item_is_in_range, mean_absolute_percentage_error
+from ..time import dt_from_s
 from ..units import Unit, TimeUnit
 from pandas import DataFrame
 from numpy import array
 from math import sqrt
-from copy import deepcopy
-from collections import OrderedDict
-import shutil
 
 # Keras and sklearn
 from keras.models import Sequential
 from keras.layers import Dense
 from keras.layers import LSTM
-from keras.layers import Dropout
-from keras import optimizers
-from keras.models import load_model as load_keras_model
-from sklearn.metrics import mean_squared_error
-from sklearn.preprocessing import MinMaxScaler
+from sklearn.metrics import mean_squared_error, mean_absolute_error
 
 # Base models and utilities
 from .base import TimeSeriesParametricModel, ProphetModel, ARIMAModel, KerasModel
-from .base import get_periodicity_index, mean_absolute_percentage_error
 
 # Setup logging
 import logging
