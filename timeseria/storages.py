@@ -1,12 +1,14 @@
-import csv
-import re
-from .utilities import detect_encoding
-from .units import TimeUnit
-from .datastructures import DataTimePoint, DataTimePointSeries, DataPointSeries, TimePointSeries, TimePoint, DataPoint, DataTimeSlot, DataTimeSlotSeries
-from .time import s_from_dt, dt_from_str, dt_from_s, s_from_dt, timezonize
+# -*- coding: utf-8 -*-
+"""Data storages."""
+
+
 import datetime
-from .exceptions import NoDataException
-from collections import OrderedDict
+from .utilities import detect_encoding, sanitize_string, is_list_of_integers, to_float
+from .units import TimeUnit
+from .datastructures import DataTimePoint, DataTimePointSeries, TimePointSeries, TimePoint, DataTimeSlot, DataTimeSlotSeries
+from .time import dt_from_str, dt_from_s, s_from_dt, timezonize
+from .exceptions import NoDataException, FloatConversionError
+
 
 # Setup logging
 import logging
@@ -17,47 +19,19 @@ HARD_DEBUG = False
 POSSIBLE_TIMESTAMP_COLUMNS = ['timestamp', 'epoch']
 NO_DATA_PLACEHOLDERS = ['na', 'nan', 'null', 'nd', 'undef']
 
-class FloatConversionError(Exception):
-    pass
-
-def sanitize(value):
-    value = re.sub('\s+',' ',value).strip()
-    if value.startswith('\'') or value.startswith('"'):
-        value = value[1:]
-    if value.endswith('\'') or value.endswith('"'):
-        value = value[:-1]
-    value = value.strip()
-    if value.lower().replace('.','') in NO_DATA_PLACEHOLDERS:
-        return None
-    return value
-
-def is_list_of_integers(list):
-    for item in list:
-        if not isinstance(item, int):
-            return False
-    else:
-        return True
-
-def to_float(string):
-    sanitized_string = sanitize(string)
-    if sanitized_string:
-        sanitized_string = sanitized_string.replace(',','.')
-    try:
-        return float(sanitized_string)
-    except (ValueError, TypeError):
-        raise FloatConversionError(sanitized_string)
 
 #======================
 #  CSV File Storage
 #======================
 
 class CSVFileStorage(object):
+    """A CSV file data storage."""
     
     def __init__(self, filename_with_path, encoding = 'auto', time_column = 'auto', time_format = 'auto',
                  date_column = None, date_format = None, data_columns = 'all', value_separator=',', line_separator='\n',
                  skip_errors=False, data_format='auto', item_type=None, tz='UTC'):
-        ''' Ref to https://docs.python.org/3/library/datetime.html#strftime-and-strptime-format-codes
-        for date_format and time_format'''
+        """Ref to https://docs.python.org/3/library/datetime.html#strftime-and-strptime-format-codes
+        for date_format and time_format"""
 
         # File & encoding
         self.filename_with_path = filename_with_path
@@ -136,7 +110,7 @@ class CSVFileStorage(object):
                 
                 # TODO: replace me using a custom line separator
                 line = csv_file.readline()
-                logger.debug('Processing line #%s: "%s"', line_number, sanitize(line))
+                logger.debug('Processing line #%s: "%s"', line_number, sanitize_string(line,NO_DATA_PLACEHOLDERS))
 
                 # Do we have to stop? Note: empty lines still have the "\n" char.
                 if not line:
@@ -163,26 +137,26 @@ class CSVFileStorage(object):
                     not_converted = 0
                     for value in line_items:
                         try:
-                            float(sanitize(value))
+                            float(sanitize_string(value,NO_DATA_PLACEHOLDERS))
                         except:
                             try:
-                                dt_from_str(sanitize(value))
+                                dt_from_str(sanitize_string(value,NO_DATA_PLACEHOLDERS))
                             except:
                                 not_converted += 1
           
                     # If it is, use it as labels (and continue with the next line)
                     if not_converted == len(line_items):
-                        column_indexes = [i for i in range(len(line_items)) if sanitize(line_items[i])]
-                        column_labels = [sanitize(label) for label in line_items if sanitize(label)]
+                        column_indexes = [i for i in range(len(line_items)) if sanitize_string(line_items[i],NO_DATA_PLACEHOLDERS)]
+                        column_labels = [sanitize_string(label,NO_DATA_PLACEHOLDERS) for label in line_items if sanitize_string(label,NO_DATA_PLACEHOLDERS)]
                         logger.debug('Set column indexes = "%s"  and column labels = "%s"', column_indexes, column_labels)
                         continue
                     
-                    # Otherwise, just use inteher keys (and go on)
+                    # Otherwise, just use integer keys (and go on)
                     else:
-                        column_indexes = [i for i in range(len(line_items)) if sanitize(line_items[i])]
+                        column_indexes = [i for i in range(len(line_items)) if sanitize_string(line_items[i],NO_DATA_PLACEHOLDERS)]
                         logger.debug('Set column indexes = "%s"  and column labels = "%s"', column_indexes, column_labels)
 
-                    # Note: above we only used labels and indexes that carry content after being sanitized.
+                    # Note: above we only used labels and indexes that carry content after being sanitize_stringd.
                     # TODO: what if a file starts with a line missing last value and we do or not do set data columns from the outside?
                     #       .. external data columns should have precedenze, but a mapping is then required more than just a list.
 
@@ -232,13 +206,13 @@ class CSVFileStorage(object):
                 # Time part
                 time_part=''
                 if time_column_index is not None:
-                    time_part = sanitize(line_items[time_column_index])
+                    time_part = sanitize_string(line_items[time_column_index],NO_DATA_PLACEHOLDERS)
 
 
                 # Date part
                 date_part=''
                 if date_column_index is not None:
-                    date_part = sanitize(line_items[date_column_index])
+                    date_part = sanitize_string(line_items[date_column_index],NO_DATA_PLACEHOLDERS)
                                    
                 # Assemble timestamp
                 if self.date_column is not None:
@@ -347,18 +321,18 @@ class CSVFileStorage(object):
                         if len(data_column_labels) >1 and self.data_format == float:
                             raise Exception('Requested data format as float but got more than 1 value')
                         if self.data_format == float:
-                            data = to_float(line_items[data_column_indexes[0]])
+                            data = to_float(line_items[data_column_indexes[0]],NO_DATA_PLACEHOLDERS)
                         elif self.data_format == list:
-                            data = [to_float(line_items[index]) for index in data_column_indexes]
+                            data = [to_float(line_items[index],NO_DATA_PLACEHOLDERS) for index in data_column_indexes]
                         else:
-                            data = {column_labels[index]: to_float(line_items[index]) for index in data_column_indexes}
+                            data = {column_labels[index]: to_float(line_items[index],NO_DATA_PLACEHOLDERS) for index in data_column_indexes}
                     else:
                         # Default here is to set a float if there is only one value.
                         # TODO: are we sure we want this?
                         if len (data_column_indexes) >1 or self.data_format == list:
-                            data = [to_float(line_items[index]) for index in data_column_indexes]
+                            data = [to_float(line_items[index],NO_DATA_PLACEHOLDERS) for index in data_column_indexes]
                         else:
-                            data = to_float(line_items[data_column_indexes[0]])
+                            data = to_float(line_items[data_column_indexes[0]],NO_DATA_PLACEHOLDERS)
            
                 # TODO: here we drop the entire line. Instead, should we use a "None" and allow "Nones" in the DataPoints data? 
                 except FloatConversionError as e:
@@ -381,7 +355,7 @@ class CSVFileStorage(object):
                 items.append([t, data])
 
 
-        # Were e able to read something?
+        # Were we able to read something?
         if not items:
             raise NoDataException('Cannot read any data!')
         
@@ -398,7 +372,7 @@ class CSVFileStorage(object):
             autodetect_item_type = True
     
             # Detect sampling interval to create right item type (points or slots)
-            from .transformations import detect_sampling_interval
+            from .utilities import detect_sampling_interval
             
             sample_timepoints = [TimePoint(t=item[0]) for item in items[0:10]]
             sample_timeseries = TimePointSeries(*sample_timepoints) # Cut to first ten elements

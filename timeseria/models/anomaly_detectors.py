@@ -1,37 +1,11 @@
-import os
-import json
-import uuid
-import copy
-import statistics
-from ..datastructures import DataTimeSlotSeries, DataTimeSlot, TimePoint, DataTimePointSeries, DataTimePoint, Slot, Point
-from ..exceptions import NotFittedError, NonContiguityError, InputException
-from ..utilities import get_periodicity, is_numerical, set_from_t_and_to_t, item_is_in_range
-from ..utilities import check_timeseries, check_resolution, check_data_keys
-from ..time import now_t, dt_from_s, s_from_dt
-from datetime import timedelta, datetime
-from sklearn.metrics import mean_squared_error, mean_absolute_error
-from ..units import Unit, TimeUnit
-from pandas import DataFrame
-from numpy import array
-from math import sqrt
-from copy import deepcopy
-from collections import OrderedDict
-import shutil
+# -*- coding: utf-8 -*-
+"""Anomaly detection models."""
 
-# Keras and sklearn
-from keras.models import Sequential
-from keras.layers import Dense
-from keras.layers import LSTM
-from keras.layers import Dropout
-from keras import optimizers
-from keras.models import load_model as load_keras_model
-from sklearn.metrics import mean_squared_error
-from sklearn.preprocessing import MinMaxScaler
+from copy import deepcopy
 
 # Base models and utilities
-from .base import TimeSeriesParametricModel, ProphetModel, ARIMAModel, KerasModel
-from .base import get_periodicity_index, mean_absolute_percentage_error
-from .forecasters import PeriodicAverageForecaster, LSTMForecaster
+from .base import TimeSeriesParametricModel
+from .forecasters import PeriodicAverageForecaster
 
 # Setup logging
 import logging

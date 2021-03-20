@@ -1,5 +1,7 @@
+# -*- coding: utf-8 -*-
+"""Provides time manipulation utilities, with a particular focus on proper timezone handling."""
+
 import datetime, calendar, pytz
-from .exceptions import InputException, ConsistencyException
 
 # Setup logging
 import logging
@@ -8,7 +10,7 @@ logger = logging.getLogger(__name__)
 UTC = pytz.UTC
 
 def timezonize(timezone):
-    '''Convert a string representation of a timezone to its pytz object or do nothing if the argument is already a pytz timezone'''
+    """Convert a string representation of a timezone to its pytz object, or do nothing if the argument is already a pytz timezone."""
     
     # Check if timezone is a valid pytz object is hard as it seems that they are spread arount the pytz package.
     # Option 1): Try to convert if string or unicode, else try to
@@ -19,24 +21,24 @@ def timezonize(timezone):
     
     if not 'pytz' in str(type(timezone)):
         timezone = pytz.timezone(timezone)
+  
     return timezone
 
 def now_s():
-    '''Return the current time in epoch seconds'''
+    """Return the current time in epoch seconds."""
     return calendar.timegm(now_dt().utctimetuple())
 
-def now_t():
-    return now_s()
 
 def now_dt(tzinfo='UTC'):
-    '''Return the current time in datetime format'''
+    """Return the current time in datetime format."""
     if tzinfo != 'UTC':
         raise NotImplementedError()
     return datetime.datetime.utcnow().replace(tzinfo = pytz.utc)
 
+
 def dt(*args, **kwargs):
-    '''Initialize a datetime object in the proper way. Using the standard datetime leads to a lot of
-     problems with the tz package. Also, it forces UTC timezone if no timezone is specified'''
+    """Initialize a datetime object with the timezone in the proper way. Using the standard datetime initilization
+    leads to various problems if setting a pytz timezone. Also, it forces UTC timezone if no timezone is specified"""
     
     if 'tz' in kwargs:
         tzinfo = kwargs.pop('tz')
@@ -69,18 +71,18 @@ def dt(*args, **kwargs):
     # Check consistency    
     if not trustme and timezone != pytz.UTC:
         if not check_dt_consistency(time_dt):
-            raise InputException('Sorry, time {} does not exists on timezone {}'.format(time_dt, timezone))
+            raise ValueError('Sorry, time {} does not exists on timezone {}'.format(time_dt, timezone))
 
     return  time_dt
 
 
 def get_tz_offset_s(time_dt):
-    '''Get the time zone offset in seconds'''
+    """Get the time zone offset in seconds."""
     return s_from_dt(time_dt.replace(tzinfo=pytz.UTC)) - s_from_dt(time_dt)
 
 
 def check_dt_consistency(date_dt):
-    '''Check that the timezone is consistent with the datetime (some conditions in Python lead to have summertime set in winter)'''
+    """Check that the timezone is consistent with the datetime (some conditions in Python lead to have summertime set in winter)."""
 
     # https://en.wikipedia.org/wiki/Tz_database
     # https://www.iana.org/time-zones
@@ -95,8 +97,9 @@ def check_dt_consistency(date_dt):
         else:
             return True
 
+
 def correct_dt_dst(datetime_obj):
-    '''Check that the dst is correct and if not change it'''
+    """Check that the dst is correct and if not, change it"""
 
     # https://en.wikipedia.org/wiki/Tz_database
     # https://www.iana.org/time-zones
@@ -115,11 +118,12 @@ def correct_dt_dst(datetime_obj):
               tzinfo=datetime_obj.tzinfo)
 
 def change_tz(dt, tz):
+    """Change the timezone of a datetime object."""
     return dt.astimezone(timezonize(tz))
 
 
 def dt_from_s(timestamp_s, tz=None):
-    '''Create a datetime object from an epoch timestamp in seconds. If no timezone is given, UTC is assumed'''
+    """Create a datetime object from an epoch timestamp in seconds. If no timezone is given, UTC is assumed."""
 
     if not tz:
         tz = "UTC"
@@ -135,7 +139,7 @@ def dt_from_s(timestamp_s, tz=None):
 
 
 def s_from_dt(dt):
-    '''Returns seconds with floating point for milliseconds/microseconds.'''
+    """Return the epoch seconds from a datetime object, with floating point for milliseconds/microseconds."""
     if not (isinstance(dt, datetime.datetime)):
         raise Exception('t_from_dt function called without datetime argument, got type "{}" instead.'.format(dt.__class__.__name__))
     microseconds_part = (dt.microsecond/1000000.0) if dt.microsecond else 0
@@ -143,19 +147,21 @@ def s_from_dt(dt):
 
 
 def dt_from_str(string, timezone=None):
+    """Create a datetime object from a string.
 
-    # This is a basic IS08601, see https://www.w3.org/TR/NOTE-datetime
+    This is a basic IS08601, see https://www.w3.org/TR/NOTE-datetime
 
-    # Supported formats on UTC
-    # 1) YYYY-MM-DDThh:mm:ssZ
-    # 2) YYYY-MM-DDThh:mm:ss.{u}Z
+    Supported formats on UTC:
+        1) YYYY-MM-DDThh:mm:ssZ
+        2) YYYY-MM-DDThh:mm:ss.{u}Z
 
-    # Supported formats with offset    
-    # 3) YYYY-MM-DDThh:mm:ss+ZZ:ZZ
-    # 4) YYYY-MM-DDThh:mm:ss.{u}+ZZ:ZZ
+    Supported formats with offset    
+        3) YYYY-MM-DDThh:mm:ss+ZZ:ZZ
+        4) YYYY-MM-DDThh:mm:ss.{u}+ZZ:ZZ
 
-    # Also:
-    # 5) YYYY-MM-DDThh:mm:ss (without the trailing Z, and assume it on UTC)
+    Other supported formats:
+        5) YYYY-MM-DDThh:mm:ss (without the trailing Z, and assume it on UTC)
+    """
 
     # Split and parse standard part
     if 'T' in string:
@@ -210,27 +216,18 @@ def dt_from_str(string, timezone=None):
 
 
 def dt_to_str(dt):
-    '''Return the ISO representation of the datetime as argument'''
+    """Return the IS08601 representation of a datetime."""
     return dt.isoformat()
 
 
-def utckfake_s_from_dt(dt):
-    dt_str = dt_to_str(dt)
-    if '+' in dt_str:
-        return s_from_dt(dt_from_str(dt_str.split('+')[0]+'+00:00'))
-    elif '-' in dt_str:
-        return s_from_dt(dt_from_str(dt_str.split('-')[0]+'+00:00'))
-    else:
-        raise ValueError('Cannot convert to fake UTC epoch a datetime without a timezone')
-
-
 class dt_range(object):
+    """A datetime range object."""
 
-    def __init__(self, from_dt, to_dt, timeSlotUnit):
+    def __init__(self, from_dt, to_dt, time_unit):
 
-        self.from_dt      = from_dt
-        self.to_dt        = to_dt
-        self.timeSlotUnit = timeSlotUnit
+        self.from_dt   = from_dt
+        self.to_dt     = to_dt
+        self.time_unit = time_unit
 
     def __iter__(self):
         self.current_dt = self.from_dt
@@ -243,10 +240,6 @@ class dt_range(object):
             raise StopIteration
         else:
             prev_current_dt = self.current_dt
-            self.current_dt = self.current_dt + self.timeSlotUnit
+            self.current_dt = self.current_dt + self.time_unit
             return prev_current_dt
-
-
-
-
 

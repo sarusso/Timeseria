@@ -1,8 +1,11 @@
+# -*- coding: utf-8 -*-
+"""Provides Units and TimeUnits (which fully support calendar arithmetic including DST changes)."""
+
 import datetime
 import math
 from .time import s_from_dt , dt_from_s, get_tz_offset_s
 from .time import check_dt_consistency, correct_dt_dst
-from .exceptions import InputException, ConsistencyException
+from .exceptions import ConsistencyException
             
 # Setup logging
 import logging
@@ -13,6 +16,7 @@ HARD_DEBUG = False
 
 
 class Unit(object):
+    """A generic unit."""
     
     def __init__(self, value):
         # TODO: Add support for creating from string repr of list/float?
@@ -77,8 +81,7 @@ class Unit(object):
 
 
 class TimeUnit(Unit):
-    ''' A time unit which can be both be physical (hours, minutes..),
-    calendar (months, for example) or defined from a start to an end'''
+    """A unit which can represent both physical (fixed) and calendar (variable) time units."""
     
     CALENDAR  = 'Calendar'
     PHYSICAL = 'Physical'
@@ -101,27 +104,27 @@ class TimeUnit(Unit):
         if not trustme:
 
             if string and not isinstance(string, str):
-                raise InputException('TimeUnits must be initialized with a string or explicitly setting years, months, days, hours etc. (Got "{}")'.format(string.__class__.__name__))
+                raise TypeError('TimeUnits must be initialized with a string or explicitly setting years, months, days, hours etc. (Got "{}")'.format(string.__class__.__name__))
 
             # String OR explicit OR start/end
             if string and (years or months or days or hours or minutes or seconds or microseconds) and ((start is not None) or (end is not None)):
-                raise InputException('Choose between string init and explicit setting of years, months, days, hours etc.')
+                raise ValueError('Choose between string init and explicit setting of years, months, days, hours etc.')
     
             # Check types:
-            if not isinstance(years, int): raise InputException('year not of type int (got "{}")'.format(years.__class__.__name__))
-            if not isinstance(weeks, int): raise InputException('weeks not of type int (got "{}")'.format(years.__class__.__name__))
-            if not isinstance(months, int): raise InputException('months not of type int (got "{}")'.format(years.__class__.__name__))
-            if not isinstance(days, int): raise InputException('days not of type int (got "{}")'.format(years.__class__.__name__))
-            if not isinstance(hours, int): raise InputException('hours not of type int (got "{}")'.format(years.__class__.__name__))
-            if not isinstance(minutes, int): raise InputException('minutes not of type int (got "{}")'.format(years.__class__.__name__))
-            if not isinstance(seconds, int): raise InputException('seconds not of type int (got "{}")'.format(years.__class__.__name__))
-            if not isinstance(microseconds, int): raise InputException('microseconds not of type int (got "{}")'.format(years.__class__.__name__))
+            if not isinstance(years, int): raise ValueError('year not of type int (got "{}")'.format(years.__class__.__name__))
+            if not isinstance(weeks, int): raise ValueError('weeks not of type int (got "{}")'.format(years.__class__.__name__))
+            if not isinstance(months, int): raise ValueError('months not of type int (got "{}")'.format(years.__class__.__name__))
+            if not isinstance(days, int): raise ValueError('days not of type int (got "{}")'.format(years.__class__.__name__))
+            if not isinstance(hours, int): raise ValueError('hours not of type int (got "{}")'.format(years.__class__.__name__))
+            if not isinstance(minutes, int): raise ValueError('minutes not of type int (got "{}")'.format(years.__class__.__name__))
+            if not isinstance(seconds, int): raise ValueError('seconds not of type int (got "{}")'.format(years.__class__.__name__))
+            if not isinstance(microseconds, int): raise ValueError('microseconds not of type int (got "{}")'.format(years.__class__.__name__))
 
             # Check that both start and end are set if one is set
             if start and not end:
-                raise InputException('You provided the start but not the end')
+                raise ValueError('You provided the start but not the end')
             if end and not start:
-                raise InputException('You provided the end but not the start')
+                raise ValueError('You provided the end but not the start')
                    
         # Set the TimeUnit in seconds
         if start and end:
@@ -139,7 +142,7 @@ class TimeUnit(Unit):
         if string:  
             self.strings = string.split("_")
             #if len (self.strings) > 1:
-            #    raise InputException('Complex time intervals are not yet supported')
+            #    raise ValueError('Complex time intervals are not yet supported')
 
             import re
             regex = re.compile('^([0-9]+)([YMDWhmsu]{1,2})$')
@@ -148,7 +151,7 @@ class TimeUnit(Unit):
                 try:
                     groups   =  regex.match(string).groups()
                 except AttributeError:
-                    raise InputException('Cannot parse string representation for the TimeUnit, unknown  format ("{}")'.format(string)) from None
+                    raise ValueError('Cannot parse string representation for the TimeUnit, unknown  format ("{}")'.format(string)) from None
 
                 setattr(self, self.mapping_table[groups[1]], int(groups[0]))
 
@@ -156,7 +159,7 @@ class TimeUnit(Unit):
                      
             # If nothing set, raise error
             if not self.years and not self.weeks and not self.months and not self.days and not self.hours and not self.minutes and not self.seconds and not self.microseconds:
-                raise InputException('Detected zero-duration TimeUnit!')
+                raise ValueError('Detected zero-duration TimeUnit!')
  
     # Representation..
     def __repr__(self):
@@ -182,7 +185,7 @@ class TimeUnit(Unit):
         elif isinstance(other, datetime.datetime):
             
             if not other.tzinfo:
-                raise InputException('Timezone of the datetime to sum with is required')
+                raise ValueError('Timezone of the datetime to sum with is required')
 
             return self.shift_dt(other, times=1)
         
@@ -279,10 +282,10 @@ class TimeUnit(Unit):
         '''Round a datetime according to this TimeUnit. Only simple time intervals are supported in this operation'''
 
         if self.is_composite():
-            raise InputException('Sorry, only simple time intervals are supported by the rebase operation')
+            raise ValueError('Sorry, only simple time intervals are supported by the rebase operation')
 
         if not time_dt.tzinfo:
-            raise InputException('Timezone of the datetime is required')    
+            raise ValueError('Timezone of the datetime is required')    
                 
         # Handle physical time 
         if self.type == self.PHYSICAL:
@@ -372,7 +375,7 @@ class TimeUnit(Unit):
     def shift_dt(self, time_dt, times=1):
         '''Shift a given datetime of n times of this TimeUnit. Only simple time intervals are supported in this operation'''
         if self.is_composite():
-            raise InputException('Sorry, only simple time intervals are supported byt he rebase operation')
+            raise ValueError('Sorry, only simple time intervals are supported by the rebase operation')
  
         # Convert input time to seconds
         time_s = s_from_dt(time_dt)
@@ -436,10 +439,10 @@ class TimeUnit(Unit):
     def duration_s(self, start_dt=None):
         '''Get the duration of the interval in seconds'''
         if self.is_composite():
-            raise InputException('Sorry, only simple time intervals are supported by this operation')
+            raise ValueError('Sorry, only simple time intervals are supported by this operation')
 
         if self.type == 'Calendar' and not start_dt:
-            raise InputException('With a calendar TimeUnit you can ask for duration only if you provide the starting point')
+            raise ValueError('With a calendar TimeUnit you can ask for duration only if you provide the starting point')
         
         if self.type == 'Calendar':
             
@@ -481,7 +484,7 @@ class TimeUnit(Unit):
                 new_values.append(center.values[i] - self.value[i]/2.0)
             return center.__class__(labels=center.labels, values=new_values, tz=center.tz)
         else:
-            raise InputException('get_start: Got not end nor center')        
+            raise ValueError('get_start: Got not end nor center')        
             
     def get_end(self, start=None, center=None):
         new_values = []
@@ -494,7 +497,7 @@ class TimeUnit(Unit):
                 new_values.append(center.values[i] + self.value[i]/2.0) 
             return center.__class__(labels=center.labels, values=new_values, tz=center.tz) 
         else:
-            raise InputException('get_end: Got not end nor center')
+            raise ValueError('get_end: Got not end nor center')
 
     def get_center(self, start=None, end=None):
         new_values = []
@@ -507,4 +510,4 @@ class TimeUnit(Unit):
                 new_values.append(end.values[i] - self.value[i]/2.0) 
             return end.__class__(labels=end.labels, values=new_values, tz=end.tz) 
         else:
-            raise InputException('get_center: Got not end not start') 
+            raise ValueError('get_center: Got not end not start') 

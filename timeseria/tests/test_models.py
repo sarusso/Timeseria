@@ -180,7 +180,12 @@ class TestReconstructors(unittest.TestCase):
         
 
     def test_ProphetReconstructor(self):
-        
+        try:
+            import fbprophet
+        except ImportError:
+            print('Skipping Prophet tests as no module is installed')
+            return
+            
         # Get test data        
         data_time_point_series = CSVFileStorage(TEST_DATA_PATH + '/csv/temperature.csv').get(limit=200)
         data_time_slot_series = Slotter('3600s').process(data_time_point_series)
@@ -293,6 +298,12 @@ class TestForecasters(unittest.TestCase):
 
 
     def test_ProphetForecaster(self):
+
+        try:
+            import fbprophet
+        except ImportError:
+            print('Skipping Prophet tests as no module is installed')
+            return
          
         forecaster = ProphetForecaster()
          

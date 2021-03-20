@@ -1,6 +1,5 @@
 import unittest
 import datetime
-from ..exceptions import InputException
 from ..time import dt, correct_dt_dst, dt_to_str, dt_from_str, change_tz
 
 
@@ -16,7 +15,7 @@ class TestTime(unittest.TestCase):
         
         # 2015-03-29 02:15:00+01:00, Wrong, does not exists and cannot be corrected
         date_time = date_time + datetime.timedelta(hours=1)
-        with self.assertRaises(InputException):
+        with self.assertRaises(ValueError):
             correct_dt_dst(date_time)
 
         # 2015-03-29 03:15:00+01:00, Wrong and can be corrected
@@ -43,7 +42,7 @@ class TestTime(unittest.TestCase):
         self.assertEqual(str(date_time), '2015-09-25 04:15:00+02:00')
 
         # Not existent time raises
-        with self.assertRaises(InputException):
+        with self.assertRaises(ValueError):
             _ = dt(2015,3,29,2,15,0, tzinfo='Europe/Rome')
          
         # Not existent time does not raises   
@@ -97,7 +96,7 @@ class TestTime(unittest.TestCase):
         # 2016-06-29T20:56:35.450686+05:00
 
         # From ISO without offset is not allowed -> Not anymore, see test "From ISO assuming UTC"]
-        #with self.assertRaises(InputException):
+        #with self.assertRaises(ValueError):
         #    dt_from_str('1986-08-01T16:46:00')
        
         # From ISO on UTC

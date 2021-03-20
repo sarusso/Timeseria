@@ -1,12 +1,17 @@
+# -*- coding: utf-8 -*-
+"""Utility functions."""
+
 import os
+import re
 import chardet
 from chardet.universaldetector import UniversalDetector
 from numpy import fft
 from scipy.signal import find_peaks
-from .time import dt_from_s
-from .exceptions import InputException, ConsistencyException
+from .exceptions import ConsistencyException
 from datetime import datetime
 from .time import s_from_dt
+from .units import Unit, TimeUnit
+from .exceptions import FloatConversionError
 
 # Setup logging
 import logging
@@ -128,7 +133,7 @@ def compute_coverage(data_time_point_series, from_t, to_t, trustme=False, validi
     # Sanity checks
     if not trustme:
         if data_time_point_series is None:
-            raise InputException('You must provide data_time_point_series, got None')
+            raise ValueError('You must provide a data_time_point_series, got None')
             
         if from_t is None or to_t is None:
             raise ValueError('Missing from_t or to_t')
@@ -468,12 +473,159 @@ def get_periodicity(timeseries):
         
         # Round max peak and return
         return int(round(max_peak_frequency))
+
+def mean_absolute_percentage_error(list1, list2):
+    '''Computes the MAPE, list 1 are true values, list2 arepredicted values'''
+    if len(list1) != len(list2):
+        raise ValueError('Lists have different lengths, cannot continue')
+    p_error_sum = 0
+    for i in range(len(list1)):
+        p_error_sum += abs((list1[i] - list2[i])/list1[i])
+    return p_error_sum/len(list1)
+
+
+def get_periodicity_index(item, resolution, periodicity, dst_affected=False):
+
+    # Handle specific cases
+    if isinstance(resolution, TimeUnit):  
+        resolution_s = resolution.duration_s(item.dt)
+    elif isinstance(resolution, Unit):  
+        if isinstance(resolution.value, list):
+            raise NotImplementedError('Sorry, periodicty in multi-dimensional spaces are not defined')
+        resolution_s = resolution.value
+    else:
+        if isinstance(resolution, list):
+            raise NotImplementedError('Sorry, periodicty in multi-dimensional spaces are not defined')
+        resolution_s = resolution
+
+    # Compute periodicity index
+    if not dst_affected:
+    
+        # Get index based on item timestamp, normalized to unit, modulus periodicity
+        periodicity_index =  int(item.t / resolution_s) % periodicity
+    
+    else:
+
+        # Get periodicity based on the datetime
+        
+        # Do we have an active DST?  
+        dst_timedelta = item.dt.dst()
+        
+        if dst_timedelta.days == 0 and dst_timedelta.seconds == 0:
+            # No DST
+            periodicity_index = int(item.t / resolution_s) % periodicity
+        
+        else:
+            # DST
+            if dst_timedelta.days != 0:
+                raise Exception('Don\'t know how to handle DST with days timedelta = "{}"'.format(dst_timedelta.days))
+
+            if resolution_s > 3600:
+                raise Exception('Sorry, this time series has not enough resolution to account for DST effects (resolution_s="{}", must be below 3600 seconds)'.format(resolution_s))
+            
+            # Get DST offset in seconds 
+            dst_offset_s = dst_timedelta.seconds # 3600 usually
+
+            # Compute the periodicity index
+            periodicity_index = (int((item.t + dst_offset_s) / resolution_s) % periodicity)
+
+    return periodicity_index
     
     
+#==============================
+#  TimeUnit conversion
+#==============================
+
+def unit_to_TimeUnit(unit):
+    if isinstance(unit, TimeUnit):
+        time_unit = unit
+    elif isinstance(unit, int):
+        time_unit = TimeUnit(seconds=unit)
+    elif isinstance(unit, float):
+        if int(str(unit).split('.')[1]) != 0:
+            raise ValueError('Cannot process decimal seconds yet')
+        time_unit = TimeUnit(seconds=unit)
+    elif isinstance(unit, str):
+        time_unit = TimeUnit(unit)
+        unit = time_unit
+    else:
+        raise ValueError('Unknown unit type "{}"'.format(unit.__class__.__name__))
+    return time_unit
+
+
+#==============================
+# Detetc sampling interval
+#==============================
+
+def detect_sampling_interval(data_time_point_series):
+
+    diffs={}
+    prev_data_time_point=None
+    for data_time_point in data_time_point_series:
+        if prev_data_time_point is not None:
+            diff = data_time_point.t - prev_data_time_point.t
+            if diff not in diffs:
+                diffs[diff] = 1
+            else:
+                diffs[diff] +=1
+        prev_data_time_point = data_time_point
     
+    # Iterate until the diffs are not too spread, then pick the maximum.
+    i=0
+    while is_almost_equal(len(diffs), len(data_time_point_series)):
+        or_diffs=diffs
+        diffs={}
+        for diff in or_diffs:
+            diff=round(diff)
+            if diff not in diffs:
+                diffs[diff] = 1
+            else:
+                diffs[diff] +=1            
+        
+        if i > 10:
+            raise Exception('Cannot automatically detect original resolution')
+    
+    most_common_diff_total = 0
+    most_common_diff = None
+    for diff in diffs:
+        if diffs[diff] > most_common_diff_total:
+            most_common_diff_total = diffs[diff]
+            most_common_diff = diff
+    return(most_common_diff)
 
 
 
+#==============================
+# Storage utilities
+#==============================
+
+def sanitize_string(string, no_data_placeholders=[]):
+    string = re.sub('\s+',' ',string).strip()
+    if string.startswith('\'') or string.startswith('"'):
+        string = string[1:]
+    if string.endswith('\'') or string.endswith('"'):
+        string = string[:-1]
+    string = string.strip()
+    if string.lower().replace('.','') in no_data_placeholders:
+        return None
+    return string
+
+
+def is_list_of_integers(list):
+    for item in list:
+        if not isinstance(item, int):
+            return False
+    else:
+        return True
+
+def to_float(string,no_data_placeholders=[]):
+    sanitized_string_string = sanitize_string(string,no_data_placeholders)
+    if sanitized_string_string:
+        sanitized_string_string = sanitized_string_string.replace(',','.')
+    try:
+        return float(sanitized_string_string)
+    except (ValueError, TypeError):
+        raise FloatConversionError(sanitized_string_string)
 
 
 

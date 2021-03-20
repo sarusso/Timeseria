@@ -7,12 +7,21 @@ ENV DEBIAN_FRONTEND noninteractive
 # Update apt cache
 RUN apt-get update
 
-# Install system requirements
-COPY requirements/system/Ubuntu_18.04.sh /tmp
-RUN bash /tmp/Ubuntu_18.04.sh
+# Curl
+RUN apt-get install curl -y
+
+# Install get-pip script
+RUN curl -O https://bootstrap.pypa.io/get-pip.py
+
+# Install Python3 and Pip3
+RUN apt-get install python3 python3-distutils -y 
+RUN python3 get-pip.py #-c <(echo 'pip==20.2')
+
+# Python-tk required by matplotlib/six
+RUN apt-get install python-tk python3-tk python3-dev build-essential -y
 
 # Install Python requirements
-COPY requirements/python/requirements.txt /tmp
+COPY requirements.txt /tmp
 RUN pip3 install -r /tmp/requirements.txt
 
 # Install Jupyter and Sphinx for docs

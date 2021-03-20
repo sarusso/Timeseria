@@ -1,7 +1,11 @@
+# -*- coding: utf-8 -*-
+"""Plotting utilities."""
+# Note: the code in this module is spaghetti-ish code, and there are no tests. A major refactoring is required.'''
+
 import os
 import uuid
 import datetime
-from .time import dt_from_s, dt_to_str, utckfake_s_from_dt
+from .time import dt_from_s, dt_to_str, dt_from_str
 from .datastructures import DataTimePointSeries, DataTimeSlotSeries
 from .units import TimeUnit
 from .utilities import is_numerical
@@ -10,15 +14,25 @@ from .utilities import is_numerical
 import logging
 logger = logging.getLogger(__name__)
 
-''' Note: the code in this module is spaghetti-code, and there are no tests. A major refactoring is required.'''
-
+AGGREGATE_THRESHOLD = 10000
 render_mark_as_index = False
 
 #=================
 #   Utilities
 #=================
 
-def get_keys_and_check_data_for_plot(data):
+def _utc_fake_s_from_dt(dt):
+    dt_str = dt_to_str(dt)
+    if '+' in dt_str:
+        return s_from_dt(dt_from_str(dt_str.split('+')[0]+'+00:00'))
+    elif '-' in dt_str:
+        return s_from_dt(dt_from_str(dt_str.split('-')[0]+'+00:00'))
+    else:
+        raise ValueError('Cannot convert to fake UTC epoch a datetime without a timezone')
+
+
+
+def _get_keys_and_check_data_for_plot(data):
     if is_numerical(data):
         keys = []
     elif isinstance(data, list):
@@ -39,7 +53,7 @@ def get_keys_and_check_data_for_plot(data):
     return keys
 
 from timeseria.time import s_from_dt
-def to_dg_time(dt):
+def _to_dg_time(dt):
     '''Get Dygraphs time form datetime'''
     #return '{}{:02d}-{:02d}T{:02d}:{:02d}:{:02d}+00:00'.format(dt.year, dt.month, dt.day, dt.hour, dt.minute,dt.second)
     #return s_from_dt(dt)*1000
@@ -49,7 +63,7 @@ def to_dg_time(dt):
         return 'new Date(Date.UTC({}, {}, {}, {}, {}, {}))'.format(dt.year, dt.month-1, dt.day, dt.hour, dt.minute, dt.second)
 
 
-def to_dg_data(serie,  indexes_to_plot, aggregate_by=0):
+def _to_dg_data(serie,  indexes_to_plot, aggregate_by=0):
     '''{% for timestamp,value in metric_data.items %}{{timestamp}},{{value}}\n{%endfor%}}'''
     
     dg_data=''
@@ -73,7 +87,7 @@ def to_dg_data(serie,  indexes_to_plot, aggregate_by=0):
             keys
         except UnboundLocalError:
             # Set keys and support vars
-            keys = get_keys_and_check_data_for_plot(item.data)
+            keys = _get_keys_and_check_data_for_plot(item.data)
             if not keys:
                 keys = [None]
             data_sums = [0 for key in keys]
@@ -184,7 +198,7 @@ def to_dg_data(serie,  indexes_to_plot, aggregate_by=0):
                 data_part = data_part[0:-1]
                 
                 # Add to dg_data
-                dg_data += '[{},{}],'.format(to_dg_time(dt_from_s(aggregation_t, tz=item.tz)), data_part)
+                dg_data += '[{},{}],'.format(_to_dg_time(dt_from_s(aggregation_t, tz=item.tz)), data_part)
                 
                 # Reset averages
                 data_sums = [0 for key in keys]
@@ -247,7 +261,7 @@ def to_dg_data(serie,  indexes_to_plot, aggregate_by=0):
             data_part = data_part[0:-1]
 
             # Add to dg_data
-            dg_data += '[{},{}],'.format(to_dg_time(dt_from_s(item.t, tz=item.tz)), data_part)
+            dg_data += '[{},{}],'.format(_to_dg_time(dt_from_s(item.t, tz=item.tz)), data_part)
 
     if dg_data.endswith(','):
         dg_data = dg_data[0:-1]
@@ -259,29 +273,42 @@ def to_dg_data(serie,  indexes_to_plot, aggregate_by=0):
 #  Dygraphs plot
 #=================
 
-def dygraphs_plot(serie, aggregate_by, log_js=False, indexes=None):
-    '''Plot a data_time_pointSeries in Jupyter using Dugraph. Based on the work here: https://www.stefaanlippens.net/jupyter-custom-d3-visualization.html'''
+def dygraphs_plot(timeseries, indexes=None, aggregate=None, aggregate_by=None, log_js=False):
+    """Plot a timeseries in Jupyter using Dygraphs. Based on the work here: https://www.stefaanlippens.net/jupyter-custom-d3-visualization.html"""
     from IPython.display import display, Javascript, HTML
     
-    if len(serie)==0:
-        raise Exception('Cannot plot empty serie')
+    if len(timeseries)==0:
+        raise Exception('Cannot plot empty timeseries')
+   
+    if aggregate_by is None:
+        # Set default aggregate_by if not explicitly set to something
+        if len(timeseries)  > AGGREGATE_THRESHOLD:
+            aggregate_by = 10**len(str(int(len(timeseries)/float(AGGREGATE_THRESHOLD))))
+        else:
+            aggregate_by = None
+ 
+    if aggregate is not None:
+        # Handle the case where we are required not to aggregate
+
+        if not aggregate:
+            aggregate_by = None
 
     #if show_data_reconstructed:
     #    show_data_loss=False
 
     # Checks
-    if isinstance(serie, DataTimePointSeries):
+    if isinstance(timeseries, DataTimePointSeries):
         stepPlot_value   = 'false'
         drawPoints_value = 'true'
         if aggregate_by:
             legend_pre = 'Point (aggregated by {}) at '.format(aggregate_by)
         else:
             legend_pre = 'Point at '
-    elif isinstance(serie, DataTimeSlotSeries):
-        if isinstance(serie._resolution, TimeUnit):
-            serie_unit_string = str(serie._resolution)
+    elif isinstance(timeseries, DataTimeSlotSeries):
+        if isinstance(timeseries._resolution, TimeUnit):
+            serie_unit_string = str(timeseries._resolution)
         else:
-            serie_unit_string = str(serie._resolution) #.split('.')[0]+'s'
+            serie_unit_string = str(timeseries._resolution) #.split('.')[0]+'s'
         #if aggregate_by: 
         #    raise NotImplementedError('Plotting slots with a plot-level aggregation is not yet supported')
         stepPlot_value   = 'true'
@@ -293,28 +320,28 @@ def dygraphs_plot(serie, aggregate_by, log_js=False, indexes=None):
             legend_pre = 'Slot of {} starting at '.format(serie_unit_string)
 
     else:
-        raise Exception('Don\'t know how to plot an object of type "{}"'.format(serie.__class__.__name__))
+        raise Exception('Don\'t know how to plot an object of type "{}"'.format(timeseries.__class__.__name__))
 
     # Set title
-    if serie.title:
-        title = serie.title
+    if timeseries.title:
+        title = timeseries.title
     else:
-        if isinstance(serie, DataTimePointSeries):
+        if isinstance(timeseries, DataTimePointSeries):
             if aggregate_by:
-                title = 'Time series of #{} points at {}, aggregated by {}'.format(len(serie), serie.resolution_string, aggregate_by)
+                title = 'Time series of #{} points at {}, aggregated by {}'.format(len(timeseries), timeseries.resolution_string, aggregate_by)
             else:
-                title = 'Time series of #{} points at {}'.format(len(serie), serie.resolution_string)
+                title = 'Time series of #{} points at {}'.format(len(timeseries), timeseries.resolution_string)
              
-        elif isinstance(serie, DataTimeSlotSeries):
+        elif isinstance(timeseries, DataTimeSlotSeries):
             if aggregate_by:
                 # TODO: "slots of unit" ?
-                title = 'Time series of #{} slots of {}, aggregated by {}'.format(len(serie), serie_unit_string, aggregate_by)
+                title = 'Time series of #{} slots of {}, aggregated by {}'.format(len(timeseries), serie_unit_string, aggregate_by)
             else:
                 # TODO: "slots of unit" ?
-                title = 'Time series of #{} slots of {}'.format(len(serie), serie_unit_string)
+                title = 'Time series of #{} slots of {}'.format(len(timeseries), serie_unit_string)
                 
         else:
-            title = serie.__class__.__name__
+            title = timeseries.__class__.__name__
 
     if aggregate_by:
         logger.info('Aggregating by "{}" for improved plotting'.format(aggregate_by))
@@ -325,7 +352,7 @@ def dygraphs_plot(serie, aggregate_by, log_js=False, indexes=None):
     legend_div_id = graph_id + '_legend'
 
     # Do we have to show a series mark?
-    if serie.mark:
+    if timeseries.mark:
         logger.info('Found series mark and showing it')
         serie_mark_html = '<span style="background:rgba(255, 255, 102, .6);">&nbsp;mark&nbsp;</span>'
         serie_mark_html_off = '<span style="background:rgba(255, 255, 102, .2);">&nbsp;mark&nbsp;</span>'
@@ -385,7 +412,7 @@ function legendFormatter(data) {
       }
 
 
-      html = '""" + legend_pre + """' + data.xHTML + ' (""" + str(serie.tz)+ """):';
+      html = '""" + legend_pre + """' + data.xHTML + ' (""" + str(timeseries.tz)+ """):';
       for (var i = 0; i < data.series.length; i++) {
         
         var mark_active = false;
@@ -443,7 +470,7 @@ function legendFormatter(data) {
 
     # Loop over all the keys
     labels=''
-    keys = get_keys_and_check_data_for_plot(serie[0].data)
+    keys = _get_keys_and_check_data_for_plot(timeseries[0].data)
     if keys:
         for key in keys:
             if isinstance(key, int):
@@ -461,7 +488,7 @@ function legendFormatter(data) {
     # Handle series indexes
     if indexes is None:
         # Plot alls eries indexes
-        indexes_to_plot = serie.indexes
+        indexes_to_plot = timeseries.indexes
     else:
         # Check that the indexes are of the right type and that are present in the series indexes
         indexes_to_plot = []
@@ -470,8 +497,8 @@ function legendFormatter(data) {
         for index in indexes:
             if not isinstance(index, str):
                 raise TypeError('The "indexes" list items must be string (got type "{}")'.format(index.__class__.__name__))
-            if not index in serie.indexes:
-                raise ValueError('The index "{}" is not present in the series indexes ({})'.format(index, serie.indexes))
+            if not index in timeseries.indexes:
+                raise ValueError('The index "{}" is not present in the series indexes ({})'.format(index, timeseries.indexes))
             indexes_to_plot.append(index)
     
     # Set index labels
@@ -479,14 +506,14 @@ function legendFormatter(data) {
         labels+=',{}'.format(index)
 
     # Handle series mark (as index)
-    if serie.mark and render_mark_as_index:
+    if timeseries.mark and render_mark_as_index:
         labels+=',data_mark'
     
     # Prepare labels string list for Dygraphs
     labels_list = ['Timestamp'] + labels.split(',')
 
     # Get series data in Dygraphs format (and aggregate if too much data and find global min and max)
-    global_min, global_max, dg_data = to_dg_data(serie, indexes_to_plot, aggregate_by)
+    global_min, global_max, dg_data = _to_dg_data(timeseries, indexes_to_plot, aggregate_by)
     if global_max != global_min:
         plot_min = str(global_min-((global_max-global_min)*0.1))
         plot_max = str(global_max+((global_max-global_min)*0.1))
@@ -498,7 +525,7 @@ function legendFormatter(data) {
     #dygraphs_javascript += '"Timestamp,{}\\n{}",'.format(labels, dg_data)
     dygraphs_javascript += '{},'.format(dg_data)
 
-#dateWindow: [0,"""+str(utckfake_s_from_dt(serie[-1].end.dt)*1000)+"""],
+#dateWindow: [0,"""+str(_utc_fake_s_from_dt(timeseries[-1].end.dt)*1000)+"""],
 
     dygraphs_javascript += """{\
 labels: """+str(labels_list)+""",
@@ -587,7 +614,7 @@ animatedZooms: true,"""
     
     # Data loss index series
     if 'data_loss' in indexes_to_plot:
-        # Add data loss special serie
+        # Add data loss special timeseries
         dygraphs_javascript += """
        'data_loss': {
          //customBars: false, // Does not work?
@@ -644,7 +671,7 @@ animatedZooms: true,"""
        },"""
 
     # Add all non-index series to be included in the miniplot
-    for label in serie.data_keys():
+    for label in timeseries.data_keys():
         dygraphs_javascript += """
            '"""+str(label)+"""': {
              showInRangeSelector:true
@@ -655,21 +682,21 @@ animatedZooms: true,"""
      },"""
 
     # Force "original" Dygraph color if only one data series           
-    if len(serie.data_keys()) <=1:
+    if len(timeseries.data_keys()) <=1:
         dygraphs_javascript += """colors: ['rgb(0,128,128)'],""" 
 
     # Handle series mark (only if not handled as an index)
-    if serie.mark and not render_mark_as_index:
+    if timeseries.mark and not render_mark_as_index:
  
         # Check that we know how to use this mark
-        if not isinstance(serie.mark[0], datetime.datetime):
+        if not isinstance(timeseries.mark[0], datetime.datetime):
             raise TypeError('Series marks must be datetime objects')
-        if not isinstance(serie.mark[1], datetime.datetime):
+        if not isinstance(timeseries.mark[1], datetime.datetime):
             raise TypeError('Series marks must be datetime objects')            
            
         # Convert the mark to fake epoch milliseconds
-        mark_start = utckfake_s_from_dt(serie.mark[0])*1000
-        mark_end   = utckfake_s_from_dt(serie.mark[1])*1000
+        mark_start = _utc_fake_s_from_dt(timeseries.mark[0])*1000
+        mark_end   = _utc_fake_s_from_dt(timeseries.mark[1])*1000
          
         # Add js code
         dygraphs_javascript  += 'underlayCallback: function(canvas, area, g) {'
@@ -732,11 +759,8 @@ define('"""+graph_id+"""', ['dgenv'], function (Dygraph) {
 # Matplotlib plot
 #=================
 
-def matplotlib_plot(serie):
-    def as_vectors(self):
-        X = [datetime.datetime.fromtimestamp(item.t) for item in serie]
-        Y = [item.data for item in serie]
-        return X,Y
+def matplotlib_plot(timeseries):
+    """Plot a timeseries in Jupyter using Matplotlib."""
     from matplotlib import pyplot
-    pyplot.plot(*as_vectors(serie))
+    pyplot.plot(timeseries.df)
     pyplot.show()
