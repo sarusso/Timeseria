@@ -10,8 +10,7 @@ models (reconstruction, forecasting and anomaly detection), and both custom oper
 
 Timeseria also tries to address by design all those annoying things which are often left as an implementation detail but that actually cause wasting massive amounts of time - as handling data losses, non-uniform sampling rates, differences between time-slotted data and punctual observations, variable time units, timezones, DST changes and so on.
 
-You can get started by reading the [quickstart](https://sarusso.github.io/Timeseria/Quickstart.html) or the [welcome tutorial](https://sarusso.github.io/Timeseria/Welcome.html). Or you can run them interactively in Binder using the button below (once the environment is ready, open the "Quickstart" or "Welcome" notebooks). Also the [reference documentation](https://timeseria.readthedocs.io) might be useful.
-
+You can get started by reading the [quickstart](https://sarusso.github.io/Timeseria/Quickstart.html) or the [welcome](https://sarusso.github.io/Timeseria/Welcome.html) notebooks. Or you can run them interactively in Binder using the button below. Also the [reference documentation](https://timeseria.readthedocs.io) might be useful.
 
 Examples are provided in the [Timeseria-notebooks](https://github.com/sarusso/Timeseria-notebooks) repository, and are accessible in Binder as well, ready to be played with.
 
