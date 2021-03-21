@@ -1,6 +1,4 @@
 
-**WARNING:** this is still only alpha software; this means you use it at your own risk, that test coverage is still in need of expansion, and also that some modules are still in need of being optimized.
-
 # Timeseria
 
 Timeseria is a time series processing library which aims at making it easy to handle time series data and to build statistical and machine learning models on top of it.
