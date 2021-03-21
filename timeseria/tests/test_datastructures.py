@@ -638,7 +638,7 @@ class TestSlotSeries(unittest.TestCase):
             prev_t    = t
         self.assertEqual(len(data_time_slot_series),10)
         self.assertEqual(data_time_slot_series[0].unit,TimeUnit('60s'))
-        self.assertNotEqual(data_time_slot_series[0].unit, Unit(60))
+        self.assertEqual(data_time_slot_series[0].unit, Unit(60))
 
         # Time series with calendar time units
         data_time_slot_series = DataTimeSlotSeries()

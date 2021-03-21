@@ -17,24 +17,28 @@ class TestUnits(unittest.TestCase):
 
     def test_Unit_math(self):
         
+        # Sum & subtract
         unit1 = Unit(60)
         self.assertEqual(unit1+5, 65)
         self.assertEqual(5+unit1, 65)
         self.assertEqual(unit1-5, 55)
         self.assertEqual(5-unit1, -55)        
-        
+
+        # Sum & subtract Units
         unit2 = Unit(67)
         self.assertEqual(unit1+unit2, 127)
         self.assertEqual(unit1-unit2, -7)
         self.assertEqual(unit2-unit1, 7)
-
+        
+        # Divide & multiply
+        self.assertEqual(unit1/2, 30)
+        self.assertEqual(120/unit1,2)
+        self.assertEqual(unit1*2,120)
+        self.assertEqual(2*unit1,120)
 
 
     def test_TimeUnit(self):
 
-        with self.assertRaises(TypeError):
-            _ = TimeUnit(60)
-        
         with self.assertRaises(ValueError):
             _ = TimeUnit('15m', '20s')
 
@@ -42,17 +46,31 @@ class TestUnits(unittest.TestCase):
         with self.assertRaises(ValueError):
             _ = TimeUnit('15q')
 
+        # Numerical init
+        time_unit_1 = TimeUnit(60)
+        self.assertEqual(str(time_unit_1), '60s')
+
         # String init
         time_unit_1 = TimeUnit('15m')
-        self.assertEqual(time_unit_1.string, '15m')
+        self.assertEqual(str(time_unit_1), '15m')
 
         time_unit_2 = TimeUnit('15m_30s_3u')
-        self.assertEqual(time_unit_2.string, '15m_30s_3u')
+        self.assertEqual(str(time_unit_2), '15m_30s_3u')
         
         time_unit_3 = TimeUnit(days=1)
+        
+        # Value (duration in seconds)
+        self.assertEqual(time_unit_1.value, 900)
 
+        with self.assertRaises(TypeError):
+            time_unit_3.value # Not defined for calendar time units
+        
+        #=====================
+        #  Sum
+        #=====================
+        
         # Sum with other TimeUnit objects
-        self.assertEqual((time_unit_1+time_unit_2+time_unit_3).string, '1D_30m_30s_3u')
+        self.assertEqual(str(time_unit_1+time_unit_2+time_unit_3), '1D_30m_30s_3u')
 
         # Sum with datetime (also on DST change)
         time_unit = TimeUnit('1h')
@@ -68,11 +86,57 @@ class TestUnits(unittest.TestCase):
         self.assertEqual(str(date_time4), '2015-10-25 02:15:00+01:00')
         self.assertEqual(str(date_time5), '2015-10-25 03:15:00+01:00')
 
+        # Sum with a numerical value
+        time_unit = TimeUnit('1h')
+        epoch1 = 3600
+        self.assertEqual(epoch1 + time_unit, 7200)
+
+
+        #=====================
+        #  Subtraction
+        #=====================
+
+        # Subtract to other TimeUnit object
+        with self.assertRaises(NotImplementedError):
+            time_unit_1 - time_unit_2
+
+        # Subtract to a datetime object
+        with self.assertRaises(NotImplementedError):
+            time_unit_1 - date_time1
+            
+        # In general, subtracting to anything is not implemented
+        with self.assertRaises(NotImplementedError):
+            time_unit_1 - 'hello'
+        
+        # Subtract from a datetime (also on DST change)
+        time_unit = TimeUnit('1h')
+        date_time1 = dt(2015,10,25,3,15,0, tzinfo='Europe/Rome')
+        date_time2 = date_time1 - time_unit
+        date_time3 = date_time2 - time_unit
+        date_time4 = date_time3 - time_unit
+        date_time5 = date_time4 - time_unit
+
+        self.assertEqual(str(date_time1), '2015-10-25 03:15:00+01:00')
+        self.assertEqual(str(date_time2), '2015-10-25 02:15:00+01:00')
+        self.assertEqual(str(date_time3), '2015-10-25 02:15:00+02:00')
+        self.assertEqual(str(date_time4), '2015-10-25 01:15:00+02:00')        
+        self.assertEqual(str(date_time5), '2015-10-25 00:15:00+02:00')
+
+        # Subtract from a numerical value
+        time_unit = TimeUnit('1h')
+        epoch1 = 7200
+        self.assertEqual(epoch1 - time_unit, 3600)
+
+
+        #=====================
+        #  Types
+        #=====================
+
         # Test type
-        self.assertEqual(TimeUnit('15m').type, TimeUnit.PHYSICAL)
-        self.assertEqual(TimeUnit('1h').type, TimeUnit.PHYSICAL)
-        self.assertEqual(TimeUnit('1D').type, TimeUnit.CALENDAR)
-        self.assertEqual(TimeUnit('1M').type, TimeUnit.CALENDAR)
+        self.assertEqual(TimeUnit('15m').type, TimeUnit._PHYSICAL)
+        self.assertEqual(TimeUnit('1h').type, TimeUnit._PHYSICAL)
+        self.assertEqual(TimeUnit('1D').type, TimeUnit._CALENDAR)
+        self.assertEqual(TimeUnit('1M').type, TimeUnit._CALENDAR)
         
         # Test sum with TimePoint
         time_unit = TimeUnit('1h')
@@ -89,6 +153,26 @@ class TestUnits(unittest.TestCase):
         self.assertEqual(TimeUnit('15m').value, 900)
         self.assertEqual(TimeUnit('1h').value, 3600)
 
+        # Test equal
+        self.assertEqual(time_unit_1, 900)
+
+        # Test duration with composite point seconds init
+        self.assertEqual(TimeUnit(minutes=1, seconds=3).value, 63)
+        
+        # Test floating point seconds init
+        self.assertEqual(TimeUnit('1.2345s').value, 1.2345)
+        self.assertEqual(TimeUnit('1.234s').value, 1.234)
+        self.assertEqual(TimeUnit('1.02s').value, 1.02)
+        self.assertEqual(TimeUnit('1.000005s').value, 1.000005)
+        self.assertEqual(TimeUnit('67.000005s').seconds, 67)
+        self.assertEqual(TimeUnit('67.000005s').microseconds, 5)
+  
+        # Too much precision (below microseconds), gets cut
+        time_unit = TimeUnit('1.0000005s')
+        self.assertEqual(str(time_unit),'1s')
+        time_unit = TimeUnit('1.0000065s')
+        self.assertEqual(str(time_unit),'1s_6u')
+        
 
     def test_TimeUnit_duration(self):
 

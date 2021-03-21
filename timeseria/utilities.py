@@ -10,7 +10,6 @@ from scipy.signal import find_peaks
 from .exceptions import ConsistencyException
 from datetime import datetime
 from .time import s_from_dt
-from .units import Unit, TimeUnit
 from .exceptions import FloatConversionError
 
 # Setup logging
@@ -485,7 +484,7 @@ def mean_absolute_percentage_error(list1, list2):
 
 
 def get_periodicity_index(item, resolution, periodicity, dst_affected=False):
-
+    from .units import Unit, TimeUnit
     # Handle specific cases
     if isinstance(resolution, TimeUnit):  
         resolution_s = resolution.duration_s(item.dt)
@@ -537,6 +536,7 @@ def get_periodicity_index(item, resolution, periodicity, dst_affected=False):
 #==============================
 
 def unit_to_TimeUnit(unit):
+    from .units import TimeUnit
     if isinstance(unit, TimeUnit):
         time_unit = unit
     elif isinstance(unit, int):
@@ -629,4 +629,25 @@ def to_float(string,no_data_placeholders=[]):
 
 
 
-
+def to_time_unit_string(seconds, friendlier=True):
+    """Converts seconds to a (friendlier) time unit string, as 1h, 10m etc.)"""    
+    seconds_str = str(seconds).replace('.0', '')
+    if seconds_str == '60':
+        seconds_str = '1m'
+    elif seconds_str == '600':
+        seconds_str = '10m'
+    elif seconds_str == '3600':
+        seconds_str = '1h'
+    else:
+        seconds_str = seconds_str+'s'
+    return seconds_str
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    

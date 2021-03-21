@@ -3,10 +3,11 @@
 
 from .time import s_from_dt , dt_from_s, UTC, timezonize
 from .units import Unit, TimeUnit
-from .utilities import is_close
+from .utilities import is_close, to_time_unit_string
 from copy import deepcopy
 from pandas import DataFrame
 from datetime import datetime
+from .exceptions import ConsistencyException
 
 # Setup logging
 import logging
@@ -516,7 +517,8 @@ class TimePointSeries(PointSeries):
                     raise ValueError('Time t="{}" is a duplicate'.format(item.t))
                 
                 if self._resolution is None:
-                    self._resolution = item.t - self.prev_t
+                    
+                    self._resolution = TimeUnit(to_time_unit_string(item.t - self.prev_t, friendlier=True))
                     
                 elif self._resolution != 'variable':
                     if self._resolution != item.t - self.prev_t:
@@ -559,15 +561,7 @@ class TimePointSeries(PointSeries):
     @property
     def resolution(self):
         return self._resolution
-        #if isinstance(self._resolution, Unit):
-        #    return self._resolution
-        #else:
-        #    from .transformations import unit_to_TimeUnit
-        #    try:
-        #        return unit_to_TimeUnit(self._resolution)
-        #    except:
-        #        return self._resolution
-        
+
     
 
 class DataPointSeries(PointSeries):
@@ -705,33 +699,22 @@ class DataTimePointSeries(DataPointSeries, TimePointSeries):
             return self._autodetected_sampling_interval
     
     @property
-    def resolution_string(self):
-        if self.resolution != 'variable':
-            resolution_as_str = str(self.resolution)
-            if resolution_as_str.endswith('.0'):
-                resolution_as_str = resolution_as_str[:-2]
-            # Friendlier name. TODO: improve me... maybe use the TimeUnit directly? Or guess..
-            if resolution_as_str == '60':
-                resolution_as_str = '1m'
-            elif resolution_as_str == '600':
-                resolution_as_str = '10m'
-            elif resolution_as_str == '3600':
-                resolution_as_str = '1h'
-            else:
-                resolution_as_str = '{}s'.format(resolution_as_str)
-            resolution_string = '{} resolution'.format(resolution_as_str)
+    def _resolution_string(self):
+        if isinstance(self.resolution, Unit):
+            # Includes TimeUnits
+            _resolution_string = '{} resolution'.format(self.resolution)
         else:
             autodetected_sampling_interval_as_str = str(self.autodetected_sampling_interval)
             if autodetected_sampling_interval_as_str.endswith('.0'):
                 # TODO: use a friendlier resolution here as well, as above?
                 autodetected_sampling_interval_as_str = autodetected_sampling_interval_as_str[:-2] 
-            resolution_string = 'variable resolution (~{}s)'.format(autodetected_sampling_interval_as_str)
-        return resolution_string
+            _resolution_string = 'variable resolution (~{}s)'.format(autodetected_sampling_interval_as_str)
+        return _resolution_string
 
     def __repr__(self):
         if len(self):
 
-            return 'Time series of #{} points at {}, from point @ {} ({}) to point @ {} ({})'.format(len(self), self.resolution_string, self[0].t, self[0].dt, self[-1].t, self[-1].dt)
+            return 'Time series of #{} points at {}, from point @ {} ({}) to point @ {} ({})'.format(len(self), self._resolution_string, self[0].t, self[0].dt, self[-1].t, self[-1].dt)
         else:
             return 'Time series of #0 points'
 
@@ -749,16 +732,18 @@ class Slot():
         
         if not isinstance(start, self.__POINT_TYPE__):
             raise TypeError('Slot start must be a Point object (got "{}")'.format(start.__class__.__name__))
+        
+        # Instantiate unit if not already done
+        if unit and not isinstance(unit, Unit):
+            unit = Unit(unit)
+        
         if end is None and unit is not None:
             if len(start.coordinates)>1:
                 raise Exception('Sorry, setting a start and a unit only works in unidimensional spaces')
             
             # Handle start + unit
-            if isinstance(unit, Unit):
-                end = start + unit
-            else:
-                end = start.__class__(start.coordinates[0] + unit)    
-            
+            end = start + unit
+             
         if not isinstance(end, self.__POINT_TYPE__):
             raise TypeError('Slot end must be a Point object (got "{}")'.format(end.__class__.__name__))
         
@@ -853,6 +838,12 @@ class TimeSlot(Slot):
                 pass
         else:    
             self.tz = start.tz
+        
+        # Convert unit to TimeUnit
+        if unit and not isinstance(unit, TimeUnit):
+            unit = TimeUnit(unit)
+                
+        # Call parent init
         super(TimeSlot, self).__init__(start=start, end=end, unit=unit)
         
         # If we did not have the end, set its timezone now:
@@ -874,7 +865,16 @@ class TimeSlot(Slot):
         self.start.change_timezone(new_timezone)
         self.end.change_timezone(new_timezone)
         self.tz = self.start.tz
-    
+
+    @property
+    def unit(self):
+        try:
+            return self._unit
+        except AttributeError:
+            # Use the string representation to handle floating point seconds
+            self._unit = TimeUnit(str(self.end.t-self.start.t)+'s')
+            return self._unit
+                   
     @property
     def t(self):
         return self.start.t
@@ -1003,14 +1003,6 @@ class TimeSlotSeries(SlotSeries):
     @property
     def resolution(self):
         return self._resolution
-        #if isinstance(self._resolution, Unit):
-        #    return self._resolution
-        #else:
-        #    from .transformations import unit_to_TimeUnit
-        #    try:
-        #        return unit_to_TimeUnit(self._resolution)
-        #    except:
-        #        return self._resolution
 
     @property
     def tz(self):

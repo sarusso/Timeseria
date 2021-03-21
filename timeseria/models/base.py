@@ -187,12 +187,7 @@ class TimeSeriesParametricModel(ParametricModel):
 
         # If the model has been loaded, convert resolution as TimeUnit
         if self.fitted:
-            try:
-                self.data['resolution'] = TimeUnit(self.data['resolution'])
-            except ValueError:
-                # TODO: load as generic unit and make __eq__ work with both Units and TimeUnits?
-                self.data['resolution'] = TimeUnit('{}s'.format(int(float(self.data['resolution']))))
-
+            self.data['resolution'] = TimeUnit(self.data['resolution'])
 
     def save(self, *args, **kwargs):
 
@@ -202,14 +197,8 @@ class TimeSeriesParametricModel(ParametricModel):
             # Save original data resolution (Unit or TimeUnit Object)
             or_resolution = self.data['resolution']
     
-            # Dump as string representation fit data resolution, always in seconds if except if in calendar units
-            try:
-                if self.data['resolution'].type == TimeUnit.CALENDAR:
-                    self.data['resolution'] = str(self.data['resolution'])
-                else:
-                    self.data['resolution'] = str(self.data['resolution'].duration_s())
-            except AttributeError:
-                self.data['resolution'] = str(self.data['resolution'])
+            # Temporarily change the model resolution unit as string representation
+            self.data['resolution'] = str(self.data['resolution'])
             
         # Call parent save
         save_output  = super(TimeSeriesParametricModel, self).save(*args, **kwargs)
