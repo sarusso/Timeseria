@@ -328,9 +328,9 @@ def dygraphs_plot(timeseries, indexes=None, aggregate=None, aggregate_by=None, l
     else:
         if isinstance(timeseries, DataTimePointSeries):
             if aggregate_by:
-                title = 'Time series of #{} points at {}, aggregated by {}'.format(len(timeseries), timeseries.resolution_string, aggregate_by)
+                title = 'Time series of #{} points at {}, aggregated by {}'.format(len(timeseries), timeseries._resolution_string, aggregate_by)
             else:
-                title = 'Time series of #{} points at {}'.format(len(timeseries), timeseries.resolution_string)
+                title = 'Time series of #{} points at {}'.format(len(timeseries), timeseries._resolution_string)
              
         elif isinstance(timeseries, DataTimeSlotSeries):
             if aggregate_by:

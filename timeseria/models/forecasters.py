@@ -361,7 +361,7 @@ class Forecaster(TimeSeriesParametricModel):
                                                  #tz = timeseries.tz,
                                                  data  = data))
                 else:
-                    forecast.append(DataTimePoint(t = last_item.t + timeseries._resolution,
+                    forecast.append(DataTimePoint(t = last_item.t + timeseries._resolution.value,
                                                   tz = timeseries.tz,
                                                   data  = data))
                 last_item = forecast[-1]
@@ -373,7 +373,7 @@ class Forecaster(TimeSeriesParametricModel):
                                         #tz = timeseries.tz,
                                         data  = predicted_data)
             else:
-                forecast = DataTimePoint(t = forecast_start_item.t + timeseries._resolution,
+                forecast = DataTimePoint(t = forecast_start_item.t + timeseries._resolution.value,
                                          tz = timeseries.tz,
                                          data  = predicted_data)
             
