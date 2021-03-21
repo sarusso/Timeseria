@@ -532,28 +532,6 @@ def get_periodicity_index(item, resolution, periodicity, dst_affected=False):
     
     
 #==============================
-#  TimeUnit conversion
-#==============================
-
-def unit_to_TimeUnit(unit):
-    from .units import TimeUnit
-    if isinstance(unit, TimeUnit):
-        time_unit = unit
-    elif isinstance(unit, int):
-        time_unit = TimeUnit(seconds=unit)
-    elif isinstance(unit, float):
-        if int(str(unit).split('.')[1]) != 0:
-            raise ValueError('Cannot process decimal seconds yet')
-        time_unit = TimeUnit(seconds=unit)
-    elif isinstance(unit, str):
-        time_unit = TimeUnit(unit)
-        unit = time_unit
-    else:
-        raise ValueError('Unknown unit type "{}"'.format(unit.__class__.__name__))
-    return time_unit
-
-
-#==============================
 # Detetc sampling interval
 #==============================
 
