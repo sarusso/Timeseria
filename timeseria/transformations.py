@@ -3,7 +3,7 @@
 
 from .time import dt_from_s, s_from_dt
 from .datastructures import DataTimeSlot, DataTimeSlotSeries, TimePoint, DataTimePointSeries, DataTimePoint
-from .utilities import compute_data_loss, unit_to_TimeUnit
+from .utilities import compute_data_loss
 from .operations import avg
 from .units import TimeUnit
 
@@ -35,12 +35,10 @@ class Slotter(Transformation):
     """Slotter transformation."""
 
     def __init__(self, unit, default_operation=avg, extra_operations=None):
-        if isinstance(unit, int):
-            self.time_unit = unit_to_TimeUnit(unit)
-        elif isinstance(unit, str) or isinstance(unit, TimeUnit):
-            self.time_unit = unit_to_TimeUnit(unit)
+        if isinstance(unit, TimeUnit):
+            self.time_unit = unit
         else:
-            raise NotImplementedError('Sorry, only (re) resolutions as int (seconds) or TimeUnit objects (or their string representation) are supported')
+            self.time_unit = TimeUnit(unit)
         self.default_operation=default_operation
         self.extra_operations=extra_operations
 
@@ -474,15 +472,12 @@ class Resampler(Transformation):
     """Resampler transformation."""
 
     def __init__(self, unit):
-        if isinstance(unit, int):
-            self.time_unit = unit_to_TimeUnit(unit)
-        elif isinstance(unit, str) or isinstance(unit, TimeUnit):
-            self.time_unit = unit_to_TimeUnit(unit)
+        if isinstance(unit, TimeUnit):
+            self.time_unit = unit
         else:
-            raise NotImplementedError('Sorry, only (re) resolutions as int (seconds) or TimeUnit objects (or their string representation) are supported')
+            self.time_unit = TimeUnit(unit)
         if self.time_unit.is_calendar():
             raise ValueError('Sorry, calendar time units are not supported by the Resampler (got "{}"). Use the Slotter instead.'.format(self.time_unit))
-
 
     def _compute_resampled_point(self, data_time_point_series, unit, start_t, end_t, validity, timezone, fill_with, force_data_loss, fill_gaps, interpolation_method, series_indexes, series_resolution, first_last):
 

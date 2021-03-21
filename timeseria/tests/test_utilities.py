@@ -1,6 +1,6 @@
 import unittest
 import os
-from ..utilities import detect_encoding, compute_coverage, compute_data_loss, get_periodicity, detect_sampling_interval, unit_to_TimeUnit
+from ..utilities import detect_encoding, compute_coverage, compute_data_loss, get_periodicity, detect_sampling_interval
 from ..datastructures import DataTimePointSeries, DataTimePoint
 from ..time import dt, s_from_dt
 from ..storages import CSVFileStorage
@@ -178,18 +178,6 @@ class TestGetPeriodicity(unittest.TestCase):
 
         self.assertEqual(perdiodicity, 24)
 
-
-
-class TestTimeUnitConversion(unittest.TestCase):
-    
-    def test_unit_to_TimeUnit(self):
-        
-        unit_to_TimeUnit('1h')
-        unit_to_TimeUnit(TimeUnit('1h'))
-        
-        with self.assertRaises(ValueError):
-            unit_to_TimeUnit('NO')
-        
 
 class TestDetectSamplingInterval(unittest.TestCase):
 
