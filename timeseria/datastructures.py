@@ -713,7 +713,6 @@ class DataTimePointSeries(DataPointSeries, TimePointSeries):
 
     def __repr__(self):
         if len(self):
-
             return 'Time series of #{} points at {}, from point @ {} ({}) to point @ {} ({})'.format(len(self), self._resolution_string, self[0].t, self[0].dt, self[-1].t, self[-1].dt)
         else:
             return 'Time series of #0 points'
@@ -1160,12 +1159,8 @@ class DataTimeSlotSeries(DataSlotSeries, TimeSlotSeries):
 
     def __repr__(self):
         if len(self):
-            if isinstance(self._resolution, TimeUnit):
-                resolution_str = str(self._resolution)
-            else:
-                resolution_str = str(self._resolution)# + 's' 
             # TODO: "slots of unit" ?
-            return 'Time series of #{} slots of {}, from slot starting @ {} ({}) to slot starting @ {} ({})'.format(len(self), resolution_str, self[0].start.t, self[0].start.dt, self[-1].start.t, self[-1].start.dt)            
+            return 'Time series of #{} slots of {}, from slot starting @ {} ({}) to slot starting @ {} ({})'.format(len(self), self._resolution, self[0].start.t, self[0].start.dt, self[-1].start.t, self[-1].start.dt)            
         else:
             return 'Time series of #0 slots'
     
