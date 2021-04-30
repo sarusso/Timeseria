@@ -2,7 +2,7 @@ Welcome to Timeseria reference documentation!
 =============================================
 
 
-Timeseria is a time series processing library which aims at making it easy to handle time series data and to build statistical and machine learning models on top of it.
+Timeseria is a data processing library which aims at making it easy to handle time series data and to build statistical and machine learning models on top of it.
 
 It provides a built-in set of common operations (resampling, slotting, differencing etc.) as well as 
 models (reconstruction, forecasting and anomaly detection), and both custom operations and models can be easily plugged in.
