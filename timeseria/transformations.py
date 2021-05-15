@@ -52,6 +52,9 @@ class Slotter(Transformation):
                                            series_resolution = series_resolution,
                                            validity = validity,
                                            first_last = first_last)
+        
+        # Initialize slot data
+        slot_data = {}
 
         # TODO: unroll the following before the compute slot call
         slot_timeseries = DataTimePointSeries()
@@ -71,14 +74,14 @@ class Slotter(Transformation):
         # TODO: we have a huge conceputal problem here if checkong on the slot_data_loss:
         #       if data_loss is 1 but due to point data loses (maybe even reconstructed)
         #       and not entirely missing points, we should actually compute as if not a full data loss.
+        
         if not slot_timeseries: # slot_data_loss == 1: 
 
             # Reconstruct (fill gaps)
-            slot_data = {}
             for key in data_time_point_series[0].data.keys():
                 
                 # Set data as None, will be interpolated afterwards
-                slot_data[key] = None
+                slot_data['{}_{}'.format(key, self.default_operation.__name__)] = None
                 
                 # Handle also extra ops
                 if self.extra_operations:
@@ -90,21 +93,27 @@ class Slotter(Transformation):
             # Keys shortcut
             keys = data_time_point_series.data_keys()
 
-            # Compute the default operation
+            # Compute the default operation (in some cases it might not be defined, hence the "if")
             if self.default_operation:
                 default_operation_data = self.default_operation(slot_timeseries, prev_point=prev_point, next_point=next_point)
                                 
                 # Do we have a 100% and a fill_with?
                 if fill_with is not None and slot_data_loss == 1:
-                    slot_data = {key:fill_with for key in keys}                
+                    for key in keys:
+                        slot_data['{}_{}'.format(key, self.default_operation.__name__)] = fill_with
+                   
                 else:
     
+                    #if isinstance(default_operation_data, dict):
+                    #    slot_data = {key:default_operation_data[key] for key in keys}
+                    #else:
+                    #    slot_data = {keys[0]: default_operation_data}
+                    
                     if isinstance(default_operation_data, dict):
-                        slot_data = {key:default_operation_data[key] for key in keys}
+                        for key in keys:
+                            slot_data['{}_{}'.format(key, self.default_operation.__name__)] = default_operation_data[key]
                     else:
-                        slot_data = {keys[0]: default_operation_data}
-            else:
-                slot_data = {}
+                        slot_data['{}_{}'.format(keys[0], self.default_operation.__name__)] = default_operation_data
 
             # Handle extra operations
             if self.extra_operations:
@@ -119,7 +128,7 @@ class Slotter(Transformation):
         # Do we have a force data_loss? #TODO: do not compute data_loss if fill_with not present and force_data_loss 
         if force_data_loss is not None:
             slot_data_loss = force_data_loss
-        
+
         # Create the DataTimeSlot
         data_time_slot = DataTimeSlot(start = TimePoint(t=start_t, tz=timezone),
                                       end   = TimePoint(t=end_t, tz=timezone),
