@@ -162,7 +162,7 @@ class TestSlotter(unittest.TestCase):
         self.assertEqual(str(data_time_slot_series[74].start.dt), str('2019-10-27 02:00:00+02:00'))
         self.assertEqual(str(data_time_slot_series[75].start.dt), str('2019-10-27 02:00:00+01:00'))
         self.assertEqual(str(data_time_slot_series[76].start.dt), str('2019-10-27 03:00:00+01:00'))
-        self.assertEqual(data_time_slot_series[76].data['temperature'],230.5)
+        self.assertEqual(data_time_slot_series[76].data['temperature_avg'],230.5)
 
         # Time series from 2019,10,24,0,0,0 to 2019,10,31,0,0,0 (Europe/Rome), DST off -> 2 AM repeated
         data_time_slot_series = Slotter('1D').process(self.data_time_point_series_7)
@@ -214,12 +214,12 @@ class TestSlotter(unittest.TestCase):
 
         # Add extra operations
         data_time_slot_series = Slotter('600s', extra_operations=[min,max]).process(data_time_point_series)        
-        self.assertEqual(data_time_slot_series[0].data, {'temperature': 161.0, 'humidity': 5.0, 'temperature_min': 156, 'humidity_min': 5, 'temperature_max': 166, 'humidity_max': 5})
+        self.assertEqual(data_time_slot_series[0].data, {'temperature_avg': 161.0, 'humidity_avg': 5.0, 'temperature_min': 156, 'humidity_min': 5, 'temperature_max': 166, 'humidity_max': 5})
 
         # Change default operations
         data_time_slot_series = Slotter('600s', default_operation=sum).process(data_time_point_series)        
-        self.assertEqual(data_time_slot_series[0].data, {'temperature': 1771, 'humidity': 55})
-        self.assertEqual(data_time_slot_series[1].data, {'temperature': 1881, 'humidity': 55})
+        self.assertEqual(data_time_slot_series[0].data, {'temperature_sum': 1771, 'humidity_sum': 55})
+        self.assertEqual(data_time_slot_series[1].data, {'temperature_sum': 1881, 'humidity_sum': 55})
 
         # Only extra operations
         data_time_slot_series = Slotter('600s', default_operation=None, extra_operations=[avg,min,max]).process(data_time_point_series)        
