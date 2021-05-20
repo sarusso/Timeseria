@@ -28,5 +28,5 @@ RUN pip3 install -r /tmp/requirements.txt
 RUN pip3 install notebook==5.7.10 Sphinx==3.5.2 sphinx-rtd-theme==0.5.1
 
 # Add code
-#COPY ./ /opt/Timeseria
+COPY ./ /opt/Timeseria
 
