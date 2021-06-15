@@ -27,6 +27,15 @@ RUN pip3 install -r /tmp/requirements.txt
 # Install Jupyter and Sphinx for docs
 RUN pip3 install notebook==5.7.10 Sphinx==3.5.2 sphinx-rtd-theme==0.5.1
 
+# Copy entrypoint
+COPY containers/Ubuntu_18.04/entrypoint.sh /
+
+# Give right permissions
+RUN chmod 755 /entrypoint.sh
+
+# Set entrypoint
+ENTRYPOINT ["/entrypoint.sh"]
+
 # Add code
 COPY ./ /opt/Timeseria
 
