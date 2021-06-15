@@ -1,28 +1,29 @@
 #!/bin/bash
 set -e
-cd ..
+
+# Move to container dir
+cd ../containers/Ubuntu_18.04
 
 if [[ "x$BUILD" != "xFalse" ]]; then
-
-    # Build Docker container
-    echo -e  "\n==============================="
-    echo -e  "|  Building Docker container  |"
-    echo -e  "===============================\n"
-
-    if [[ "x$CACHE" == "xFalse" ]]; then
-        docker build --no-cache -f containers/Ubuntu_18.04/Dockerfile ./ -t timeseria_docs_container
-    else
-        docker build -f containers/Ubuntu_18.04/Dockerfile ./ -t timeseria_docs_container
-    fi
+    # Build
+    echo ""
+    echo "Building Timeseria Docker container. Use BUILD=False to skip."
+    ./build.sh
 fi
             
-# Start testing
+        
+# Start building the docs
+cd ../../
+
 echo -e  "\n==============================="
 echo -e  "|     Building docs           |"
 echo -e  "===============================\n"
 
 # Reduce verbosity and disable Python buffering
 ENV_VARS="PYTHONWARNINGS=ignore TF_CPP_MIN_LOG_LEVEL=3 PYTHONUNBUFFERED=on EXTENDED_TESTING=False LOGLEVEL=$LOGLEVEL "
-docker run -v $PWD:/opt/Timeseria -it timeseria_docs_container /bin/bash -c "cd /opt/Timeseria/docs && $ENV_VARS make clean && make html"
+
+docker run -v $PWD:/opt/Timeseria -it timeseria "cd /opt/Timeseria/docs && $ENV_VARS make clean && make html"
+
+
 
 
