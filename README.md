@@ -9,7 +9,7 @@ Timeseria also tries to address by design all those annoying things which are of
 
 You can get started by reading the [quickstart](https://sarusso.github.io/Timeseria/Quickstart.html) or the [welcome](https://sarusso.github.io/Timeseria/Welcome.html) notebooks, or you can run them interactively in Binder using the button below. Also the [reference documentation](https://timeseria.readthedocs.io) might be useful.
 
-Examples are provided in the [Timeseria-notebooks](https://github.com/sarusso/Timeseria-notebooks) repository, and are accessible in Binder as well, ready to be played with. If you instead are lookign for a Docker image to run on your laptop, head to [Timeseria on Docker Hub](https://hub.docker.com/r/sarusso/timeseria).
+Examples are provided in the [Timeseria-notebooks](https://github.com/sarusso/Timeseria-notebooks) repository, and are accessible in Binder as well, ready to be played with. If you instead are looking for a Docker image to run on your laptop, head to [Timeseria on Docker Hub](https://hub.docker.com/r/sarusso/timeseria).
 
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/sarusso/Timeseria-notebooks/HEAD)
 
