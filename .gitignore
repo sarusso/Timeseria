@@ -35,7 +35,6 @@ pip-delete-this-directory.txt
 .project
 .pydevproject
 
-
 # Mac
 .DS_Store
 ._.DS_Store
@@ -43,3 +42,5 @@ pip-delete-this-directory.txt
 # Sphinx
 docs/_build
 
+# Notebooks
+notebooks
