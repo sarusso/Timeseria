@@ -6,9 +6,8 @@ set -e
 
 
 if [[ "x$@" == "x" ]] ; then
-    
 
-# Start testing
+    # Start Jupyter as default entrypoint
     echo -e  "Running Jupyter"
 
     # Reduce verbosity and disable Python buffering
