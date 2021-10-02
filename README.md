@@ -20,9 +20,9 @@ Examples are provided in the [Timeseria-notebooks](https://github.com/sarusso/Ti
 
 
 
-# Testing ![](https://api.travis-ci.org/sarusso/Timeseria.svg?branch=master) 
+# Testing ![](https://app.travis-ci.com/sarusso/Timeseria.svg?branch=master) 
 
-Every commit on the Timeseria codebase is automatically tested with Travis-CI. [Check status on Travis](https://travis-ci.org/sarusso/Timeseria/).
+Every commit on the Timeseria codebase is automatically tested with Travis-CI. [Check status on Travis](https://app.travis-ci.com/github/sarusso/Timeseria/builds).
 
 
 # Licensing
