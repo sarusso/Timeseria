@@ -596,13 +596,16 @@ def is_list_of_integers(list):
     else:
         return True
 
-def to_float(string,no_data_placeholders=[]):
+def to_float(string,no_data_placeholders=[],label=None):
     sanitized_string_string = sanitize_string(string,no_data_placeholders)
     if sanitized_string_string:
         sanitized_string_string = sanitized_string_string.replace(',','.')
     try:
         return float(sanitized_string_string)
     except (ValueError, TypeError):
+        # Do not raise inf converting indexes as they are allowed to be "None"
+        if label and label.startswith('__'):
+            return None
         raise FloatConversionError(sanitized_string_string)
 
 

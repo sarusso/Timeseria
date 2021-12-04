@@ -56,13 +56,13 @@ class Series(list):
         try:
             try:
                 if not item.__succedes__(self[-1]):
-                    raise ValueError('Not in succession ("{}" vs "{}")'.format(item,self[-1])) from None                    
+                    raise ValueError('Not in succession ("{}" does not succeeds "{}")'.format(item,self[-1])) from None                    
             except IndexError:
                 raise
             except AttributeError:
                 try:
                     if not item > self[-1]:
-                        raise ValueError('Not in order ("{}" vs "{}")'.format(item,self[-1])) from None
+                        raise ValueError('Not in order ("{}" does not follow "{}")'.format(item,self[-1])) from None
                 except TypeError:
                     raise TypeError('Object of class "{}" does not implement a "__gt__" or a "__succedes__" method, cannot append it to a Series (which is ordered)'.format(item.__class__.__name__)) from None
         except IndexError:
@@ -468,6 +468,11 @@ class DataPoint(Point):
             return self._data_reconstructed
         except AttributeError:
             return None
+
+    @data_reconstructed.setter
+    def data_reconstructed(self, value):
+        self._data_reconstructed = value
+
 
 
 class DataTimePoint(DataPoint, TimePoint):
@@ -926,6 +931,10 @@ class DataSlot(Slot):
             return self._data_reconstructed
         except AttributeError:
             return None
+    
+    @data_reconstructed.setter
+    def data_reconstructed(self, value):
+        self._data_reconstructed = value
 
 
 class DataTimeSlot(DataSlot, TimeSlot):
