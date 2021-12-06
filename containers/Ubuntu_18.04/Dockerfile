@@ -21,8 +21,8 @@ RUN python3 get-pip.py #-c <(echo 'pip==20.2')
 RUN apt-get install python-tk python3-tk python3-dev build-essential -y
 
 # Install Python requirements
-COPY requirements.txt /tmp
-RUN pip3 install -r /tmp/requirements.txt
+COPY requirements-tf2.6.txt /tmp/
+RUN pip3 install -r /tmp/requirements-tf2.6.txt
 
 # Install Jupyter and Sphinx for docs
 RUN pip3 install notebook==5.7.10 Sphinx==3.5.2 sphinx-rtd-theme==0.5.1
