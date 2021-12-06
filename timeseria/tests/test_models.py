@@ -359,8 +359,8 @@ class TestForecasters(unittest.TestCase):
         forecaster = ARIMAForecaster(p=1,d=1,q=0)
         forecaster.fit(self.sine_data_time_slot_series_day[0:800])                 
         evaluation_results = forecaster.evaluate(self.sine_data_time_slot_series_day[800:1000])
-        self.assertAlmostEqual(evaluation_results['RMSE'], 2.7108009033754485)
-        self.assertAlmostEqual(evaluation_results['MAE'], 2.5248923274486983)
+        self.assertAlmostEqual(evaluation_results['RMSE'], 2.71, places=2)
+        self.assertAlmostEqual(evaluation_results['MAE'], 2.52, places=2 )
  
         # Test on Points as well
         data_time_point_series = CSVFileStorage(TEST_DATA_PATH + '/csv/temperature.csv').get(limit=200)
