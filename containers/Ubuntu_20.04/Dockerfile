@@ -1,4 +1,4 @@
-FROM ubuntu:20.04
+FROM sarusso/tensorflow:2.7.0
 MAINTAINER Stefano Alberto Russo <stefano.russo@gmail.com>
 
 # Set non-interactive
