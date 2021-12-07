@@ -183,7 +183,7 @@ class TestReconstructors(unittest.TestCase):
         try:
             import fbprophet
         except ImportError:
-            print('Skipping Prophet tests as no module is installed')
+            print('Skipping Prophet tests as no fbprophet module installed')
             return
             
         # Get test data        
@@ -302,7 +302,7 @@ class TestForecasters(unittest.TestCase):
         try:
             import fbprophet
         except ImportError:
-            print('Skipping Prophet tests as no module is installed')
+            print('Skipping Prophet tests as no fbprophet module installed')
             return
          
         forecaster = ProphetForecaster()
@@ -336,6 +336,12 @@ class TestForecasters(unittest.TestCase):
 
 
     def test_ARIMAForecaster(self):
+
+        try:
+            import statsmodels
+        except ImportError:
+            print('Skipping ARIMA tests as no statsmodels module installed')
+            return
          
         # Basic ARIMA 
         forecaster = ARIMAForecaster(p=1,d=1,q=0)
@@ -376,6 +382,12 @@ class TestForecasters(unittest.TestCase):
 
 
     def test_AARIMAForecaster(self):
+
+        try:
+            import statsmodels
+        except ImportError:
+            print('Skipping AARIMA tests as no statsmodels module installed')
+            return
          
         # Automatic ARIMA 
         forecaster = AARIMAForecaster()
