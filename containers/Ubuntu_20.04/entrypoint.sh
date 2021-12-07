@@ -4,6 +4,9 @@
 # (see https://stackoverflow.com/questions/4381618/exit-a-script-on-error)
 set -e
 
+if [[ "x$(uname -i)" == "xaarch64" ]] ; then
+    export LD_PRELOAD=/usr/local/lib/python3.8/dist-packages/scikit_learn.libs/libgomp-d22c30c5.so.1.0.0 
+fi
 
 if [[ "x$@" == "x" ]] ; then
 
