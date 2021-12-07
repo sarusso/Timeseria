@@ -1,5 +1,5 @@
 Keras==2.7.0
-tensorflow==2.7.0
+tensorflow-aarch64==2.7.0
 matplotlib==3.5.0
 numpy==1.21.4
 scikit-learn==1.0.1
