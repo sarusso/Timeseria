@@ -2,7 +2,7 @@
 set -e
 
 # Move to container dir
-cd ../containers/Ubuntu_18.04
+cd ../containers/Ubuntu_20.04
 
 if [[ "x$BUILD" != "xFalse" ]]; then
     # Build
