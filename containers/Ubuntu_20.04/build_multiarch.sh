@@ -11,10 +11,10 @@ echo -e  "===============================\n"
 
 if [[ "x$CACHE" == "xFalse" ]]; then
     echo "Building without cache."
-    docker build --no-cache -f containers/Ubuntu_20.04/Dockerfile ./ -t timeseria
+    docker buildx build --progress=plain --no-cache -f containers/Ubuntu_20.04/Dockerfile ./ --platform linux/amd64 -t timeseria-amd64  --load #--push
+    docker buildx build --progress=plain --no-cache -f containers/Ubuntu_20.04/Dockerfile ./ --platform linux/arm64/v8 -t timeseria-arm64v8  --load #--push
 else
     echo "Building with cache. Use CACHE=False to disable it."
-    docker buildx build -f containers/Ubuntu_20.04/Dockerfile ./ --platform linux/arm64/v8 -t timeseria-arm64v8 --load #--push
-    docker buildx build -f containers/Ubuntu_20.04/Dockerfile ./ --platform linux/amd64 -t timeseria-amd64 --load #--push
-
+    docker buildx build --progress=plain -f containers/Ubuntu_20.04/Dockerfile ./ --platform linux/amd64 -t timeseria-amd64 --load #--push
+    docker buildx build --progress=plain -f containers/Ubuntu_20.04/Dockerfile ./ --platform linux/arm64/v8 -t timeseria-arm64v8  --load #--push
 fi
