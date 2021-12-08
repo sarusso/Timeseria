@@ -5,6 +5,7 @@ from setuptools import setup, find_packages
 setup(name='timeseria',
       version='0.1.3',
       description='A time series processing library',
+      url="https://github.com/sarusso/timeseria",
       author='Stefano Alberto Russo',
       author_email='stefano.russo@gmail.com',
       packages=['timeseria','timeseria.tests', 'timeseria.models'],
@@ -28,5 +29,6 @@ setup(name='timeseria',
                           'h5py >=2.10.0, <4.0.0',
                           'scipy >=1.5.4, <2.0.0'
                           ],
-      license='LICENSE',
+      license='Apache License 2.0',
+      license_files = ('LICENSE',),
     )
