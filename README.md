@@ -19,9 +19,10 @@ Examples are provided in the [Timeseria-notebooks](https://github.com/sarusso/Ti
 
 
 
-# Testing ![](https://app.travis-ci.com/sarusso/Timeseria.svg?branch=master) 
+# Testing ![example workflow](https://github.com/sarusso/timeseria/actions/workflows/ci.yml/badge.svg)
 
-Every commit on the Timeseria codebase is automatically tested with Travis-CI. [Check status on Travis](https://app.travis-ci.com/github/sarusso/Timeseria/builds).
+
+Every commit on the Timeseria codebase is automatically tested with GitHub Actions. Travis-CI. [Check all branch statuses](https://github.com/sarusso/Timeseria/actions).
 
 
 # Licensing
