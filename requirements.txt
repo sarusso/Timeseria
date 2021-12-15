@@ -1,5 +1,4 @@
 Keras==2.7.0
-tensorflow==2.7.0
 matplotlib==3.5.0
 numpy==1.21.4
 scikit-learn==1.0.1
@@ -14,6 +13,7 @@ h5py==3.6.0
 scipy==1.7.3
 
 # Optional
+#tensorflow==2.7.0   # TensorFlow (also -gpu, -macos or -aarch64 variants)
 #fbprophet==0.6      # Facebook's Prophet
 #pmdarima==1.8       # AARIMA
 #statsmodels==0.12.1 # ARIMA, SARIMAX

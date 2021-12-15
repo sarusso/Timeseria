@@ -2,7 +2,7 @@
 set -e
 
 USER="sarusso"
-VERSION="v0.1.3"
+VERSION="v0.1.4"
 
 echo "Tagging..."
 docker tag timeseria-amd64 docker.io/$USER/timeseria-amd64:$VERSION

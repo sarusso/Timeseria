@@ -6,8 +6,10 @@ RUN apt-get update
 
 # Install Python requirements
 COPY requirements.txt /tmp
-COPY requirements-arm.txt /tmp
-RUN if [ "$(uname -i)" = "aarch64" ] ; then pip3 install -r /tmp/requirements-arm.txt; else pip3 install -r /tmp/requirements.txt; fi
+RUN pip3 install -r /tmp/requirements.txt
+
+# Install TensorFlow (Intel and ARM supported)
+RUN if [ "$(uname -i)" = "aarch64" ] ; then pip3 install tensorflow-aarch64==2.7.0; else pip3 install tensorflow==2.7.0; fi
 
 # Install Jupyter and Sphinx for docs
 RUN pip3 install notebook==5.7.10 Sphinx==3.5.2 sphinx-rtd-theme==0.5.1

@@ -3,7 +3,7 @@
 from setuptools import setup, find_packages
 
 setup(name='timeseria',
-      version='0.1.3',
+      version='0.1.4',
       description='A time series processing library',
       url="https://github.com/sarusso/timeseria",
       author='Stefano Alberto Russo',
@@ -15,7 +15,6 @@ setup(name='timeseria',
        },
       install_requires = [
                           'Keras >=2.1.3, <3.0.0',
-                          'tensorflow >=1.15.2, <3.0.0',
                           'matplotlib >=2.1.2, <4.0.0',
                           'numpy >=1.19.5, <2.0.0',
                           'scikit-learn >=0.2.2, <2.0.0',
@@ -29,6 +28,14 @@ setup(name='timeseria',
                           'h5py >=2.10.0, <4.0.0',
                           'scipy >=1.5.4, <2.0.0'
                           ],
+      extras_require = {
+                        'tensorflow': ['tensorflow >=1.15.2, <3.0.0'],
+                        'tensorflow-gpu': ['tensorflow-gpu >=1.15.2, <3.0.0'],
+                        'tensorflow-macos': ['tensorflow-macos >=1.15.2, <3.0.0'],
+                        'tensorflow-aarch64': ['tensorflow-aarch64 >=1.15.2, <3.0.0'],
+                        'prophet':['fbprophet==0.6'],
+                        'arima': ['pmdarima >=1.8, <2.0.0', 'statsmodels >=0.12.1, <1.0.0']
+                       },
       license='Apache License 2.0',
       license_files = ('LICENSE',),
     )
