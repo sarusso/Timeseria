@@ -8,7 +8,9 @@ import datetime
 from .time import dt_from_s, dt_to_str, dt_from_str
 from .datastructures import DataTimePointSeries, DataTimeSlotSeries
 from .units import TimeUnit
-from .utilities import is_numerical
+from .utilities import is_numerical, os_shell
+from pyppeteer.chromium_downloader import download_chromium,chromium_executable
+            
 
 # Setup logging
 import logging
@@ -273,9 +275,16 @@ def _to_dg_data(serie,  indexes_to_plot, aggregate_by=0):
 #  Dygraphs plot
 #=================
 
-def dygraphs_plot(timeseries, indexes=None, aggregate=None, aggregate_by=None, log_js=False):
+def dygraphs_plot(timeseries, indexes=None, aggregate=None, aggregate_by=None, log_js=False, 
+                  save_to=None, interactive=True, image_resolution='1280x400', return_dygraph_html=False):
     """Plot a timeseries in Jupyter using Dygraphs. Based on the work here: https://www.stefaanlippens.net/jupyter-custom-d3-visualization.html"""
-    from IPython.display import display, Javascript, HTML
+    from IPython.display import display, Javascript, HTML, Image
+    
+    if return_dygraph_html and not interactive:
+        raise ValueError('Setting return_dygraph_html=True is not compatible with interactive=False.')
+
+    if return_dygraph_html and save_to:
+        raise ValueError('Setting return_dygraph_html=True is not compatible with setting a save_to value.')    
     
     if len(timeseries)==0:
         raise Exception('Cannot plot empty timeseries')
@@ -538,7 +547,7 @@ stepPlot: """+stepPlot_value+""",
 fillGraph: false,
 fillAlpha: 0.5,
 colorValue: 0.5,
-showRangeSelector: true,
+showRangeSelector: """+('true' if interactive else 'false')+""",
 //rangeSelectorHeight: 30,
 hideOverlayOnMouseOut: true,
 interactionModel: Dygraph.defaultInteractionModel,
@@ -728,31 +737,122 @@ define('"""+graph_id+"""', ['dgenv'], function (Dygraph) {
 
     STATIC_DATA_PATH = '/'.join(os.path.realpath(__file__).split('/')[0:-1]) + '/static/'
 
-    # Require Dygraphs Javascript library
-    # https://raw.githubusercontent.com/sarusso/Timeseria/develop/timeseria/static/js/dygraph-2.1.0.min
-    display(Javascript("require.config({paths: {dgenv: 'https://cdnjs.cloudflare.com/ajax/libs/dygraph/2.1.0/dygraph.min'}});"))
-    # TODO: load it locally, maybe with something like:    
-    #with open(STATIC_DATA_PATH+'js/dygraph-2.1.0.min.js') as dy_js_file:
-    #    display(Javascript(dy_js_file.read()))
+    # By defualt we show the plot
+    show_plot = True
 
-    # Load Dygraphs CSS
-    with open(STATIC_DATA_PATH+'css/dygraph-2.1.0.css') as dg_css_file:
-        display(HTML('<style>'+dg_css_file.read()+'</style>'))
+    if (not interactive) or save_to or return_dygraph_html:
+
+        # Generate random UUID
+        rnd_uuid=str(uuid.uuid4())
+        
+        # If a destination was set, we do not show the plot.
+        if save_to:
+            show_plot = False
+        
+        # Set destination file values
+        if save_to:
+            if interactive:
+                # Interactive, dump as html
+                html_dest = save_to
+                png_dest=None
+            else:
+                # Not interactive, dump as image
+                html_dest = '/tmp/{}.html'.format(rnd_uuid)
+                png_dest = save_to
+        else:
+            if interactive:
+                # Will never get here, directly rendered in iPython
+                pass
+            else:
+                # Not interactive, dump as image
+                html_dest = '/tmp/{}.html'.format(rnd_uuid)
+                png_dest = '/tmp/{}.png'.format(rnd_uuid)
+
+        # Start building HTML content
+        html_content = ''
+        if not return_dygraph_html:
+            html_content += '<html><head>'
+            with open(STATIC_DATA_PATH+'/js/dygraph-2.1.0.min.js') as dg_js_file:
+                html_content += '<script type="text/javascript">'+dg_js_file.read()+'</script>\n'
+            with open(STATIC_DATA_PATH+'css/dygraph-2.1.0.css') as dg_css_file:
+                html_content += '<style>'+dg_css_file.read()+'</style>\n'
+            html_content += '</head><body style="font-family:\'Helvetica Neue\', Helvetica, Arial, sans-serif; font-size:1.0em">\n'
+            html_content += '<div style="height:36px; padding:0; margin-left:0px; margin-top:10px">\n'
+        html_content += '<div id="{}" style="width:100%"></div></div>\n'.format(legend_div_id)
+        html_content += '<div id="{}" style="width:100%; margin-right:0px"></div>\n'.format(graph_div_id)
+        if not return_dygraph_html:
+            html_content += '</body></html>\n'
+        html_content += '<script>{}</script>\n'.format(dygraphs_javascript)
+        
+        # Dump html to file
+        try:
+            with open(html_dest, 'w') as f:
+                f.write(html_content)
+        except UnboundLocalError:
+            pass
+        
+        # Also render if not interactive mode
+        if not interactive:
+            
+            # Disable 
+            pyppeteer_logger = logging.getLogger('pyppeteer')
+            pyppeteer_logger.setLevel(logging.CRITICAL)
+            
+            # Check we have Chromium,. if not, download
+            if not chromium_executable().exists():
+                logger.info('Downloading Chromium for rendering image-based plots...')
+                download_chromium()
+                logger.info('Done. Will not be required anymore on this system.')
     
-    # Load Dygraphs Javascript and html code    
-    display(Javascript(rendering_javascript))
-    display(HTML('''<div style="height:36px; padding:0; margin-left:0px; margin-top:10px">
-                    <div id="'''+legend_div_id+'''" style="width:100%"></div></div>
-                    <div id="'''+graph_div_id+'''" style="width:100%; margin-right:0px"></div>'''))
+            resolution = image_resolution.replace('x', ',')
+            command = '{} --no-sandbox --headless --disable-gpu --window-size={} --screenshot={} {}'.format(chromium_executable(), resolution, png_dest, html_dest)
+            logger.debug('Executing "{}"'.format(command))
+            out = os_shell(command, capture=True)
+            
+            if not out.exit_code == 0:
+                raise OSError('Error: {}'.format(out.stderr))
+            
+            if show_plot:
+                return (Image(filename=png_dest))
+        
+        if return_dygraph_html:
+            return html_content
+        
+        # Log 
+        if save_to:
+            if interactive:
+                logger.info('Saved interactive plot in html format to "{}".'.format(html_dest))
+            else:
+                logger.info('Saved static plot in png format to "{}".'.format(png_dest))
+                    
+    else:
 
-    # Render the graph (this is the "entrypoint")
-    display(Javascript("""
-        (function(element){
-            require(['"""+graph_id+"""'], function("""+graph_id+""") {
-                """+graph_id+"""(element.get(0), '%s');
-            });
-        })(element);
-    """ % (graph_div_id)))
+        if show_plot:
+            # Require Dygraphs Javascript library
+            # https://raw.githubusercontent.com/sarusso/Timeseria/develop/timeseria/static/js/dygraph-2.1.0.min
+            display(Javascript("require.config({paths: {dgenv: 'https://cdnjs.cloudflare.com/ajax/libs/dygraph/2.1.0/dygraph.min'}});"))
+            # TODO: load it locally, maybe with something like:    
+            #with open(STATIC_DATA_PATH+'js/dygraph-2.1.0.min.js') as dy_js_file:
+            #    display(Javascript(dy_js_file.read()))
+        
+            # Load Dygraphs CSS
+            with open(STATIC_DATA_PATH+'css/dygraph-2.1.0.css') as dg_css_file:
+                display(HTML('<style>'+dg_css_file.read()+'</style>'))
+            
+            # Load Dygraphs Javascript and html code    
+            display(Javascript(rendering_javascript))
+            display(HTML('''<div style="height:36px; padding:0; margin-left:0px; margin-top:10px">
+                            <div id="'''+legend_div_id+'''" style="width:100%"></div></div>
+                            <div id="'''+graph_div_id+'''" style="width:100%; margin-right:0px"></div>'''))
+        
+            # Render the graph (this is the "entrypoint")
+            display(Javascript("""
+                (function(element){
+                    require(['"""+graph_id+"""'], function("""+graph_id+""") {
+                        """+graph_id+"""(element.get(0), '%s');
+                    });
+                })(element);
+            """ % (graph_div_id)))
 
 
 #=================
