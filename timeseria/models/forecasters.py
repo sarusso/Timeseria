@@ -659,12 +659,12 @@ class AARIMAForecaster(Forecaster):
                             
         data = array(timeseries.df[key])
 
-        # Chenage some defaults
-        trace = kwargs.pop('trace', True) # Get some output by default
-        error_action = kwargs.pop('error_action', 'ignore') # Hide if an order does not work
-        suppress_warnings = kwargs.pop('suppress_warnings', True) # Hide convergence warnings
+        # Change some defaults
+        trace = kwargs.pop('trace', False)
+        error_action = kwargs.pop('error_action', 'ignore')
+        suppress_warnings = kwargs.pop('suppress_warnings', True)
         stepwise = kwargs.pop('stepwise', True) 
-        
+
         # See https://alkaline-ml.com/pmdarima/_modules/pmdarima/arima/auto.html for the other defaults
         
         # Call the pmdarima aut_arima function
