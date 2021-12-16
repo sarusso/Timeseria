@@ -793,19 +793,30 @@ define('"""+graph_id+"""', ['dgenv'], function (Dygraph) {
         
         # Also render if not interactive mode
         if not interactive:
+
+            # Get OS and architecture
+            _os = os.uname()[0]
+            _arch = os.uname()[4]
             
-            # Disable 
-            pyppeteer_logger = logging.getLogger('pyppeteer')
-            pyppeteer_logger.setLevel(logging.CRITICAL)
-            
-            # Check we have Chromium,. if not, download
-            if not chromium_executable().exists():
-                logger.info('Downloading Chromium for rendering image-based plots...')
-                download_chromium()
-                logger.info('Done. Will not be required anymore on this system.')
-    
+            # For ARM and Linux, use system system chromium, otherwise rely on Pyppeteer
+
+            if (_os == 'Linux') and (_arch == 'aarch64'):
+                _chromium_executable = 'chromium-browser'
+            else:
+                # Disable logging for Pyppeteer
+                pyppeteer_logger = logging.getLogger('pyppeteer')
+                pyppeteer_logger.setLevel(logging.CRITICAL)
+                
+                # Check we have Chromium,. if not, download
+                if not chromium_executable().exists():
+                    logger.info('Downloading Chromium for rendering image-based plots...')
+                    download_chromium()
+                    logger.info('Done. Will not be required anymore on this system.')
+                _chromium_executable = chromium_executable()
+
+            # Render HTML to image
             resolution = image_resolution.replace('x', ',')
-            command = '{} --no-sandbox --headless --disable-gpu --window-size={} --screenshot={} {}'.format(chromium_executable(), resolution, png_dest, html_dest)
+            command = '{} --no-sandbox --headless --disable-gpu --window-size={} --screenshot={} {}'.format(_chromium_executable, resolution, png_dest, html_dest)
             logger.debug('Executing "{}"'.format(command))
             out = os_shell(command, capture=True)
             
