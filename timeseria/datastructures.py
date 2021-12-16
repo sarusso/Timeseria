@@ -690,7 +690,8 @@ class DataTimePointSeries(DataPointSeries, TimePointSeries):
             matplotlib_plot(self, *args, **kwargs)
         elif engine=='dg':
             from .plots import dygraphs_plot
-            dygraphs_plot(self, *args, **kwargs)
+            out = dygraphs_plot(self, *args, **kwargs)
+            if out: return out
         else:
             raise ValueError('Unknown plotting engine "{}'.format(engine))
         
@@ -1162,7 +1163,8 @@ class DataTimeSlotSeries(DataSlotSeries, TimeSlotSeries):
             matplotlib_plot(self, *args, **kwargs)
         elif engine=='dg':
             from .plots import dygraphs_plot
-            dygraphs_plot(self, *args, **kwargs)
+            out = dygraphs_plot(self, *args, **kwargs)
+            if out: return out
         else:
             raise Exception('Unknown plotting engine "{}'.format(engine))
 

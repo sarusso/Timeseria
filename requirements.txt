@@ -11,6 +11,7 @@ cython==0.29.17
 requests==2.26.0
 h5py==3.6.0
 scipy==1.7.3
+pyppeteer==0.2.6
 
 # Optional
 #tensorflow==2.7.0   # TensorFlow (also -gpu, -macos or -aarch64 variants)
