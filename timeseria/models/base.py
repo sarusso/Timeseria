@@ -12,17 +12,16 @@ from ..units import TimeUnit
 from pandas import DataFrame
 import shutil
 
-# Keras
-from keras.models import load_model as load_keras_model
-
 # Setup logging
 import logging
 logger = logging.getLogger(__name__)
 
 # Suppress TensorFlow warnings as default behavior
-import tensorflow as tf
-tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
-
+try:
+    import tensorflow as tf
+    tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
+except ImportError:
+    pass
 
 #======================
 #  Base Model
@@ -464,6 +463,7 @@ class KerasModel(ParametricModel):
 
         # If loaded, load the Keras model as well
         if path:
+            from keras.models import load_model as load_keras_model
             self.keras_model = load_keras_model('{}/keras_model'.format(path))
 
 

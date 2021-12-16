@@ -429,6 +429,12 @@ class TestForecasters(unittest.TestCase):
 
     def test_LSTMForecaster(self):
 
+        try:
+            import tensorflow
+        except ImportError:
+            print('Skipping LSTM forecaster tests as no tensorflow module installed')
+            return
+
         # Create a minute-resolution test DataTimeSlotSeries
         sine_data_time_slot_series_minute = DataTimeSlotSeries()
         for i in range(10):
@@ -451,6 +457,12 @@ class TestForecasters(unittest.TestCase):
 
 
     def test_LSTMForecaster_multivariate(self):
+
+        try:
+            import tensorflow
+        except ImportError:
+            print('Skipping LSTM forecaster tests as no tensorflow module installed')
+            return
         
         # Create a minute-resolution test DataTimeSlotSeries
         sine_data_time_slot_series_minute = DataTimeSlotSeries()
@@ -466,6 +478,12 @@ class TestForecasters(unittest.TestCase):
 
 
     def test_LSTMForecaster_save_load(self):
+        
+        try:
+            import tensorflow
+        except ImportError:
+            print('Skipping LSTM forecaster tests as no tensorflow module installed')
+            return
         
         # Create a minute-resolution test DataTimeSlotSeries
         sine_data_time_slot_series_minute = DataTimeSlotSeries()

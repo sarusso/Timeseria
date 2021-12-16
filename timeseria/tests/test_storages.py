@@ -231,47 +231,48 @@ class TestCSVFileStorage(unittest.TestCase):
 
 
     def test_CSVFileStorage_put(self):
-        
-        # Points
-        data_time_point_series = DataTimePointSeries(DataTimePoint(t=60, data=[23.8,3]),
-                                                     DataTimePoint(t=120, data=[24.1,4]),
-                                                     DataTimePoint(t=240, data=[23.1,5]),
-                                                     DataTimePoint(t=300, data=[22.7,6]))
-        data_time_point_series.change_timezone('Europe/Rome')
-   
-        storage = CSVFileStorage('/tmp/file_1.csv')
-        storage.put(data_time_point_series)
-        
-        with self.assertRaises(Exception):
+        import tempfile
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Points
+            data_time_point_series = DataTimePointSeries(DataTimePoint(t=60, data=[23.8,3]),
+                                                         DataTimePoint(t=120, data=[24.1,4]),
+                                                         DataTimePoint(t=240, data=[23.1,5]),
+                                                         DataTimePoint(t=300, data=[22.7,6]))
+            data_time_point_series.change_timezone('Europe/Rome')
+       
+            storage = CSVFileStorage('/{}/file_1.csv'.format(temp_dir))
             storage.put(data_time_point_series)
-        
-        storage.put(data_time_point_series, overwrite=True)
-        
-        #with open('/tmp/file_1.csv') as f:
-        #    print(f.read())
-        
-        self.assertEqual(len(storage.get()),4)
-        self.assertTrue(isinstance(storage.get(), DataTimePointSeries))
-        
-        
-        # Slots
-        data_time_point_series = DataTimeSlotSeries(DataTimeSlot(t=60, unit=TimeUnit('1m'), data=[23.8,3]),
-                                                    DataTimeSlot(t=120, unit=TimeUnit('1m'), data=[24.1,4]),
-                                                    DataTimeSlot(t=180, unit=TimeUnit('1m'), data=[23.1,5]),
-                                                    DataTimeSlot(t=240, unit=TimeUnit('1m'), data=[22.7,6]))
-        data_time_point_series.change_timezone('Europe/Rome')
-        
-        storage = CSVFileStorage('/tmp/file_2.csv')
-        storage.put(data_time_point_series)
-
-        with self.assertRaises(Exception):
+            
+            with self.assertRaises(Exception):
+                storage.put(data_time_point_series)
+            
+            storage.put(data_time_point_series, overwrite=True)
+            
+            #with open('/tmp/file_1.csv') as f:
+            #    print(f.read())
+            
+            self.assertEqual(len(storage.get()),4)
+            self.assertTrue(isinstance(storage.get(), DataTimePointSeries))
+            
+            
+            # Slots
+            data_time_point_series = DataTimeSlotSeries(DataTimeSlot(t=60, unit=TimeUnit('1m'), data=[23.8,3]),
+                                                        DataTimeSlot(t=120, unit=TimeUnit('1m'), data=[24.1,4]),
+                                                        DataTimeSlot(t=180, unit=TimeUnit('1m'), data=[23.1,5]),
+                                                        DataTimeSlot(t=240, unit=TimeUnit('1m'), data=[22.7,6]))
+            data_time_point_series.change_timezone('Europe/Rome')
+            
+            storage = CSVFileStorage('/{}/file_2.csv'.format(temp_dir))
             storage.put(data_time_point_series)
-        
-        storage.put(data_time_point_series, overwrite=True)
-        
-        #with open('/tmp/file_2.csv') as f:
-        #    print(f.read())
-        
-        self.assertEqual(len(storage.get(item_type='slots')),4)
-        self.assertTrue(isinstance(storage.get(item_type='slots'), DataTimeSlotSeries))
+    
+            with self.assertRaises(Exception):
+                storage.put(data_time_point_series)
+            
+            storage.put(data_time_point_series, overwrite=True)
+            
+            #with open('/tmp/file_2.csv') as f:
+            #    print(f.read())
+            
+            self.assertEqual(len(storage.get(item_type='slots')),4)
+            self.assertTrue(isinstance(storage.get(item_type='slots'), DataTimeSlotSeries))
 

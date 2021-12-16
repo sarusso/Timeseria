@@ -11,10 +11,7 @@ from pandas import DataFrame
 from numpy import array
 from math import sqrt
 
-# Keras and sklearn
-from keras.models import Sequential
-from keras.layers import Dense
-from keras.layers import LSTM
+# Sklearn
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 
 # Base models and utilities
@@ -25,8 +22,11 @@ import logging
 logger = logging.getLogger(__name__)
 
 # Suppress TensorFlow warnings as default behavior
-import tensorflow as tf
-tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
+try:
+    import tensorflow as tf
+    tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
+except ImportError:
+    pass
 
 
 #======================
@@ -779,6 +779,9 @@ class LSTMForecaster(KerasModel, Forecaster):
         
         # Create the default model architeture if not given in the init
         if not self.keras_model:
+            from keras.models import Sequential
+            from keras.layers import Dense
+            from keras.layers import LSTM
             self.keras_model = Sequential()
             self.keras_model.add(LSTM(self.data['neurons'], input_shape=(self.data['window'], features_per_window_item)))
             self.keras_model.add(Dense(output_dimension)) 

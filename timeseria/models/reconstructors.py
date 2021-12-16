@@ -15,8 +15,11 @@ import logging
 logger = logging.getLogger(__name__)
 
 # Suppress TensorFlow warnings as default behavior
-import tensorflow as tf
-tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
+try:
+    import tensorflow as tf
+    tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
+except ImportError:
+    pass
 
 # Base models and utilities
 from .base import TimeSeriesParametricModel, ProphetModel
