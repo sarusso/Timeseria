@@ -28,6 +28,14 @@ try:
 except ImportError:
     pass
 
+# Also suppress absl warnings as default behavior
+# https://stackoverflow.com/questions/65697623/tensorflow-warning-found-untraced-functions-such-as-lstm-cell-6-layer-call-and
+# https://github.com/tensorflow/tensorflow/issues/47554
+try:
+    import absl.logging
+    absl.logging.set_verbosity(absl.logging.ERROR)
+except ImportError:
+    pass
 
 #======================
 #  Generic Forecaster
