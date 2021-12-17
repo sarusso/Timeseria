@@ -17,4 +17,5 @@ else
     docker run -v$PWD:/opt/timeseria -it sarusso/tensorflow:2.7.0 /bin/bash -c "cd /opt/timeseria && ./pypi.sh push"
 fi
 
-
+# Remove build artifacts
+rm -rf build dist timeseria.egg-info
