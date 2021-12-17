@@ -1,6 +1,7 @@
 import unittest
 import datetime
-from ..time import dt, correct_dt_dst, dt_to_str, dt_from_str, change_tz
+from ..time import dt, correct_dt_dst, dt_to_str, dt_from_str, s_from_dt, change_tz, timezonize
+from pandas import Timestamp as PandasTimestamp
 
 
 class TestTime(unittest.TestCase):
@@ -73,6 +74,15 @@ class TestTime(unittest.TestCase):
 
         date_time = dt(3567,8,1,16,46, tzinfo='Europe/Rome')
         self.assertEqual(str(date_time), '3567-08-01 16:46:00+01:00')
+
+    
+    def test_s_from_dt(self):
+        
+        date_time = dt(2001,12,1,16,46,10,6575, tzinfo='Europe/Rome')
+        self.assertEqual(s_from_dt(date_time), 1007221570.006575)
+        
+        date_time_pandas = PandasTimestamp(year=2001,month=12,day=1,hour=16,minute=46,second=10,microsecond=6575, tzinfo=timezonize('Europe/Rome'))
+        self.assertEqual(s_from_dt(date_time_pandas), 1007221570.006575)
 
 
     def test_str_conversions(self):

@@ -142,8 +142,12 @@ def s_from_dt(dt):
     """Return the epoch seconds from a datetime object, with floating point for milliseconds/microseconds."""
     if not (isinstance(dt, datetime.datetime)):
         raise Exception('t_from_dt function called without datetime argument, got type "{}" instead.'.format(dt.__class__.__name__))
-    microseconds_part = (dt.microsecond/1000000.0) if dt.microsecond else 0
-    return  ( calendar.timegm(dt.utctimetuple()) + microseconds_part)
+    try:
+        return dt.timestamp()
+    except AttributeError:
+        # Python 2.7
+        microseconds_part = (dt.microsecond/1000000.0) if dt.microsecond else 0
+        return (calendar.timegm(dt.utctimetuple()) + microseconds_part)
 
 
 def dt_from_str(string, timezone=None):
