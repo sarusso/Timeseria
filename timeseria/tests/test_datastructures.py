@@ -346,6 +346,12 @@ class TestPointSeries(unittest.TestCase):
         self.assertEqual(data_time_point_series.df.iloc[0][0],21.7)
         self.assertEqual(data_time_point_series.df.iloc[0][1],54.9)
 
+        # Test loading a Pandas data frame as a time series        
+        loaded_data_time_point_series = DataTimePointSeries(data_time_point_series.df)
+        self.assertEqual(loaded_data_time_point_series[0].dt,dt(2020,4,3,0,0,0))
+        self.assertEqual(loaded_data_time_point_series[5].dt,dt(2020,4,3,5,0,0))
+        self.assertEqual((loaded_data_time_point_series[0].data['C']), 21.7)
+        self.assertEqual((loaded_data_time_point_series[0].data['RH']), 54.9)
 
         # Test resolution
         data_time_point_series = DataTimePointSeries(DataTimePoint(dt=dt(2015,10,24,0,0,0, tzinfo='Europe/Rome'), data=23.8),
@@ -663,6 +669,13 @@ class TestSlotSeries(unittest.TestCase):
         self.assertEqual(list(data_time_slot_series.df.columns),['C','RH'])
         self.assertEqual(data_time_slot_series.df.iloc[0][0],21.7)
         self.assertEqual(data_time_slot_series.df.iloc[0][1],54.9)
+
+        # Test loading a Pandas data frame as a time series        
+        loaded_data_time_slot_series = DataTimeSlotSeries(data_time_slot_series.df)
+        self.assertEqual(loaded_data_time_slot_series[0].start.dt,dt(2020,4,3,0,0,0))
+        self.assertEqual(loaded_data_time_slot_series[4].end.dt,dt(2020,4,3,10,0,0))
+        self.assertEqual((loaded_data_time_slot_series[0].data['C']), 21.7)
+        self.assertEqual((loaded_data_time_slot_series[0].data['RH']), 54.9)
 
         # Test resolution
         data_time_slot_series =  DataTimeSlotSeries(DataTimeSlot(start=TimePoint(t=60),  end=TimePoint(t=120), data=23.8),
