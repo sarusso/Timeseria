@@ -1,6 +1,6 @@
 # Timeseria
 
-Timeseria is a time series processing library which aims at making it easy to handle time series data and to build statistical and machine learning models on top of it.
+Timeseria is a data processing library which aims at making it easy to handle time series data and to build statistical and machine learning models on top of it.
 
 It comes with a built-in set of common operations (resampling, slotting, differencing etc.) and models (reconstruction, forecasting and anomaly detection). Both custom operations and models can be easily plugged in.
 
