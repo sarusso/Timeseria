@@ -20,12 +20,19 @@ if [[ "x$@" == "x" ]] ; then
     export EXTENDED_TESTING=False
     export PYTHONPATH=\$PYTHONPATH:/opt/Timeseria
     
-    # Set port
+    # Set base port
 	if [ "x$BASE_PORT" == "x" ]; then
 	    BASE_PORT=8888
 	fi
 
-    cd /opt/Timeseria && jupyter notebook --ip=0.0.0.0 --port=$BASE_PORT --NotebookApp.token='' --NotebookApp.notebook_dir='/notebooks'
+    # Set base dir
+    if [ "x$BASE_DIR" == "x" ]; then
+        BASE_DIR='/notebooks'
+    else
+        BASE_DIR="'$BASE_DIR'"
+    fi
+
+    cd /opt/Timeseria && jupyter notebook --ip=0.0.0.0 --port=$BASE_PORT --NotebookApp.token='' --NotebookApp.notebook_dir=$BASE_DIR
 
 else
     ENTRYPOINT_COMMAND=$@
