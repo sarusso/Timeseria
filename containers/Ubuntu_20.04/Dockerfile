@@ -25,20 +25,33 @@ RUN if [ "$(uname -i)" = "aarch64" ] ; then \
 # Install Jupyter and Sphinx for docs
 RUN pip3 install notebook==5.7.10 Sphinx==3.5.2 sphinx-rtd-theme==0.5.1
 
-# Add demo notebooks
-RUN apt-get install git -y 
-RUN cd /opt && git clone https://github.com/sarusso/Timeseria-notebooks && cd /opt/Timeseria-notebooks && git checkout 145a9a8
-RUN ln -s /opt/Timeseria-notebooks/notebooks /notebooks
-
-# Copy entrypoint
+# Add the entrypoint
 COPY containers/Ubuntu_20.04/entrypoint.sh /
-
-# Give right permissions
 RUN chmod 755 /entrypoint.sh
 
-# Set entrypoint
-ENTRYPOINT ["/entrypoint.sh"]
+# Add timeseria group. We chose GID 1000 as default.
+RUN groupadd -g 1000 timeseria
+
+# Add timeseria user. We chose UID 1000 as default
+RUN useradd timeseria -d /home/timeseria -u 1000 -g 1000 -m -s /bin/bash
+
+# Add timeseria user to sudoers
+RUN adduser timeseria sudo
+
+# No pass sudo (for everyone, actually)
+COPY containers/Ubuntu_20.04/sudoers /etc/sudoers
+
+# Create a directory for the notebook
+RUN mkdir /notebooks && chown timeseria:timeseria /notebooks
+
+# Add demo notebooks
+RUN cd /tmp && git clone https://github.com/sarusso/Timeseria-notebooks && cd Timeseria-notebooks && git checkout 145a9a8
+RUN mv /tmp/Timeseria-notebooks/notebooks/* /notebooks/ && rm -rf /tmp/Timeseria-notebooks
+RUN chown -R timeseria:timeseria /notebooks/*
 
 # Add code
 COPY ./ /opt/Timeseria
 
+# Set user and entrypoint
+USER timeseria
+ENTRYPOINT ["/entrypoint.sh"]
