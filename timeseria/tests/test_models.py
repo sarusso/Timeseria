@@ -3,7 +3,7 @@ import os
 import tempfile
 from math import sin, cos
 from ..datastructures import DataTimeSlotSeries, DataTimeSlot, TimePoint, DataTimePoint, DataTimePointSeries
-from ..models import Model, ParametricModel, TimeSeriesParametricModel
+from ..models import Model, ParametricModel, TimeSeriesParametricModel, KerasModel
 from ..models import PeriodicAverageReconstructor, PeriodicAverageForecaster, PeriodicAverageAnomalyDetector
 from ..models import ProphetForecaster, ProphetReconstructor
 from ..models import ARIMAForecaster, AARIMAForecaster
@@ -91,6 +91,59 @@ class TestBaseModelClasses(unittest.TestCase):
         loaded_parametric_model = ParametricModelMock(model_dir)
         self.assertEqual(loaded_parametric_model.id, parametric_model_id)
 
+
+    def test_KerasModel(self):
+        
+        # Define a trainable model mock
+        class KerasModelMock(KerasModel):            
+            def _fit(self, *args, **kwargs):
+                pass 
+            def _evaluate(self, *args, **kwargs):
+                pass
+            def _apply(self, *args, **kwargs):
+                pass 
+
+        # Define test time series
+        data_time_point_series = DataTimePointSeries(DataTimePoint(t=1, data={'metric1': 0.1}),
+                                                     DataTimePoint(t=2, data={'metric1': 0.2}),
+                                                     DataTimePoint(t=3, data={'metric1': 0.3}),
+                                                     DataTimePoint(t=4, data={'metric1': 0.4}),
+                                                     DataTimePoint(t=5, data={'metric1': 0.5}),
+                                                     DataTimePoint(t=6, data={'metric1': 0.6}),)
+
+
+        # Test window generation functions
+        window_matrix = KerasModelMock.to_window_datapoints_matrix(data_time_point_series, window=2, forecast_n=1, encoder=None)
+        
+        # What to expect (using the timestamp to represent a datapoint):
+        # 1,2
+        # 2,3
+        # 3,4
+        # 4,5
+
+        self.assertEqual(len(window_matrix), 4)
+        
+        self.assertEqual(window_matrix[0][0].t, 1)
+        self.assertEqual(window_matrix[0][1].t, 2)
+        
+        self.assertEqual(window_matrix[1][0].t, 2)
+        self.assertEqual(window_matrix[1][1].t, 3)
+
+        self.assertEqual(window_matrix[2][0].t, 3)
+        self.assertEqual(window_matrix[2][1].t, 4)
+        
+        self.assertEqual(window_matrix[-1][0].t, 4)
+        self.assertEqual(window_matrix[-1][1].t, 5)
+        
+        target_vector = KerasModelMock.to_target_values_vector(data_time_point_series, window=2, forecast_n=1)
+
+        # What to expect (using the data value to represent a datapoint):
+        # [0.3], [0.4], [0.5], [0.6] Note that they are lists in order to support multi-step forecast
+        self.assertEqual(target_vector, [[0.3], [0.4], [0.5], [0.6]])
+        
+        
+        
+        
 
 
 class TestReconstructors(unittest.TestCase):

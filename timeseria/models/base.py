@@ -480,15 +480,17 @@ class KerasModel(ParametricModel):
             raise e
         return model_dir
 
-
-    @staticmethod
-    def to_windows(timeseries):
-        '''Compute window data values from a time series.'''
-        key = timeseries.data_keys()[0]
-        window_data_values = []
-        for item in timeseries:
-            window_data_values.append(item.data[key])
-        return window_data_values
+    
+    # TODO: this following stuff should not go here. Maybe only if extending a TimeSeriesParametricModel, and still it is probably wrong.
+    
+    #@staticmethod
+    #def to_windows(timeseries):
+    #    '''Compute window data values from a time series.'''
+    #    key = timeseries.data_keys()[0]
+    #    window_data_values = []
+    #    for item in timeseries:
+    #        window_data_values.append(item.data[key])
+    #    return window_data_values
 
         
     @staticmethod
@@ -499,7 +501,7 @@ class KerasModel(ParametricModel):
         for i, _ in enumerate(timeseries):
             if i <  window:
                 continue
-            if i == len(timeseries)-forecast_n:
+            if i == len(timeseries) + 1 - forecast_n:
                 break
                     
             # Add window values
@@ -521,7 +523,7 @@ class KerasModel(ParametricModel):
         for i, _ in enumerate(timeseries):
             if i <  window:
                 continue
-            if i == len(timeseries)-forecast_n:
+            if i == len(timeseries) + 1 - forecast_n:
                 break
             
             # Add forecast target value(s)
