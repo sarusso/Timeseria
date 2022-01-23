@@ -21,7 +21,7 @@ class TestCSVFileStorage(unittest.TestCase):
         data_time_point_series = storage.get()
         self.assertEqual(len(data_time_point_series), 6)
         self.assertEqual(data_time_point_series[0].t, 946684800)
-        self.assertEqual(data_time_point_series[0].data, 1000)
+        self.assertEqual(data_time_point_series[0].data, [1000])
  
         # Basic iso8601 multi values no labels
         storage = CSVFileStorage(TEST_DATA_PATH + '/csv/multi_values_no_labels.csv')
@@ -37,8 +37,8 @@ class TestCSVFileStorage(unittest.TestCase):
         self.assertEqual(data_time_point_series[0].data, [10])
         self.assertEqual(data_time_point_series[-1].data, [14])
  
-        # Basic iso8601 multi values no labels and filtering and force format
-        storage = CSVFileStorage(TEST_DATA_PATH + '/csv/multi_values_with_labels.csv', data_columns=[1], data_format=list)
+        # Basic iso8601 multi values no labels and filtering and force data type
+        storage = CSVFileStorage(TEST_DATA_PATH + '/csv/multi_values_with_labels.csv', data_columns=[1], data_type=float)
         data_time_point_series = storage.get()
         self.assertEqual(len(data_time_point_series), 50)
         self.assertEqual(data_time_point_series[0].data, [1000])
@@ -94,10 +94,10 @@ class TestCSVFileStorage(unittest.TestCase):
         data_time_point_series = storage.get()       
         self.assertEqual(len(data_time_point_series), 3)
         self.assertEqual(data_time_point_series[0].t, 946684800)
-        self.assertEqual(data_time_point_series[0].data, 1000)
+        self.assertEqual(data_time_point_series[0].data, [1000])
 
         # Basic iso8601 with two labels, dirty
-        storage = CSVFileStorage(TEST_DATA_PATH + '/csv/multi_values_with_labels_dirty.csv', value_separator=';', skip_errors=True)
+        storage = CSVFileStorage(TEST_DATA_PATH + '/csv/multi_values_with_labels_dirty.csv', separator=';', skip_errors=True)
         data_time_point_series = storage.get()      
         self.assertEqual(len(data_time_point_series), 3)
         self.assertEqual(data_time_point_series[0], DataTimePoint(t= 946688400, data={'flow': 1010.0, 'temp': 11.0}))
@@ -155,7 +155,7 @@ class TestCSVFileStorage(unittest.TestCase):
 
         # Test only date column and without meaningful timestamp label (and force points)
         storage = CSVFileStorage(TEST_DATA_PATH + '/csv/only_date_no_meaningful_timestamp_label.csv',
-                                 time_format = '%Y-%m-%d', item_type='points')
+                                 timestamp_format = '%Y-%m-%d', series_type='points')
 
         data_time_point_series = storage.get()
         self.assertEqual(len(data_time_point_series), 95)
@@ -168,7 +168,7 @@ class TestCSVFileStorage(unittest.TestCase):
 
         # Test only date column and without meaningful timestamp label, let generate slots with interpolated data
         storage = CSVFileStorage(TEST_DATA_PATH + '/csv/only_date_no_meaningful_timestamp_label.csv',
-                                 time_format = '%Y-%m-%d')
+                                 timestamp_format = '%Y-%m-%d')
 
         data_time_slot_series = storage.get()
         self.assertEqual(len(data_time_slot_series), 100)
@@ -208,16 +208,16 @@ class TestCSVFileStorage(unittest.TestCase):
         self.assertEqual(str(data_time_slot_series.tz), 'Europe/Rome')
 
         # Force point and get on a specific timezone
-        data_time_point_series = storage.get(tz='Europe/Rome', item_type='points')
+        data_time_point_series = storage.get(tz='Europe/Rome', series_type='points')
         self.assertTrue(isinstance(data_time_point_series[0], DataTimePoint))
         self.assertEqual(str(data_time_point_series.tz), 'Europe/Rome')
 
 
-    def test_CSVFileStorage_item_types(self):
+    def test_CSVFileStorage_series_types(self):
 
         # Get data as slots
         storage = CSVFileStorage(TEST_DATA_PATH + '/csv/temp_short_1h.csv')
-        data_time_point_series = storage.get(item_type='slots')
+        data_time_point_series = storage.get(series_type='slots')
         self.assertEqual(len(data_time_point_series), 100)
         self.assertEqual(data_time_point_series[0].start.t, 1546477200)
         self.assertEqual(data_time_point_series[-1].start.t, 1546833600)
@@ -273,6 +273,6 @@ class TestCSVFileStorage(unittest.TestCase):
             #with open('/tmp/file_2.csv') as f:
             #    print(f.read())
             
-            self.assertEqual(len(storage.get(item_type='slots')),4)
-            self.assertTrue(isinstance(storage.get(item_type='slots'), DataTimeSlotSeries))
+            self.assertEqual(len(storage.get(series_type='slots')),4)
+            self.assertTrue(isinstance(storage.get(series_type='slots'), DataTimeSlotSeries))
 

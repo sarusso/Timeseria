@@ -27,22 +27,53 @@ NO_DATA_PLACEHOLDERS = ['na', 'nan', 'null', 'nd', 'undef']
 class CSVFileStorage(object):
     """A CSV file data storage."""
     
-    def __init__(self, filename_with_path, encoding = 'auto', time_column = 'auto', time_format = 'auto',
-                 date_column = None, date_format = None, data_columns = 'all', value_separator=',', line_separator='\n',
-                 skip_errors=False, data_format='auto', item_type=None, tz='UTC'):
+    def __init__(self, filename, timestamp_column='auto', timestamp_format='auto',
+                 time_column=None, time_format=None, date_column=None, date_format=None,
+                 tz='UTC', data_columns='all', data_type='auto', series_type=None,
+                 separator=',', newline='\n', encoding='auto', skip_errors=False, order=False):
         """Ref to https://docs.python.org/3/library/datetime.html#strftime-and-strptime-format-codes
-        for date_format and time_format"""
+        for timestamp_format, date_format and time_format"""
+
+
+        # Handle setting a time column
+        if time_column or date_column:
+            if timestamp_column == 'auto':
+                timestamp_column = None
+
+        # Sanity checks
+        if timestamp_column is None and time_column is None and date_column is None and not data_columns:
+            raise ValueError('No timestamp column, time column, date column or data columns provided, cannot get anything from this CSV file')
+
+        if timestamp_column and (time_column or date_column):
+            raise ValueError('Got both timestamp column and time/date columns, choose which approach to use.')
+
+        if timestamp_column is not None and not isinstance(timestamp_column, int) and not isinstance(timestamp_column, str):
+            raise ValueError('timestamp_column argument must be either integer or string (got "{}")'.format(timestamp_column.__class__.__name__))
+
+        if time_column is not None and not isinstance(time_column, int) and not isinstance(time_column, str):
+            raise ValueError('time_column argument must be either integer or string (got "{}")'.format(time_column.__class__.__name__))
+
+        if date_column is not None and not isinstance(date_column, int) and not isinstance(date_column, str):
+            raise ValueError('date_column argument must be either integer or string (got "{}")'.format(date_column.__class__.__name__))
+
+        if data_columns != 'all' and not isinstance(data_columns, list):
+            raise ValueError('data_columns argument must be a list (got "{}")'.format(data_columns.__class__.__name__))
 
         # File & encoding
-        self.filename_with_path = filename_with_path
+        self.filename = filename
         if encoding == 'auto':
             self.encoding = None
         else:
             self.encoding = encoding
 
         # Time
-        self.time_column = time_column
-        self.time_format = time_format
+        if timestamp_column:
+            # We use "time" also for the timestamp. TODO: unroll this?
+            self.time_column = timestamp_column
+            self.time_format = timestamp_format  
+        else:
+            self.time_column = time_column
+            self.time_format = time_format
         self.date_column = date_column
         self.date_format = date_format 
         
@@ -52,32 +83,20 @@ class CSVFileStorage(object):
         # Data
         self.data_columns = data_columns
         
-        # Value and line separators
-        self.value_separator = value_separator
-        self.line_separator = line_separator
+        # Separator and newline chars
+        self.separator = separator
+        self.newline = newline
 
         # Other
         self.skip_errors = skip_errors
-        self.data_format = data_format
+        self.data_type = data_type
+        self.order = order
         
-        # Set item type (that will be forced)
-        self.item_type = item_type
-
-        # Check
-        if self.time_column is None and self.date_column is None and not self.data_columns:
-            raise ValueError('No time column, date column or data columns provided, cannot get anyything fromt this CSV file')
-        
-        if self.time_column is not None and not isinstance(self.time_column, int) and not isinstance(self.time_column, str):
-            raise ValueError('time_column argument must be either integer os string (got "{}")'.format(self.time_column.__class__.__name__))
-
-        if self.date_column is not None and not isinstance(self.date_column, int) and not isinstance(self.date_column, str):
-            raise ValueError('date_column argument must be either integer os string (got "{}")'.format(self.date_column.__class__.__name__))
-
-        if self.data_columns != 'all' and not isinstance(self.data_columns, list):
-            raise ValueError('data_columns argument must be a list (got "{}")'.format(self.data_columns.__class__.__name__))
+        # Set series type (that will be forced)
+        self.series_type = series_type
 
 
-    def get(self, limit=None, tz=None, item_type=None, sort=False):
+    def get(self, limit=None, tz=None, series_type=None, sort=False):
 
         # Line counter
         line_number=0
@@ -94,12 +113,12 @@ class CSVFileStorage(object):
 
         # Detect encoding if not set
         if not self.encoding:
-            self.encoding = detect_encoding(self.filename_with_path, streaming=False)
+            self.encoding = detect_encoding(self.filename, streaming=False)
 
         items = []
 
         # TODO: evaluate rU vs newline='\n'
-        with open(self.filename_with_path, 'r', encoding=self.encoding) as csv_file:
+        with open(self.filename, 'r', encoding=self.encoding) as csv_file:
 
             while True:
                 
@@ -127,12 +146,12 @@ class CSVFileStorage(object):
                     continue
 
                 # Is this line something else? 
-                if not self.value_separator in line:
+                if not self.separator in line:
                     logger.debug('Skipping line "%s" as marked no value separator found', line)
                     continue
 
                 # Get values from this line:
-                line_items = line.split(self.value_separator)
+                line_items = line.split(self.separator)
 
                 # Set column keys if not already done
                 if not column_indexes:
@@ -284,7 +303,7 @@ class CSVFileStorage(object):
                         if is_list_of_integers(self.data_columns):
                             # Case where we have been given a list of integers
                             data_column_indexes =  self.data_columns
-                            self.data_format = list
+                            self.data_type = list
 
                         else:
                             # Case where we have been given a list of labels
@@ -321,23 +340,15 @@ class CSVFileStorage(object):
 
                 # Set data
                 try:
-                    if data_column_labels:
-                        if len(data_column_labels) >1 and self.data_format == float:
-                            raise Exception('Requested data format as float but got more than 1 value')
-                        if self.data_format == float:
-                            data = to_float(line_items[data_column_indexes[0]],NO_DATA_PLACEHOLDERS)
-                        elif self.data_format == list:
-                            data = [to_float(line_items[index],NO_DATA_PLACEHOLDERS) for index in data_column_indexes]
-                        else:
-                            data = {column_labels[index]: to_float(line_items[index],NO_DATA_PLACEHOLDERS,column_labels[index]) for index in data_column_indexes}
+                    if data_column_labels and len(data_column_labels) > 1 and self.data_type == float:
+                        raise Exception('Requested data format as float but got more than 1 value')
+                    if self.data_type == float:
+                        data = to_float(line_items[data_column_indexes[0]],NO_DATA_PLACEHOLDERS)
+                    elif self.data_type == list or not data_column_labels:
+                        data = [to_float(line_items[index],NO_DATA_PLACEHOLDERS) for index in data_column_indexes]
                     else:
-                        # Default here is to set a float if there is only one value.
-                        # TODO: are we sure we want this?
-                        if len (data_column_indexes) >1 or self.data_format == list:
-                            data = [to_float(line_items[index],NO_DATA_PLACEHOLDERS) for index in data_column_indexes]
-                        else:
-                            data = to_float(line_items[data_column_indexes[0]],NO_DATA_PLACEHOLDERS)
-           
+                        data = {column_labels[index]: to_float(line_items[index],NO_DATA_PLACEHOLDERS,column_labels[index]) for index in data_column_indexes}
+               
                 # TODO: here we drop the entire line. Instead, should we use a "None" and allow "Nones" in the DataPoints data? 
                 except FloatConversionError as e:
                     if self.skip_errors:
@@ -364,16 +375,16 @@ class CSVFileStorage(object):
             raise NoDataException('Cannot read any data!')
         
         # Support var
-        autodetect_item_type = False
+        autodetect_series_type = False
 
-        # Set item type if forced
-        if not item_type and self.item_type:
-            item_type = self.item_type
+        # Set item type if not forced
+        if not series_type and self.series_type:
+            series_type = self.series_type
 
         # Otherwise, auto-detect
-        if not item_type or item_type=='slots':
+        if not series_type or series_type=='slots':
     
-            autodetect_item_type = True
+            autodetect_series_type = True
     
             # Detect sampling interval to create right item type (points or slots)
             from .utilities import detect_sampling_interval
@@ -384,33 +395,33 @@ class CSVFileStorage(object):
             
             # Years
             if detected_sampling_interval in [86400*365, 886400*366]:
-                detected_item_type = DataTimeSlot
+                detected_series_type = DataTimeSlot
                 detected_unit = TimeUnit('1Y') 
                    
             # Months
             elif detected_sampling_interval in [86400*31, 86400*30, 86400*28]:
-                detected_item_type = DataTimeSlot
+                detected_series_type = DataTimeSlot
                 detected_unit = TimeUnit('1M')
             
             # Days
             elif detected_sampling_interval in [3600*24, 3600*23, 3600*25]:
-                detected_item_type = DataTimeSlot
+                detected_series_type = DataTimeSlot
                 detected_unit = TimeUnit('1D')
             
             # Weeks still to be implemented in the unit
             #elif detected_sampling_interval in [3600*24*7, (3600*24*7)-3600, (3600*24*7)+3600]:
-            #    detected_item_type = DataTimeSlot
+            #    detected_series_type = DataTimeSlot
             #    detected_unit = TimeUnit('1D')
             
             # Else, use points with no unit if we were not using slots
             else:
-                if item_type!='slots':
-                    detected_item_type = DataTimePoint
+                if series_type!='slots':
+                    detected_series_type = DataTimePoint
                     detected_unit = None
                 else:
-                    # TODO: "detected_item_type" is not a nice name here, the
-                    # code in the following should use item_type if forced..
-                    detected_item_type = DataTimeSlot
+                    # TODO: "detected_series_type" is not a nice name here, the
+                    # code in the following should use series_type if forced..
+                    detected_series_type = DataTimeSlot
 
                     # Can we auto-detect unit? TODO: can we standardize this? Check also in the entire codebase..
                     if detected_sampling_interval == 3600:
@@ -429,27 +440,27 @@ class CSVFileStorage(object):
                         detected_unit = TimeUnit('{}s'.format(detected_sampling_interval)) 
                         
         # Do we have to force a specific type?
-        if not autodetect_item_type:
-            if item_type == 'points':
-                item_type = DataTimePoint
+        if not autodetect_series_type:
+            if series_type == 'points':
+                series_type = DataTimePoint
                 unit = None 
-            elif item_type == 'slots':
-                item_type = DataTimeSlot
+            elif series_type == 'slots':
+                series_type = DataTimeSlot
                 unit = TimeUnit('{}s'.format(detected_sampling_interval))
             else:
-                raise ValueError('Unknown value "{}" for type. Accepted types are "points" or "slots".'.format(self.item_type))
+                raise ValueError('Unknown value "{}" for type. Accepted types are "points" or "slots".'.format(self.series_type))
         else:
             # Log the type and unit we detected 
-            if detected_item_type == DataTimeSlot:
-                if item_type:
+            if detected_series_type == DataTimeSlot:
+                if series_type:
                     logger.info('Assuming {} time unit and creating Slots.'.format(detected_unit))                
                 else:
-                    logger.info('Assuming {} time unit and creating Slots. Use item_type=\'points\' if you want Points instead.'.format(detected_unit))
+                    logger.info('Assuming {} time unit and creating Slots. Use series_type=\'points\' if you want Points instead.'.format(detected_unit))
             #else:
-            #    logger.info('Assuming {} sampling interval and creating {}.'.format(detected_sampling_interval, item_type.__class__.__name__))
+            #    logger.info('Assuming {} sampling interval and creating {}.'.format(detected_sampling_interval, series_type.__class__.__name__))
             
             # and use it.
-            item_type = detected_item_type
+            series_type = detected_series_type
             unit = detected_unit
 
         # Set and timezonize the timezone. In this way the it will be just a pointer.
@@ -460,7 +471,7 @@ class CSVFileStorage(object):
 
         
         # Create point or slot series
-        if item_type == DataTimePoint:
+        if series_type == DataTimePoint:
             timeseries = DataTimePointSeries()
             if sort:
                 from operator import itemgetter
@@ -555,13 +566,13 @@ class CSVFileStorage(object):
 
     def put(self, timeseries, overwrite=False):
         
-        if os.path.isfile(self.filename_with_path) and not overwrite:
+        if os.path.isfile(self.filename) and not overwrite:
             raise Exception('File already exists. use overwrite=True to overwrite.')
 
         # Set indexes here once for all or thre will be a slowndowd afterwards
         indexes = timeseries.indexes
 
-        with open(self.filename_with_path, 'w') as csv_file:
+        with open(self.filename, 'w') as csv_file:
        
             # 0) Dump CSV-storage specific metadata & chck type     
             if isinstance(timeseries, DataTimePointSeries):
