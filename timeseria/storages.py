@@ -96,7 +96,7 @@ class CSVFileStorage(object):
         self.series_type = series_type
 
 
-    def get(self, limit=None, tz=None, series_type='auto'):
+    def get(self, limit=None, as_tz=None, as_series_type=None):
 
         # Line counter
         line_number=0
@@ -383,12 +383,12 @@ class CSVFileStorage(object):
         autodetect_series_type = False
 
         # Set series type
-        if series_type == 'auto' and self.series_type != 'auto':
+        if not as_series_type and self.series_type != 'auto':
             # Use the object one
             series_type = self.series_type
-        elif series_type != 'auto':
+        elif as_series_type != 'auto':
             # Use this one
-            series_type = series_type
+            series_type = as_series_type
         else:
             # Go in auto mode
             series_type = None
@@ -484,8 +484,8 @@ class CSVFileStorage(object):
             unit = detected_unit
 
         # Set and timezonize the timezone. In this way the it will be just a pointer.
-        if tz:
-            tz = timezonize(tz)
+        if as_tz:
+            tz = timezonize(as_tz)
         else:
             tz = timezonize(self.tz)
 

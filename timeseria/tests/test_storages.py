@@ -212,12 +212,12 @@ class TestCSVFileStorage(unittest.TestCase):
                 self.assertEqual(item.data_loss, 1, 'Failed for i={}'.format(i))
 
         # Get on a specific timezone
-        data_time_slot_series = storage.get(tz='Europe/Rome')
+        data_time_slot_series = storage.get(as_tz='Europe/Rome')
         self.assertTrue(isinstance(data_time_slot_series[0], DataTimeSlot)) # This is kind of useless here
         self.assertEqual(str(data_time_slot_series.tz), 'Europe/Rome')
 
         # Force point and get on a specific timezone
-        data_time_point_series = storage.get(tz='Europe/Rome', series_type='points')
+        data_time_point_series = storage.get(as_tz='Europe/Rome', as_series_type='points')
         self.assertTrue(isinstance(data_time_point_series[0], DataTimePoint))
         self.assertEqual(str(data_time_point_series.tz), 'Europe/Rome')
 
@@ -226,7 +226,7 @@ class TestCSVFileStorage(unittest.TestCase):
 
         # Get data as slots
         storage = CSVFileStorage(TEST_DATA_PATH + '/csv/temp_short_1h.csv')
-        data_time_point_series = storage.get(series_type='slots')
+        data_time_point_series = storage.get(as_series_type='slots')
         self.assertEqual(len(data_time_point_series), 100)
         self.assertEqual(data_time_point_series[0].start.t, 1546477200)
         self.assertEqual(data_time_point_series[-1].start.t, 1546833600)
@@ -282,6 +282,6 @@ class TestCSVFileStorage(unittest.TestCase):
             #with open('/tmp/file_2.csv') as f:
             #    print(f.read())
             
-            self.assertEqual(len(storage.get(series_type='slots')),4)
-            self.assertTrue(isinstance(storage.get(series_type='slots'), DataTimeSlotSeries))
+            self.assertEqual(len(storage.get(as_series_type='slots')),4)
+            self.assertTrue(isinstance(storage.get(as_series_type='slots'), DataTimeSlotSeries))
 
