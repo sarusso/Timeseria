@@ -394,9 +394,17 @@ class CSVFileStorage(object):
             # Detect sampling interval to create right item type (points or slots)
             from .utilities import detect_sampling_interval
             
-            sample_timepoints = [TimePoint(t=item[0]) for item in items[0:10]]
-            sample_timeseries = TimePointSeries(*sample_timepoints) # Cut to first ten elements
-            detected_sampling_interval = detect_sampling_interval(sample_timeseries)
+            # Add first ten elements max and then detect sampling interval.
+            # Use a try-execpt as this can lead to errors due to duplicates,
+            sample_timepointseries = TimePointSeries()
+            for item in items:
+                try:
+                    sample_timepointseries.append(TimePoint(t=item[0]))
+                except:
+                    pass
+                if len(sample_timepointseries)>10:
+                    break
+            detected_sampling_interval = detect_sampling_interval(sample_timepointseries)
             
             # Years
             if detected_sampling_interval in [86400*365, 886400*366]:
