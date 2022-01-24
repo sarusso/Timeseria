@@ -29,8 +29,8 @@ class CSVFileStorage(object):
     
     def __init__(self, filename, timestamp_column='auto', timestamp_format='auto',
                  time_column=None, time_format=None, date_column=None, date_format=None,
-                 tz='UTC', data_columns='all', data_type='auto', series_type=None,
-                 separator=',', newline='\n', encoding='auto', skip_errors=False, order=False):
+                 tz='UTC', data_columns='all', data_type='auto', series_type=None, sort=False,
+                 separator=',', newline='\n', encoding='auto', skip_errors=False):
         """Ref to https://docs.python.org/3/library/datetime.html#strftime-and-strptime-format-codes
         for timestamp_format, date_format and time_format"""
 
@@ -90,13 +90,13 @@ class CSVFileStorage(object):
         # Other
         self.skip_errors = skip_errors
         self.data_type = data_type
-        self.order = order
+        self.sort = sort
         
         # Set series type (that will be forced)
         self.series_type = series_type
 
 
-    def get(self, limit=None, tz=None, series_type=None, sort=False):
+    def get(self, limit=None, tz=None, series_type=None):
 
         # Line counter
         line_number=0
@@ -373,7 +373,12 @@ class CSVFileStorage(object):
         # Were we able to read something?
         if not items:
             raise NoDataException('Cannot read any data!')
-        
+
+        # Sort if required
+        if self.sort:
+            from operator import itemgetter
+            items = sorted(items, key=itemgetter(0))
+
         # Support var
         autodetect_series_type = False
 
@@ -469,13 +474,11 @@ class CSVFileStorage(object):
         else:
             tz = timezonize(self.tz)
 
-        
         # Create point or slot series
         if series_type == DataTimePoint:
+            
             timeseries = DataTimePointSeries()
-            if sort:
-                from operator import itemgetter
-                items = sorted(items, key=itemgetter(0))
+            
             for item in items:
                 try:
                     data_loss = None

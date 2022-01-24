@@ -104,6 +104,15 @@ class TestCSVFileStorage(unittest.TestCase):
         self.assertEqual(data_time_point_series[1], DataTimePoint(t= 946706400, data={'flow': 1100.0, 'temp': 10.7}))
         self.assertEqual(data_time_point_series[2], DataTimePoint(t= 946713600, data={'flow': 1300.0, 'temp': 10.0}))
 
+    def test_CSVFileStorage_unordered(self):
+
+        storage = CSVFileStorage(TEST_DATA_PATH + '/csv/multi_values_with_labels_unordered.csv', sort=True)
+        data_time_point_series = storage.get()       
+        self.assertEqual(len(data_time_point_series), 5)
+        self.assertEqual(data_time_point_series[0].t, 946684800)
+        self.assertEqual(data_time_point_series[0].data, {'flow': 1000.0, 'temp': 10.0})
+        self.assertEqual(data_time_point_series[-1].t, 946684800 + 60*60*4)
+        self.assertEqual(data_time_point_series[-1].data, {'flow': 1040.0, 'temp': 14.0})
 
     def test_CSVFileStorage_datetimeformats(self):
 
