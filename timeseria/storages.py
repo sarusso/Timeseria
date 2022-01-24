@@ -29,7 +29,7 @@ class CSVFileStorage(object):
     
     def __init__(self, filename, timestamp_column='auto', timestamp_format='auto',
                  time_column=None, time_format=None, date_column=None, date_format=None,
-                 tz='UTC', data_columns='all', data_type='auto', series_type=None, sort=False,
+                 tz='UTC', data_columns='all', data_type='auto', series_type='auto', sort=False,
                  separator=',', newline='\n', encoding='auto', skip_errors=False):
         """Ref to https://docs.python.org/3/library/datetime.html#strftime-and-strptime-format-codes
         for timestamp_format, date_format and time_format"""
@@ -96,7 +96,7 @@ class CSVFileStorage(object):
         self.series_type = series_type
 
 
-    def get(self, limit=None, tz=None, series_type=None):
+    def get(self, limit=None, tz=None, series_type='auto'):
 
         # Line counter
         line_number=0
@@ -382,10 +382,17 @@ class CSVFileStorage(object):
         # Support var
         autodetect_series_type = False
 
-        # Set item type if not forced
-        if not series_type and self.series_type:
+        # Set series type
+        if series_type == 'auto' and self.series_type != 'auto':
+            # Use the object one
             series_type = self.series_type
-
+        elif series_type != 'auto':
+            # Use this one
+            series_type = series_type
+        else:
+            # Go in auto mode
+            series_type = None
+            
         # Otherwise, auto-detect
         if not series_type or series_type=='slots':
     
