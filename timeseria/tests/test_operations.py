@@ -202,16 +202,16 @@ class TestMathOperations(unittest.TestCase):
         data_time_point_series.append(DataTimePoint(t=180, data={'value':16, 'another_value': 10}))
         
         self.assertEqual(data_time_point_series.min(), {'value': 6, 'another_value': 10})
-        self.assertEqual(data_time_point_series.min(key='value'), 6)
-        self.assertEqual(data_time_point_series.min(key='another_value'), 10)
+        self.assertEqual(data_time_point_series.min(data_key='value'), 6)
+        self.assertEqual(data_time_point_series.min(data_key='another_value'), 10)
 
         self.assertEqual(data_time_point_series.max(), {'value': 16, 'another_value': 75})
-        self.assertEqual(data_time_point_series.max(key='value'), 16)        
-        self.assertEqual(data_time_point_series.max(key='another_value'), 75)
+        self.assertEqual(data_time_point_series.max(data_key='value'), 16)        
+        self.assertEqual(data_time_point_series.max(data_key='another_value'), 75)
 
         self.assertEqual(data_time_point_series.avg(), {'value': 11, 'another_value': 45.5})
-        self.assertEqual(data_time_point_series.avg(key='value'), 11)          
-        self.assertEqual(data_time_point_series.avg(key='another_value'), 45.5)
+        self.assertEqual(data_time_point_series.avg(data_key='value'), 11)          
+        self.assertEqual(data_time_point_series.avg(data_key='another_value'), 45.5)
 
 
 class TestSeriesOperations(unittest.TestCase):

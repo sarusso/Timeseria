@@ -19,7 +19,13 @@ logger = logging.getLogger(__name__)
 #======================
 
 class Series(list):
-    '''A list of items coming one after another where every item is guaranteed to be of the same type and in an order or succession.'''
+    """A list of items coming one after another, where every item
+       is guaranteed to be of the same type and in an order or
+       succession.
+       
+       Args:
+           *args (list): the series items.    
+    """
 
     # 1,2,3 are in order. 1,3,8 are in order. 1,8,3 re not in order.
     # 5,6,7 are integer succession. 5.3, 5.4, 5.5 are too in a succesisons. 5,6,8 are not in a succession. 
@@ -41,7 +47,7 @@ class Series(list):
         self._title = None
 
     def append(self, item):
-        """Append an item to the series"""
+        """Append an item to the series."""
         # logger.debug('Checking %s', item)
         
         # Set type if not already done
@@ -76,6 +82,7 @@ class Series(list):
     
     @property
     def title(self):
+        """A title for the series, to be used for plotting etc.""" 
         if self._title:
             return self._title
         else:
@@ -110,76 +117,15 @@ class Series(list):
         else:
             return super(Series, self).__getitem__(key)
 
-
-    # Operations
-    def duplicate(self):
-        return deepcopy(self)
-
-    def filter(self, *args, **kwargs):
-        from .operations import filter as filter_operation
-        return filter_operation(self, *args, **kwargs) 
-
-    def merge(self, *args, **kwargs):
-        from .operations import merge as merge_operation
-        return merge_operation(self, *args, **kwargs)
-
-    def select(self, *args, **kwargs):
-        from .operations import select as select_operation
-        return select_operation(self, *args, **kwargs)
-    
-    def min(self, *args, **kwargs):
-        from .operations import min as min_operation
-        return min_operation(self, *args, **kwargs)
-
-    def max(self, *args, **kwargs):
-        from .operations import max as max_operation
-        return max_operation(self, *args, **kwargs)    
-
-    def avg(self, *args, **kwargs):
-        from .operations import avg as avg_operation
-        return avg_operation(self, *args, **kwargs)   
-
-    def sum(self, *args, **kwargs):
-        from .operations import sum as sum_operation
-        return sum_operation(self, *args, **kwargs)  
-
-    def derivative(self, *args, **kwargs):
-        from .operations import derivative as derivative_operation
-        return derivative_operation(self, *args, **kwargs)   
-
-    def integral(self, *args, **kwargs):
-        from .operations import integral as integral_operation
-        return integral_operation(self, *args, **kwargs)   
-
-    def diff(self, *args, **kwargs):
-        from .operations import diff as diff_operation
-        return diff_operation(self, *args, **kwargs)   
-
-    def csum(self, *args, **kwargs):
-        from .operations import csum as csum_operation
-        return csum_operation(self, *args, **kwargs)
-     
-    def mavg(self, *args, **kwargs):
-        from .operations import mavg as mavg_operation
-        return mavg_operation(self, *args, **kwargs)  
-
-    # Transformation-based operations
-    def slot(self, *args, **kwargs):
-        from .transformations import Slotter
-        slotter = Slotter(*args, **kwargs)
-        return slotter.process(self)  
-
-    # Transformation-based operations
-    def resample(self, *args, **kwargs):
-        from .transformations import Resampler
-        resampler = Resampler(*args, **kwargs)
-        return resampler.process(self)  
-
     # Indexes
     @property
     def indexes(self):
+        """Return the indexes of the series, to be intended as custom
+        defined indicators (i.e. data_loss, anomaly_index, etc.)."""
+        
         # TODO: this approach does not allow for custom-defined indexes.
         #       Maybe move indexes from item attributes to a dictionary?
+        # Moreover, should not be here but at least in the DataSeries...
         if not self:
             return []
         else:
@@ -239,7 +185,6 @@ class Series(list):
             raise ValueError('Series mark must be a list or tuple of two elements')    
         self._mark = value
 
-
     # Inherited methods to be edited
     def pop(self, i=None):
         """
@@ -250,12 +195,10 @@ class Series(list):
             raise NotImplementedError('Cannot pop an item in the middle')
         super(Series, self).pop(i)
 
-    
     def clear(self):
         """Remove all items from the series. Equivalent to del a[:]."""
         super(Series, self).clear()
 
-        
     def index(self, x, start=None, end=None):
         """
         Return zero-based index in the series of the item whose value is equal to x.
@@ -267,13 +210,31 @@ class Series(list):
         """
         super(Series, self).index(x, start, end)
 
-
     def copy(self):
-        """Return a shallow copy of the list."""
+        """Return a shallow copy of the series."""
+
+    # Operations
+    def duplicate(self):
+        """ Return a deep copy of the series."""
+        return deepcopy(self)
+
+    def merge(self, *args, **kwargs):
+        """Merge the series with one or more other series."""
+        from .operations import merge as merge_operation
+        return merge_operation(self, *args, **kwargs)
+
+    def filter(self, *args, **kwargs):
+        # TODO: refactor this to allow generic item properties? Maybe merge witht he following select?
+        """Filter a series given item properties. Example filtering arguments: ``data_key``, ``from_t``, ``to_t``, ``from_dt``, ``to_dt``."""
+        from .operations import filter as filter_operation
+        return filter_operation(self, *args, **kwargs) 
+
+    def select(self, *args, **kwargs):
+        """Select items of the series given SQL-like queries."""
+        from .operations import select as select_operation
+        return select_operation(self, *args, **kwargs)
         
-
     # Inherited methods to be disabled
-
     def remove(self):
         """Disabled (removing is not compatible with a succession)."""
 
@@ -298,7 +259,11 @@ class Series(list):
 #======================
 
 class Point():
-    """A generic point."""
+    """A point.
+    
+       Args:
+           *args (list): the coordinates.
+    """
 
     def __init__(self, *args):
         if not args:
@@ -341,7 +306,12 @@ class Point():
 
 
 class TimePoint(Point):
-    """A point in the time dimension."""
+    """A point in the time dimension.
+    
+       Args:
+           t (float): epoch timestamp, decimals for sub-second precision.
+           dt (datetime): a datetime object timestamp.
+    """
     
     def __init__(self, *args, **kwargs):
 
@@ -394,6 +364,7 @@ class TimePoint(Point):
 
     @property
     def t(self):
+        """The timestamp as epoch, with decimals for sub-second precision."""
         return self.coordinates[0]
     
     def __gt__(self, other):
@@ -404,16 +375,19 @@ class TimePoint(Point):
 
     @property
     def tz(self):
+        """The time zone."""
         try:
             return self._tz
         except AttributeError:
             return UTC
     
     def change_timezone(self, new_timezone):
+        """Change the time zone (in-place)."""
         self._tz = timezonize(new_timezone)
 
     @property
     def dt(self):
+        """The timestamp as datetime object."""
         return dt_from_s(self.t, tz=self.tz)
 
     def __repr__(self):
@@ -421,9 +395,14 @@ class TimePoint(Point):
         # return '{} @ t={} ({})'.format(self.__class__.__name__, self.t, self.dt)
     
 
-
 class DataPoint(Point):
-    """A point that carries some data."""
+    """A point that carries some data.
+    
+       Args:
+           *args (list): the coordinates.
+           data: the data.
+    """
+    
     
     def __init__(self, *args, **kwargs):
         try:
@@ -453,10 +432,12 @@ class DataPoint(Point):
 
     @property
     def data(self):
+        """The data."""
         return self._data
 
     @property
     def data_loss(self):
+        """The data loss index, if any. Usually computed out from resampling transformations."""
         try:
             return self._data_loss
         except AttributeError:
@@ -464,6 +445,7 @@ class DataPoint(Point):
 
     @property
     def data_reconstructed(self):
+        """The data reconstruction index, if any. Usually computed out from reconstruction models."""
         try:
             return self._data_reconstructed
         except AttributeError:
@@ -474,9 +456,14 @@ class DataPoint(Point):
         self._data_reconstructed = value
 
 
-
 class DataTimePoint(DataPoint, TimePoint):
-    """A point that carries some data in the time dimension."""
+    """A point that carries some data in the time dimension.
+    
+       Args:
+           t (float): epoch timestamp, decimals for sub-second precision.
+           dt (datetime): a datetime object timestamp.
+           data: the data.
+    """
     pass
 
     # NOTE: the __repr__ used is from the DataPoint above, which in turn uses the TimePoint one.
@@ -487,12 +474,20 @@ class DataTimePoint(DataPoint, TimePoint):
 #======================
 
 class PointSeries(Series):
-    """A series of generic points, where each item is guaranteed to be ordered."""
+    """A series of points, where each item is guaranteed to be ordered.
+
+       Args:
+           *args (list): the series points.    
+    """
     __TYPE__ = Point
 
 
 class TimePointSeries(PointSeries):
-    """A series of points in time, where each item is guaranteed to be ordered."""
+    """A series of points in time, where each item is guaranteed to be ordered.
+
+       Args:
+           *args (list): the series of time points.    
+    """
 
     __TYPE__ = TimePoint
 
@@ -522,7 +517,6 @@ class TimePointSeries(PointSeries):
                     raise ValueError('Time t="{}" is a duplicate'.format(item.t))
                 
                 if self._resolution is None:
-                    
                     self._resolution = TimeUnit(to_time_unit_string(item.t - self.prev_t, friendlier=True))
                     
                 elif self._resolution != 'variable':
@@ -538,6 +532,7 @@ class TimePointSeries(PointSeries):
 
     @property
     def tz(self):
+        """The time zone of the time series."""
         # Note: we compute the tz on the fly beacuse for point time series we assume to use the tz
         # attribute way lass than the slot time series, where the tz is instead computed at append-time.
         try:
@@ -559,18 +554,23 @@ class TimePointSeries(PointSeries):
         self._tz = timezonize(value) 
 
     def change_timezone(self, new_timezone):
+        """Change the time zone (in-place)."""
         for time_point in self:
             time_point.change_timezone(new_timezone)
         self.tz = time_point.tz
 
     @property
     def resolution(self):
+        """The (temporal) resolution of the time series."""
         return self._resolution
 
     
-
 class DataPointSeries(PointSeries):
-    """A series of data points, where each item is guaranteed to be ordered and to carry the same data type."""
+    """A series of data points, where each item is guaranteed to be ordered and to carry the same data type.
+
+       Args:
+           *args (list): the series of data points.    
+    """
 
     __TYPE__ = DataPoint
 
@@ -597,6 +597,11 @@ class DataPointSeries(PointSeries):
         super(DataPointSeries, self).append(item)
 
     def data_keys(self):
+        """Return the keys of the data carried by the DataPoints.
+        If data is a dictionary, then these are the dictionary keys,
+        if data is a list, then these are the list indexes. Other
+        data formats are not supported."""
+          
         if len(self) == 0:
             return None
         else:
@@ -607,15 +612,70 @@ class DataPointSeries(PointSeries):
                 return list(range(len(self[0].data)))
 
     def remove_data_loss(self):
+        """Return a new series without the ``data_loss`` index."""
         new_series = self.duplicate()
         for item in new_series:
             item._data_loss = None
         return new_series
+    
+    # Operations
+    def min(self, *args, **kwargs):
+        """Get the minimum data value(s) of a series. Supports an optional ``data_key`` argument."""
+        from .operations import min as min_operation
+        return min_operation(self, *args, **kwargs)
 
+    def max(self, *args, **kwargs):
+        """Get the maximum data value(s) of a series. Supports an optional ``data_key`` argument."""
+        from .operations import max as max_operation
+        return max_operation(self, *args, **kwargs)    
+
+    def avg(self, *args, **kwargs):
+        """Get the average data value(s) of a series. Supports an optional ``data_key`` argument."""
+        from .operations import avg as avg_operation
+        return avg_operation(self, *args, **kwargs)   
+
+    def sum(self, *args, **kwargs):
+        """Sum every data value(s) of a series. Supports an optional ``data_key`` argument."""
+        from .operations import sum as sum_operation
+        return sum_operation(self, *args, **kwargs)  
+
+    def derivative(self, *args, **kwargs):
+        """Compute the derivative of the series. Extra parameters: ``inplace`` (defaulted to false),
+        ``normalize`` (defaulted to true), ``diffs`` (defaulted to false) to compute differences
+        instead of the derivative."""
+        from .operations import derivative as derivative_operation
+        return derivative_operation(self, *args, **kwargs)   
+
+    def integral(self, *args, **kwargs):
+        """Compute the integral of the series. Extra parameters: ``inplace`` (defaulted to false),
+        ``normalize`` (defaulted to true), ``c`` (defaulted to zero) for the integration constant."""
+        from .operations import integral as integral_operation
+        return integral_operation(self, *args, **kwargs)   
+
+    def diff(self, *args, **kwargs):
+        """Compute the incremental differences. Extra parameters: ``inplace`` (defaulted to false)."""
+        from .operations import diff as diff_operation
+        return diff_operation(self, *args, **kwargs)   
+
+    def csum(self, *args, **kwargs):
+        """Compute the incremental sum. Extra parameters: ``inplace`` (defaulted to false),
+        ``offset`` (defaulted to zero) to set the starting value where to apply the sums on."""
+        from .operations import csum as csum_operation
+        return csum_operation(self, *args, **kwargs)
+     
+    def mavg(self, *args, **kwargs):
+        """Compute the moving average. Extra parameters: ``inplace`` (defaulted to false)
+        and ``window``, a required parameter, for the length of the moving average window."""
+        from .operations import mavg as mavg_operation
+        return mavg_operation(self, *args, **kwargs)
 
 
 class DataTimePointSeries(DataPointSeries, TimePointSeries):
-    """A series of data points in time, where each item is guaranteed to be ordered and to carry the same data type."""
+    """A series of data points in time, where each item is guaranteed to be ordered and to carry the same data type.
+    
+        Args:
+           *args (list): the series of data time points.    
+    """
 
     __TYPE__ = DataTimePoint
 
@@ -660,8 +720,7 @@ class DataTimePointSeries(DataPointSeries, TimePointSeries):
 
     @property
     def df(self):
-        """The time series as a Pandas DataFrame object"""
-
+        """The time series as a Pandas DataFrame object."""
         data_keys = self.data_keys()
         
         if self[0].data_loss is not None:
@@ -685,6 +744,10 @@ class DataTimePointSeries(DataPointSeries, TimePointSeries):
         return df
         
     def plot(self, engine='dg', *args, **kwargs):
+        """Plot the time series. The default plotting engine is Dygraphs (engine=\'dg\'),
+           limited support for Matplotplib (engine=\'mp\') is also available.
+           For plotting options for Dygraphs, see :func:`~.plots.dygraphs_plot`, while for
+           plotting options for Matplotlib, see :func:`~.plots.matplotlib_plot`.""" 
         if engine=='mp':
             from .plots import matplotlib_plot
             matplotlib_plot(self, *args, **kwargs)
@@ -723,14 +786,32 @@ class DataTimePointSeries(DataPointSeries, TimePointSeries):
         else:
             return 'Time series of #0 points'
 
+    # Transformations
+    def slot(self, *args, **kwargs):
+        """Slot the series in slots of a length set by the ``unit`` parameter."""
+        from .transformations import Slotter
+        slotter = Slotter(*args, **kwargs)
+        return slotter.process(self)  
+
+    def resample(self, *args, **kwargs):
+        """Resample the series using a sampling interval of a length set by the ``unit`` parameter."""
+        from .transformations import Resampler
+        resampler = Resampler(*args, **kwargs)
+        return resampler.process(self)  
+
 
 #======================
 #  Slots
 #======================
 
 class Slot():
-    """A generic slot."""
-
+    """A slot. Can be initialized with start and end, or start and unit.
+    
+       Args:
+           start(Point): the slot starting point.
+           end(Point): the slot ending point.
+           unit(Unit): the slot unit.
+    """
     __POINT_TYPE__ = Point
     
     def __init__(self, start, end=None, unit=None):
@@ -793,6 +874,7 @@ class Slot():
             
     @property
     def length(self):
+        """The slot length."""
         try:
             self._length
         except AttributeError:
@@ -801,6 +883,7 @@ class Slot():
 
     @property
     def unit(self):
+        """The slot unit."""
         try:
             return self._unit
         except AttributeError:
@@ -815,11 +898,17 @@ class Slot():
 
 
 class TimeSlot(Slot):
-    """A slot in the time dimension."""
+    """A slot in the time dimension. Can be initialized with start and end,
+       or start and unit. Can be also initialized using t, dt and tz, for the
+       starting point but mainly for internal use and should not be relied upon.
+    
+       Args:
+           start(TimePoint): the slot starting time point.
+           end(TimePoint): the slot ending time point.
+           unit(TimeUnit): the slot time unit."""
 
     __POINT_TYPE__ = TimePoint
 
-   
     def __init__(self, start=None, end=None, unit=None, t=None, dt=None, tz=None):
         
         # Handle t and dt shortcuts
@@ -855,7 +944,6 @@ class TimeSlot(Slot):
         if end is None:
             self.end.change_timezone(self.start.tz)
 
-
     # Overwrite parent succedes, this has better performance as it checks for only one dimension
     def __succedes__(self, other):
         if other.end.t != self.start.t:
@@ -867,12 +955,14 @@ class TimeSlot(Slot):
             return True
 
     def change_timezone(self, new_timezone):
+        """Change the time zone (in-place)."""
         self.start.change_timezone(new_timezone)
         self.end.change_timezone(new_timezone)
         self.tz = self.start.tz
 
     @property
     def unit(self):
+        """The slot time unit"""
         try:
             return self._unit
         except AttributeError:
@@ -882,15 +972,25 @@ class TimeSlot(Slot):
                    
     @property
     def t(self):
+        """The slot epoch timestamp, intended as the starting point one."""
         return self.start.t
     
     @property
     def dt(self):
+        """The slot datetime timestamp, intended as the starting point one."""
         return self.start.dt
 
 
 class DataSlot(Slot):
-    """A slot that carries some data."""
+    """A slot that carries some data. Can be initialized with start and end
+       or start and unit, plus the data argument.
+    
+       Args:
+           start(Point): the slot starting point.
+           end(Point): the slot ending point.
+           unit(Unit): the slot unit.
+           data: the slot data.
+    """
 
     def __init__(self, **kwargs):
         try:
@@ -917,10 +1017,12 @@ class DataSlot(Slot):
 
     @property
     def data(self):
+        """The slot data."""
         return self._data
 
     @property
     def data_loss(self):
+        """The data loss index, if any. Usually computed out from slotting transformations."""
         try:
             return self._data_loss
         except AttributeError:
@@ -928,6 +1030,8 @@ class DataSlot(Slot):
     
     @property
     def data_reconstructed(self):
+        """The data reconstruction index, if any. Usually computed out from reconstruction models."""
+
         try:
             return self._data_reconstructed
         except AttributeError:
@@ -939,7 +1043,18 @@ class DataSlot(Slot):
 
 
 class DataTimeSlot(DataSlot, TimeSlot):
-    """A slot that carries some data in the time dimension."""
+    """A slot that carries some data in the time dimension. Can be initialized
+       with start and end, or start and unit, plus the data argument. Can be also
+       initialized using t, dt and tz, for the starting point but mainly for internal
+       use and should not be relied upon.
+    
+       Args:
+           start(TimePoint): the slot starting time point.
+           end(TimePoint): the slot ending time point.
+           unit(TimeUnit): the slot time unit.
+           data: the data.
+    """
+
 
     def __repr__(self):
         #if self.data_loss is not None:
@@ -959,7 +1074,11 @@ class DataTimeSlot(DataSlot, TimeSlot):
 #======================
 
 class SlotSeries(Series):
-    """A series of generic slots, where each item is guaranteed to be in succession."""
+    """A series of generic slots, where each item is guaranteed to be in succession.
+    
+       Args:
+           *args (list): the series of slots.    
+    """
     
     __TYPE__ = Slot
 
@@ -985,10 +1104,13 @@ class SlotSeries(Series):
         super(SlotSeries, self).append(item)
 
 
-
 class TimeSlotSeries(SlotSeries):
-    """A series of slots in time, where each item is guaranteed to be in succession."""
+    """A series of slots in time, where each item is guaranteed to be in succession.
     
+       Args:
+           *args (list): the series of time slots.    
+    """
+
     __TYPE__ = TimeSlot
 
     def append(self, item):
@@ -1005,25 +1127,31 @@ class TimeSlotSeries(SlotSeries):
         super(TimeSlotSeries, self).append(item)
         
     def change_timezone(self, new_timezone):
+        """Change the time zone (in-place)."""
         for time_slot in self:
             time_slot.change_timezone(new_timezone)
         self._tz = time_slot.tz
 
     @property
     def resolution(self):
+        """The (temporal) resolution of the time series"""
         return self._resolution
 
     @property
     def tz(self):
+        """The time zone of the time series."""
         try:
             return self._tz
         except AttributeError:
             return None
 
 
-
 class DataSlotSeries(SlotSeries):
-    """A series of data slots, where each item is guaranteed to be in succession and to carry the same data type."""
+    """A series of data slots, where each item is guaranteed to be in succession and to carry the same data type.
+    
+       Args:
+           *args (list): the series of data slots.    
+    """
 
     __TYPE__ = DataSlot
 
@@ -1048,6 +1176,10 @@ class DataSlotSeries(SlotSeries):
         super(DataSlotSeries, self).append(item)
     
     def data_keys(self):
+        """Return the keys of the data carried by the DataSlots.
+        If data is a dictionary, then these are the dictionary keys,
+        if data is a list, then these are the list indexes. Other
+        data formats are not supported."""
         if len(self) == 0:
             return None
         else:
@@ -1058,14 +1190,70 @@ class DataSlotSeries(SlotSeries):
                 return list(range(len(self[0].data)))
 
     def remove_data_loss(self):
+        """Return a new series without the ``data_loss`` index."""
         new_series = self.duplicate()
         for item in new_series:
             item._data_loss = None
         return new_series
 
+    # Operations
+    def min(self, *args, **kwargs):
+        """Get the minimum data value(s) of a series. Supports an optional ``data_key`` argument."""
+        from .operations import min as min_operation
+        return min_operation(self, *args, **kwargs)
+
+    def max(self, *args, **kwargs):
+        """Get the maximum data value(s) of a series. Supports an optional ``data_key`` argument."""
+        from .operations import max as max_operation
+        return max_operation(self, *args, **kwargs)    
+
+    def avg(self, *args, **kwargs):
+        """Get the average data value(s) of a series. Supports an optional ``data_key`` argument."""
+        from .operations import avg as avg_operation
+        return avg_operation(self, *args, **kwargs)   
+
+    def sum(self, *args, **kwargs):
+        """Sum every data value(s) of a series. Supports an optional ``data_key`` argument."""
+        from .operations import sum as sum_operation
+        return sum_operation(self, *args, **kwargs)  
+
+    def derivative(self, *args, **kwargs):
+        """Compute the derivative of the series. Extra parameters: ``inplace`` (defaulted to false),
+        ``normalize`` (defaulted to true), ``diffs`` (defaulted to false) to compute differences
+        instead of the derivative."""
+        from .operations import derivative as derivative_operation
+        return derivative_operation(self, *args, **kwargs)   
+
+    def integral(self, *args, **kwargs):
+        """Compute the integral of the series. Extra parameters: ``inplace`` (defaulted to false),
+        ``normalize`` (defaulted to true), ``c`` (defaulted to zero) for the integration constant."""
+        from .operations import integral as integral_operation
+        return integral_operation(self, *args, **kwargs)   
+
+    def diff(self, *args, **kwargs):
+        """Compute the incremental differences. Extra parameters: ``inplace`` (defaulted to false)."""
+        from .operations import diff as diff_operation
+        return diff_operation(self, *args, **kwargs)   
+
+    def csum(self, *args, **kwargs):
+        """Compute the incremental sum. Extra parameters: ``inplace`` (defaulted to false),
+        ``offset`` (defaulted to zero) to set the starting value where to apply the sums on."""
+        from .operations import csum as csum_operation
+        return csum_operation(self, *args, **kwargs)
+     
+    def mavg(self, *args, **kwargs):
+        """Compute the moving average. Extra parameters: ``inplace`` (defaulted to false)
+        and ``window``, a required parameter, for the length of the moving average window."""
+        from .operations import mavg as mavg_operation
+        return mavg_operation(self, *args, **kwargs)
+
 
 class DataTimeSlotSeries(DataSlotSeries, TimeSlotSeries):
-    """A series of data slots in time, where each item is guaranteed to be in succession and to carry the same data type."""
+    """A series of data slots in time, where each item is guaranteed to be in succession and to carry the same data type.
+       
+       Args:
+           *args (list): the series of data time slots.    
+    """
 
     __TYPE__ = DataTimeSlot
 
@@ -1134,7 +1322,7 @@ class DataTimeSlotSeries(DataSlotSeries, TimeSlotSeries):
 
     @property
     def df(self):
-        '''The time series as a Pandas DataFrame object'''
+        """The time series as a Pandas DataFrame object."""
         data_keys = self.data_keys()
         
         if self[0].data_loss is not None:
@@ -1158,6 +1346,10 @@ class DataTimeSlotSeries(DataSlotSeries, TimeSlotSeries):
         return df
 
     def plot(self, engine='dg', *args, **kwargs):
+        """Plot the time series. The default plotting engine is Dygraphs (engine=\'dg\'),
+           limited support for Matplotplib (engine=\'mp\') is also available.
+           For plotting options for Dygraphs, see :func:`~.plots.dygraphs_plot`, while for
+           plotting options for Matplotlib, see :func:`~.plots.matplotlib_plot`.""" 
         if engine=='mp':
             from .plots import matplotlib_plot
             matplotlib_plot(self, *args, **kwargs)
@@ -1174,6 +1366,10 @@ class DataTimeSlotSeries(DataSlotSeries, TimeSlotSeries):
             return 'Time series of #{} slots of {}, from slot starting @ {} ({}) to slot starting @ {} ({})'.format(len(self), self._resolution, self[0].start.t, self[0].start.dt, self[-1].start.t, self[-1].start.dt)            
         else:
             return 'Time series of #0 slots'
-    
-    
-    
+
+    # Transformations
+    def slot(self, *args, **kwargs):
+        """Slot the series in slots of a length set by the ``unit`` parameter."""
+        from .transformations import Slotter
+        slotter = Slotter(*args, **kwargs)
+        return slotter.process(self)  

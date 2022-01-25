@@ -56,22 +56,22 @@ class Max(ScalarOperation):
     def __init__(self):
         self.built_in_max = max
     
-    def __call__(self, arg, key=None, **kwargs):
+    def __call__(self, arg, data_key=None, **kwargs):
         if not isinstance(arg, Series):
             return self.built_in_max(arg)
         else:
             series = arg
-            mins = {key: None for key in series.data_keys()}
+            mins = {data_key: None for data_key in series.data_keys()}
             for item in series:
-                for data_key in mins:
-                    if mins[data_key] is None:
-                        mins[data_key] = item.data[data_key]
+                for _data_key in mins:
+                    if mins[_data_key] is None:
+                        mins[_data_key] = item.data[_data_key]
                     else:
-                        if item.data[data_key] > mins[data_key]:
-                            mins[data_key] = item.data[data_key]
+                        if item.data[_data_key] > mins[_data_key]:
+                            mins[_data_key] = item.data[_data_key]
             
-            if key is not None:
-                return mins[key]
+            if data_key is not None:
+                return mins[data_key]
             if len(mins) == 1:
                 return mins[series.data_keys()[0]]
             else:
@@ -85,22 +85,22 @@ class Min(ScalarOperation):
     def __init__(self):
         self.built_in_min = min
     
-    def __call__(self, arg, key=None, **kwargs):
+    def __call__(self, arg, data_key=None, **kwargs):
         if not isinstance(arg, Series):
             return self.built_in_min(arg)
         else:
             series = arg
-            mins = {key: None for key in series.data_keys()}
+            mins = {data_key: None for data_key in series.data_keys()}
             for item in series:
-                for data_key in mins:
-                    if mins[data_key] is None:
-                        mins[data_key] = item.data[data_key]
+                for _data_key in mins:
+                    if mins[_data_key] is None:
+                        mins[_data_key] = item.data[_data_key]
                     else:
-                        if item.data[data_key] < mins[data_key]:
-                            mins[data_key] = item.data[data_key]
+                        if item.data[_data_key] < mins[_data_key]:
+                            mins[_data_key] = item.data[_data_key]
             
-            if key is not None:
-                return mins[key]
+            if data_key is not None:
+                return mins[data_key]
             if len(mins) == 1:
                 return mins[series.data_keys()[0]]
             else:
@@ -110,23 +110,23 @@ class Min(ScalarOperation):
 class Avg(ScalarOperation):
     """Average operation (callable object)."""
     
-    def __call__(self, arg, key=None, **kwargs):
+    def __call__(self, arg, data_key=None, **kwargs):
         if not isinstance(arg, Series):
             raise NotImplementedError('Avg implemented only on series objects')
         else:
             series = arg
-            sums = {key: None for key in series.data_keys()}
+            sums = {data_key: None for data_key in series.data_keys()}
             for item in series:
-                for data_key in sums:
-                    if sums[data_key] is None:
-                        sums[data_key] = item.data[data_key]
+                for _data_key in sums:
+                    if sums[_data_key] is None:
+                        sums[_data_key] = item.data[_data_key]
                     else:
-                        sums[data_key] += item.data[data_key]
+                        sums[_data_key] += item.data[_data_key]
             avgs={}
-            for data_key in sums:
-                avgs[data_key] = sums[data_key] / len(series)
-            if key is not None:
-                return avgs[key]
+            for _data_key in sums:
+                avgs[_data_key] = sums[_data_key] / len(series)
+            if data_key is not None:
+                return avgs[data_key]
             if len(avgs) == 1:
                 return avgs[series.data_keys()[0]]
             else:
@@ -160,17 +160,17 @@ class Sum(ScalarOperation):
     def __init__(self):
         self.built_in_sum = sum
     
-    def __call__(self, arg, key=None, **kwargs):
+    def __call__(self, arg, data_key=None, **kwargs):
         if not isinstance(arg, Series):
             return self.built_in_sum(arg)
         else:
             series = arg
-            sums = {key: 0 for key in series.data_keys()}
+            sums = {data_key: 0 for data_key in series.data_keys()}
             for item in series:
-                for data_key in sums:
-                    sums[data_key] += item.data[data_key]
-            if key is not None:
-                return sums[key]
+                for _data_key in sums:
+                    sums[_data_key] += item.data[_data_key]
+            if data_key is not None:
+                return sums[data_key]
             if len(sums) == 1:
                 return sums[series.data_keys()[0]]
             else:
