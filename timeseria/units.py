@@ -18,7 +18,11 @@ HARD_DEBUG = False
 
 
 class Unit(object):
-    """A generic unit."""
+    """A generic unit.
+    
+       Args:
+           value: the unit value.    
+    """
     
     def __init__(self, value):
         # TODO: check numerical or list? An perhaps support string representations?
@@ -113,26 +117,41 @@ class Unit(object):
 
 class TimeUnit(Unit):
     """A unit which can represent both physical (fixed) and calendar (variable) time units.
-    Handles precision up to the microsecond and can be summed and subtracted with numerical
+    Can handle precision up to the microsecond and can be summed and subtracted with numerical
     values, Python datetime objects, other TimeUnits, or TimePoints.
+
+    Can be initialized both using a numerical value, a string representation, or by explicitly setting
+    years, months, weeks, days, hours, minutes, seconds and microseconds. In the string representation,
+    the mapping is as follows:
     
-    Can be initialized both using a numerical or string value, and by explicitly setting years,
-    months, weeks, days, hours, minutes, seconds and microseconds. In the string representation,
-    the mapping is as follows::
-    
-        {
-          'Y': 'years',
-          'M': 'months',
-          'W': 'weeks',
-          'D': 'days',
-          'h': 'hours',
-          'm': 'minutes',
-          's': 'seconds',
-          'u': 'microseconds'
-        }
+        * ``'Y': 'years'``
+        * ``'M': 'months'``
+        * ``'W': 'weeks'``
+        * ``'D': 'days'``
+        * ``'h': 'hours'``
+        * ``'m': 'minutes'``
+        * ``'s': 'seconds'``
+        * ``'u': 'microseconds'``
      
-    So for example to create a time unit of one hour you can do a ``TimeUnit('1h')``, or to set
-    it explicitly ``TimeUnit(hours=1)``. Also ``TimeUnit(3600)`` would work.
+    For example, to create a time unit of one hour, the following three are equivalent, where the
+    first one uses the numerical value, the second the string representation, and the third explicitly
+    sets the time component (hours in this case): ``TimeUnit('1h')``, ``TimeUnit(hours=1)``, or ``TimeUnit(3600)``.
+    Not all time units can be initialized using the numerical value, in particular calendar time units which can
+    have variable duration: a time unit of one day, or ``TimeUnit('1d')``, can last for 23, 24 or 24 hours depending
+    on DST changes. On the contrary, a ``TimeUnit('24h')`` will always last 24 hours and can be initialized as
+    ``TimeUnit(86400)`` as well. 
+    
+    Args:
+        value: the time unit value, either as seconds (float) or string representation according to the mapping above.  
+        years: the time unit years component.
+        weeks: the time unit weeks component.
+        months: the time unit weeks component.
+        days: the time unit days component.
+        hours: the time unit hours component.
+        minutes: the time unit minutes component.
+        seconds: the time unit seconds component.
+        microseconds: the time unit microseconds component.
+        trustme: a boolean switch to skip checks.
     """
     
     _CALENDAR = 'Calendar'
@@ -152,7 +171,7 @@ class TimeUnit(Unit):
                        'u': 'microseconds'
                       }
 
-    def __init__(self, value=None, years=0, weeks=0, months=0, days=0, hours=0, minutes=0, seconds=0, microseconds=0, start=None, end=None, trustme=False):
+    def __init__(self, value=None, years=0, weeks=0, months=0, days=0, hours=0, minutes=0, seconds=0, microseconds=0, trustme=False):
 
         if not trustme:
 
@@ -166,8 +185,8 @@ class TimeUnit(Unit):
             else:
                 string = None
 
-            # Value OR explicit OR start/end
-            if value and (years or months or days or hours or minutes or seconds or microseconds) and ((start is not None) or (end is not None)):
+            # Value OR explicit time components
+            if value and (years or months or days or hours or minutes or seconds or microseconds):
                 raise ValueError('Choose between string/numerical init and explicit setting of years, months, days, hours etc.')
     
             # Check types:
@@ -180,16 +199,8 @@ class TimeUnit(Unit):
             if not isinstance(seconds, int): raise ValueError('seconds not of type int (got "{}")'.format(seconds.__class__.__name__))
             if not isinstance(microseconds, int): raise ValueError('microseconds not of type int (got "{}")'.format(microseconds.__class__.__name__))
 
-            # Check that both start and end are set if one is set
-            if start and not end:
-                raise ValueError('You provided the start but not the end')
-            if end and not start:
-                raise ValueError('You provided the end but not the start')
-                   
-        # Set the TimeUnit in seconds
-        if start and end:
-            seconds = s_from_dt((end-start).dt)
-
+        # Set the time components if given
+        # TODO: set them only if given?
         self.years        = years
         self.months       = months
         self.weeks        = weeks
@@ -379,9 +390,9 @@ class TimeUnit(Unit):
     def type(self):
         """The type of the TimeUnit.
         
-           - "Physical" if based on hours, minutes, seconds, micorseconds (fixed duration)
-           - "Calendar" if based on years, months, weeks, days (variable duration depending on the starting date,
-             math not always well defined (30 Jan + 1 month does not make sense)."""
+           - "Physical" if based on hours, minutes, seconds and  microseconds, which have fixed duration.
+           - "Calendar" if based on years, months, weeks and days, which have variable duration depending on the starting date,
+             and their math is not always well defined (e.g. adding a month to the 30th of January does not make sense)."""
 
         if self.years or self.months or self.weeks or self.days:
             return self._CALENDAR
@@ -391,14 +402,14 @@ class TimeUnit(Unit):
             raise ConsistencyException('Error, TimeSlot not initialized?!')
     
     def is_physical(self):
-        """Return True if the TimeUnit type is physical, False otherwise"""
+        """Return True if the TimeUnit type is physical, False otherwise."""
         if self.type == self._PHYSICAL:
             return True
         else:
             return False
         
     def is_calendar(self):
-        """Return True if the TimeUnit type is calendar, False otherwise"""
+        """Return True if the TimeUnit type is calendar, False otherwise."""
         if self.type == self._CALENDAR:
             return True 
         else:       
@@ -411,7 +422,7 @@ class TimeUnit(Unit):
             raise ValueError('Sorry, only simple TimeUnits are supported by the rebase operation')
 
         if not time_dt.tzinfo:
-            raise ValueError('Timezone of the datetime is required')    
+            raise ValueError('The time zone of the datetime is required')    
                 
         # Handle physical time 
         if self.type == self._PHYSICAL:
@@ -563,7 +574,7 @@ class TimeUnit(Unit):
         return time_shifted_dt   
 
     def duration_s(self, start_dt=None):
-        """Get the duration of the TimeUnit in seconds."""
+        """The duration of the TimeUnit in seconds."""
 
         if self.type == self._CALENDAR:
 
