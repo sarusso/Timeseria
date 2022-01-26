@@ -275,9 +275,32 @@ def _to_dg_data(serie,  indexes_to_plot, aggregate_by=0):
 #  Dygraphs plot
 #=================
 
-def dygraphs_plot(timeseries, indexes=None, aggregate=None, aggregate_by=None, log_js=False, 
-                  save_to=None, interactive=True, image_resolution='1280x400', return_dygraph_html=False):
-    """Plot a timeseries in Jupyter using Dygraphs. Based on the work here: https://www.stefaanlippens.net/jupyter-custom-d3-visualization.html"""
+def dygraphs_plot(timeseries, indexes=None, aggregate=None, aggregate_by=None, color=None, height=None, 
+                  interactive=True, save_to=None, image_resolution='1280x400', return_dygraph_html=False):
+    """Plot a timeseries using Dygraphs.
+    
+       Args:
+           timeseries(DataTimePointSeries/DataTimeSlotSeries): the time series to plot.
+           indexes(list): a list of indexes as the ``data_loss``, ``data_reconstructed`` etc.
+                          To disable plotting them, use an empty list.
+           aggregate(bool): if to aggregate the time series, in order to speed up plotting.
+                            By default, above 10000 data points the time series starts to
+                            get aggregated by a factor of ten for each order of magnitude. 
+           aggregate_by(int): a custom aggregation factor.
+           color(str): the color of the time series in the plot. Only supported for univariate time series.
+           height(int): force a plot height, in the time series data units.
+           interactive(bool): if to generate an interactive plot (default) or an image rendering. For the
+                              image rendering, an headless Chromium web browser is downloaded on the
+                              fly in order to render the plot as a PNG image.
+           save_to(str): a path where to save the plot. If the plot is generated as interactive, then it
+                         is saved as a self-consistent HTML page which can be opened in a web browser. If
+                         the plot is not generated as interactive, then it is saved as PNG image.
+           image_resolution(str): the image resolution for non interactive plots.
+           return_dygraph_html(bool): if to return the HTML code for the plot. Useful for embedding it
+                                      in a website or for generating an HTML page with more than one plot.
+    """
+    # Credits: the interactive plot is based on the work here: https://www.stefaanlippens.net/jupyter-custom-d3-visualization.html.
+
     from IPython.display import display, Javascript, HTML, Image
     
     if return_dygraph_html and not interactive:
@@ -523,6 +546,8 @@ function legendFormatter(data) {
 
     # Get series data in Dygraphs format (and aggregate if too much data and find global min and max)
     global_min, global_max, dg_data = _to_dg_data(timeseries, indexes_to_plot, aggregate_by)
+    if height:
+        global_max = height
     if global_max != global_min:
         plot_min = str(global_min-((global_max-global_min)*0.1))
         plot_max = str(global_max+((global_max-global_min)*0.1))
@@ -690,9 +715,12 @@ animatedZooms: true,"""
     dygraphs_javascript += """
      },"""
 
-    # Force "original" Dygraph color if only one data series           
+    # Force "original" Dygraph color if only one data series, or use custom color:          
     if len(timeseries.data_keys()) <=1:
-        dygraphs_javascript += """colors: ['rgb(0,128,128)'],""" 
+        if color:
+            dygraphs_javascript += """colors: ['"""+color+"""'],"""         
+        else:
+            dygraphs_javascript += """colors: ['rgb(0,128,128)'],""" 
 
     # Handle series mark (only if not handled as an index)
     if timeseries.mark and not render_mark_as_index:
@@ -721,8 +749,8 @@ animatedZooms: true,"""
         dygraphs_javascript += 'customBars: true'        
     dygraphs_javascript += '})'
     
-    if log_js:
-        logger.info(dygraphs_javascript)
+    #if log_js:
+    #    logger.info(dygraphs_javascript)
 
     rendering_javascript = """
 require.undef('"""+graph_id+"""'); // Helps to reload in Jupyter
