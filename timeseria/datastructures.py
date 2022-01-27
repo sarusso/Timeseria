@@ -171,6 +171,11 @@ class Series(list):
 
     @property
     def mark(self):
+        """A mark for the series, useful for highlighting a portion of a plot.
+           Required to be formatted as a list or tuple with two elements, the
+           first from where the mark has to start and the second where it has
+           to end.
+        """
         try:
             return self._mark
         except AttributeError:
@@ -178,12 +183,30 @@ class Series(list):
 
     @mark.setter
     def mark(self, value):
-        # Check valid mark
-        if not isinstance(value, (list, tuple)):
-            raise TypeError('Series mark must be a list or tuple')
-        if not len(value) == 2:
-            raise ValueError('Series mark must be a list or tuple of two elements')    
-        self._mark = value
+        if not value:
+            del self._mark
+        else:
+            # Check valid mark
+            if not isinstance(value, (list, tuple)):
+                raise TypeError('Series mark must be a list or tuple')
+            if not len(value) == 2:
+                raise ValueError('Series mark must be a list or tuple of two elements')    
+            self._mark = value
+
+    @property
+    def mark_title(self):
+        """A tile for the mark, to be displayed in the plot legend."""
+        try:
+            return self._mark_title
+        except AttributeError:
+            return None
+
+    @mark_title.setter
+    def mark_title(self, value):
+        if not value:
+            del self._mark_title
+        else: 
+            self._mark_title = value
 
     # Inherited methods to be edited
     def pop(self, i=None):

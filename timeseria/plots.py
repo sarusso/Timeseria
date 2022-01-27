@@ -386,8 +386,12 @@ def dygraphs_plot(timeseries, indexes=None, aggregate=None, aggregate_by=None, c
     # Do we have to show a series mark?
     if timeseries.mark:
         logger.info('Found series mark and showing it')
-        serie_mark_html = '<span style="background:rgba(255, 255, 102, .6);">&nbsp;mark&nbsp;</span>'
-        serie_mark_html_off = '<span style="background:rgba(255, 255, 102, .2);">&nbsp;mark&nbsp;</span>'
+        if timeseries.mark_title:
+            mark_title = timeseries.mark_title
+        else:
+            mark_title = 'mark'
+        serie_mark_html = '<span style="background:rgba(255, 255, 102, .6);">&nbsp;{}&nbsp;</span>'.format(mark_title)
+        serie_mark_html_off = '<span style="background:rgba(255, 255, 102, .2);">&nbsp;{}&nbsp;</span>'.format(mark_title)
     else:
         serie_mark_html=''
         serie_mark_html_off = ''
@@ -736,7 +740,7 @@ animatedZooms: true,"""
         mark_end   = _utc_fake_s_from_dt(timeseries.mark[1])*1000
          
         # Add js code
-        dygraphs_javascript  += 'underlayCallback: function(canvas, area, g) {'
+        dygraphs_javascript += 'underlayCallback: function(canvas, area, g) {'
         dygraphs_javascript += 'var bottom_left = g.toDomCoords({}, -20);'.format(mark_start)
         dygraphs_javascript += 'var top_right = g.toDomCoords({}, +20);'.format(mark_end)
         dygraphs_javascript += 'var left = bottom_left[0];'
@@ -746,6 +750,9 @@ animatedZooms: true,"""
         dygraphs_javascript += '}'
 
     if aggregate_by:
+        # Add a cooma. Just if the previosu section kiked-in
+        if dygraphs_javascript[-1] != ',':
+            dygraphs_javascript += ','
         dygraphs_javascript += 'customBars: true'        
     dygraphs_javascript += '})'
     
