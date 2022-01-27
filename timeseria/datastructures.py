@@ -405,7 +405,7 @@ class TimePoint(Point):
             return UTC
     
     def change_timezone(self, new_timezone):
-        """Change the time zone (in-place)."""
+        """Change the time zone of the Point."""
         self._tz = timezonize(new_timezone)
 
     @property
@@ -577,10 +577,16 @@ class TimePointSeries(PointSeries):
         self._tz = timezonize(value) 
 
     def change_timezone(self, new_timezone):
-        """Change the time zone (in-place)."""
+        """Change the time zone od the series."""
         for time_point in self:
             time_point.change_timezone(new_timezone)
         self.tz = time_point.tz
+
+    def as_timezone(self, timezone):
+        """Get a copy of the series on a new time zone.""" 
+        new_series = self.duplicate() 
+        new_series.change_timezone(new_timezone=timezone)
+        return new_series
 
     @property
     def resolution(self):
@@ -978,7 +984,7 @@ class TimeSlot(Slot):
             return True
 
     def change_timezone(self, new_timezone):
-        """Change the time zone (in-place)."""
+        """Change the time zone of the slot."""
         self.start.change_timezone(new_timezone)
         self.end.change_timezone(new_timezone)
         self.tz = self.start.tz
@@ -1150,14 +1156,20 @@ class TimeSlotSeries(SlotSeries):
         super(TimeSlotSeries, self).append(item)
         
     def change_timezone(self, new_timezone):
-        """Change the time zone (in-place)."""
+        """Change the time zone of the series."""
         for time_slot in self:
             time_slot.change_timezone(new_timezone)
         self._tz = time_slot.tz
 
+    def as_timezone(self, timezone):
+        """Get a copy of the series on a new time zone.""" 
+        new_series = self.duplicate() 
+        new_series.change_timezone(new_timezone=timezone)
+        return new_series
+
     @property
     def resolution(self):
-        """The (temporal) resolution of the time series"""
+        """The (temporal) resolution of the time series."""
         return self._resolution
 
     @property
