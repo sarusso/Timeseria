@@ -20,6 +20,7 @@
       compute_data_loss
       detect_encoding
       detect_sampling_interval
+      format_shell_error
       get_periodicity
       get_periodicity_index
       is_almost_equal
@@ -28,10 +29,12 @@
       is_numerical
       item_is_in_range
       mean_absolute_percentage_error
+      os_shell
+      sanitize_shell_encoding
       sanitize_string
       set_from_t_and_to_t
       to_float
-      unit_to_TimeUnit
+      to_time_unit_string
    
    
 
