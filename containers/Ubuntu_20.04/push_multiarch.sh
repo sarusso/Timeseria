@@ -2,7 +2,7 @@
 set -e
 
 USER="sarusso"
-VERSION="v0.1.6"
+VERSION="v0.1.6" # Remember to re-run using "latest" as well
 
 echo "Tagging..."
 docker tag timeseria-amd64 docker.io/$USER/timeseria-amd64:$VERSION
@@ -13,7 +13,8 @@ docker push docker.io/$USER/timeseria-amd64:$VERSION
 docker push docker.io/$USER/timeseria-arm64v8:$VERSION
 
 echo "Creating manifest..."
-docker manifest rm docker.io/$USER/timeseria:$VERSION
+# https://unix.stackexchange.com/questions/393310/preventing-shell-from-exiting-when-set-e-is-turned-on
+docker manifest rm docker.io/$USER/timeseria:$VERSION || true
 docker manifest create \
 docker.io/$USER/timeseria:$VERSION \
 --amend docker.io/$USER/timeseria-amd64:$VERSION \
