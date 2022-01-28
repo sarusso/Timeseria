@@ -16,8 +16,21 @@ from pyppeteer.chromium_downloader import download_chromium,chromium_executable
 import logging
 logger = logging.getLogger(__name__)
 
-AGGREGATE_THRESHOLD = 10000
-render_mark_as_index = False
+# Setup come configuration
+AGGREGATE_THRESHOLD = int(os.environ.get('AGGREGATE_THRESHOLD', 10000))
+RENDER_MARK_AS_INDEX = False
+DEFAULT_PLOT_TYPE = os.environ.get('DEFAULT_PLOT_TYPE', None)
+if DEFAULT_PLOT_TYPE:
+    if DEFAULT_PLOT_TYPE == 'interactive':
+        logger.info('Forcing interactive plot type')
+        DEFAULT_PLOT_INTERACTIVE = True
+    elif DEFAULT_PLOT_TYPE == 'image':
+        logger.info('Forcing image plot type')
+        DEFAULT_PLOT_INTERACTIVE = False         
+    else:
+        raise ValueError('Unknown plot type "{}" for DEFAULT_PLOT_TYPE'.forat(DEFAULT_PLOT_TYPE))
+else:
+    DEFAULT_PLOT_INTERACTIVE=True
 
 #=================
 #   Utilities
@@ -188,7 +201,7 @@ def _to_dg_data(serie,  indexes_to_plot, aggregate_by=0):
                         data_part+='[,,],'
 
                 # Do we have a mark?
-                if serie.mark and render_mark_as_index:
+                if serie.mark and RENDER_MARK_AS_INDEX:
                     if item.start.t >= serie_mark_start_t and item.end.t < serie_mark_end_t:                                    
                         # Add the (active) mark
                         data_part+='[0,1,1],'
@@ -251,7 +264,7 @@ def _to_dg_data(serie,  indexes_to_plot, aggregate_by=0):
                     data_part+=','
 
             # Do we have a mark?
-            if serie.mark and render_mark_as_index:
+            if serie.mark and RENDER_MARK_AS_INDEX:
                 if item.t >= serie_mark_start_t and item.t < serie_mark_end_t:
                     # Add the (active) mark
                     data_part+='1,'
@@ -276,7 +289,7 @@ def _to_dg_data(serie,  indexes_to_plot, aggregate_by=0):
 #=================
 
 def dygraphs_plot(timeseries, indexes=None, aggregate=None, aggregate_by=None, color=None, height=None, 
-                  interactive=True, save_to=None, image_resolution='1280x400', return_dygraph_html=False):
+                  interactive=DEFAULT_PLOT_INTERACTIVE, save_to=None, image_resolution='1280x400', return_dygraph_html=False):
     """Plot a timeseries using Dygraphs.
     
        Args:
@@ -542,7 +555,7 @@ function legendFormatter(data) {
         labels+=',{}'.format(index)
 
     # Handle series mark (as index)
-    if timeseries.mark and render_mark_as_index:
+    if timeseries.mark and RENDER_MARK_AS_INDEX:
         labels+=',data_mark'
     
     # Prepare labels string list for Dygraphs
@@ -727,7 +740,7 @@ animatedZooms: true,"""
             dygraphs_javascript += """colors: ['rgb(0,128,128)'],""" 
 
     # Handle series mark (only if not handled as an index)
-    if timeseries.mark and not render_mark_as_index:
+    if timeseries.mark and not RENDER_MARK_AS_INDEX:
  
         # Check that we know how to use this mark
         if not isinstance(timeseries.mark[0], datetime.datetime):
