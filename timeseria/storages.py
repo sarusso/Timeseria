@@ -30,7 +30,7 @@ class CSVFileStorage(object):
     def __init__(self, filename, timestamp_column='auto', timestamp_format='auto',
                  time_column=None, time_format=None, date_column=None, date_format=None,
                  tz='UTC', data_columns='all', data_type='auto', series_type='auto', sort=False,
-                 separator=',', newline='\n', encoding='auto', skip_errors=False):
+                 separator=',', newline='\n', encoding='auto', skip_errors=False, silence_errors=True):
         """Ref to https://docs.python.org/3/library/datetime.html#strftime-and-strptime-format-codes
         for timestamp_format, date_format and time_format"""
 
@@ -89,6 +89,7 @@ class CSVFileStorage(object):
 
         # Other
         self.skip_errors = skip_errors
+        self.silence_errors = silence_errors
         self.data_type = data_type
         self.sort = sort
         
@@ -525,7 +526,8 @@ class CSVFileStorage(object):
 
                 except Exception as e:
                     if self.skip_errors:
-                        logger.error(e)
+                        if not self.silence_errors:
+                            logger.error(e)
                     else:
                         raise e from None
         else:
