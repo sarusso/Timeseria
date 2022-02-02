@@ -47,7 +47,10 @@ If you don't want to automatically trigger a container build every time you run 
 You can also run only specific tests:
 
     BUILD=False ./test.sh timeseria.tests.test_datastructures
-    
+
+To instead set a specific log level when testing (default is CRITICAL):
+
+    TIMESERIA_LOGLEVEL=DEBUG ./test.sh
 
 
 # Licensing

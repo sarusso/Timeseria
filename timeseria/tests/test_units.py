@@ -2,6 +2,10 @@ import unittest
 from ..time import dt
 from ..units import Unit, TimeUnit
 
+# Setup logging
+from .. import logger
+logger.setup()
+
 class TestUnits(unittest.TestCase):
 
     def setUp(self):       
