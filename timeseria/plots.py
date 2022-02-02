@@ -22,10 +22,10 @@ RENDER_MARK_AS_INDEX = False
 DEFAULT_PLOT_TYPE = os.environ.get('DEFAULT_PLOT_TYPE', None)
 if DEFAULT_PLOT_TYPE:
     if DEFAULT_PLOT_TYPE == 'interactive':
-        logger.info('Forcing interactive plot type')
+        logger.debug('Setting default plot type to "interactive"')
         DEFAULT_PLOT_INTERACTIVE = True
     elif DEFAULT_PLOT_TYPE == 'image':
-        logger.info('Forcing image plot type')
+        logger.debug('Setting default plot type to "image"')
         DEFAULT_PLOT_INTERACTIVE = False         
     else:
         raise ValueError('Unknown plot type "{}" for DEFAULT_PLOT_TYPE'.forat(DEFAULT_PLOT_TYPE))
