@@ -6,8 +6,8 @@ from ..time import dt, s_from_dt, dt_from_str
 from ..units import TimeUnit
 
 # Setup logging
-import logging
-logging.basicConfig(level=os.environ.get('LOGLEVEL') if os.environ.get('LOGLEVEL') else 'CRITICAL')
+from .. import logger
+logger.setup()
 
 # Set test data path
 TEST_DATA_PATH = '/'.join(os.path.realpath(__file__).split('/')[0:-1]) + '/test_data/'

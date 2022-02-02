@@ -6,8 +6,8 @@ from ..operations import derivative, integral, diff, csum, min, max, avg, filter
 from ..operations import Operation
 
 # Setup logging
-import logging
-logging.basicConfig(level=os.environ.get('LOGLEVEL') if os.environ.get('LOGLEVEL') else 'CRITICAL')
+from .. import logger
+logger.setup()
 
 class TestBaseOpertions(unittest.TestCase):
     

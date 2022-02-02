@@ -22,10 +22,10 @@ echo -e  "|   Running tests             |"
 echo -e  "===============================\n"
 
 # Reduce verbosity and disable Python buffering
-ENV_VARS="PYTHONWARNINGS=ignore TF_CPP_MIN_LOG_LEVEL=3 PYTHONUNBUFFERED=on EXTENDED_TESTING=False LOGLEVEL=$LOGLEVEL"
+ENV_VARS="PYTHONWARNINGS=ignore TF_CPP_MIN_LOG_LEVEL=3 PYTHONUNBUFFERED=on EXTENDED_TESTING=False TIMESERIA_LOGLEVEL=$TIMESERIA_LOGLEVEL"
 
 if [ $# -eq 0 ]; then
-    docker run -v $PWD:/opt/Timeseria -it timeseria "cd /opt/Timeseria && $ENV_VARS KERAS_BACKEND=tensorflow python3 -m unittest"
+    docker run -v $PWD:/opt/Timeseria -it timeseria "cd /opt/Timeseria && $ENV_VARS KERAS_BACKEND=tensorflow python3 -m unittest discover"
 else
     docker run -v $PWD:/opt/Timeseria -it timeseria "cd /opt/Timeseria && $ENV_VARS KERAS_BACKEND=tensorflow python3 -m unittest $@"
 fi

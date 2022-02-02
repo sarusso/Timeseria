@@ -3,6 +3,9 @@ import datetime
 from ..time import dt, correct_dt_dst, dt_to_str, dt_from_str, s_from_dt, change_tz, timezonize
 from pandas import Timestamp as PandasTimestamp
 
+# Setup logging
+from .. import logger
+logger.setup()
 
 class TestTime(unittest.TestCase):
 
