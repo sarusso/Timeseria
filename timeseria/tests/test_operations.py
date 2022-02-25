@@ -2,7 +2,7 @@ import unittest
 import os
 from ..datastructures import TimePoint, DataTimePoint, DataTimeSlotSeries, DataTimeSlot
 from ..datastructures import TimePointSeries, DataTimePointSeries
-from ..operations import derivative, integral, diff, csum, min, max, avg, filter, select, mavg
+from ..operations import derivative, integral, diff, csum, min, max, avg, filter, select, mavg, normalize
 from ..operations import Operation
 
 # Setup logging
@@ -212,6 +212,22 @@ class TestMathOperations(unittest.TestCase):
         self.assertEqual(data_time_point_series.avg(), {'value': 11, 'another_value': 45.5})
         self.assertEqual(data_time_point_series.avg(data_key='value'), 11)          
         self.assertEqual(data_time_point_series.avg(data_key='another_value'), 45.5)
+
+
+    def test_normalize(self):
+        data_time_point_series =  DataTimePointSeries(DataTimePoint(t=60, data={'a':2, 'b':6}),
+                                                      DataTimePoint(t=120, data={'a':4, 'b':9}),
+                                                      DataTimePoint(t=180, data={'a':8, 'b':3}))
+
+        normalized_data_time_point_series = normalize(data_time_point_series)
+        print(normalized_data_time_point_series)
+
+        self.assertEqual(normalized_data_time_point_series[0].data['a'],0)
+        self.assertEqual(normalized_data_time_point_series[2].data['b'],0)
+        
+        self.assertEqual(normalized_data_time_point_series[2].data['a'],1)
+        self.assertEqual(normalized_data_time_point_series[1].data['b'],1)
+
 
 
 class TestSeriesOperations(unittest.TestCase):
