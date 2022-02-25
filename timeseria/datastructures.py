@@ -691,7 +691,12 @@ class DataPointSeries(PointSeries):
         ``offset`` (defaulted to zero) to set the starting value where to apply the sums on."""
         from .operations import csum as csum_operation
         return csum_operation(self, *args, **kwargs)
-     
+
+    def normalize(self, *args, **kwargs):
+        """Normalize the time series data values. Extra parameters: ``inplace`` (defaulted to false)."""
+        from .operations import normalize as normalize_operation
+        return normalize_operation(self, *args, **kwargs)   
+  
     def mavg(self, *args, **kwargs):
         """Compute the moving average. Extra parameters: ``inplace`` (defaulted to false)
         and ``window``, a required parameter, for the length of the moving average window."""
@@ -1275,7 +1280,12 @@ class DataSlotSeries(SlotSeries):
         ``offset`` (defaulted to zero) to set the starting value where to apply the sums on."""
         from .operations import csum as csum_operation
         return csum_operation(self, *args, **kwargs)
-     
+
+    def normalize(self, *args, **kwargs):
+        """Normalize the time series data values. Extra parameters: ``inplace`` (defaulted to false)."""
+        from .operations import normalize as normalize_operation
+        return normalize_operation(self, *args, **kwargs)   
+  
     def mavg(self, *args, **kwargs):
         """Compute the moving average. Extra parameters: ``inplace`` (defaulted to false)
         and ``window``, a required parameter, for the length of the moving average window."""

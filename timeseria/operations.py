@@ -353,6 +353,65 @@ class CSum(Integral):
         return super(CSum, self).__call__(timeseries, inplace=inplace, normalize=False, c=offset)
 
 
+class Normalize(SeriesOperation):
+    """Normalization operation (callable object)"""
+    
+    def __call__(self, timeseries, inplace=False):
+        
+        if not inplace:
+            normalized_timeseries = timeseries.__class__()
+
+        data_keys = timeseries.data_keys()
+
+        # Get Min and max for the data keys
+        for i, datapoint in enumerate(timeseries):
+            
+            if i == 0:
+                mins = {key: datapoint.data[key] for key in data_keys}
+                maxs = {key: datapoint.data[key] for key in data_keys}        
+            else:
+                for key in data_keys:
+                    if datapoint.data[key] < mins[key]:
+                        mins[key] = datapoint.data[key]
+                    if datapoint.data[key] > maxs[key]:
+                        maxs[key] = datapoint.data[key]                
+                
+        
+        for i, datapoint in enumerate(timeseries):
+ 
+            if not inplace:
+                data = {}
+             
+            for key in data_keys:
+                 
+
+
+                # Normalize data
+                if not inplace:
+                    data[key] = (datapoint.data[key] - mins[key])  / (maxs[key]-mins[key])
+                else:
+                    datapoint.data[key] = (datapoint.data[key] - mins[key])  / (maxs[key]-mins[key])
+             
+            # Create the item
+            if not inplace:
+ 
+                if isinstance(timeseries[0], Point):
+                    normalized_timeseries.append(timeseries[0].__class__(t = datapoint.t,
+                                                                         tz = datapoint.tz,
+                                                                         data = data))         
+                elif isinstance(timeseries[0], Slot):
+                    normalized_timeseries.append(timeseries[0].__class__(start = datapoint.start,
+                                                                         unit = datapoint.unit,
+                                                                         data = data))                
+                else:
+                    raise NotImplementedError('Working on series other than slots or points not yet implemented')
+ 
+        if not inplace:
+            return normalized_timeseries
+
+
+
+
 class MAvg(SeriesOperation):
     """Moving average operation (callable object)."""
 
@@ -570,6 +629,8 @@ integral = Integral()
 diff = Diff()
 csum = CSum()
 mavg = MAvg()
+
+normalize = Normalize()
 
 merge = Merge()
 filter = Filter()
