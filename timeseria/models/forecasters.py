@@ -57,9 +57,10 @@ class Forecaster(TimeSeriesParametricModel):
         return super(Forecaster, self).predict(timeseries, *args, **kwargs)
 
 
-    def _evaluate(self, timeseries, steps='auto', limit=None, plots=False, metrics=['RMSE', 'MAE'], details=False, from_t=None, to_t=None, from_dt=None, to_dt=None):
+    def _evaluate(self, timeseries, steps='auto', limit=None, plots=False, plot=False, metrics=['RMSE', 'MAE'], details=False, from_t=None, to_t=None, from_dt=None, to_dt=None, evaluation_timeseries=False):
 
-        # Set evaluation_score steps if we have to
+
+        # Set evaluation steps if we have to
         if steps == 'auto':
             try:
                 steps = [1, self.data['periodicity']]
@@ -77,9 +78,19 @@ class Forecaster(TimeSeriesParametricModel):
                 if steps != 1:
                     raise ValueError('Evaluating a windowless model on a multi-step forecast does not make sense (got steps={})'.format(steps))
             steps = list(range(1, steps+1))
-                            
+        
+        if plot and steps != [1]:
+            raise ValueError('Plotting an evaluation is supported only with single step-ahead forecasts (steps=[1])')
+
+        if plot or evaluation_timeseries:
+            evaluation_timeseries = timeseries.duplicate()
+            if self.data['window']:
+                evaluation_timeseries = evaluation_timeseries[self.data['window']:]
+            if limit:
+                evaluation_timeseries = evaluation_timeseries[:limit]
+        
         # Support vars
-        evaluation_score = {}
+        results = {}
         from_t, to_t = set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
         warned = False
 
@@ -175,14 +186,14 @@ class Forecaster(TimeSeriesParametricModel):
                             break  
                     
                         # Check that we can get enough data
-                        if i < self.data['window']+steps_round:
+                        if i < self.data['window']:
                             continue
                         if i > (len(timeseries)-steps_round):
                             continue
-    
+                        
                         # Compute the various boundaries
-                        original_timeseries_boundaries_start = i - (self.data['window']) - steps_round
-                        original_timeseries_boundaries_end = i
+                        original_timeseries_boundaries_start = i - (self.data['window']) 
+                        original_timeseries_boundaries_end = i + steps_round
                         
                         original_forecast_timeseries_boundaries_start = original_timeseries_boundaries_start
                         original_forecast_timeseries_boundaries_end = original_timeseries_boundaries_end-steps_round
@@ -207,9 +218,9 @@ class Forecaster(TimeSeriesParametricModel):
                         # Apply the forecasting model
                         self._apply(forecast_timeseries, n=steps_round, inplace=True)
     
-                        # Plot evaluation_score time series?
+                        # Plot results time series?
                         if plots:
-                            forecast_timeseries.plot(log_js=False)
+                            forecast_timeseries.plot()
                         
                         # Save the model and the original value to be compared later on
                         for step in range(steps_round):
@@ -238,55 +249,72 @@ class Forecaster(TimeSeriesParametricModel):
             if not model_values:
                 raise Exception('Could not evaluate model, maybe not enough data?')
 
-            # Compute RMSE and ME, and add to the evaluation_score
+            # Compute RMSE and ME, and add to the results
             if 'RMSE' in metrics:
-                evaluation_score['RMSE_{}_steps'.format(steps_round)] = sqrt(mean_squared_error(real_values, model_values))
+                results['RMSE_{}_steps'.format(steps_round)] = sqrt(mean_squared_error(real_values, model_values))
             if 'MAE' in metrics:
-                evaluation_score['MAE_{}_steps'.format(steps_round)] = mean_absolute_error(real_values, model_values)
+                results['MAE_{}_steps'.format(steps_round)] = mean_absolute_error(real_values, model_values)
+                if evaluation_timeseries:
+                    for i in range(len(model_values)):
+                        evaluation_timeseries[i].data['{}_AE'.format(key)] = abs(real_values[i] - model_values[i])  
             if 'MAPE' in metrics:
-                evaluation_score['MAPE_{}_steps'.format(steps_round)] = mean_absolute_percentage_error(real_values, model_values)
-
+                results['MAPE_{}_steps'.format(steps_round)] = mean_absolute_percentage_error(real_values, model_values)
+                if evaluation_timeseries:
+                    for i in range(len(model_values)):
+                        evaluation_timeseries[i].data['{}_APE'.format(key)] = abs(real_values[i] - model_values[i]) / real_values[i]
+            
+            if evaluation_timeseries:
+                for i in range(len(model_values)):
+                    evaluation_timeseries[i].data['{}_pred'.format(key)] = model_values[i]
+        
         # Compute overall RMSE
         if 'RMSE' in metrics:
             sum_rmse = 0
             count = 0
-            for key in evaluation_score:
+            for key in results:
                 if key.startswith('RMSE_'):
-                    sum_rmse += evaluation_score[key]
+                    sum_rmse += results[key]
                     count += 1
-            evaluation_score['RMSE'] = sum_rmse/count
+            results['RMSE'] = sum_rmse/count
 
         # Compute overall MAE
         if 'MAE' in metrics:
             sum_me = 0
             count = 0
-            for key in evaluation_score:
+            for key in results:
                 if key.startswith('MAE_'):
-                    sum_me += evaluation_score[key]
+                    sum_me += results[key]
                     count += 1
-            evaluation_score['MAE'] = sum_me/count
+            results['MAE'] = sum_me/count
 
         # Compute overall MAPE
         if 'MAPE' in metrics:
             sum_me = 0
             count = 0
-            for key in evaluation_score:
+            for key in results:
                 if key.startswith('MAPE_'):
-                    sum_me += evaluation_score[key]
+                    sum_me += results[key]
                     count += 1
-            evaluation_score['MAPE'] = sum_me/count
+            results['MAPE'] = sum_me/count
         
         if not details:
-            simple_evaluation_score = {}
+            simple_results = {}
             if 'RMSE' in metrics:
-                simple_evaluation_score['RMSE'] = evaluation_score['RMSE']
+                simple_results['RMSE'] = results['RMSE']
             if 'MAE' in metrics:
-                simple_evaluation_score['MAE'] = evaluation_score['MAE']
+                simple_results['MAE'] = results['MAE']
             if 'MAPE' in metrics:
-                simple_evaluation_score['MAPE'] = evaluation_score['MAPE']
-            evaluation_score = simple_evaluation_score
-            
-        return evaluation_score
+                simple_results['MAPE'] = results['MAPE']
+            results = simple_results
+
+        # Handle evaluation timeseries if required
+        if evaluation_timeseries:
+            results['evaluation_timeseries'] = evaluation_timeseries 
+        if plot:
+            evaluation_timeseries.plot()   
+
+        # Return evaluation results
+        return results
 
 
     def _apply(self, timeseries, n=1, inplace=False):
@@ -739,7 +767,7 @@ class LSTMForecaster(KerasModel, Forecaster):
         self.keras_model = keras_model
 
 
-    def _fit(self, timeseries, from_t=None, to_t=None, from_dt=None, to_dt=None, verbose=False, epochs=30):
+    def _fit(self, timeseries, from_t=None, to_t=None, from_dt=None, to_dt=None, verbose=False, epochs=30, normalize=True):
 
         # Set from and to
         from_t, to_t = set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
@@ -753,21 +781,31 @@ class LSTMForecaster(KerasModel, Forecaster):
         # Data keys shortcut
         data_keys = timeseries.data_keys()
 
-        # Set min and max
-        min_values = timeseries.min()
-        max_values = timeseries.max()
+        if normalize:
+            # Set min and max
+            min_values = timeseries.min()
+            max_values = timeseries.max()
+            
+            # Fix some debeatable behaviour (which is, that min and max return different things for univariate and multivariate data)
+            # TODO: fix me!
+            if not isinstance(min_values, dict):
+                min_values = {timeseries.data_keys()[0]:min_values}
+            if not isinstance(max_values, dict):
+                max_values = {timeseries.data_keys()[0]:max_values}
+            
+            # Normalize data
+            timeseries_normalized = timeseries.duplicate()
+            for datapoint in timeseries_normalized:
+                for data_key in datapoint.data:
+                    datapoint.data[data_key] = (datapoint.data[data_key] - min_values[data_key]) / (max_values[data_key] - min_values[data_key])
         
-        # Fix some debeatable behaviour
-        if not isinstance(min_values, dict):
-            min_values = {timeseries.data_keys()[0]:min_values}
-        if not isinstance(max_values, dict):
-            max_values = {timeseries.data_keys()[0]:max_values}
+            # Store normalization factors
+            self.data['min_values'] = min_values
+            self.data['max_values'] = max_values
         
-        # Normalize data
-        timeseries_normalized = timeseries.duplicate()
-        for datapoint in timeseries_normalized:
-            for data_key in datapoint.data:
-                datapoint.data[data_key] = (datapoint.data[data_key] - min_values[data_key]) / (max_values[data_key] - min_values[data_key])
+        else:
+            # TODO: here the name is worn,
+            timeseries_normalized = timeseries
 
         # Move to "matrix" of windows plus "vector" of targets data representation. Or, in other words:
         # window_datapoints is a list of lists (matrix) where each nested list (row) is a list of window datapoints.
@@ -797,10 +835,6 @@ class LSTMForecaster(KerasModel, Forecaster):
 
         # Fit
         self.keras_model.fit(array(window_features), array(target_values_vector), epochs=epochs, verbose=verbose)
-        
-        # Store data
-        self.data['min_values'] = min_values
-        self.data['max_values'] = max_values
 
 
     def _predict(self, timeseries, n=1, verbose=False):
@@ -820,10 +854,16 @@ class LSTMForecaster(KerasModel, Forecaster):
         # Duplicate so that we ae free to normalize in-place at the next step
         window_timeseries = window_timeseries.duplicate()
         
-        # Normalize window data
-        for datapoint in window_timeseries:
-            for data_key in datapoint.data:
-                datapoint.data[data_key] = (datapoint.data[data_key] - self.data['min_values'][data_key]) / (self.data['max_values'][data_key] - self.data['min_values'][data_key])
+        # Normalize window data if we have to do so
+        try:
+            self.data['min_values']   
+        except:
+            normalize = False
+        else:
+            normalize = True
+            for datapoint in window_timeseries:
+                for data_key in datapoint.data:
+                    datapoint.data[data_key] = (datapoint.data[data_key] - self.data['min_values'][data_key]) / (self.data['max_values'][data_key] - self.data['min_values'][data_key])
 
         # Compute window features
         window_features = self.compute_window_features(window_timeseries, data_keys=self.data['data_keys'], features=self.data['features'])
@@ -837,8 +877,11 @@ class LSTMForecaster(KerasModel, Forecaster):
             # Get the prediction
             predicted_value_normalized = yhat[0][i]
         
-            # De-normalize
-            predicted_value = (predicted_value_normalized*(self.data['max_values'][data_key] - self.data['min_values'][data_key])) + self.data['min_values'][data_key]
+            # De-normalize if we have to
+            if normalize:
+                predicted_value = (predicted_value_normalized*(self.data['max_values'][data_key] - self.data['min_values'][data_key])) + self.data['min_values'][data_key]
+            else:
+                predicted_value = predicted_value_normalized
             
             # Append to prediction data
             predicted_data[data_key] = predicted_value
