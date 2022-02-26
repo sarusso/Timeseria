@@ -548,62 +548,118 @@ class Merge(SeriesOperation):
     
     def __call__(self, *timeseriess):
         
+        # Support vars
         resolution = None
-        for i, arg in enumerate(timeseriess):
+        timeseriess_starting_points_t = []
+        timeseriess_ending_points_t   = []
+        
+        # Checks
+        for i, timeseries in enumerate(timeseriess):
             #if not isinstance(arg, DataTimeSlotSeries):
-            #    raise TypeError('Argument #{} is not of type DataTimeSlotSeries, got "{}"'.format(i, arg.__class__.__name__))
+            #    raise TypeError('Argument #{} is not of type DataTimeSlotSeries, got "{}"'.format(i, timeseries.__class__.__name__))
             if resolution is None:
-                resolution = arg.resolution
+                resolution = timeseries.resolution
             else:
-                if arg.resolution != resolution:
+                if timeseries.resolution != resolution:
                     abort = True
                     try:
                         # Handle floating point precision issues 
-                        if is_close(arg.resolution, resolution):
+                        if is_close(timeseries.resolution, resolution):
                             abort = False
                     except (ValueError,TypeError):
                         pass
                     if abort:
                         raise ValueError('DataTimeSlotSeries have different units, cannot merge')
         
-        length = len(timeseriess[0])
-        n_timeseriess = len(timeseriess)
+            # Find min and max epoch for each series (aka start-end points)
+            timeseriess_starting_points_t.append(timeseries[0].t)
+            timeseriess_ending_points_t.append(timeseries[-1].t)
+        
+        # Find max min and min max to set the subset where timeseries are all deifned. e.g.:
+        # ======
+        #    ======
+        # we are looking for the second segment (max) starting point
+        
+        max_starting_point_t = None
+        for starting_point_t in timeseriess_starting_points_t:
+            if max_starting_point_t is None:
+                max_starting_point_t = starting_point_t
+            else:
+                if starting_point_t > max_starting_point_t:
+                    max_starting_point_t = starting_point_t 
+
+        min_ending_point_t = None
+        for ending_point_t in timeseriess_ending_points_t:
+            if min_ending_point_t is None:
+                min_ending_point_t = ending_point_t
+            else:
+                if ending_point_t < min_ending_point_t:
+                    min_ending_point_t = ending_point_t
+
+        # Find the time series with the max starting point
+        for timeseries in timeseriess:
+            if timeseries[0].t == max_starting_point_t:
+                reference_timeseries = timeseries
+
+        # Create the (empty) result time series 
         result_timeseries = timeseriess[0].__class__(unit=resolution)
         
-        for i in range(length):
+        # Scroll the time series to get the offsets
+        offsets = {}
+        for timeseries in timeseriess:
+            for i in range(len(timeseries)):
+                if timeseries[i].t == max_starting_point_t:
+                    offsets[timeseries] = i
+                    break
+
+        # Loop over the reference series to create the datapoints for the merge
+        for i in range(len(reference_timeseries)):
+            
+            # Check if we gone beyond the minimum ending point
+            if reference_timeseries[i].t > min_ending_point_t:
+                break  
+            
+            # Support vars
             data = None
-            coverage = None
-            valid_coverages = 0
-            for j in range(n_timeseriess):
-                #logger.critical('i={}, j={}'.format(i, j))
-                
+            data_loss = 0
+            valid_data_losses = 0
+            
+            tz = timeseriess[0][0].tz
+            if isinstance(reference_timeseries[0], Slot):
+                unit = reference_timeseries[0].unit
+            else:
+                unit = None  
+            
+            # For each time series, get data in i-th position (given the offset) and merge it
+            for timeseries in timeseriess:
+
                 # Data
                 if data is None:
-                    data = deepcopy(timeseriess[j][i].data)
+                    data = deepcopy(timeseries[i+offsets[timeseries]].data)
                 else:
-                    data.update(timeseriess[j][i].data)
-                
-                # Coverage
-                if coverage is None:
-                    coverage = coverage
-                else:
-                    valid_coverages += 1
-                    coverage += timeseriess[j][i].coverage
-            
-            # Finalize coverage if there were valid   
-            if valid_coverages:
-                coverage = coverage / valid_coverages
+                    data.update(timeseries[i+offsets[timeseries]].data)
+                 
+                # Data loss
+                if timeseries[i+offsets[timeseries]].data_loss is not None:
+                    valid_data_losses += 1
+                    data_loss += timeseries[i+offsets[timeseries]].data_loss
+             
+            # Finalize data loss if there were valid ones
+            if valid_data_losses:
+                data_loss = data_loss / valid_data_losses
             else:
-                coverage = None
-
-            if isinstance(timeseriess[0][0], Point):
-                result_timeseries.append(timeseriess[0][0].__class__(t = timeseriess[j][i].t,
-                                                                     tz = timeseriess[j][i].tz,
-                                                                     data  = data))         
-            elif isinstance(timeseriess[0][0], Slot):
-                result_timeseries.append(timeseriess[0][0].__class__(start = timeseriess[j][i].start,
-                                                                     unit   = timeseriess[j][i].unit,
-                                                                     data  = data))                
+                data_loss = None
+ 
+            if isinstance(reference_timeseries[0], Point):
+                result_timeseries.append(timeseriess[0][0].__class__(t = reference_timeseries[i].t,
+                                                                     tz = tz,
+                                                                     data  = data,
+                                                                     data_loss = data_loss))         
+            elif isinstance(reference_timeseries[0], Slot):
+                result_timeseries.append(timeseriess[0][0].__class__(start = reference_timeseries[i].start,
+                                                                     unit  = unit,
+                                                                     data  = data,
+                                                                     data_loss = data_loss))                
             else:
                 raise NotImplementedError('Working on series other than slots or points not yet implemented')
 

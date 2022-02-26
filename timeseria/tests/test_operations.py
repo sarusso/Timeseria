@@ -2,7 +2,7 @@ import unittest
 import os
 from ..datastructures import TimePoint, DataTimePoint, DataTimeSlotSeries, DataTimeSlot
 from ..datastructures import TimePointSeries, DataTimePointSeries
-from ..operations import derivative, integral, diff, csum, min, max, avg, filter, select, mavg, normalize
+from ..operations import derivative, integral, diff, csum, min, max, avg, filter, select, mavg, normalize, merge
 from ..operations import Operation
 
 # Setup logging
@@ -277,4 +277,48 @@ class TestSeriesOperations(unittest.TestCase):
         self.assertEqual(data_time_point_series.select('"another_value"=65')[0].t, 60)
 
 
+    def test_merge(self):
+    
+        # Test data
+        data_time_point_series1 = DataTimePointSeries()
+        data_time_point_series1.append(DataTimePoint(t=0, data={'value':10}, data_loss=0.1))
+        data_time_point_series1.append(DataTimePoint(t=60, data={'value':12}, data_loss=0.2))
+        data_time_point_series1.append(DataTimePoint(t=120, data={'value':6}, data_loss=0.3))
+        data_time_point_series1.append(DataTimePoint(t=180, data={'value':16}, data_loss=0.4))
+        data_time_point_series1.append(DataTimePoint(t=240, data={'value':20}, data_loss=0.5))
 
+        data_time_point_series2 = DataTimePointSeries()
+        data_time_point_series2.append(DataTimePoint(t=0, data={'another_value': 75}, data_loss=0.01))
+        data_time_point_series2.append(DataTimePoint(t=60, data={'another_value': 65}, data_loss=0.02))
+        data_time_point_series2.append(DataTimePoint(t=120, data={'another_value': 32}, data_loss=0.03))
+        data_time_point_series2.append(DataTimePoint(t=180, data={'another_value': 10}, data_loss=None))
+        data_time_point_series2.append(DataTimePoint(t=240, data={'another_value': 7}, data_loss=None))
+
+        # Basic merge test
+        merged = merge(data_time_point_series1,data_time_point_series2)
+        self.assertEqual(len(merged), 5)
+        self.assertEqual(merged[0].t, 0)
+        self.assertEqual(merged[-1].t, 240)
+        self.assertEqual(merged[0].data['value'], 10)
+        self.assertEqual(merged[0].data['another_value'], 75)
+        self.assertEqual(merged[-1].data['value'], 20)
+        self.assertEqual(merged[-1].data['another_value'], 7)
+
+        # Subset merge test
+        merged = merge(data_time_point_series1[2:4],data_time_point_series2)
+        self.assertEqual(len(merged), 2)
+        self.assertEqual(merged[0].t, 120)
+        self.assertEqual(merged[-1].t, 180)
+        self.assertEqual(merged[0].data['value'], 6)
+        self.assertEqual(merged[0].data['another_value'], 32)
+        self.assertEqual(merged[-1].data['value'], 16)
+        self.assertEqual(merged[-1].data['another_value'], 10)
+
+
+        # Coverage merge test
+        merged = merge(data_time_point_series1,data_time_point_series2)
+        self.assertEqual(merged[0].data_loss, (0.1+0.01)/2)
+        self.assertEqual(merged[1].data_loss, (0.2+0.02)/2)
+        self.assertEqual(merged[2].data_loss, (0.3+0.03)/2)
+        self.assertEqual(merged[3].data_loss, 0.4)
+        self.assertEqual(merged[4].data_loss, 0.5)

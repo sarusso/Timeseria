@@ -79,7 +79,10 @@ class Series(list):
     
     def __sum__(self, other):
         raise NotImplementedError
-    
+
+    def __hash__(self):
+        return id(self)
+
     @property
     def title(self):
         """A title for the series, to be used for plotting etc.""" 
@@ -562,6 +565,7 @@ class TimePointSeries(PointSeries):
             return self._tz
         except AttributeError:
             # Detect time zone on the fly
+            # TODO: this takes forever, why do we compare with ALL data points/slots time zones?
             detected_tz = None
             for item in self:
                 if not detected_tz:
