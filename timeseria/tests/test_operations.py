@@ -220,7 +220,6 @@ class TestMathOperations(unittest.TestCase):
                                                       DataTimePoint(t=180, data={'a':8, 'b':3}))
 
         normalized_data_time_point_series = normalize(data_time_point_series)
-        print(normalized_data_time_point_series)
 
         self.assertEqual(normalized_data_time_point_series[0].data['a'],0)
         self.assertEqual(normalized_data_time_point_series[2].data['b'],0)
