@@ -28,10 +28,10 @@ class TestMathOperations(unittest.TestCase):
   
         # Test data        
         data_time_slot_series = DataTimeSlotSeries()
-        data_time_slot_series.append(DataTimeSlot(start=TimePoint(0), end=TimePoint(60), data={'value':10}))
-        data_time_slot_series.append(DataTimeSlot(start=TimePoint(60), end=TimePoint(120), data={'value':12}))
-        data_time_slot_series.append(DataTimeSlot(start=TimePoint(120), end=TimePoint(180), data={'value':15}))
-        data_time_slot_series.append(DataTimeSlot(start=TimePoint(180), end=TimePoint(240), data={'value':16}))
+        data_time_slot_series.append(DataTimeSlot(start=TimePoint(0), end=TimePoint(60), data={'value':10}, data_loss=0.1))
+        data_time_slot_series.append(DataTimeSlot(start=TimePoint(60), end=TimePoint(120), data={'value':12}, data_loss=0.2))
+        data_time_slot_series.append(DataTimeSlot(start=TimePoint(120), end=TimePoint(180), data={'value':15}, data_loss=0.3))
+        data_time_slot_series.append(DataTimeSlot(start=TimePoint(180), end=TimePoint(240), data={'value':16}, data_loss=0.4))
            
         # Test standard, from the series
         diff_data_time_slot_series = diff(data_time_slot_series)
@@ -40,6 +40,12 @@ class TestMathOperations(unittest.TestCase):
         self.assertEqual(diff_data_time_slot_series[1].data['value_diff'],2)
         self.assertEqual(diff_data_time_slot_series[2].data['value_diff'],3)
         self.assertEqual(diff_data_time_slot_series[3].data['value_diff'],1)
+        
+        # Test data loss carried forward by the diff
+        self.assertEqual(diff_data_time_slot_series[0].data_loss, 0.1)
+        self.assertEqual(diff_data_time_slot_series[1].data_loss, 0.2)
+        self.assertEqual(diff_data_time_slot_series[2].data_loss, 0.3)
+        self.assertEqual(diff_data_time_slot_series[3].data_loss, 0.4)
 
         # Test csum as well  
         diff_csum_data_time_slot_series = csum(diff_data_time_slot_series, offset=10)
@@ -47,7 +53,13 @@ class TestMathOperations(unittest.TestCase):
         self.assertEqual(diff_csum_data_time_slot_series[1].data['value_diff_csum'], 12)
         self.assertEqual(diff_csum_data_time_slot_series[2].data['value_diff_csum'], 15)
         self.assertEqual(diff_csum_data_time_slot_series[3].data['value_diff_csum'], 16)
-        
+
+        # Test data loss carried forward by the csum
+        self.assertEqual(diff_csum_data_time_slot_series[0].data_loss, 0.1)
+        self.assertEqual(diff_csum_data_time_slot_series[1].data_loss, 0.2)
+        self.assertEqual(diff_csum_data_time_slot_series[2].data_loss, 0.3)
+        self.assertEqual(diff_csum_data_time_slot_series[3].data_loss, 0.4)
+
         # Test standalone
         self.assertEqual(len(diff(data_time_slot_series)), 4)
   
@@ -87,10 +99,10 @@ class TestMathOperations(unittest.TestCase):
         
         # Test data        
         data_time_slot_series = DataTimeSlotSeries()
-        data_time_slot_series.append(DataTimeSlot(start=TimePoint(0), end=TimePoint(1), data={'value':10}))
-        data_time_slot_series.append(DataTimeSlot(start=TimePoint(1), end=TimePoint(2), data={'value':12}))
-        data_time_slot_series.append(DataTimeSlot(start=TimePoint(2), end=TimePoint(3), data={'value':15}))
-        data_time_slot_series.append(DataTimeSlot(start=TimePoint(3), end=TimePoint(4), data={'value':16}))
+        data_time_slot_series.append(DataTimeSlot(start=TimePoint(0), end=TimePoint(1), data={'value':10}, data_loss=0.1))
+        data_time_slot_series.append(DataTimeSlot(start=TimePoint(1), end=TimePoint(2), data={'value':12}, data_loss=0.2))
+        data_time_slot_series.append(DataTimeSlot(start=TimePoint(2), end=TimePoint(3), data={'value':15}, data_loss=0.3))
+        data_time_slot_series.append(DataTimeSlot(start=TimePoint(3), end=TimePoint(4), data={'value':16}, data_loss=0.4))
         
         # Test standard derivativeative behavior, from the series
         derivative_data_time_slot_series = derivative(data_time_slot_series)
@@ -100,13 +112,25 @@ class TestMathOperations(unittest.TestCase):
         self.assertAlmostEqual(derivative_data_time_slot_series[2].data['value_derivative'],2)     # 5
         self.assertAlmostEqual(derivative_data_time_slot_series[3].data['value_derivative'],1.0)   # 6
 
+        # Test data loss carried forward by the derivative
+        self.assertEqual(derivative_data_time_slot_series[0].data_loss, 0.1)
+        self.assertEqual(derivative_data_time_slot_series[1].data_loss, 0.2)
+        self.assertEqual(derivative_data_time_slot_series[2].data_loss, 0.3)
+        self.assertEqual(derivative_data_time_slot_series[3].data_loss, 0.4)
+
         # Test integral as well  
         derivative_integral_data_time_slot_series = integral(derivative_data_time_slot_series, c=10)
         self.assertEqual(derivative_integral_data_time_slot_series[0].data['value_derivative_integral'], 10)
         self.assertEqual(derivative_integral_data_time_slot_series[1].data['value_derivative_integral'], 12)
         self.assertEqual(derivative_integral_data_time_slot_series[2].data['value_derivative_integral'], 15)
         self.assertEqual(derivative_integral_data_time_slot_series[3].data['value_derivative_integral'], 16)
-        
+
+        # Test data loss carried forward by the integral
+        self.assertEqual(derivative_integral_data_time_slot_series[0].data_loss, 0.1)
+        self.assertEqual(derivative_integral_data_time_slot_series[1].data_loss, 0.2)
+        self.assertEqual(derivative_integral_data_time_slot_series[2].data_loss, 0.3)
+        self.assertEqual(derivative_integral_data_time_slot_series[3].data_loss, 0.4)
+
         # Test data        
         data_time_slot_series = DataTimeSlotSeries()
         data_time_slot_series.append(DataTimeSlot(start=TimePoint(0), end=TimePoint(10), data={'value':10}))
@@ -152,22 +176,51 @@ class TestMathOperations(unittest.TestCase):
         self.assertAlmostEqual(derivative_integral_data_time_slot_series[4].data['value_derivative_integral'],20)
 
 
+    def test_normalize(self):
+        data_time_point_series =  DataTimePointSeries(DataTimePoint(t=60, data={'a':2, 'b':6}, data_loss=0.1),
+                                                      DataTimePoint(t=120, data={'a':4, 'b':9}, data_loss=0.2),
+                                                      DataTimePoint(t=180, data={'a':8, 'b':3}, data_loss=0.3))
+
+        normalized_data_time_point_series = normalize(data_time_point_series)
+
+        self.assertEqual(normalized_data_time_point_series[0].data['a'],0)
+        self.assertEqual(normalized_data_time_point_series[2].data['b'],0)
+        
+        self.assertEqual(normalized_data_time_point_series[2].data['a'],1)
+        self.assertEqual(normalized_data_time_point_series[1].data['b'],1)
+
+        # Test data loss carried forward by the csum
+        self.assertEqual(normalized_data_time_point_series[0].data_loss, 0.1)
+        self.assertEqual(normalized_data_time_point_series[1].data_loss, 0.2)
+        self.assertEqual(normalized_data_time_point_series[2].data_loss, 0.3)
+
+
     def test_mavg(self):
 
         data_time_slot_series = DataTimeSlotSeries()
-        data_time_slot_series.append(DataTimeSlot(start=TimePoint(0), end=TimePoint(1), data={'value':2}))
-        data_time_slot_series.append(DataTimeSlot(start=TimePoint(1), end=TimePoint(2), data={'value':4}))
-        data_time_slot_series.append(DataTimeSlot(start=TimePoint(2), end=TimePoint(3), data={'value':8}))
-        data_time_slot_series.append(DataTimeSlot(start=TimePoint(3), end=TimePoint(4), data={'value':16}))
+        data_time_slot_series.append(DataTimeSlot(start=TimePoint(0), end=TimePoint(1), data={'value':2}, data_loss=0.1))
+        data_time_slot_series.append(DataTimeSlot(start=TimePoint(1), end=TimePoint(2), data={'value':4}, data_loss=0.2))
+        data_time_slot_series.append(DataTimeSlot(start=TimePoint(2), end=TimePoint(3), data={'value':8}, data_loss=0.3))
+        data_time_slot_series.append(DataTimeSlot(start=TimePoint(3), end=TimePoint(4), data={'value':16}, data_loss=0.4))
   
         mavg_data_time_slot_series = mavg(data_time_slot_series, 2)
-        self.assertEqual(mavg_data_time_slot_series[0].data['value_mavg_2'], 3)
-        self.assertEqual(mavg_data_time_slot_series[1].data['value_mavg_2'], 6)
-        self.assertEqual(mavg_data_time_slot_series[2].data['value_mavg_2'], 12)
+        
+        # Check len and timestamps (the first is skipped due to moving average window of two)
+        self.assertEqual(len(mavg_data_time_slot_series),3)
         self.assertEqual(mavg_data_time_slot_series[0].t, 1)
         self.assertEqual(mavg_data_time_slot_series[1].t, 2)
         self.assertEqual(mavg_data_time_slot_series[2].t, 3)
+        
+        # Check data
+        self.assertEqual(mavg_data_time_slot_series[0].data['value_mavg_2'], 3)
+        self.assertEqual(mavg_data_time_slot_series[1].data['value_mavg_2'], 6)
+        self.assertEqual(mavg_data_time_slot_series[2].data['value_mavg_2'], 12)
 
+        # Check data loss removed (does not make sense in a moving average logic)
+        self.assertEqual(mavg_data_time_slot_series[0].data_loss, None)
+        self.assertEqual(mavg_data_time_slot_series[1].data_loss, None)
+        self.assertEqual(mavg_data_time_slot_series[2].data_loss, None)
+        
 
     def test_min_max_avg(self):
         
@@ -212,21 +265,6 @@ class TestMathOperations(unittest.TestCase):
         self.assertEqual(data_time_point_series.avg(), {'value': 11, 'another_value': 45.5})
         self.assertEqual(data_time_point_series.avg(data_key='value'), 11)          
         self.assertEqual(data_time_point_series.avg(data_key='another_value'), 45.5)
-
-
-    def test_normalize(self):
-        data_time_point_series =  DataTimePointSeries(DataTimePoint(t=60, data={'a':2, 'b':6}),
-                                                      DataTimePoint(t=120, data={'a':4, 'b':9}),
-                                                      DataTimePoint(t=180, data={'a':8, 'b':3}))
-
-        normalized_data_time_point_series = normalize(data_time_point_series)
-
-        self.assertEqual(normalized_data_time_point_series[0].data['a'],0)
-        self.assertEqual(normalized_data_time_point_series[2].data['b'],0)
-        
-        self.assertEqual(normalized_data_time_point_series[2].data['a'],1)
-        self.assertEqual(normalized_data_time_point_series[1].data['b'],1)
-
 
 
 class TestSeriesOperations(unittest.TestCase):
@@ -313,7 +351,6 @@ class TestSeriesOperations(unittest.TestCase):
         self.assertEqual(merged[0].data['another_value'], 32)
         self.assertEqual(merged[-1].data['value'], 16)
         self.assertEqual(merged[-1].data['another_value'], 10)
-
 
         # Coverage merge test
         merged = merge(data_time_point_series1,data_time_point_series2)

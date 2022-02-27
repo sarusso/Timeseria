@@ -244,11 +244,13 @@ class Derivative(SeriesOperation):
                 if isinstance(timeseries[0], Point):
                     der_timeseries.append(timeseries[0].__class__(t = item.t,
                                                                   tz = item.tz,
-                                                                  data = data))         
+                                                                  data = data,
+                                                                  data_loss = item.data_loss))         
                 elif isinstance(timeseries[0], Slot):
                     der_timeseries.append(timeseries[0].__class__(start = item.start,
                                                                   unit = item.unit,
-                                                                  data = data))                
+                                                                  data = data,
+                                                                  data_loss = item.data_loss))                
                 else:
                     raise NotImplementedError('Working on series other than slots or points not yet implemented')
 
@@ -329,11 +331,13 @@ class Integral(SeriesOperation):
                 if isinstance(timeseries[0], Point):
                     der_timeseries.append(timeseries[0].__class__(t = item.t,
                                                                   tz = item.tz,
-                                                                  data = data))         
+                                                                  data = data,
+                                                                  data_loss = item.data_loss))         
                 elif isinstance(timeseries[0], Slot):
                     der_timeseries.append(timeseries[0].__class__(start = item.start,
                                                                   unit = item.unit,
-                                                                  data = data))                
+                                                                  data = data,
+                                                                  data_loss = item.data_loss))                
                 else:
                     raise NotImplementedError('Working on series other than slots or points not yet implemented')
 
@@ -364,45 +368,45 @@ class Normalize(SeriesOperation):
         data_keys = timeseries.data_keys()
 
         # Get Min and max for the data keys
-        for i, datapoint in enumerate(timeseries):
+        for i, item in enumerate(timeseries):
             
             if i == 0:
-                mins = {key: datapoint.data[key] for key in data_keys}
-                maxs = {key: datapoint.data[key] for key in data_keys}        
+                mins = {key: item.data[key] for key in data_keys}
+                maxs = {key: item.data[key] for key in data_keys}        
             else:
                 for key in data_keys:
-                    if datapoint.data[key] < mins[key]:
-                        mins[key] = datapoint.data[key]
-                    if datapoint.data[key] > maxs[key]:
-                        maxs[key] = datapoint.data[key]                
+                    if item.data[key] < mins[key]:
+                        mins[key] = item.data[key]
+                    if item.data[key] > maxs[key]:
+                        maxs[key] = item.data[key]                
                 
         
-        for i, datapoint in enumerate(timeseries):
+        for i, item in enumerate(timeseries):
  
             if not inplace:
                 data = {}
              
             for key in data_keys:
-                 
-
 
                 # Normalize data
                 if not inplace:
-                    data[key] = (datapoint.data[key] - mins[key])  / (maxs[key]-mins[key])
+                    data[key] = (item.data[key] - mins[key])  / (maxs[key]-mins[key])
                 else:
-                    datapoint.data[key] = (datapoint.data[key] - mins[key])  / (maxs[key]-mins[key])
+                    item.data[key] = (item.data[key] - mins[key])  / (maxs[key]-mins[key])
              
             # Create the item
             if not inplace:
  
                 if isinstance(timeseries[0], Point):
-                    normalized_timeseries.append(timeseries[0].__class__(t = datapoint.t,
-                                                                         tz = datapoint.tz,
-                                                                         data = data))         
+                    normalized_timeseries.append(timeseries[0].__class__(t = item.t,
+                                                                         tz = item.tz,
+                                                                         data = data,
+                                                                         data_loss = item.data_loss))         
                 elif isinstance(timeseries[0], Slot):
-                    normalized_timeseries.append(timeseries[0].__class__(start = datapoint.start,
-                                                                         unit = datapoint.unit,
-                                                                         data = data))                
+                    normalized_timeseries.append(timeseries[0].__class__(start = item.start,
+                                                                         unit = item.unit,
+                                                                         data = data,
+                                                                         data_loss = item.data_loss))                
                 else:
                     raise NotImplementedError('Working on series other than slots or points not yet implemented')
  
