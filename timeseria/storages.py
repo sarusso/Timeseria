@@ -123,11 +123,6 @@ class CSVFileStorage(object):
 
             while True:
                 
-                # Increase line_counter and check for limit
-                line_number+=1
-                if limit and line_number > limit:
-                    break
-                
                 # TODO: replace me using a custom line separator
                 line = csv_file.readline()
                 logger.debug('Processing line #%s: "%s"', line_number, sanitize_string(line,NO_DATA_PLACEHOLDERS))
@@ -370,6 +365,10 @@ class CSVFileStorage(object):
                 # Append to the series
                 items.append([t, data])
 
+                # Lastly, increase line_counter and check for limit
+                line_number+=1
+                if limit and line_number >= limit:
+                    break
 
         # Were we able to read something?
         if not items:
