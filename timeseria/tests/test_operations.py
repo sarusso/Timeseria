@@ -2,7 +2,7 @@ import unittest
 import os
 from ..datastructures import TimePoint, DataTimePoint, DataTimeSlotSeries, DataTimeSlot
 from ..datastructures import TimePointSeries, DataTimePointSeries
-from ..operations import derivative, integral, diff, csum, min, max, avg, filter, select, mavg, normalize, merge
+from ..operations import derivative, integral, diff, csum, min, max, avg, filter, select, mavg, normalize, merge, offset, rescale
 from ..operations import Operation
 
 # Setup logging
@@ -41,7 +41,7 @@ class TestMathOperations(unittest.TestCase):
         self.assertEqual(diff_data_time_slot_series[2].data['value_diff'],3)
         self.assertEqual(diff_data_time_slot_series[3].data['value_diff'],1)
         
-        # Test data loss carried forward by the diff
+        # Test data loss correctly carried forward by the diff
         self.assertEqual(diff_data_time_slot_series[0].data_loss, 0.1)
         self.assertEqual(diff_data_time_slot_series[1].data_loss, 0.2)
         self.assertEqual(diff_data_time_slot_series[2].data_loss, 0.3)
@@ -54,7 +54,7 @@ class TestMathOperations(unittest.TestCase):
         self.assertEqual(diff_csum_data_time_slot_series[2].data['value_diff_csum'], 15)
         self.assertEqual(diff_csum_data_time_slot_series[3].data['value_diff_csum'], 16)
 
-        # Test data loss carried forward by the csum
+        # Test data loss correctly carried forward by the csum
         self.assertEqual(diff_csum_data_time_slot_series[0].data_loss, 0.1)
         self.assertEqual(diff_csum_data_time_slot_series[1].data_loss, 0.2)
         self.assertEqual(diff_csum_data_time_slot_series[2].data_loss, 0.3)
@@ -112,7 +112,7 @@ class TestMathOperations(unittest.TestCase):
         self.assertAlmostEqual(derivative_data_time_slot_series[2].data['value_derivative'],2)     # 5
         self.assertAlmostEqual(derivative_data_time_slot_series[3].data['value_derivative'],1.0)   # 6
 
-        # Test data loss carried forward by the derivative
+        # Test data loss correctly carried forward by the derivative
         self.assertEqual(derivative_data_time_slot_series[0].data_loss, 0.1)
         self.assertEqual(derivative_data_time_slot_series[1].data_loss, 0.2)
         self.assertEqual(derivative_data_time_slot_series[2].data_loss, 0.3)
@@ -125,7 +125,7 @@ class TestMathOperations(unittest.TestCase):
         self.assertEqual(derivative_integral_data_time_slot_series[2].data['value_derivative_integral'], 15)
         self.assertEqual(derivative_integral_data_time_slot_series[3].data['value_derivative_integral'], 16)
 
-        # Test data loss carried forward by the integral
+        # Test data loss correctly carried forward by the integral
         self.assertEqual(derivative_integral_data_time_slot_series[0].data_loss, 0.1)
         self.assertEqual(derivative_integral_data_time_slot_series[1].data_loss, 0.2)
         self.assertEqual(derivative_integral_data_time_slot_series[2].data_loss, 0.3)
@@ -189,10 +189,72 @@ class TestMathOperations(unittest.TestCase):
         self.assertEqual(normalized_data_time_point_series[2].data['a'],1)
         self.assertEqual(normalized_data_time_point_series[1].data['b'],1)
 
-        # Test data loss carried forward by the csum
+        # Test data loss correctly carried forward by the operation
         self.assertEqual(normalized_data_time_point_series[0].data_loss, 0.1)
         self.assertEqual(normalized_data_time_point_series[1].data_loss, 0.2)
         self.assertEqual(normalized_data_time_point_series[2].data_loss, 0.3)
+
+
+    def test_rescale(self):
+        data_time_point_series = DataTimePointSeries(DataTimePoint(t=60, data={'a':2, 'b':6}, data_loss=0.1),
+                                                     DataTimePoint(t=120, data={'a':4, 'b':9}, data_loss=0.2),
+                                                     DataTimePoint(t=180, data={'a':8, 'b':3}, data_loss=0.3))
+        
+        # Rescale with single value
+        rescaled_data_time_point_series = rescale(data_time_point_series, 2)
+        self.assertEqual(len(rescaled_data_time_point_series),3)        
+        self.assertEqual(rescaled_data_time_point_series[0].data['a'],4)
+        self.assertEqual(rescaled_data_time_point_series[0].data['b'],12)
+        self.assertEqual(rescaled_data_time_point_series[1].data['a'],8)
+        self.assertEqual(rescaled_data_time_point_series[1].data['b'],18)
+        self.assertEqual(rescaled_data_time_point_series[2].data['a'],16)
+        self.assertEqual(rescaled_data_time_point_series[2].data['b'],6)        
+        
+        # Rescale with specific value
+        rescaled_data_time_point_series = rescale(data_time_point_series, {'b':2})
+        self.assertEqual(len(rescaled_data_time_point_series),3)        
+        self.assertEqual(rescaled_data_time_point_series[0].data['a'],2)
+        self.assertEqual(rescaled_data_time_point_series[0].data['b'],12)
+        self.assertEqual(rescaled_data_time_point_series[1].data['a'],4)
+        self.assertEqual(rescaled_data_time_point_series[1].data['b'],18)
+        self.assertEqual(rescaled_data_time_point_series[2].data['a'],8)
+        self.assertEqual(rescaled_data_time_point_series[2].data['b'],6)  
+        
+        # Test data loss correctly carried forward by the operation
+        self.assertEqual(rescaled_data_time_point_series[0].data_loss, 0.1)
+        self.assertEqual(rescaled_data_time_point_series[1].data_loss, 0.2)
+        self.assertEqual(rescaled_data_time_point_series[2].data_loss, 0.3)
+
+
+    def test_offset(self):
+        data_time_point_series = DataTimePointSeries(DataTimePoint(t=60, data={'a':2, 'b':6}, data_loss=0.1),
+                                                     DataTimePoint(t=120, data={'a':4, 'b':9}, data_loss=0.2),
+                                                     DataTimePoint(t=180, data={'a':8, 'b':3}, data_loss=0.3))
+        
+        # Offset with single value
+        offsetted_data_time_point_series = offset(data_time_point_series, 10)
+        self.assertEqual(len(offsetted_data_time_point_series),3)        
+        self.assertEqual(offsetted_data_time_point_series[0].data['a'],12)
+        self.assertEqual(offsetted_data_time_point_series[0].data['b'],16)
+        self.assertEqual(offsetted_data_time_point_series[1].data['a'],14)
+        self.assertEqual(offsetted_data_time_point_series[1].data['b'],19)
+        self.assertEqual(offsetted_data_time_point_series[2].data['a'],18)
+        self.assertEqual(offsetted_data_time_point_series[2].data['b'],13)        
+        
+        # Offset with specific value
+        offsetted_data_time_point_series = offset(data_time_point_series, {'b':-3})
+        self.assertEqual(len(offsetted_data_time_point_series),3)        
+        self.assertEqual(offsetted_data_time_point_series[0].data['a'],2)
+        self.assertEqual(offsetted_data_time_point_series[0].data['b'],3)
+        self.assertEqual(offsetted_data_time_point_series[1].data['a'],4)
+        self.assertEqual(offsetted_data_time_point_series[1].data['b'],6)
+        self.assertEqual(offsetted_data_time_point_series[2].data['a'],8)
+        self.assertEqual(offsetted_data_time_point_series[2].data['b'],0)  
+        
+        # Test data loss correctly carried forward by the operation
+        self.assertEqual(offsetted_data_time_point_series[0].data_loss, 0.1)
+        self.assertEqual(offsetted_data_time_point_series[1].data_loss, 0.2)
+        self.assertEqual(offsetted_data_time_point_series[2].data_loss, 0.3)
 
 
     def test_mavg(self):
