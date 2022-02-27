@@ -706,7 +706,17 @@ class DataPointSeries(PointSeries):
         """Normalize the time series data values. Extra parameters: ``inplace`` (defaulted to false)."""
         from .operations import normalize as normalize_operation
         return normalize_operation(self, *args, **kwargs)   
-  
+
+    def rescale(self, *args, **kwargs):
+        """Rescale the time series data values. Extra parameters: ``inplace`` (defaulted to false)."""
+        from .operations import rescale as rescale_operation
+        return rescale_operation(self, *args, **kwargs)
+
+    def offset(self, *args, **kwargs):
+        """Offset the time series data values. Extra parameters: ``inplace`` (defaulted to false)."""
+        from .operations import offset as offset_operation
+        return offset_operation(self, *args, **kwargs)  
+
     def mavg(self, *args, **kwargs):
         """Compute the moving average. Extra parameters: ``inplace`` (defaulted to false)
         and ``window``, a required parameter, for the length of the moving average window."""
@@ -1301,6 +1311,16 @@ class DataSlotSeries(SlotSeries):
         """Normalize the time series data values. Extra parameters: ``inplace`` (defaulted to false)."""
         from .operations import normalize as normalize_operation
         return normalize_operation(self, *args, **kwargs)   
+
+    def rescale(self, *args, **kwargs):
+        """Rescale the time series data values. Extra parameters: ``inplace`` (defaulted to false)."""
+        from .operations import rescale as rescale_operation
+        return rescale_operation(self, *args, **kwargs)
+
+    def offset(self, *args, **kwargs):
+        """Offset the time series data values. Extra parameters: ``inplace`` (defaulted to false)."""
+        from .operations import offset as offset_operation
+        return offset_operation(self, *args, **kwargs)  
   
     def mavg(self, *args, **kwargs):
         """Compute the moving average. Extra parameters: ``inplace`` (defaulted to false)

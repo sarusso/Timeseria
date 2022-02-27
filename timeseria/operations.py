@@ -367,7 +367,7 @@ class Normalize(SeriesOperation):
 
         data_keys = timeseries.data_keys()
 
-        # Get Min and max for the data keys
+        # Get min and max for the data keys
         for i, item in enumerate(timeseries):
             
             if i == 0:
@@ -412,6 +412,104 @@ class Normalize(SeriesOperation):
  
         if not inplace:
             return normalized_timeseries
+
+
+
+
+class Rescale(SeriesOperation):
+    """Rescaling operation (callable object)"""
+    
+    def __call__(self, timeseries, value, inplace=False):
+        
+        if not inplace:
+            rescaled_timeseries = timeseries.__class__()
+
+        data_keys = timeseries.data_keys()
+
+        for item in timeseries:
+ 
+            if not inplace:
+                rescaled_data = {}
+            
+            # Rescale data
+            for key in data_keys:
+                if isinstance(value, dict):
+                    if key in value:
+                        rescaled_data[key] = item.data[key] * value[key]
+                    else:
+                        rescaled_data[key] = item.data[key]
+                else:
+                    rescaled_data[key] = item.data[key] * value
+            
+            # Set data or create the item
+            if inplace: 
+                item.data[key] = rescaled_data
+                            
+            else:
+
+                if isinstance(timeseries[0], Point):
+                    rescaled_timeseries.append(timeseries[0].__class__(t = item.t,
+                                                                         tz = item.tz,
+                                                                         data = rescaled_data,
+                                                                         data_loss = item.data_loss))         
+                elif isinstance(timeseries[0], Slot):
+                    rescaled_timeseries.append(timeseries[0].__class__(start = item.start,
+                                                                         unit = item.unit,
+                                                                         data = rescaled_data,
+                                                                         data_loss = item.data_loss))                
+                else:
+                    raise NotImplementedError('Working on series other than slots or points not yet implemented')
+ 
+        if not inplace:
+            return rescaled_timeseries
+
+
+class Offset(SeriesOperation):
+    """Offsetting operation (callable object)"""
+    
+    def __call__(self, timeseries, value, inplace=False):
+        
+        if not inplace:
+            rescaled_timeseries = timeseries.__class__()
+
+        data_keys = timeseries.data_keys()
+
+        for item in timeseries:
+ 
+            if not inplace:
+                offsetted_data = {}
+            
+            # Offset data
+            for key in data_keys:
+                if isinstance(value, dict):
+                    if key in value:
+                        offsetted_data[key] = item.data[key] + value[key]
+                    else:
+                        offsetted_data[key] = item.data[key]
+                else:
+                    offsetted_data[key] = item.data[key] + value
+            
+            # Set data or create the item
+            if inplace: 
+                item.data[key] = offsetted_data
+                            
+            else:
+
+                if isinstance(timeseries[0], Point):
+                    rescaled_timeseries.append(timeseries[0].__class__(t = item.t,
+                                                                         tz = item.tz,
+                                                                         data = offsetted_data,
+                                                                         data_loss = item.data_loss))         
+                elif isinstance(timeseries[0], Slot):
+                    rescaled_timeseries.append(timeseries[0].__class__(start = item.start,
+                                                                         unit = item.unit,
+                                                                         data = offsetted_data,
+                                                                         data_loss = item.data_loss))                
+                else:
+                    raise NotImplementedError('Working on series other than slots or points not yet implemented')
+ 
+        if not inplace:
+            return rescaled_timeseries
 
 
 
@@ -691,6 +789,8 @@ csum = CSum()
 mavg = MAvg()
 
 normalize = Normalize()
+offset = Offset()
+rescale = Rescale()
 
 merge = Merge()
 filter = Filter()
