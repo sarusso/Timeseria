@@ -644,6 +644,12 @@ class DataPointSeries(PointSeries):
             except AttributeError:
                 return list(range(len(self[0].data)))
 
+    def rename_data_key(self, old_key, new_key):
+        """Rename a data key."""
+        for item in self:
+            # TODO: move to the DataPoint/DataSlot?
+            item.data[new_key] = item.data.pop(old_key)
+
     def remove_data_loss(self):
         """Return a new series without the ``data_loss`` index."""
         new_series = self.duplicate()
@@ -1232,6 +1238,12 @@ class DataSlotSeries(SlotSeries):
                 return sorted(list(self[0].data.keys()))
             except AttributeError:
                 return list(range(len(self[0].data)))
+
+    def rename_data_key(self, old_key, new_key):
+        """Rename a data key."""
+        for item in self:
+            # TODO: move to the DataPoint/DataSlot?
+            item.data[new_key] = item.data.pop(old_key)
 
     def remove_data_loss(self):
         """Return a new series without the ``data_loss`` index."""

@@ -372,6 +372,20 @@ class TestPointSeries(unittest.TestCase):
         self.assertEqual(data_time_point_series['a'][0].data, {'a': 1})
 
 
+        # Test data keys and rename a data key
+        # TODO: move this test where to test data point series ?
+        data_time_point_series = DataTimePointSeries(DataTimePoint(dt=dt(2015,10,27,0,0,0, tzinfo='Europe/Rome'), data={'a':23.8, 'b':1}),
+                                                     DataTimePoint(dt=dt(2015,10,28,0,0,0, tzinfo='Europe/Rome'), data={'a':24.1, 'b':2}),
+                                                     DataTimePoint(dt=dt(2015,10,29,0,0,0, tzinfo='Europe/Rome'), data={'a':23.1, 'b':3}))
+        
+        self.assertEqual(data_time_point_series.data_keys(), ['a','b'])
+        data_time_point_series.rename_data_key('b','c')
+        self.assertEqual(data_time_point_series.data_keys(), ['a','c'])
+        
+        with self.assertRaises(KeyError):
+            data_time_point_series.rename_data_key('notexistent_key','c')
+
+
 
 class TestUnit(unittest.TestCase):
 
@@ -705,4 +719,18 @@ class TestSlotSeries(unittest.TestCase):
         # Test get item by string key (filter on data labels). More testing is done in the operation tests
         data_time_slot_series =  DataTimeSlotSeries(DataTimeSlot(start=TimePoint(t=60),  end=TimePoint(t=120), data={'a':1, 'b':2}))
         self.assertEqual(data_time_slot_series['a'][0].data, {'a': 1})
+
+
+        # Test data keys and rename a data key
+        # TODO: move this test where to test data point series ?
+        data_time_slot_series = DataTimeSlotSeries(DataTimeSlot(dt=dt(2015,10,27,0,0,0), unit='1D', data={'a':23.8, 'b':1}),
+                                                   DataTimeSlot(dt=dt(2015,10,28,0,0,0), unit='1D', data={'a':24.1, 'b':2}),
+                                                   DataTimeSlot(dt=dt(2015,10,29,0,0,0), unit='1D', data={'a':23.1, 'b':3}))
+        
+        self.assertEqual(data_time_slot_series.data_keys(), ['a','b'])
+        data_time_slot_series.rename_data_key('b','c')
+        self.assertEqual(data_time_slot_series.data_keys(), ['a','c'])
+        
+        with self.assertRaises(KeyError):
+            data_time_slot_series.rename_data_key('notexistent_key','c')
 
