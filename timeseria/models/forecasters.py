@@ -59,6 +59,9 @@ class Forecaster(TimeSeriesParametricModel):
 
     def _evaluate(self, timeseries, steps='auto', limit=None, plots=False, plot=False, metrics=['RMSE', 'MAE'], details=False, from_t=None, to_t=None, from_dt=None, to_dt=None, evaluation_timeseries=False):
 
+        # Set empty list if metrics were None
+        if metrics is None:
+            metrics = []
 
         # Set evaluation steps if we have to
         if steps == 'auto':
@@ -79,10 +82,13 @@ class Forecaster(TimeSeriesParametricModel):
                     raise ValueError('Evaluating a windowless model on a multi-step forecast does not make sense (got steps={})'.format(steps))
             steps = list(range(1, steps+1))
         
-        if plot and steps != [1]:
-            raise ValueError('Plotting an evaluation is supported only with single step-ahead forecasts (steps=[1])')
-
+        return_evaluation_timeseries = evaluation_timeseries
+        
         if plot or evaluation_timeseries:
+
+            if steps != [1]:
+                raise ValueError('Plotting or getting back an evaluation time series is only supported with single step ahead forecasts (steps=[1])')
+            
             evaluation_timeseries = timeseries.duplicate()
             if self.data['window']:
                 evaluation_timeseries = evaluation_timeseries[self.data['window']:]
@@ -95,7 +101,7 @@ class Forecaster(TimeSeriesParametricModel):
         warned = False
 
         # Log
-        logger.info('Will evaluate model for %s steps with metrics %s', steps, metrics)
+        logger.info('Will evaluate model for %s steps ahead with metrics %s', steps, metrics)
 
         for steps_round in steps:
             
@@ -308,13 +314,14 @@ class Forecaster(TimeSeriesParametricModel):
             results = simple_results
 
         # Handle evaluation timeseries if required
-        if evaluation_timeseries:
+        if return_evaluation_timeseries:
             results['evaluation_timeseries'] = evaluation_timeseries 
         if plot:
             evaluation_timeseries.plot()   
 
-        # Return evaluation results
-        return results
+        # Return evaluation results if any
+        if results:
+            return results
 
 
     def _apply(self, timeseries, n=1, inplace=False):
