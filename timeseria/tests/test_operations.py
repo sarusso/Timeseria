@@ -194,6 +194,14 @@ class TestMathOperations(unittest.TestCase):
         self.assertEqual(normalized_data_time_point_series[1].data_loss, 0.2)
         self.assertEqual(normalized_data_time_point_series[2].data_loss, 0.3)
 
+        # Test normalize with respect to another range (other than 0-1):
+        custom_normalized_data_time_point_series = normalize(data_time_point_series, [0.5,1.5])
+
+        self.assertEqual(custom_normalized_data_time_point_series[0].data['a'],0.5)
+        self.assertAlmostEqual(custom_normalized_data_time_point_series[1].data['a'],0.83333333)
+        self.assertEqual(custom_normalized_data_time_point_series[2].data['a'],1.5)
+        
+
 
     def test_rescale(self):
         data_time_point_series = DataTimePointSeries(DataTimePoint(t=60, data={'a':2, 'b':6}, data_loss=0.1),

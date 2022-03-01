@@ -360,7 +360,12 @@ class CSum(Integral):
 class Normalize(SeriesOperation):
     """Normalization operation (callable object)"""
     
-    def __call__(self, timeseries, inplace=False):
+    def __call__(self, timeseries, range=[0,1], inplace=False):
+        
+        if range == [0,1]:
+            custom_range = None
+        else:
+            custom_range = range
         
         if not inplace:
             normalized_timeseries = timeseries.__class__()
@@ -379,7 +384,7 @@ class Normalize(SeriesOperation):
                         mins[key] = item.data[key]
                     if item.data[key] > maxs[key]:
                         maxs[key] = item.data[key]                
-                
+        
         
         for i, item in enumerate(timeseries):
  
@@ -390,9 +395,15 @@ class Normalize(SeriesOperation):
 
                 # Normalize data
                 if not inplace:
-                    data[key] = (item.data[key] - mins[key])  / (maxs[key]-mins[key])
+                    if custom_range:
+                        data[key] = (((item.data[key] - mins[key])  / (maxs[key]-mins[key])) * (custom_range[1]-custom_range[0])) + custom_range[0]            
+                    else:    
+                        data[key] = (item.data[key] - mins[key])  / (maxs[key]-mins[key])
                 else:
-                    item.data[key] = (item.data[key] - mins[key])  / (maxs[key]-mins[key])
+                    if custom_range:
+                        item.data[key] = (((item.data[key] - mins[key])  / (maxs[key]-mins[key])) * (custom_range[1]-custom_range[0])) + custom_range[0]               
+                    else:
+                        item.data[key] = (item.data[key] - mins[key])  / (maxs[key]-mins[key])
              
             # Create the item
             if not inplace:
