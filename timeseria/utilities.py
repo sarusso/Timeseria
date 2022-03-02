@@ -22,6 +22,7 @@ HARD_DEBUG = False
 
 
 def is_numerical(item):
+    """Check if item is numerical (float or int)"""
     if isinstance(item, float):
         return True
     if isinstance(item, int):
@@ -113,7 +114,6 @@ def detect_encoding(filename, streaming=False):
      
     return encoding
 
-
 def compute_coverage(data_time_point_series, from_t, to_t, trustme=False, validity=None, validity_placement='center'):
     '''Compute the data coverage of a data_time_point_series based on the data_time_points validity'''
     
@@ -121,6 +121,10 @@ def compute_coverage(data_time_point_series, from_t, to_t, trustme=False, validi
     center = 1
     left   = 2
     right  = 3
+    
+    # If there is no validity, we cannot compute any coverage
+    if not validity:
+        return None
     
     if validity_placement == 'center':
         validity_placement=center
@@ -153,21 +157,15 @@ def compute_coverage(data_time_point_series, from_t, to_t, trustme=False, validi
     #  START cycle over points
     #===========================
     
-    for this_data_time_point in data_time_point_series:
-        
+    for i, this_data_time_point in enumerate(data_time_point_series):
         
         # Compute this_data_time_point validity boundaries
-        if validity:
-            if validity_placement==center:
-                this_data_time_point_valid_from_t = this_data_time_point.t - (validity/2)
-                this_data_time_point_valid_to_t   = this_data_time_point.t + (validity/2)
-            else:
-                raise NotImplementedError('Validity placements other than "center" are not yet supported')
-        
+        if validity_placement==center:
+            this_data_time_point_valid_from_t = this_data_time_point.t - (validity/2)
+            this_data_time_point_valid_to_t   = this_data_time_point.t + (validity/2)
         else:
-            this_data_time_point_valid_from_t = this_data_time_point.t
-            this_data_time_point_valid_to_t   = this_data_time_point.t
-        
+            raise NotImplementedError('Validity placements other than "center" are not yet supported')
+
         # Hard debug
         #logger.debug('HARD DEBUG %s %s %s', this_data_time_point.Point_part, this_data_time_point.validity_region.start, this_data_time_point.validity_region.end)
         
@@ -176,48 +174,11 @@ def compute_coverage(data_time_point_series, from_t, to_t, trustme=False, validi
         #    start_Point = data_time_point_series.Point_part
         # TODO: add support also for dynamically setting the end_Point to allow empty start_Point/end_Point input        
         
-        #=====================
-        #  BEFORE START
-        #=====================
-        
-        # Are we before the start_Point? 
-        if this_data_time_point.t < from_t:
-            
-            # Just set the previous Point valid until
-            prev_datapoint_valid_to_t = this_data_time_point_valid_to_t
-
-            # If prev point too far, skip it
-            if prev_datapoint_valid_to_t <= from_t:
-                prev_datapoint_valid_to_t = None
-
+        # Are we processing points not belonging by any means to this interval?
+        if this_data_time_point_valid_to_t <= from_t:
             continue
-
-
-        #=====================
-        #  After end
-        #=====================
-        # Are we after the end_Point? In this case, we can treat it as if we are in the middle-
-        elif this_data_time_point.t >= to_t:
-
-            if not next_processed: 
-                next_processed = True
-                
-                # If "next" point too far, skip it:
-                if this_data_time_point_valid_from_t > to_t:
-                    continue
-            else:
-                continue
-
-
-        #=====================
-        #  In the middle
-        #=====================
-        
-        # Otherwise, we are in the middle?
-        else:
-            # Normal operation mode
-            pass
-
+        if this_data_time_point_valid_from_t > to_t:
+            break
         
 
         # Okay, now we have all the values we need:
@@ -228,8 +189,8 @@ def compute_coverage(data_time_point_series, from_t, to_t, trustme=False, validi
         if empty_data_time_point_series:
             empty_data_time_point_series = False
 
-        # Compute coverage
-        # TODO: and idea could also to initialize Units and sum them
+        # Compute coverage by checking
+        # TODO: and idea could also to initialize Units and sum them        
         if prev_datapoint_valid_to_t is None:
             value = this_data_time_point_valid_from_t - from_t
             
