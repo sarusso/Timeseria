@@ -114,6 +114,64 @@ def detect_encoding(filename, streaming=False):
      
     return encoding
 
+
+def compute_validity_regions(series, from_t=None, to_t=None, sampling_interval=None, shrink=False):
+    """
+    Compute the validity regions for the series points. If from_t or to_t are given, computes them within that interval only.
+    
+    Args:
+        series: the time series.  
+        from_t: the interval start.
+        to_t: the interval end.
+        sampling_interval: the sampling interval. In not set, it will be used the series' (auto-detected) one.
+        shrink: if to shrink the validity according to the start/end.
+    """
+
+    # Get the series sampling interval unless it is forced to a specific value
+    if not sampling_interval:
+        sampling_interval = series.autodetected_sampling_interval
+
+    # Segments dict
+    validity_segments = {}
+    
+    # Compute validity segments for each point
+    prev_point_t = None
+    for point in series:
+
+        # Get point validity boundaries
+        point_valid_from_t = point.t - (sampling_interval/2)
+        point_valid_to_t   = point.t + (sampling_interval/2)
+
+        # Are we processing points not belonging to this interval, if set?
+        if from_t is not None and point_valid_to_t <= from_t:
+            continue
+        if to_t is not None and point_valid_from_t > to_t:
+            break
+        
+        # Shrink with respect to start-end if required
+        if shrink:
+            if from_t is not None and point_valid_from_t < from_t:
+                point_valid_from_t = from_t
+            if to_t is not None and point_valid_to_t > to_t:
+                point_valid_to_t = to_t
+    
+        # Shrink if overlaps: if the previous point validity overlap with ours, resize both
+        if prev_point_t is not None:
+            if point_valid_from_t < validity_segments[prev_point_t][1]:
+                # Shrink both
+                mid_t = (validity_segments[prev_point_t][1] + point_valid_from_t)/2                
+                validity_segments[prev_point_t][1] = mid_t
+                point_valid_from_t = mid_t
+    
+        # Set this validity segment boundaries
+        validity_segments[point.t] = [point_valid_from_t,point_valid_to_t]
+
+        # Set previous point timestamp
+        prev_point_t = point.t
+
+    return validity_segments
+
+
 def compute_coverage(data_time_point_series, from_t, to_t, trustme=False, validity=None, validity_placement='center'):
     '''Compute the data coverage of a data_time_point_series based on the data_time_points validity'''
     

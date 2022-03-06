@@ -1,6 +1,8 @@
 import unittest
 import os
-from ..utilities import detect_encoding, compute_coverage, compute_data_loss, get_periodicity, detect_sampling_interval
+from ..utilities import detect_encoding, get_periodicity, detect_sampling_interval
+from ..utilities import compute_coverage, compute_data_loss, compute_validity_regions 
+
 from ..datastructures import DataTimePointSeries, DataTimePoint
 from ..time import dt, s_from_dt
 from ..storages import CSVFileStorage
@@ -21,8 +23,91 @@ class TestDetectEncoding(unittest.TestCase):
         
         encoding = detect_encoding('{}/csv/shampoo_sales.csv'.format(TEST_DATA_PATH), streaming=False)
         self.assertEqual(encoding, 'ascii')
+
+
+class TestComputeValidityRegions(unittest.TestCase):
+    
+    def test_standard(self):
         
-     
+        series = DataTimePointSeries()
+        series.append(DataTimePoint(t = 7, data = {'value': 4571.55}))
+        series.append(DataTimePoint(t = 12, data = {'value': 4571.55}))
+        series.append(DataTimePoint(t = 17, data = {'value': 4571.55}))
+        series.append(DataTimePoint(t = 22, data = {'value': 4571.55}))
+        series.append(DataTimePoint(t = 27, data = {'value': 4571.55}))
+
+        # All of them
+        expected_results = {7: [4.5, 9.5], 12: [9.5, 14.5], 17: [14.5, 19.5], 22: [19.5, 24.5], 27: [24.5, 29.5]}
+        results = compute_validity_regions(series)
+        self.assertEqual(results, expected_results)
+        
+        # Only from-to
+        expected_results = {12: [9.5, 14.5], 17: [14.5, 19.5], 22: [19.5, 24.5]}
+        results = compute_validity_regions(series, from_t=10, to_t=20)
+        self.assertEqual(results, expected_results)
+
+        # Shrink them according to the from-to
+        expected_results = {12: [10, 14.5], 17: [14.5, 19.5], 22: [19.5, 20]}
+        results = compute_validity_regions(series, from_t=10, to_t=20, shrink=True)
+        self.assertEqual(results, expected_results)
+        
+        # Force a specific sampling intervals
+        expected_results = {12: [11.5, 12.5], 17: [16.5, 17.5]}
+        results = compute_validity_regions(series, from_t=10, to_t=20, sampling_interval=1)
+        self.assertEqual(results, expected_results)
+        
+
+    def test_prev_next_points(self):
+        series = DataTimePointSeries()
+        series.append(DataTimePoint(t = 7, data = {'value': 4571.55}))
+        series.append(DataTimePoint(t = 12, data = {'value': 4571.55}))
+        series.append(DataTimePoint(t = 17, data = {'value': 4571.55}))
+        series.append(DataTimePoint(t = 22, data = {'value': 4571.55}))
+        series.append(DataTimePoint(t = 27, data = {'value': 4571.55}))
+ 
+ 
+        # Test prev-next
+        expected_results = {7: [4.5, 9.5], 12: [9.5, 14.5], 17: [14.5, 19.5], 22: [19.5, 24.5], 27: [24.5, 29.5]}
+        results = compute_validity_regions(series, from_t=9, to_t=25)
+        self.assertEqual(results, expected_results)
+
+        # Test shrinked prev-next
+        expected_results = {7: [9, 9.5], 12: [9.5, 14.5], 17: [14.5, 19.5], 22: [19.5, 24.5], 27: [24.5, 25]}
+        results = compute_validity_regions(series, from_t=9, to_t=25, shrink=True)
+        self.assertEqual(results, expected_results)
+ 
+ 
+    def test_overlaps(self):
+         
+        series = DataTimePointSeries()
+        series.append(DataTimePoint(t = 7, data = {'value': 4571.55}))
+        series.append(DataTimePoint(t = 12, data = {'value': 4571.55}))
+        series.append(DataTimePoint(t = 13, data = {'value': 4571.55}))
+        series.append(DataTimePoint(t = 17, data = {'value': 4571.55}))
+        series.append(DataTimePoint(t = 22, data = {'value': 4571.55}))
+        series.append(DataTimePoint(t = 27, data = {'value': 4571.55}))
+
+        expected_results = {7: [4.5, 9.5], 12: [9.5, 12.5], 13: [12.5, 15], 17: [15, 19.5], 22: [19.5, 24.5], 27: [24.5, 29.5]}
+        results = compute_validity_regions(series)
+        self.assertEqual(results, expected_results)
+
+
+    def test_major_overlaps(self):
+
+        series = DataTimePointSeries()
+        series.append(DataTimePoint(t = 7, data = {'value': 4571.55}))
+        series.append(DataTimePoint(t = 12, data = {'value': 4571.55}))
+        series.append(DataTimePoint(t = 12.1, data = {'value': 4571.55}))
+        series.append(DataTimePoint(t = 12.3, data = {'value': 4571.55}))
+        series.append(DataTimePoint(t = 13, data = {'value': 4571.55}))
+        series.append(DataTimePoint(t = 17, data = {'value': 4571.55}))
+        series.append(DataTimePoint(t = 22, data = {'value': 4571.55}))
+        series.append(DataTimePoint(t = 27, data = {'value': 4571.55}))
+
+        expected_results = {7: [4.5, 9.5], 12: [9.5, 12.05], 12.1: [12.05, 12.2], 12.3: [12.2, 12.65], 13: [12.65, 15.0], 17: [15.0, 19.5], 22: [19.5, 24.5], 27: [24.5, 29.5]}
+        results = compute_validity_regions(series)
+        self.assertEqual(results, expected_results)
+
 
 class TestComputeCoverage(unittest.TestCase):
 
