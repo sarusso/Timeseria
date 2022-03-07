@@ -213,7 +213,7 @@ class TestSlotter(unittest.TestCase):
             data_time_point_series.append(data_time_point)
 
         # Add extra operations
-        data_time_slot_series = Slotter('600s', extra_operations=[min,max]).process(data_time_point_series)        
+        data_time_slot_series = Slotter('600s', extra_operations=[min,max]).process(data_time_point_series)      
         self.assertEqual(data_time_slot_series[0].data, {'temperature_avg': 161.0, 'humidity_avg': 5.0, 'temperature_min': 156, 'humidity_min': 5, 'temperature_max': 166, 'humidity_max': 5})
 
         # Change default operations
@@ -426,7 +426,116 @@ class TestResampler(unittest.TestCase):
         
         # When implementing it, remember about check correct linear interpolation when there is data loss vs. when there isn't,
         # and that all the prev-next math has to be correctly taken into account together with computing the right data loss.
-         
+
+
+    def test_resample_edge_cases(self):
+        #self.assertEqual(1, 2)
+        
+        #data_time_point_series = DataTimePointSeries({1:2, 2:4})
+        
+        data_time_point_series = DataTimePointSeries()
+        #data_time_point_series.append(DataTimePoint(t = (60*35)+18, data = {'value': 4571.27}))
+        #data_time_point_series.append(DataTimePoint(t = (60*40)+18, data = {'value': 4571.3}))
+        #data_time_point_series.append(DataTimePoint(t = (60*45)+18, data = {'value': 4571.33}))
+        #data_time_point_series.append(DataTimePoint(t = (60*55)+18, data = {'value': 4571.4}))
+        #data_time_point_series.append(DataTimePoint(t = (60*60)+18, data = {'value': 4571.43}))
+
+
+        data_time_point_series.append(DataTimePoint(t = (60*20), data = {'value': 4571.55}))
+        data_time_point_series.append(DataTimePoint(t = (60*25), data = {'value': 4571.58}))
+        data_time_point_series.append(DataTimePoint(t = (60*30), data = {'value': 4571.61}))
+        data_time_point_series.append(DataTimePoint(t = (60*45), data = {'value': 4571.71}))
+        data_time_point_series.append(DataTimePoint(t = (60*50), data = {'value': 4571.74}))
+
+        # DataTimePoint @ 1500.0 (1970-01-01 00:25:00+00:00) with data "{'value': 4571.5650000000005}"
+        # DataTimePoint @ 1800.0 (1970-01-01 00:30:00+00:00) with data "{'value': 4571.594999999999}"
+        # DataTimePoint @ 2100.0 (1970-01-01 00:35:00+00:00) with data "{'value': 4571.625}"
+        # DataTimePoint @ 2400.0 (1970-01-01 00:40:00+00:00) with data "{'value': 4571.66}"
+        # DataTimePoint @ 2700.0 (1970-01-01 00:45:00+00:00) with data "{'value': 4571.695}"
+        # DataTimePoint @ 3000.0 (1970-01-01 00:50:00+00:00) with data "{'value': 4571.725}"
+        # vs 
+        # DataTimePoint @ 1500.0 (1970-01-01 00:25:00+00:00) with data "{'value': 4571.5650000000005}" and data_loss="0.0"
+        # DataTimePoint @ 1800.0 (1970-01-01 00:30:00+00:00) with data "{'value': 4571.594999999999}" and data_loss="0.0"
+        # DataTimePoint @ 2100.0 (1970-01-01 00:35:00+00:00) with data "{'value': 4571.61}" and data_loss="0.94"
+        # DataTimePoint @ 2400.0 (1970-01-01 00:40:00+00:00) with data "{'value': 4571.68}" and data_loss="0.06000000000000005"
+        # DataTimePoint @ 2700.0 (1970-01-01 00:45:00+00:00) with data "{'value': 4571.695}" and data_loss="0.0"
+        # DataTimePoint @ 3000.0 (1970-01-01 00:50:00+00:00) with data "{'value': 4571.725}" and data_loss="0.0"
+
+
+        resampled_data_time_point_series = Resampler('300s').process(data_time_point_series) 
+        
+        print(data_time_point_series)
+        print(resampled_data_time_point_series)
+        for item in resampled_data_time_point_series:
+            print(item)
+            
+            
+        print('---------------------------------')
+
+
+        #self.assertEqual(1, 2)
+        
+        #data_time_point_series = DataTimePointSeries({1:2, 2:4})
+        
+        data_time_point_series = DataTimePointSeries()
+        #data_time_point_series.append(DataTimePoint(t = (60*35)+18, data = {'value': 4571.27}))
+        #data_time_point_series.append(DataTimePoint(t = (60*40)+18, data = {'value': 4571.3}))
+        #data_time_point_series.append(DataTimePoint(t = (60*45)+18, data = {'value': 4571.33}))
+        #data_time_point_series.append(DataTimePoint(t = (60*55)+18, data = {'value': 4571.4}))
+        #data_time_point_series.append(DataTimePoint(t = (60*60)+18, data = {'value': 4571.43}))
+
+
+        data_time_point_series.append(DataTimePoint(t = (60*20)+18, data = {'value': 4571.55}))
+        data_time_point_series.append(DataTimePoint(t = (60*25)+18, data = {'value': 4571.58}))
+        data_time_point_series.append(DataTimePoint(t = (60*30)+18, data = {'value': 4571.61}))
+        #data_time_point_series.append(DataTimePoint(t = (60*35)+18, data = {'value': 4571.64}))
+        data_time_point_series.append(DataTimePoint(t = (60*40)+18, data = {'value': 4571.68}))
+        data_time_point_series.append(DataTimePoint(t = (60*45)+18, data = {'value': 4571.71}))
+        data_time_point_series.append(DataTimePoint(t = (60*50)+18, data = {'value': 4571.74}))
+
+        # DataTimePoint @ 1500.0 (1970-01-01 00:25:00+00:00) with data "{'value': 4571.5650000000005}"
+        # DataTimePoint @ 1800.0 (1970-01-01 00:30:00+00:00) with data "{'value': 4571.594999999999}"
+        # DataTimePoint @ 2100.0 (1970-01-01 00:35:00+00:00) with data "{'value': 4571.625}"
+        # DataTimePoint @ 2400.0 (1970-01-01 00:40:00+00:00) with data "{'value': 4571.66}"
+        # DataTimePoint @ 2700.0 (1970-01-01 00:45:00+00:00) with data "{'value': 4571.695}"
+        # DataTimePoint @ 3000.0 (1970-01-01 00:50:00+00:00) with data "{'value': 4571.725}"
+        # vs 
+        # DataTimePoint @ 1500.0 (1970-01-01 00:25:00+00:00) with data "{'value': 4571.5650000000005}" and data_loss="0.0"
+        # DataTimePoint @ 1800.0 (1970-01-01 00:30:00+00:00) with data "{'value': 4571.594999999999}" and data_loss="0.0"
+        # DataTimePoint @ 2100.0 (1970-01-01 00:35:00+00:00) with data "{'value': 4571.61}" and data_loss="0.94"
+        # DataTimePoint @ 2400.0 (1970-01-01 00:40:00+00:00) with data "{'value': 4571.68}" and data_loss="0.06000000000000005"
+        # DataTimePoint @ 2700.0 (1970-01-01 00:45:00+00:00) with data "{'value': 4571.695}" and data_loss="0.0"
+        # DataTimePoint @ 3000.0 (1970-01-01 00:50:00+00:00) with data "{'value': 4571.725}" and data_loss="0.0"
+
+
+        resampled_data_time_point_series = Resampler('300s').process(data_time_point_series) 
+        
+        print(data_time_point_series)
+        print(resampled_data_time_point_series)
+        for item in resampled_data_time_point_series:
+            print(item)
+
+
+
+
+
+
+
+
+
+
+
+
+#         start_t = 1436022000 - 120
+#         for i in range(35):
+#             data_time_point = DataTimePoint(t = start_t + (i*60),
+#                                             tz='Europe/Rome',
+#                                             data = {'temperature': 154+i})
+#             data_time_point_series.append(data_time_point)
+#  
+#         data_time_slot_series = Resampler('600s').process(data_time_point_series)        
+#          
+#   
 
     def test_resampler_indexes(self):
         
