@@ -341,7 +341,7 @@ class TestResampler(unittest.TestCase):
                                             tz='Europe/Rome',
                                             data = {'temperature': 154+i})
             data_time_point_series.append(data_time_point)
- 
+
         data_time_slot_series = Resampler('600s').process(data_time_point_series)        
  
         self.assertEqual(str(data_time_slot_series[0].dt), '2015-07-04 17:00:00+02:00')
@@ -350,11 +350,11 @@ class TestResampler(unittest.TestCase):
          
         self.assertEqual(str(data_time_slot_series[1].dt), '2015-07-04 17:10:00+02:00')
         self.assertAlmostEqual(data_time_slot_series[1].data_loss, 0.0)
-        self.assertEqual(data_time_slot_series[1].data['temperature'], 166.0)
+        self.assertEqual(data_time_slot_series[1].data['temperature'], 166.5)
          
         self.assertEqual(str(data_time_slot_series[3].dt), '2015-07-04 17:30:00+02:00')
         self.assertAlmostEqual(data_time_slot_series[3].data_loss, 0.25)
-        self.assertEqual(data_time_slot_series[3].data['temperature'], 184.5)
+        self.assertEqual(data_time_slot_series[3].data['temperature'], 185.0)
  
      
         # Time series from 15:00:00 to 15:37:00 (UTC)
@@ -365,8 +365,13 @@ class TestResampler(unittest.TestCase):
                                             data = {'temperature': 154+i})
             data_time_point_series.append(data_time_point)
  
+        #for item in data_time_point_series:
+        #    print(item)
  
         data_time_slot_series = Resampler('600s').process(data_time_point_series)
+
+        #for item in data_time_slot_series:
+        #    print(item)
          
         self.assertEqual(str(data_time_slot_series[0].dt), '2015-07-04 15:00:00+00:00')
         self.assertAlmostEqual(data_time_slot_series[0].data_loss, 0.45)
