@@ -77,18 +77,19 @@ def _compute_new(type,
             # If we are here it means that the point is completely outside the interval
             # This is required if in the operation there is the need of knowing the next
             # (or prev) value, even if it was far away
-            point.weigth = 0
-           
+            point.weight = 0
+    logger.debug('Working series: %s', series)
+    
     # Create the series containing only the data points for the interval, 
     # and set prev and next. As always, left included, right excluded
     interval_series = DataTimePointSeries()
     prev_point = None
     next_point = None
     for point in series:
-        if point.t <= start_t:
+        if point.t < start_t:
             prev_point = point
             continue
-        if point.t > end_t:
+        if point.t >= end_t:
             next_point = point
             continue
         interval_series.append(point)
@@ -111,12 +112,12 @@ def _compute_new(type,
     if type=='point':
         # If we have to fully reconstruct data
         if data_loss == 1: 
-    
+
             # Reconstruct
             for key in data_keys:
                 
                 # If we have to fill with a specific value, use it
-                if fill_with:
+                if fill_with is not None:
                     data = {key:fill_with for key in data_keys}
                     continue                
  
@@ -129,13 +130,15 @@ def _compute_new(type,
                 # with respect to the entire interpolation
                 else:   
 
-                    if interpolation_method == 'linear': 
+                    if interpolation_method == 'linear':
+                        prev_point.data[key]
+                        next_point.data[key]
                         diff = next_point.data[key] - prev_point.data[key]
                         delta_t = next_point.t - prev_point.t
                         ratio = diff / delta_t
                         point_t = start_t + (unit.duration_s() /2)
                         data[key] = prev_point.data[key] + ((point_t - prev_point.t) * ratio)
-    
+
                     elif interpolation_method == 'uniform':
                         data[key] = (prev_point.data[key] + next_point.data[key]) /2
                    
@@ -145,7 +148,7 @@ def _compute_new(type,
         else:    
     
             # If we have some data to work on, compute the averages data
-            avgs = avg(interval_series, prev_point=prev_point, next_point=next_point)
+            avgs = avg(series)
             
             # ...and assign them to the data value
             if isinstance(avgs, dict):
@@ -325,8 +328,10 @@ class Resampler(Transformation):
 
         # Move fromt_dt and to_dt to epoch to simplify the following
         if from_dt is not None:
+            raise NotImplementedError('The resampler does not support setting a from')
             from_t = s_from_dt(from_dt)
         if to_dt is not None:
+            raise NotImplementedError('The resampler does not support setting a to')
             to_t = s_from_dt(to_dt)
             # Also force close if we have explicitly set an end
             force_close_last = True
@@ -381,7 +386,9 @@ class Resampler(Transformation):
 
         # Set some support vars
         slot_start_t       = None
+        slot_start_dt = None
         slot_end_t         = None
+        slot_end_dt = None
         prev_data_time_point = None
         working_serie      = DataTimePointSeries()
         process_ended      = False
@@ -452,16 +459,16 @@ class Resampler(Transformation):
                 
                     else:
                         
-                        # Append last point, 
-                        # Note: the same point can be appended to multiple slots, this is normal since
-                        # the empty slots in the middle will have only a far prev and a far next.
-                        # can also be appended several times if working_serie is not reset (looping in the while)
-                        #if working_serie[-1].t >= slot_end_t:
-                        #    if data_time_point not in working_serie:
-                        logger.debug('Appending this (next) to working series: %s', data_time_point)
-                        working_serie.append(data_time_point)
-      
-                        logger.debug('This slot (start=%s, end=%s) is closed, now computing it..', slot_start_t, slot_end_t)
+                        # Add this as next if not already there (i.e. totally empty slots spinned over and over)
+                        if data_time_point not in working_serie:
+                            logger.debug('Appending this (as next) to working series: %s', data_time_point)
+                            working_serie.append(data_time_point)
+                        else:
+                            logger.debug('Not appending this (as next) to working series as already present: %s', data_time_point)
+
+
+                        logger.debug('This slot with start=%s (%s) and end=%s (%s) is closed, now computing it..', slot_start_t, slot_start_dt, slot_end_t, slot_end_dt)
+                        #logger.debug('This slot (start=%s, end=%s) is closed, now computing it..', slot_start_t, slot_end_t)
                         logger.debug('working_serie first point dt: %s (t=%s)', working_serie[0].dt, working_serie[0].t)
                         logger.debug('working_serie  last point dt: %s (t=%s)', working_serie[-1].dt, working_serie[-1].t)
 
@@ -497,26 +504,38 @@ class Resampler(Transformation):
                     slot_end_dt = slot_start_dt + self.time_unit
                     slot_end_t = s_from_dt(slot_end_dt)
 
-                    # Create a new working_serie as part of the "create a new slot" procedure
-                    working_serie = DataTimePointSeries()
-                    
-                    # Append the last prev_data_time_point to the new DataTimeSeries,
-                    # that will be in turn the new prev since not yet updated outside
-                    if prev_data_time_point:
-                        logger.debug('Appending new prev point to working series: %s', prev_data_time_point)
-                        working_serie.append(prev_data_time_point)
-                    
-                    # Now append this point to the new working series
-                    logger.debug('Appending new this point to working series: %', data_time_point)
-                    working_serie.append(data_time_point)
-                
-                    # ..and save it as previous point
-                    logger.debug('Setting prev to %s', data_time_point.dt)
-                    prev_data_time_point = data_time_point     
-
                     # Log the newly spinned slot
                     logger.debug('Spinned a new slot, start=%s (%s), end=%s (%s)', slot_start_t, slot_start_dt, slot_end_t, slot_end_dt)
-                   
+
+                    # Create a new working_serie as part of the "create a new slot" procedure
+                    working_serie = DataTimePointSeries()
+
+                    # Add prev if not already there
+                    if prev_data_time_point:
+                        if prev_data_time_point not in working_serie:
+                            logger.debug('Appending prev to new working series: %s', prev_data_time_point)
+                            working_serie.append(prev_data_time_point)
+                        else:
+                            logger.debug('Not appending prev to new working series as already present: %s', prev_data_time_point)
+                    else:
+                        logger.debug('Not appending prev to new working series as not defined')
+                        
+                    # Add this if not already there
+                    if data_time_point not in working_serie:
+                        logger.debug('Appending this to new working series: %s', data_time_point)
+                        working_serie.append(data_time_point)
+                    else:
+                        logger.debug('Not appending this to new working series as already present: %s', data_time_point)
+
+                    # ..and save the prev for the next round if an actual prev for the next slot
+                    # Note: the slot_end_t is the next slot start.
+                    # Note: if we are spinning more than one slot it might is still far away
+                    if data_time_point.t < slot_end_t:
+                        logger.debug('Setting prev to %s', data_time_point.dt)
+                        prev_data_time_point = data_time_point
+                    else:
+                        logger.debug('Not setting new prev as still in future: %s', data_time_point.dt)
+
                     
                 # If last slot mark process as completed (and aggregate last slot if necessary)
                 if data_time_point.dt >= to_dt:
@@ -549,7 +568,7 @@ class Resampler(Transformation):
             else:
                 
                 # Normal operation mode: append this point to the working series
-                logger.debug('Appending starndard this point to working series: %s', data_time_point)
+                logger.debug('Appending standard this point to working series: %s', data_time_point)
                 working_serie.append(data_time_point)
                 
                 # ..and save it as previous point
@@ -560,7 +579,7 @@ class Resampler(Transformation):
         # Last slots
         if force_close_last:
 
-            # 1) Close the last slot and aggreagte it. You should never do it unless you knwo what you are doing
+            # 1) Close the last slot and aggreagte it. If slotting (aggregating), you should never do it unless you know what you are doing
             if working_serie:
     
                 logger.debug('This resampled point (start=%s, end=%s) is done, now computing it..', slot_start_t, slot_end_t)
@@ -581,10 +600,12 @@ class Resampler(Transformation):
                                               first_last = True,
                                               interpolation_method=self.interpolation_method)
                 
-                # .. and append results
+                # .. and append results, unless we have a duplicate (WTF)
                 if dataTimePoint:
-                    resampled_data_time_point_series.append(dataTimePoint)
-
+                    try:
+                        resampled_data_time_point_series.append(dataTimePoint)
+                    except ValueError:
+                        pass
             # 2) Handle missing slots until the requested end (end_dt)
             # TODO: Implement it. Sure?
 

@@ -333,104 +333,32 @@ class TestResampler(unittest.TestCase):
 
     def test_resample(self):
         
-        # Time series from 16:58:00 to 17:32:00 (Europe/Rome)
-        data_time_point_series = DataTimePointSeries()
-        start_t = 1436022000 - 120
-        for i in range(35):
-            data_time_point = DataTimePoint(t = start_t + (i*60),
-                                            tz='Europe/Rome',
-                                            data = {'temperature': 154+i})
-            data_time_point_series.append(data_time_point)
-
-        data_time_slot_series = Resampler('600s').process(data_time_point_series)        
- 
-        self.assertEqual(str(data_time_slot_series[0].dt), '2015-07-04 17:00:00+02:00')
-        self.assertAlmostEqual(data_time_slot_series[0].data_loss, 0.25)
-        self.assertEqual(data_time_slot_series[0].data['temperature'], 157.5)
-         
-        self.assertEqual(str(data_time_slot_series[1].dt), '2015-07-04 17:10:00+02:00')
-        self.assertAlmostEqual(data_time_slot_series[1].data_loss, 0.0)
-        self.assertEqual(data_time_slot_series[1].data['temperature'], 166.5)
-         
-        self.assertEqual(str(data_time_slot_series[3].dt), '2015-07-04 17:30:00+02:00')
-        self.assertAlmostEqual(data_time_slot_series[3].data_loss, 0.25)
-        self.assertEqual(data_time_slot_series[3].data['temperature'], 185.0)
- 
-     
-        # Time series from 15:00:00 to 15:37:00 (UTC)
-        data_time_point_series = DataTimePointSeries()
-        start_t = 1436022000
-        for i in range(38):
-            data_time_point = DataTimePoint(t = start_t + (i*60),
-                                            data = {'temperature': 154+i})
-            data_time_point_series.append(data_time_point)
- 
-        #for item in data_time_point_series:
-        #    print(item)
- 
-        data_time_slot_series = Resampler('600s').process(data_time_point_series)
-
-        #for item in data_time_slot_series:
-        #    print(item)
-         
-        self.assertEqual(str(data_time_slot_series[0].dt), '2015-07-04 15:00:00+00:00')
-        self.assertAlmostEqual(data_time_slot_series[0].data_loss, 0.45)
-        self.assertEqual(data_time_slot_series[0].data['temperature'], 156.5)
-         
-        self.assertEqual(str(data_time_slot_series[1].dt), '2015-07-04 15:10:00+00:00')
-        self.assertAlmostEqual(data_time_slot_series[1].data_loss, 0.0)
-        self.assertEqual(data_time_slot_series[1].data['temperature'], 164.0)
-         
-        self.assertEqual(str(data_time_slot_series[4].dt), '2015-07-04 15:40:00+00:00')
-        self.assertAlmostEqual(data_time_slot_series[4].data_loss, 0.85)
-        self.assertEqual(data_time_slot_series[4].data['temperature'], 189.5)        
-         
- 
-        # Time series from 00:00 to 00:19 (UTC) 
-        data_time_point_series = DataTimePointSeries()
-        start_t = 0
-        for i in range(20):
-            if i < 8 or i > 12:
-                data_time_point = DataTimePoint(t = start_t + (i*60),
-                                                data = {'temperature': 154+i})
-                data_time_point_series.append(data_time_point)
- 
-        # Re-sample as is
-        data_time_slot_series = Resampler('1m').process(data_time_point_series)        
-        self.assertEqual(len(data_time_slot_series), 20)
-         
-        # Original points
-        self.assertEqual(data_time_slot_series[0].data_loss, 0)
-        self.assertEqual(data_time_slot_series[0].data['temperature'], 154)
-        self.assertEqual(data_time_slot_series[1].data_loss, 0)
-        self.assertEqual(data_time_slot_series[1].data['temperature'], 155)
-        self.assertEqual(data_time_slot_series[19].data_loss, 0)
-        self.assertEqual(data_time_slot_series[19].data['temperature'], 173)
- 
-        # Reconstructed (interpolated) points
-        self.assertEqual(data_time_slot_series[8].data_loss, 1)
-        self.assertEqual(data_time_slot_series[8].data['temperature'], 162)
-        self.assertEqual(data_time_slot_series[9].data_loss, 1)
-        self.assertEqual(data_time_slot_series[9].data['temperature'], 163)
-        self.assertEqual(data_time_slot_series[12].data_loss, 1)
-        self.assertEqual(data_time_slot_series[12].data['temperature'], 166)
-
-
-        # Time series from 00:00 to 00:19 (UTC) with missing data in the middle
-        data_time_point_series = DataTimePointSeries()
-        start_t = 0
-        for i in range(20):
-            if i < 8 or i > 12:
-                data_time_point = DataTimePoint(t = start_t + (i*60),
-                                                data = {'temperature': 154+i})
-                data_time_point_series.append(data_time_point)
-
-        #  Upsampling not supported yet
-        with self.assertRaises(ValueError):
-            data_time_slot_series = Resampler('20s').process(data_time_point_series)        
+        # Test series
+        series = DataTimePointSeries()
+        ##series.append(DataTimePoint(t=-3,  data={'v':0}))
+        #series.append(DataTimePoint(t=-2,  data={'v':0}))
+        #series.append(DataTimePoint(t=-1,  data={'v':0}))
+        series.append(DataTimePoint(t=0,  data={'v':0}))
+        series.append(DataTimePoint(t=1,  data={'v':1}))
+        series.append(DataTimePoint(t=2,  data={'v':2}))
+        series.append(DataTimePoint(t=3,  data={'v':3}))
+        series.append(DataTimePoint(t=4,  data={'v':4}))
+        series.append(DataTimePoint(t=5,  data={'v':5}))
+        series.append(DataTimePoint(t=6,  data={'v':6}))
+        series.append(DataTimePoint(t=7,  data={'v':7}))
+        series.append(DataTimePoint(t=16, data={'v':16}))
+        series.append(DataTimePoint(t=17, data={'v':17}))
+        series.append(DataTimePoint(t=18, data={'v':18}))
         
-        # When implementing it, remember about check correct linear interpolation when there is data loss vs. when there isn't,
-        # and that all the prev-next math has to be correctly taken into account together with computing the right data loss.
+        resampled_series = series.resample(4)
+        for item in resampled_series:
+            print(item)
+
+        print('=====================================')
+
+        resampled_series = series.resample(3)
+        for item in resampled_series:
+            print(item)
 
 
     def test_resample_edge_cases(self):
@@ -451,6 +379,12 @@ class TestResampler(unittest.TestCase):
         data_time_point_series.append(DataTimePoint(t = (60*30), data = {'value': 4571.61}))
         data_time_point_series.append(DataTimePoint(t = (60*45), data = {'value': 4571.71}))
         data_time_point_series.append(DataTimePoint(t = (60*50), data = {'value': 4571.74}))
+        
+        #DataTimePoint @ 1200 (1970-01-01 00:20:00+00:00) with data "{'value': 4571.55}"
+        #DataTimePoint @ 1500 (1970-01-01 00:25:00+00:00) with data "{'value': 4571.58}"
+        #DataTimePoint @ 1800 (1970-01-01 00:30:00+00:00) with data "{'value': 4571.61}"
+        #DataTimePoint @ 2700 (1970-01-01 00:45:00+00:00) with data "{'value': 4571.71}"
+        #DataTimePoint @ 3000 (1970-01-01 00:50:00+00:00) with data "{'value': 4571.74}"
 
         # DataTimePoint @ 1500.0 (1970-01-01 00:25:00+00:00) with data "{'value': 4571.5650000000005}"
         # DataTimePoint @ 1800.0 (1970-01-01 00:30:00+00:00) with data "{'value': 4571.594999999999}"
@@ -465,7 +399,8 @@ class TestResampler(unittest.TestCase):
         # DataTimePoint @ 2400.0 (1970-01-01 00:40:00+00:00) with data "{'value': 4571.68}" and data_loss="0.06000000000000005"
         # DataTimePoint @ 2700.0 (1970-01-01 00:45:00+00:00) with data "{'value': 4571.695}" and data_loss="0.0"
         # DataTimePoint @ 3000.0 (1970-01-01 00:50:00+00:00) with data "{'value': 4571.725}" and data_loss="0.0"
-
+        for item in data_time_point_series:
+            print(item)
 
         resampled_data_time_point_series = Resampler('300s').process(data_time_point_series) 
         
