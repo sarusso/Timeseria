@@ -331,13 +331,51 @@ class TestSlotter(unittest.TestCase):
 class TestResampler(unittest.TestCase):
 
 
-    def test_resample(self):
+    def test_resample_minimal(self):
         
         # Test series
         series = DataTimePointSeries()
-        ##series.append(DataTimePoint(t=-3,  data={'v':0}))
-        #series.append(DataTimePoint(t=-2,  data={'v':0}))
-        #series.append(DataTimePoint(t=-1,  data={'v':0}))
+        series.append(DataTimePoint(t=-4,  data={'value':4}))
+        series.append(DataTimePoint(t=-3,  data={'value':3}))
+        series.append(DataTimePoint(t=-2,  data={'value':2}))
+        series.append(DataTimePoint(t=-1,  data={'value':1}))
+        series.append(DataTimePoint(t=0,  data={'value':0}))
+        series.append(DataTimePoint(t=1,  data={'value':1}))
+        series.append(DataTimePoint(t=2,  data={'value':2}))
+        series.append(DataTimePoint(t=3,  data={'value':3}))
+        series.append(DataTimePoint(t=4,  data={'value':4}))
+
+        # Since by default the resample does not include extremes, we onlu expect the point
+        # at t=0, covering from -2 to +2. Other points would be at t=-4 and t=+4
+        resampled_series = series.resample(4)
+        self.assertEqual(len(resampled_series),1)
+        self.assertEqual(resampled_series[0].t,0)
+        self.assertEqual(resampled_series[0].data['value'],1)
+        self.assertEqual(resampled_series[0].data_loss,0)   
+     
+        # Now include extremes as well
+        resampled_series = series.resample(4, include_extremes=True)
+        self.assertEqual(len(resampled_series),3)
+        self.assertEqual(resampled_series[0].t,-4)
+        self.assertEqual(resampled_series[0].data['value'],3.2)   
+        self.assertEqual(resampled_series[0].data_loss,0.375)   
+        self.assertEqual(resampled_series[1].t,0)
+        self.assertEqual(resampled_series[1].data['value'],1)   
+        self.assertEqual(resampled_series[1].data_loss,0)
+        self.assertEqual(resampled_series[2].t,4)
+        self.assertEqual(resampled_series[2].data['value'],3.2)   
+        self.assertEqual(resampled_series[2].data_loss,0.375)
+        
+        # TODO: test resample for unit=3 here as well?
+
+
+    def test_resample_basic(self):
+        
+        # Test series
+        series = DataTimePointSeries()
+        series.append(DataTimePoint(t=-3,  data={'v':3}))
+        series.append(DataTimePoint(t=-2,  data={'v':2}))
+        series.append(DataTimePoint(t=-1,  data={'v':1}))
         series.append(DataTimePoint(t=0,  data={'v':0}))
         series.append(DataTimePoint(t=1,  data={'v':1}))
         series.append(DataTimePoint(t=2,  data={'v':2}))
@@ -356,9 +394,9 @@ class TestResampler(unittest.TestCase):
 
         print('=====================================')
 
-        resampled_series = series.resample(3)
-        for item in resampled_series:
-            print(item)
+        #resampled_series = series.resample(3)
+        #for item in resampled_series:
+        #    print(item)
 
 
     def test_resample_edge_cases(self):

@@ -2,7 +2,7 @@ import unittest
 import os
 from ..datastructures import TimePoint, DataTimePoint, DataTimeSlotSeries, DataTimeSlot
 from ..datastructures import TimePointSeries, DataTimePointSeries
-from ..operations import derivative, integral, diff, csum, min, max, avg, filter, select, mavg, normalize, merge, offset, rescale
+from ..operations import derivative, integral, diff, csum, min, max, avg, wavg, filter, select, mavg, normalize, merge, offset, rescale
 from ..operations import Operation
 
 # Setup logging
@@ -335,6 +335,51 @@ class TestMathOperations(unittest.TestCase):
         self.assertEqual(data_time_point_series.avg(), {'value': 11, 'another_value': 45.5})
         self.assertEqual(data_time_point_series.avg(data_key='value'), 11)          
         self.assertEqual(data_time_point_series.avg(data_key='another_value'), 45.5)
+
+
+    def test_wavg(self):
+   
+        series1 = DataTimePointSeries()
+        series2 = DataTimePointSeries()
+  
+        point = DataTimePoint(t=-3, data={'value':3})
+        point.weight=0
+        series1.append(point)
+        series2.append(point)
+
+        point = DataTimePoint(t=-2, data={'value':2})
+        point.weight=0.125
+        series1.append(point)
+
+        point = DataTimePoint(t=-1, data={'value':1})
+        point.weight=0.25
+        series1.append(point)
+        series2.append(point)
+
+        point = DataTimePoint(t=0, data={'value':0})
+        point.weight=0.25
+        series1.append(point)
+        series2.append(point)
+        
+        point = DataTimePoint(t=1, data={'value':1})
+        point.weight=0.25
+        series1.append(point)
+        series2.append(point)
+        
+        point = DataTimePoint(t=2, data={'value':2})
+        point.weight=0.125
+        series1.append(point)
+        series2.append(point)
+
+        # [DEBUG] timeseria.operations: Point @ 1969-12-31 23:59:57+00:00, weight: 0
+        # [DEBUG] timeseria.operations: Point @ 1969-12-31 23:59:58+00:00, weight: 0.125
+        # [DEBUG] timeseria.operations: Point @ 1969-12-31 23:59:59+00:00, weight: 0.25
+        # [DEBUG] timeseria.operations: Point @ 1970-01-01 00:00:00+00:00, weight: 0.25
+        # [DEBUG] timeseria.operations: Point @ 1970-01-01 00:00:01+00:00, weight: 0.25
+        # [DEBUG] timeseria.operations: Point @ 1970-01-01 00:00:02+00:00, weight: 0.125
+        
+        self.assertEqual(wavg(series1), 1)
+        self.assertEqual(wavg(series2), 0.8571428571428571)
 
 
 class TestSeriesOperations(unittest.TestCase):

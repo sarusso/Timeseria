@@ -111,47 +111,77 @@ class Avg(ScalarOperation):
     """Average operation (callable object)."""
     
     def __call__(self, arg, data_key=None, **kwargs):
+        
+        # Log & checks
+        logger.debug('Called avg operation')        
         if not isinstance(arg, Series):
             raise NotImplementedError('Avg implemented only on series objects')
-        else:
-            series = arg
-            sums = {data_key: None for data_key in series.data_keys()}
-            for item in series:
-                for _data_key in sums:
-                    if sums[_data_key] is None:
-                        sums[_data_key] = item.data[_data_key]
-                    else:
-                        sums[_data_key] += item.data[_data_key]
-            avgs={}
+        
+        # Compute
+        series = arg
+        sums = {data_key: None for data_key in series.data_keys()}
+        for item in series:
             for _data_key in sums:
-                avgs[_data_key] = sums[_data_key] / len(series)
-            if data_key is not None:
-                return avgs[data_key]
-            if len(avgs) == 1:
-                return avgs[series.data_keys()[0]]
-            else:
-                return avgs
-
+                if sums[_data_key] is None:
+                    sums[_data_key] = item.data[_data_key]
+                else:
+                    sums[_data_key] += item.data[_data_key]
+        avgs={}
+        for _data_key in sums:
+            avgs[_data_key] = sums[_data_key] / len(series)
+        if data_key is not None:
+            return avgs[data_key]
+        if len(avgs) == 1:
+            return avgs[series.data_keys()[0]]
+        else:
+            return avgs
 
 class WAvg(ScalarOperation):
     """Weighted average operation (callable object)."""
 
-    def __call__(self, series, prev_point=None, next_point=None):
-        raise NotImplementedError('Weighted Average is not yet implemented')
-        #keys = None
-        #avgs = {}
-        #count=0
-        #for data_time_point in series:
-        #    count+=1              
-        #    if not keys:
-        #        keys=data_time_point.data.keys()
-        #    for key in keys:
-        #        if key not in avgs:
-        #            avgs[key] = 0
-        #        avgs[key] += data_time_point.data[key]
-        #for key in keys:
-        #    new_avgs = {key:avgs[key]/count for key in keys}
-        #return new_avgs
+    def __call__(self, arg, data_key=None, **kwargs):
+
+        # Log & checks
+        logger.debug('Called wavg operation')
+        if not isinstance(arg, Series):
+            raise NotImplementedError('Wavg implemented only on series objects')
+        try:
+            arg[0].weight
+        except AttributeError:
+            raise AttributeError('Trying to apply a weightd average on non-weigthed point')     
+
+        # Compute
+        series = arg
+        sums = {data_key: None for data_key in series.data_keys()}
+        total_weights = 0
+        for item in series:
+    
+            logger.debug('Point @ %s, weight: %s, data: %s', item.dt, item.weight, item.data)
+    
+            for _data_key in sums:
+                if sums[_data_key] is None:
+                    sums[_data_key] = item.data[_data_key]*item.weight
+                else:
+                    sums[_data_key] += item.data[_data_key]*item.weight
+                #logger.debug('Sums: %s',sums[_data_key])
+            total_weights += item.weight
+        
+        # The sum are already the average as weugthed
+        logger.debug('Total weights: %s', total_weights)
+        if total_weights == 1:
+            avgs = sums
+        else:
+            avgs = {}
+            for _data_key in sums:
+                avgs[_data_key] = sums[_data_key] / total_weights
+        
+        if data_key is not None:
+            return avgs[data_key]
+        if len(avgs) == 1:
+            return avgs[series.data_keys()[0]]
+        else:
+            return avgs
+
 
 
 class Sum(ScalarOperation):
