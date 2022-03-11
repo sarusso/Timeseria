@@ -16,6 +16,13 @@ logger.setup()
 # Set test data path
 TEST_DATA_PATH = '/'.join(os.path.realpath(__file__).split('/')[0:-1]) + '/test_data/'
 
+# Support functions
+def attach_validity_regions(series, sampling_interval=None):
+    validity_regions = compute_validity_regions(series, sampling_interval=sampling_interval)
+    for point in series:
+        point.valid_from = validity_regions[point.t][0]
+        point.valid_to = validity_regions[point.t][1]
+
 
 class TestDetectEncoding(unittest.TestCase):
 
@@ -30,11 +37,11 @@ class TestComputeValidityRegions(unittest.TestCase):
     def test_standard(self):
         
         series = DataTimePointSeries()
-        series.append(DataTimePoint(t = 7, data = {'value': 4571.55}))
-        series.append(DataTimePoint(t = 12, data = {'value': 4571.55}))
-        series.append(DataTimePoint(t = 17, data = {'value': 4571.55}))
-        series.append(DataTimePoint(t = 22, data = {'value': 4571.55}))
-        series.append(DataTimePoint(t = 27, data = {'value': 4571.55}))
+        series.append(DataTimePoint(t = 7, data = {'value': 7}))
+        series.append(DataTimePoint(t = 12, data = {'value': 12}))
+        series.append(DataTimePoint(t = 17, data = {'value': 17}))
+        series.append(DataTimePoint(t = 22, data = {'value': 22}))
+        series.append(DataTimePoint(t = 27, data = {'value': 27}))
 
         # All of them
         expected_results = {7: [4.5, 9.5], 12: [9.5, 14.5], 17: [14.5, 19.5], 22: [19.5, 24.5], 27: [24.5, 29.5]}
@@ -48,7 +55,7 @@ class TestComputeValidityRegions(unittest.TestCase):
 
         # Shrink them according to the from-to
         expected_results = {12: [10, 14.5], 17: [14.5, 19.5], 22: [19.5, 20]}
-        results = compute_validity_regions(series, from_t=10, to_t=20, shrink=True)
+        results = compute_validity_regions(series, from_t=10, to_t=20, cut=True)
         self.assertEqual(results, expected_results)
         
         # Force a specific sampling intervals
@@ -70,37 +77,35 @@ class TestComputeValidityRegions(unittest.TestCase):
 
         self.assertEqual(results, expected_results)
 
-        
 
     def test_prev_next_points(self):
         series = DataTimePointSeries()
-        series.append(DataTimePoint(t = 7, data = {'value': 4571.55}))
-        series.append(DataTimePoint(t = 12, data = {'value': 4571.55}))
-        series.append(DataTimePoint(t = 17, data = {'value': 4571.55}))
-        series.append(DataTimePoint(t = 22, data = {'value': 4571.55}))
-        series.append(DataTimePoint(t = 27, data = {'value': 4571.55}))
- 
+        series.append(DataTimePoint(t = 7, data = {'value': 7}))
+        series.append(DataTimePoint(t = 12, data = {'value': 12}))
+        series.append(DataTimePoint(t = 17, data = {'value': 17}))
+        series.append(DataTimePoint(t = 22, data = {'value': 22}))
+        series.append(DataTimePoint(t = 27, data = {'value': 27}))
  
         # Test prev-next
         expected_results = {7: [4.5, 9.5], 12: [9.5, 14.5], 17: [14.5, 19.5], 22: [19.5, 24.5], 27: [24.5, 29.5]}
         results = compute_validity_regions(series, from_t=9, to_t=25)
         self.assertEqual(results, expected_results)
 
-        # Test shrinked prev-next
+        # Test cutted prev-next
         expected_results = {7: [9, 9.5], 12: [9.5, 14.5], 17: [14.5, 19.5], 22: [19.5, 24.5], 27: [24.5, 25]}
-        results = compute_validity_regions(series, from_t=9, to_t=25, shrink=True)
+        results = compute_validity_regions(series, from_t=9, to_t=25, cut=True)
         self.assertEqual(results, expected_results)
  
  
     def test_overlaps(self):
          
         series = DataTimePointSeries()
-        series.append(DataTimePoint(t = 7, data = {'value': 4571.55}))
-        series.append(DataTimePoint(t = 12, data = {'value': 4571.55}))
-        series.append(DataTimePoint(t = 13, data = {'value': 4571.55}))
-        series.append(DataTimePoint(t = 17, data = {'value': 4571.55}))
-        series.append(DataTimePoint(t = 22, data = {'value': 4571.55}))
-        series.append(DataTimePoint(t = 27, data = {'value': 4571.55}))
+        series.append(DataTimePoint(t = 7, data = {'value': 7}))
+        series.append(DataTimePoint(t = 12, data = {'value': 12}))
+        series.append(DataTimePoint(t = 13, data = {'value': 13}))
+        series.append(DataTimePoint(t = 17, data = {'value': 17}))
+        series.append(DataTimePoint(t = 22, data = {'value': 22}))
+        series.append(DataTimePoint(t = 27, data = {'value': 27}))
 
         expected_results = {7: [4.5, 9.5], 12: [9.5, 12.5], 13: [12.5, 15], 17: [15, 19.5], 22: [19.5, 24.5], 27: [24.5, 29.5]}
         results = compute_validity_regions(series)
@@ -110,14 +115,14 @@ class TestComputeValidityRegions(unittest.TestCase):
     def test_major_overlaps(self):
 
         series = DataTimePointSeries()
-        series.append(DataTimePoint(t = 7, data = {'value': 4571.55}))
-        series.append(DataTimePoint(t = 12, data = {'value': 4571.55}))
-        series.append(DataTimePoint(t = 12.1, data = {'value': 4571.55}))
-        series.append(DataTimePoint(t = 12.3, data = {'value': 4571.55}))
-        series.append(DataTimePoint(t = 13, data = {'value': 4571.55}))
-        series.append(DataTimePoint(t = 17, data = {'value': 4571.55}))
-        series.append(DataTimePoint(t = 22, data = {'value': 4571.55}))
-        series.append(DataTimePoint(t = 27, data = {'value': 4571.55}))
+        series.append(DataTimePoint(t = 7, data = {'value': 7}))
+        series.append(DataTimePoint(t = 12, data = {'value': 12}))
+        series.append(DataTimePoint(t = 12.1, data = {'value': 12.1}))
+        series.append(DataTimePoint(t = 12.3, data = {'value': 12.3}))
+        series.append(DataTimePoint(t = 13, data = {'value': 13}))
+        series.append(DataTimePoint(t = 17, data = {'value': 17}))
+        series.append(DataTimePoint(t = 22, data = {'value': 22}))
+        series.append(DataTimePoint(t = 27, data = {'value': 27}))
 
         expected_results = {7: [4.5, 9.5], 12: [9.5, 12.05], 12.1: [12.05, 12.2], 12.3: [12.2, 12.65], 13: [12.65, 15.0], 17: [15.0, 19.5], 22: [19.5, 24.5], 27: [24.5, 29.5]}
         results = compute_validity_regions(series)
@@ -137,6 +142,7 @@ class TestComputeCoverageAndDataLoss(unittest.TestCase):
             data_time_point = DataTimePoint(t = start_t + (i*60),
                                             data = {'temperature': 154+i})
             self.data_time_point_series_1.append(data_time_point)
+        attach_validity_regions(self.data_time_point_series_1)
         
         # Time series from 17:00:00 to 17:30:00 (Europe/Rome)
         self.data_time_point_series_2 = DataTimePointSeries()
@@ -145,6 +151,7 @@ class TestComputeCoverageAndDataLoss(unittest.TestCase):
             data_time_point = DataTimePoint(t    = start_t + (i*60),
                                             data = {'temperature': 154+i})
             self.data_time_point_series_2.append(data_time_point)
+        attach_validity_regions(self.data_time_point_series_2)
 
         # Time series from 17:00:00 to 17:20:00 (Europe/Rome)
         self.data_time_point_series_3 = DataTimePointSeries()
@@ -153,7 +160,8 @@ class TestComputeCoverageAndDataLoss(unittest.TestCase):
             data_time_point = DataTimePoint(t    = start_t + (i*60),
                                             data = {'temperature': 154+i})
             self.data_time_point_series_3.append(data_time_point) 
-        
+        attach_validity_regions(self.data_time_point_series_3)
+    
         # Time series from 17:10:00 to 17:30:00 (Europe/Rome)
         self.data_time_point_series_4 = DataTimePointSeries()
         start_t = 1436022000 + 600
@@ -161,6 +169,7 @@ class TestComputeCoverageAndDataLoss(unittest.TestCase):
             data_time_point = DataTimePoint(t    = start_t + (i*60),
                                             data = {'temperature': 154+i})
             self.data_time_point_series_4.append(data_time_point)
+        attach_validity_regions(self.data_time_point_series_4)
 
         # Time series from 16:58:00 to 17:32:00 (Europe/Rome)
         self.data_time_point_series_5 = DataTimePointSeries()
@@ -171,6 +180,8 @@ class TestComputeCoverageAndDataLoss(unittest.TestCase):
             data_time_point = DataTimePoint(t    = start_t + (i*60),
                                             data = {'temperature': 154+i})
             self.data_time_point_series_5.append(data_time_point)
+        attach_validity_regions(self.data_time_point_series_5)
+
 
         # The following time series has point with validity=15m
 
@@ -188,6 +199,7 @@ class TestComputeCoverageAndDataLoss(unittest.TestCase):
                 self.data_time_point_series_6.append(data_time_point)
             slider_dt = slider_dt + time_unit
             count += 1
+        attach_validity_regions(self.data_time_point_series_6)
  
 
     def test_compute_coverage(self):
@@ -244,6 +256,7 @@ class TestComputeCoverageAndDataLoss(unittest.TestCase):
         data_time_point_series.append(DataTimePoint(t = 40, data = {'temperature': 23}))
         data_time_point_series.append(DataTimePoint(t = 60, data = {'temperature': 23}))
         data_time_point_series.append(DataTimePoint(t = 70, data = {'temperature': 23}))
+        attach_validity_regions(data_time_point_series)
         
         coverage = compute_coverage(series = data_time_point_series, from_t = 30, to_t = 60) 
         self.assertAlmostEqual(coverage, (2.0/3.0))
@@ -252,8 +265,11 @@ class TestComputeCoverageAndDataLoss(unittest.TestCase):
         single_element_series = DataTimePointSeries()
         single_element_series.append(DataTimePoint(t = 40, data = {'temperature': 23}))
         
-        with self.assertRaises(ValueError):
-            compute_coverage(series = single_element_series, from_t = 30, to_t = 60) 
+        # TODO: the following is quite messy.
+        attach_validity_regions(single_element_series, sampling_interval=10)
+
+        #with self.assertRaises(ValueError):
+        #    compute_coverage(series = single_element_series, from_t = 30, to_t = 60) 
 
         coverage = compute_coverage(series = single_element_series, from_t = 30, to_t = 60, sampling_interval=10)
         # 30 to 60, point is from 35 to 45 -> 10 seconds out of 30
@@ -269,6 +285,7 @@ class TestComputeCoverageAndDataLoss(unittest.TestCase):
         series.append(DataTimePoint(t = 40, data = {'temperature': 23}))
         series.append(DataTimePoint(t = 60, data = {'temperature': 23}))
         series.append(DataTimePoint(t = 70, data = {'temperature': 23}))
+        attach_validity_regions(series)
  
         # Test basic
         self.assertAlmostEqual(compute_data_loss(series, from_t = 45, to_t = 55, sampling_interval=10), 1.0)
@@ -282,10 +299,13 @@ class TestComputeCoverageAndDataLoss(unittest.TestCase):
         # Test for 1-element series
         single_element_series = DataTimePointSeries()
         single_element_series.append(DataTimePoint(t = 40, data = {'temperature': 23}))
-         
+        attach_validity_regions(single_element_series, sampling_interval=10)
+
+        # TODO: the following is quite messy.
+
         # The series has only one element and no sampling_interval is provided, no idea how to compute validity        
-        with self.assertRaises(ValueError):
-            compute_data_loss(single_element_series, from_t = 30, to_t = 60) 
+        #with self.assertRaises(ValueError):
+        #    compute_data_loss(single_element_series, from_t = 30, to_t = 60) 
  
         # Only 10 seconds out of 30 (point has validity regions 35-45, interval is from 30 to 60)
         data_loss = compute_data_loss(single_element_series, from_t = 30, to_t = 60, sampling_interval=10) 
@@ -295,6 +315,8 @@ class TestComputeCoverageAndDataLoss(unittest.TestCase):
         series_two_elements = DataTimePointSeries()
         series_two_elements.append(DataTimePoint(t = 40, data = {'temperature': 23}))
         series_two_elements.append(DataTimePoint(t = 60, data = {'temperature': 23}))
+        attach_validity_regions(series_two_elements, sampling_interval=10)
+        
         self.assertEqual(compute_data_loss(series_two_elements, from_t = 45, to_t = 55, sampling_interval=10), 1)
  
         # Series with pre-existent data losses, which have to be taken into account as well
@@ -304,17 +326,22 @@ class TestComputeCoverageAndDataLoss(unittest.TestCase):
         series_with_data_losses.append(DataTimePoint(t = 40, data = {'temperature': 23}, data_loss=0.5))
         series_with_data_losses.append(DataTimePoint(t = 60, data = {'temperature': 23}, data_loss=0))
         series_with_data_losses.append(DataTimePoint(t = 70, data = {'temperature': 23}, data_loss=0))
-  
+        attach_validity_regions(series_with_data_losses)
+
         # Test missing + already ( 0 + 0.5 + 1 + 0 = 1.5 / 3 = 0.5)
         data_loss = compute_data_loss(series_with_data_losses, from_t = 30, to_t = 60, sampling_interval=10, force=True) 
         self.assertAlmostEqual(data_loss, 0.5)
  
         # Test also on actually resampled series
         resampled_series = series.resample(10)
+        attach_validity_regions(resampled_series)
+
         data_loss = compute_data_loss(resampled_series, from_t = 30, to_t = 60)
         self.assertAlmostEqual(data_loss, 1.0/3.0)
 
-        resampled_series_5 = self.data_time_point_series_5.resample(60)        
+        resampled_series_5 = self.data_time_point_series_5.resample(60)  
+        attach_validity_regions(resampled_series_5)
+      
         data_loss = compute_data_loss(resampled_series_5, from_t = 1436022300, to_t = 1436022600) 
         self.assertAlmostEqual(data_loss, 0.4)    
 

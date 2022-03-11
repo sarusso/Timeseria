@@ -115,7 +115,7 @@ def detect_encoding(filename, streaming=False):
     return encoding
 
 
-def compute_validity_regions(series, from_t=None, to_t=None, sampling_interval=None, shrink=False):
+def compute_validity_regions(series, from_t=None, to_t=None, sampling_interval=None, cut=False):
     """
     Compute the validity regions for the series points. If from_t or to_t are given, computes them within that interval only.
     
@@ -124,7 +124,7 @@ def compute_validity_regions(series, from_t=None, to_t=None, sampling_interval=N
         from_t: the interval start, if any.
         to_t: the interval end, if any.
         sampling_interval: the sampling interval. In not set, it will be used the series' (auto-detected) one.
-        shrink: if to shrink the validity according to the start/end.
+        cut: if to shrink the validity according to the start/end.
 
     Returns:
         dict: for each point, the validity region start and end.
@@ -157,7 +157,7 @@ def compute_validity_regions(series, from_t=None, to_t=None, sampling_interval=N
             break
         
         # Shrink with respect to start-end if required
-        if shrink:
+        if cut:
             if from_t is not None and point_valid_from_t < from_t:
                 point_valid_from_t = from_t
             if to_t is not None and point_valid_to_t > to_t:
@@ -203,19 +203,39 @@ def compute_coverage(series, from_t, to_t, sampling_interval=None):
     # If the series is empty, return zero coverage
     if not series:
         return 0.0
-    
-    # Compute the validity regions in the interval.
-    validity_regions = compute_validity_regions(series, from_t=from_t, to_t=to_t, shrink=True, sampling_interval=sampling_interval)
-    
-    # TODO: when using this in the resampler and aggregator, if the series is the entire series
-    #       there would be a lot of wasted loop iterations befoer getting to the start.
-    #       Instead, compute them for the entire series without shrinking and use them here
-    
-    # Sum all the validity regions:
+        
+    # Compute the validity regions in the interval. if point haven't them?
+    # validity_regions = compute_validity_regions(series, from_t=from_t, to_t=to_t, cut=True, sampling_interval=sampling_interval)
+    # And now attach?
+
+    # Sum all the validity regions according to the from/to:
     coverage_s = 0
-    for t, validity_region in validity_regions.items():
-        coverage_s += validity_region[1]-validity_region[0]
-        logger.debug('Validity region @%s: start=%s, end=%s', t, validity_region[0], validity_region[1])
+    for point in series:
+        try:
+            # Skip at the beginning and end if any
+            if point.valid_to < from_t:
+                continue
+            if point.valid_from >= to_t:
+                break 
+            
+            # Skip if reconstructed as well
+            try:
+                if point.reconstructed:
+                    continue
+            except AttributeError:
+                pass
+            
+            # Set this point valid from/to accoring to the interval boundaries
+            this_point_valid_from = point.valid_from if point.valid_from >= from_t else from_t
+            this_point_valid_to = point.valid_to if point.valid_to < to_t else to_t
+            
+            # Add this point coverage to the overall coverage
+            coverage_s += this_point_valid_to-this_point_valid_from
+            
+            logger.debug('Point %s: from %s, to %s (current total=%s) ', point.t, this_point_valid_from, this_point_valid_to, coverage_s)
+            
+        except AttributeError:
+            raise AttributeError('Point {} has no valid_to or valid_from'.format(point)) from None
 
     # Convert from coverage in seconds to ratio:
     coverage = coverage_s / (to_t - from_t)
@@ -223,68 +243,6 @@ def compute_coverage(series, from_t, to_t, sampling_interval=None):
     # Return
     logger.debug('compute_coverage: Returning %s (%s percent)', coverage, coverage*100.0)
     return coverage
-
-
-def compute_data_loss_old(data_time_point_series, from_t, to_t, sampling_interval=None, force=False):
-
-    logger.debug(data_time_point_series)
-    logger.debug(from_t)
-    logger.debug(to_t)
-    logger.debug(sampling_interval)
-    logger.debug(force)
-
-    # If single-element series, check that the sampling_interval was given
-    if len(data_time_point_series) == 1:
-        if sampling_interval is None:
-            raise ValueError('The series has only one element and no sampling_interval is provided, no idea how to compute the data loss') 
-
-    # Get the series sampling interval unless it is forced to a specific value
-    if not sampling_interval:
-        sampling_interval = data_time_point_series.autodetected_sampling_interval
-    
-    # Data loss from missing coverage. Computing it useless if the series has no 'variable' resolution, 
-    # however, if removed, it is still to be applied for the first and last item as on the borders there
-    # still may be  data losses. 
-    print('HERE: {}'.format(data_time_point_series))
-
-    if data_time_point_series.resolution == 'variable' or len(data_time_point_series) <=1 or force:
-        data_loss_from_missing_coverage = 1 - compute_coverage(data_time_point_series, from_t, to_t, sampling_interval)
-    else:
-        data_loss_from_missing_coverage = 0
-
-    # Data loss from previously computed data losses
-    data_loss_from_previously_computed = 0
-    for this_data_time_point in data_time_point_series:
-
-        if this_data_time_point.data_loss:
-
-            # Skip points not to be taken dinto account
-            if this_data_time_point.t + (sampling_interval/2) < from_t:
-                continue
-            if this_data_time_point.t - (sampling_interval/2) >= to_t:
-                continue
-            
-            # Compute the contribution of this point data loss.
-            if (this_data_time_point.t < from_t)  and this_data_time_point.t + (sampling_interval/2) >= from_t:
-                this_sampling_interval = (this_data_time_point.t + (sampling_interval/2)) - from_t
-            elif (this_data_time_point.t > to_t)  and this_data_time_point.t + (sampling_interval/2) < to_t:
-                this_sampling_interval = to_t - (this_data_time_point.t + (sampling_interval/2))
-            else:
-                this_sampling_interval = sampling_interval
-            
-            # Now add, rescaling the data loss with respect to the sampling_interval and from/to 
-            data_loss_from_previously_computed += this_data_time_point.data_loss * (this_sampling_interval/( to_t - from_t))
-
-    # Compute total data loss    
-    data_loss = data_loss_from_missing_coverage + data_loss_from_previously_computed
-
-    # The next step is controversial, as it will cause to abuse the "None" data losses that 
-    # are only used for the forecasts at the moment. TODO: what do we want to do here?
-    #if series_resolution != 'variable' and not data_loss:
-    #    data_loss = None
-
-    # Return
-    return data_loss
 
 
 def compute_data_loss(series, from_t, to_t, force=False, sampling_interval=None):
@@ -727,8 +685,9 @@ def os_shell(command, capture=False, verbose=False, interactive=False, silent=Fa
             return True
 
 
-    
-    
+
+
+
     
     
     

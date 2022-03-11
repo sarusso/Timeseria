@@ -2,7 +2,7 @@ import unittest
 import os
 from ..datastructures import TimePoint, DataTimePoint, DataTimeSlotSeries, DataTimeSlot
 from ..datastructures import TimePointSeries, DataTimePointSeries
-from ..operations import derivative, integral, diff, csum, min, max, avg, wavg, filter, select, mavg, normalize, merge, offset, rescale
+from ..operations import derivative, integral, diff, csum, min, max, avg, filter, select, mavg, normalize, merge, offset, rescale
 from ..operations import Operation
 
 # Setup logging
@@ -337,7 +337,7 @@ class TestMathOperations(unittest.TestCase):
         self.assertEqual(data_time_point_series.avg(data_key='another_value'), 45.5)
 
 
-    def test_wavg(self):
+    def test_avg_weighted(self):
    
         series1 = DataTimePointSeries()
         series2 = DataTimePointSeries()
@@ -378,8 +378,8 @@ class TestMathOperations(unittest.TestCase):
         # [DEBUG] timeseria.operations: Point @ 1970-01-01 00:00:01+00:00, weight: 0.25
         # [DEBUG] timeseria.operations: Point @ 1970-01-01 00:00:02+00:00, weight: 0.125
         
-        self.assertEqual(wavg(series1), 1)
-        self.assertEqual(wavg(series2), 0.8571428571428571)
+        self.assertEqual(avg(series1), 1)
+        self.assertEqual(avg(series2), 0.8571428571428571)
 
 
 class TestSeriesOperations(unittest.TestCase):

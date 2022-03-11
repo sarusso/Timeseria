@@ -446,7 +446,7 @@ class DataPoint(Point):
         super(DataPoint, self).__init__(*args, **kwargs)
 
     def __repr__(self):
-        if self.data_loss:
+        if self.data_loss is not None:
             return '{} with data "{}" and data_loss="{}"'.format(super(DataPoint, self).__repr__(), self.data, self._data_loss)            
         else:
             return '{} with data "{}"'.format(super(DataPoint, self).__repr__(), self.data)
@@ -1454,3 +1454,167 @@ class DataTimeSlotSeries(DataSlotSeries, TimeSlotSeries):
         from .transformations import Slotter
         slotter = Slotter(*args, **kwargs)
         return slotter.process(self)  
+
+
+
+
+
+#==============================
+#  Series Slices
+#==============================
+class SeriesSlice(Series):
+    
+    dense = False
+    
+    def __init__(self, series, from_i, to_i, from_t=None, to_t=None, interpolation_method='linear'):
+        # TODO: move to "fill_strategy" instead of "interpolation_mode"?
+        self.series = series
+        self.from_i = from_i
+        self.to_i = to_i
+        self.interpolation_method = interpolation_method
+        self.len = None
+        self.new_points = {}
+        self.from_t = from_t
+        self.to_t=to_t
+    
+    def __getitem__(self, i):
+        if self.dense:
+            raise NotImplementedError('Getting items by index on dense slices is not supporter. Use the iterator instead.')
+
+        if i>=0:
+            return self.series[self.from_i + i]
+        else:
+            return self.series[self.to_i - abs(i)]
+            
+    def __iter__(self):
+        self.count = 0
+        self.prev_was_new = False
+        return self
+    
+    def __next__(self):
+                
+        this_i = self.count + self.from_i
+        
+        if this_i >= self.to_i:
+            # If reached the end stop
+            raise StopIteration
+        
+        elif self.count == 0 or not self.dense:
+            # If first point or not dense just return
+            self.count += 1
+            return self.series[this_i]
+        
+        else:
+            # Otherwise check if we have to add new missing points
+
+            if self.prev_was_new:
+                # If we just created a new missing point, return
+                self.prev_was_new = False
+                self.count += 1
+                return self.series[this_i]
+            
+            else:
+                # Check if we have to add a new missing point: do we have a gap?
+                prev_point = self.series[this_i-1]
+                this_point = self.series[this_i]
+                
+                
+                if prev_point.valid_to < this_point.valid_from:
+
+                    # Compute new point validity
+                    if self.from_t is not None and prev_point.valid_to < self.from_t:
+                        new_point_valid_from = self.from_t
+                    else:
+                        new_point_valid_from = prev_point.valid_to
+                    
+                    if self.to_t is not None and this_point.valid_from > self.to_t:
+                        new_point_valid_to = self.to_t
+                    else:
+                        new_point_valid_to = this_point.valid_from
+                    
+                    # Compute new point timestamp    
+                    new_point_t = new_point_valid_from + (new_point_valid_to-new_point_valid_from)/2
+
+                    # Can we use cache?
+                    if new_point_t in self.new_points:
+                        self.prev_was_new = True
+                        return self.new_points[new_point_t]
+                    
+                    # Log new point creation
+                    logger.debug('New point t=,%s validity: [%s,%s]',new_point_t, new_point_valid_from,new_point_valid_to)
+                                            
+                    # Compute the new point values with respect to the entire interpolation           
+                    new_point_data = {}
+                    for data_key in self.series.data_keys():
+        
+                        if self.interpolation_method == 'linear':
+        
+                            # Compute the "growth" ratio
+                            diff = this_point.data[data_key] - prev_point.data[data_key]
+                            delta_t = this_point.t - prev_point.t
+                            ratio = diff / delta_t
+                            
+                            # Compute the value of the data for the new point
+                            new_point_data[data_key] = prev_point.data[data_key] + ((new_point_t-prev_point.t)*ratio)
+        
+                        elif self.interpolation_method == 'uniform':
+                            raise NotImplementedError('uniform interpolation is not implemented yet')
+                            new_point_data[data_key] = (prev_point.data[data_key] + this_point.data[data_key]) /2
+                       
+                        else:
+                            raise Exception('Unknown interpolation method "{}"'.format(self.interpolation_method))
+            
+                    # Create the new point    
+                    new_point = this_point.__class__(t = new_point_t, data = new_point_data)
+                    new_point.valid_from = new_point_valid_from
+                    new_point.valid_to = new_point_valid_to
+                    new_point.reconstructed = True
+                    
+                    # Set flag
+                    self.prev_was_new = True 
+                    
+                    # Add to cache
+                    self.new_points[new_point_t] = new_point
+                    
+                    # ..and return it
+                    return new_point
+                 
+                else:
+                    # Return this point if no gaps
+                    self.count += 1
+                    return this_point
+    
+    def __len__(self):
+        if not self.dense:
+            return self.to_i-self.from_i
+        else:
+            if self.len is None:
+                self.len=0
+                for _ in self:
+                    self.len+=1
+            return self.len
+    
+    @property
+    def resolution(self):
+        return self.series.resolution
+
+    def data_keys(self):
+        return self.series.data_keys()
+    
+    # Generic attributes
+    #def __getattribute__(self, name):
+    #    try:
+    #        return object.__getattribute__(self, name)
+    #    except AttributeError:
+    #        try:
+    #            return object.__getattribute__(self.series, name)
+    #        except Exception as e:
+    #            raise e from None
+
+class SeriesDenseSlice(SeriesSlice):    
+
+    dense = True
+
+
+
+

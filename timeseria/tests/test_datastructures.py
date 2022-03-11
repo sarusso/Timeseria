@@ -7,6 +7,7 @@ from ..datastructures import Point, TimePoint, DataPoint, DataTimePoint
 from ..datastructures import Slot, TimeSlot, DataSlot, DataTimeSlot
 from ..datastructures import Series, SlotSeries, TimePointSeries, TimeSlotSeries, DataSlotSeries
 from ..datastructures import DataTimePointSeries, DataTimeSlotSeries 
+from ..datastructures import SeriesSlice, SeriesDenseSlice 
 from ..time import UTC, dt
 from ..units import Unit, TimeUnit
 
@@ -733,4 +734,110 @@ class TestSlotSeries(unittest.TestCase):
         
         with self.assertRaises(KeyError):
             data_time_slot_series.rename_data_key('notexistent_key','c')
+
+
+class TestSeriesSlices(unittest.TestCase):
+
+    def test_SeriesSlice(self):
+        series = DataTimePointSeries()
+        series.append(DataTimePoint(t = 0, data = {'value': 0}))
+        series.append(DataTimePoint(t = 1, data = {'value': 1}))
+        series.append(DataTimePoint(t = 2, data = {'value': 2}))
+        series.append(DataTimePoint(t = 3, data = {'value': 3}))
+        series.append(DataTimePoint(t = 4, data = {'value': 4}))
+        series.append(DataTimePoint(t = 5, data = {'value': 5}))
+        series.append(DataTimePoint(t = 6, data = {'value': 6}))
+        series.append(DataTimePoint(t = 7, data = {'value': 7}))
+        series.append(DataTimePoint(t = 8, data = {'value': 8}))
+        series.append(DataTimePoint(t = 9, data = {'value': 9}))
+        
+        from ..utilities import compute_validity_regions
+        validity_regions = compute_validity_regions(series)
+        for point in series:
+            point.valid_from=validity_regions[point.t][0]
+            point.valid_to=validity_regions[point.t][1]
+        
+        series_slice = SeriesSlice(series, 2, 5)
+        
+        self.assertEqual(len(series_slice), 3)
+        
+        for i, point in enumerate(series_slice):
+            self.assertEqual(point.t, 2+i)
+
+        self.assertEqual(series_slice[0].t, 2)
+        self.assertEqual(series_slice[1].t, 3)
+        self.assertEqual(series_slice[2].t, 4)
+        self.assertEqual(series_slice[-1].t, 4)
+        
+        # Test extra attributes
+        self.assertEqual(str(series_slice.resolution), '1s')
+        self.assertEqual(series_slice.data_keys(), ['value'])
+        
+        with self.assertRaises(AttributeError):
+            series_slice.diff()
+        with self.assertRaises(AttributeError):
+            series_slice.blackmagic()
+
+
+    def test_SeriesDenseSlice(self):
+        series = DataTimePointSeries()
+        series.append(DataTimePoint(t = 0, data = {'value': 0}))
+        series.append(DataTimePoint(t = 1, data = {'value': 1}))
+        series.append(DataTimePoint(t = 2, data = {'value': 2}))
+        series.append(DataTimePoint(t = 3, data = {'value': 3}))
+        series.append(DataTimePoint(t = 4, data = {'value': 4}))
+        series.append(DataTimePoint(t = 7, data = {'value': 7}))
+        series.append(DataTimePoint(t = 8, data = {'value': 8}))
+        series.append(DataTimePoint(t = 9, data = {'value': 9}))
+        
+        from ..utilities import compute_validity_regions
+        validity_regions = compute_validity_regions(series)
+        for point in series:
+            point.valid_from=validity_regions[point.t][0]
+            point.valid_to=validity_regions[point.t][1]
+        
+        series_slice = SeriesDenseSlice(series, 2, 8)
+        
+        self.assertEqual(len(series_slice), 7)
+        
+        series_slice_materialized=[]
+        for point in series_slice:
+            series_slice_materialized.append(point)
+
+        self.assertEqual(series_slice_materialized[0].t, 2)
+        self.assertEqual(series_slice_materialized[1].t, 3)
+        self.assertEqual(series_slice_materialized[2].t, 4)
+        self.assertEqual(series_slice_materialized[3].t, 5.5)
+        self.assertEqual(series_slice_materialized[3].data['value'], 5.5)
+        self.assertEqual(series_slice_materialized[4].t, 7)
+        self.assertEqual(series_slice_materialized[5].t, 8)
+        self.assertEqual(series_slice_materialized[6].t, 9)
+        
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
