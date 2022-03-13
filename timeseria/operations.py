@@ -36,13 +36,12 @@ class Operation():
 
 
 class ScalarOperation(Operation):
-    """An operation operating on a series and returning a scalar (callable object)."""
-    pass
+    """An operation operating on a series and returning a scalar (callable object)."""    
+    supports_weights = False
 
 
 class SeriesOperation(Operation):
     """An operation operating on a series and returning a series (callable object)."""
-    pass
 
 
 #=======================
@@ -108,50 +107,69 @@ class Min(ScalarOperation):
 
 
 class Avg(ScalarOperation):
-    """Average operation (callable object)."""
+    """Weighted average operation (callable object)."""
     
+    supports_weights = True
+
     def __call__(self, arg, data_key=None, **kwargs):
+
+        # Log & checks
+        logger.debug('Called avg operation')
         if not isinstance(arg, Series):
             raise NotImplementedError('Avg implemented only on series objects')
+        try:
+            for item in arg:
+                item.weight
+                weighted=True
+        except AttributeError:
+            weighted=False
+            #raise AttributeError('Trying to apply a weightd average on non-weigthed point')     
+
+        # Prepare
+        series = arg
+        sums = {data_key: None for data_key in series.data_keys()}
+        
+        # Compute
+        if weighted:
+            total_weights = 0
+            for item in series:
+        
+                logger.debug('Point @ %s, weight: %s, data: %s', item.dt, item.weight, item.data)
+        
+                for _data_key in sums:
+                    if sums[_data_key] is None:
+                        sums[_data_key] = item.data[_data_key]*item.weight
+                    else:
+                        sums[_data_key] += item.data[_data_key]*item.weight
+                    #logger.debug('Sums: %s',sums[_data_key])
+                total_weights += item.weight
+            
+            # The sum are already the average as weugthed
+            logger.debug('Total weights: %s', total_weights)
+            if total_weights == 1:
+                avgs = sums
+            else:
+                avgs = {}
+                for _data_key in sums:
+                    avgs[_data_key] = sums[_data_key] / total_weights
         else:
-            series = arg
-            sums = {data_key: None for data_key in series.data_keys()}
             for item in series:
                 for _data_key in sums:
                     if sums[_data_key] is None:
                         sums[_data_key] = item.data[_data_key]
                     else:
-                        sums[_data_key] += item.data[_data_key]
-            avgs={}
+                        sums[_data_key] += item.data[_data_key]            
+            avgs = {}
             for _data_key in sums:
                 avgs[_data_key] = sums[_data_key] / len(series)
-            if data_key is not None:
-                return avgs[data_key]
-            if len(avgs) == 1:
-                return avgs[series.data_keys()[0]]
-            else:
-                return avgs
-
-
-class WAvg(ScalarOperation):
-    """Weighted average operation (callable object)."""
-
-    def __call__(self, series, prev_point=None, next_point=None):
-        raise NotImplementedError('Weighted Average is not yet implemented')
-        #keys = None
-        #avgs = {}
-        #count=0
-        #for data_time_point in series:
-        #    count+=1              
-        #    if not keys:
-        #        keys=data_time_point.data.keys()
-        #    for key in keys:
-        #        if key not in avgs:
-        #            avgs[key] = 0
-        #        avgs[key] += data_time_point.data[key]
-        #for key in keys:
-        #    new_avgs = {key:avgs[key]/count for key in keys}
-        #return new_avgs
+            
+        # FInalize and return
+        if data_key is not None:
+            return avgs[data_key]
+        if len(avgs) == 1:
+            return avgs[series.data_keys()[0]]
+        else:
+            return avgs
 
 
 class Sum(ScalarOperation):
@@ -224,6 +242,14 @@ class Derivative(SeriesOperation):
                         diff = diff/2
 
                 # Normalize the increment to get the actual derivative
+                #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                # TODO: use point timestamps, why using resolution?
+                #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+                # + move to "der" & "int"
+                
+                # der is the rigt+left variation. diff is..? 
+
                 if normalize:
                     if isinstance(timeseries.resolution, TimeUnit):
                         diff = diff / timeseries.resolution.duration_s(item.dt)               
@@ -384,7 +410,6 @@ class Normalize(SeriesOperation):
                         mins[key] = item.data[key]
                     if item.data[key] > maxs[key]:
                         maxs[key] = item.data[key]                
-        
         
         for i, item in enumerate(timeseries):
  
@@ -788,7 +813,6 @@ class Merge(SeriesOperation):
 min = Min()
 max = Max()
 avg = Avg()
-wavg = WAvg()
 sum = Sum()
 
 # Series operations

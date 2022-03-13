@@ -22,6 +22,7 @@ HARD_DEBUG = False
 
 
 def is_numerical(item):
+    """Check if item is numerical (float or int)"""
     if isinstance(item, float):
         return True
     if isinstance(item, int):
@@ -114,208 +115,192 @@ def detect_encoding(filename, streaming=False):
     return encoding
 
 
-def compute_coverage(data_time_point_series, from_t, to_t, trustme=False, validity=None, validity_placement='center'):
-    '''Compute the data coverage of a data_time_point_series based on the data_time_points validity'''
+def compute_validity_regions(series, from_t=None, to_t=None, sampling_interval=None, cut=False):
+    """
+    Compute the validity regions for the series points. If from_t or to_t are given, computes them within that interval only.
     
-    # TODO: The following should be implemented when computing averages as well.. put it in common?
-    center = 1
-    left   = 2
-    right  = 3
+    Args:
+        series: the time series.  
+        from_t: the interval start, if any.
+        to_t: the interval end, if any.
+        sampling_interval: the sampling interval. In not set, it will be used the series' (auto-detected) one.
+        cut: if to shrink the validity according to the start/end.
+
+    Returns:
+        dict: for each point, the validity region start and end.
+    """
+
+    # If single-element series, check that the sampling_interval was given
+    if len(series) == 1:
+        if sampling_interval is None:
+            raise ValueError('The series has only one element and no sampling_interval is provided, no idea how to compute validity') 
+
+    # Get the series sampling interval unless it is forced to a specific value
+    if not sampling_interval:
+        sampling_interval = series.autodetected_sampling_interval
+
+    # Segments dict
+    validity_segments = {}
     
-    if validity_placement == 'center':
-        validity_placement=center
-    elif validity_placement == 'left':
-        validity_placement=left
-    elif validity_placement == 'right':
-        validity_placement=right
-    else:
-        raise ValueError('Unknown value "{}" for validity_placement'.format(validity_placement))
+    # Compute validity segments for each point
+    prev_point_t = None
+    for point in series:
+
+        # Get point validity boundaries
+        point_valid_from_t = point.t - (sampling_interval/2)
+        point_valid_to_t   = point.t + (sampling_interval/2)
+
+        # Are we processing points not belonging to this interval, if set?
+        if from_t is not None and point_valid_to_t <= from_t:
+            continue
+        if to_t is not None and point_valid_from_t > to_t:
+            break
+        
+        # Shrink with respect to start-end if required
+        if cut:
+            if from_t is not None and point_valid_from_t < from_t:
+                point_valid_from_t = from_t
+            if to_t is not None and point_valid_to_t > to_t:
+                point_valid_to_t = to_t
     
-    # Sanity checks
-    if not trustme:
-        if data_time_point_series is None:
-            raise ValueError('You must provide a data_time_point_series, got None')
-            
-        if from_t is None or to_t is None:
-            raise ValueError('Missing from_t or to_t')
+        # Shrink if overlaps: if the previous point validity overlap with ours, resize both
+        if prev_point_t is not None:
+            if point_valid_from_t < validity_segments[prev_point_t][1]:
+                # Shrink both
+                mid_t = (validity_segments[prev_point_t][1] + point_valid_from_t)/2                
+                validity_segments[prev_point_t][1] = mid_t
+                point_valid_from_t = mid_t
+    
+        # Set this validity segment boundaries
+        validity_segments[point.t] = [point_valid_from_t,point_valid_to_t]
+
+        # Set previous point timestamp
+        prev_point_t = point.t
+
+    return validity_segments
 
 
-    # Support vars
-    prev_datapoint_valid_to_t = None
-    empty_data_time_point_series = True
-    missing_coverage = None
-    next_processed = False
+def compute_coverage(series, from_t, to_t, sampling_interval=None):
+    """
+    Compute the coverage of an interval based on the points validity regions.
+    
+    Args:
+        series: the time series.
+        from_t: the interval start.
+        to_t: the interval end.
+        sampling_interval: the sampling interval. In not set, it will be used the series' (auto-detected) one.
+    
+    Returns:
+        float: the interval coverage.
+    """
 
     logger.debug('Called compute_coverage from {} to {}'.format(from_t, to_t))
 
-
-    #===========================
-    #  START cycle over points
-    #===========================
+    # Check from_t/to_t
+    if from_t >= to_t:
+        raise ValueError('From is higher than to (or equal): from_t="{}", to_t="{}"'.format(from_t, to_t))
     
-    for this_data_time_point in data_time_point_series:
+    # If the series is empty, return zero coverage
+    if not series:
+        return 0.0
         
-        
-        # Compute this_data_time_point validity boundaries
-        if validity:
-            if validity_placement==center:
-                this_data_time_point_valid_from_t = this_data_time_point.t - (validity/2)
-                this_data_time_point_valid_to_t   = this_data_time_point.t + (validity/2)
-            else:
-                raise NotImplementedError('Validity placements other than "center" are not yet supported')
-        
-        else:
-            this_data_time_point_valid_from_t = this_data_time_point.t
-            this_data_time_point_valid_to_t   = this_data_time_point.t
-        
-        # Hard debug
-        #logger.debug('HARD DEBUG %s %s %s', this_data_time_point.Point_part, this_data_time_point.validity_region.start, this_data_time_point.validity_region.end)
-        
-        # If no start point has been set, just use the first one in the data
-        #if start_Point is None:
-        #    start_Point = data_time_point_series.Point_part
-        # TODO: add support also for dynamically setting the end_Point to allow empty start_Point/end_Point input        
-        
-        #=====================
-        #  BEFORE START
-        #=====================
-        
-        # Are we before the start_Point? 
-        if this_data_time_point.t < from_t:
-            
-            # Just set the previous Point valid until
-            prev_datapoint_valid_to_t = this_data_time_point_valid_to_t
+    # Compute the validity regions in the interval. if point haven't them?
+    # validity_regions = compute_validity_regions(series, from_t=from_t, to_t=to_t, cut=True, sampling_interval=sampling_interval)
+    # And now attach?
 
-            # If prev point too far, skip it
-            if prev_datapoint_valid_to_t <= from_t:
-                prev_datapoint_valid_to_t = None
-
-            continue
-
-
-        #=====================
-        #  After end
-        #=====================
-        # Are we after the end_Point? In this case, we can treat it as if we are in the middle-
-        elif this_data_time_point.t >= to_t:
-
-            if not next_processed: 
-                next_processed = True
-                
-                # If "next" point too far, skip it:
-                if this_data_time_point_valid_from_t > to_t:
-                    continue
-            else:
+    # Sum all the validity regions according to the from/to:
+    coverage_s = 0
+    for point in series:
+        try:
+            # Skip at the beginning and end if any
+            if point.valid_to < from_t:
                 continue
-
-
-        #=====================
-        #  In the middle
-        #=====================
-        
-        # Otherwise, we are in the middle?
-        else:
-            # Normal operation mode
-            pass
-
-        
-
-        # Okay, now we have all the values we need:
-        # 1) prev_datapoint_valid_until
-        # 2) this_data_time_point_valid_from
-        
-        # Also, if we are here it also means that we have valid data
-        if empty_data_time_point_series:
-            empty_data_time_point_series = False
-
-        # Compute coverage
-        # TODO: and idea could also to initialize Units and sum them
-        if prev_datapoint_valid_to_t is None:
-            value = this_data_time_point_valid_from_t - from_t
+            if point.valid_from >= to_t:
+                break 
             
-        else:
-            value = this_data_time_point_valid_from_t - prev_datapoint_valid_to_t
+            # Skip if reconstructed as well
+            try:
+                if point.reconstructed:
+                    continue
+            except AttributeError:
+                pass
             
-        # If for whatever reason the validity regions overlap we don't want to end up in
-        # invalidating the coverage calculation by summing negative numbers
-        if value > 0:
-            if missing_coverage is None:
-                missing_coverage = value
-            else:
-                missing_coverage = missing_coverage + value
+            # Set this point valid from/to accoring to the interval boundaries
+            this_point_valid_from = point.valid_from if point.valid_from >= from_t else from_t
+            this_point_valid_to = point.valid_to if point.valid_to < to_t else to_t
+            
+            # Add this point coverage to the overall coverage
+            coverage_s += this_point_valid_to-this_point_valid_from
+            
+            logger.debug('Point %s: from %s, to %s (current total=%s) ', point.t, this_point_valid_from, this_point_valid_to, coverage_s)
+            
+        except AttributeError:
+            raise AttributeError('Point {} has no valid_to or valid_from'.format(point)) from None
 
-        # Update previous datapoint Validity:
-        prev_datapoint_valid_to_t = this_data_time_point_valid_to_t
-        
-    #=========================
-    #  END cycle over points
-    #=========================
+    # Convert from coverage in seconds to ratio:
+    coverage = coverage_s / (to_t - from_t)
 
-    # Compute the coverage until the end point
-    if prev_datapoint_valid_to_t is not None:
-        if to_t > prev_datapoint_valid_to_t:
-            if missing_coverage is not None:
-                missing_coverage += (to_t - prev_datapoint_valid_to_t)
-            else:
-                missing_coverage = (to_t - prev_datapoint_valid_to_t)
-    
-    # Convert missing_coverage_s_is in percentage
-        
-    if empty_data_time_point_series:
-        coverage = 0.0 # Return zero coverage if empty
-    
-    elif missing_coverage is not None :
-        coverage = 1.0 - float(missing_coverage) / ( to_t - from_t) 
-        
-        # Fix boundaries # TODO: understand better this part
-        if coverage < 0:
-            coverage = 0.0
-            #raise ConsistencyException('Got Negative coverage!! {}'.format(coverage))
-        if coverage > 1:
-            coverage = 1.0
-            #raise ConsistencyException('Got >1 coverage!! {}'.format(coverage))
-    
-    else:
-        coverage = 1.0
-        
     # Return
     logger.debug('compute_coverage: Returning %s (%s percent)', coverage, coverage*100.0)
     return coverage
 
 
-def compute_data_loss(data_time_point_series, from_t, to_t, series_resolution, validity,
-                      validity_placement='center', first_last=False, trustme=False):
+def compute_data_loss(series, from_t, to_t, force=False, sampling_interval=None):
+    """
+    Compute the data loss  of an interval based on the points validity regions.
     
-    # Data loss from missing coverage. Computing it useless if the series has no 'variable' resolution, 
-    # however, if removed, it is still to be applied for the first and last item as on the borders there
-    # still may be  data losses. 
-    if series_resolution == 'variable' or first_last:
-        data_loss_from_missing_coverage = 1 - compute_coverage(data_time_point_series, from_t, to_t, trustme, validity, validity_placement)
-    else:
-        data_loss_from_missing_coverage = 0
+    Args:
+        series: the time series.
+        from_t: the interval start.
+        to_t: the interval end.
+        force: if to force computing even when not strictly necessary.
+        sampling_interval: the sampling interval. In not set, it will be used the series' (auto-detected) one.
+    
+    Returns:
+        float: the interval data loss.
+    """
 
-    # Data loss from previously computed data losses
-    data_loss_from_previously_computed = 0
-    for this_data_time_point in data_time_point_series:
+    # Get the series sampling interval unless it is forced to a specific value
+    if not sampling_interval:
+        sampling_interval = series.autodetected_sampling_interval
+       
+    #========================================
+    #  Data loss from missing coverage.
+    #========================================
+    
+    # Note: to improve performance, this could be computed only if the series is "raw" or forced,
+    # i.e. at first and last items since on the borders there still may be  data losses. 
+    data_loss_from_missing_coverage = 1 - compute_coverage(series, from_t, to_t, sampling_interval=sampling_interval)
 
-        if this_data_time_point.data_loss:
 
-            # Skip points not to be taken dinto account
-            if this_data_time_point.t + (validity/2) < from_t:
-                continue
-            if this_data_time_point.t - (validity/2) >= to_t:
-                continue
-            
-            # Compute the contribution of this point data loss.
-            if (this_data_time_point.t < from_t)  and this_data_time_point.t + (validity/2) >= from_t:
-                this_validity = (this_data_time_point.t + (validity/2)) - from_t
-            elif (this_data_time_point.t > to_t)  and this_data_time_point.t + (validity/2) < to_t:
-                this_validity = to_t - (this_data_time_point.t + (validity/2))
-            else:
-                this_validity = validity
-            
-            # Now add, rescaling the data loss with respect to the validity and from/to 
-            data_loss_from_previously_computed += this_data_time_point.data_loss * (this_validity/( to_t - from_t))
+    #========================================
+    #  Data loss from previous data losses.
+    #========================================
+
+    # Computed only if the resolutions is constant, as they can be defined only if the series was already 
+    # made uniform (i.e. by a resampling process), or if forced for testing or other potential reasons.
+    data_loss_from_previously_computed = 0.0
+    if series.resolution != 'variable' or force:
+        
+        for point in series:
+            if point.data_loss:
+    
+                # Skip points not to be taken dinto account
+                if point.t + (sampling_interval/2) < from_t:
+                    continue
+                if point.t - (sampling_interval/2) >= to_t:
+                    continue
+                
+                # Compute the contribution of this point data loss.
+                if (point.t < from_t)  and point.t + (sampling_interval/2) >= from_t:
+                    this_validity = (point.t + (sampling_interval/2)) - from_t
+                elif (point.t > to_t)  and point.t + (sampling_interval/2) < to_t:
+                    this_validity = to_t - (point.t + (sampling_interval/2))
+                else:
+                    this_validity = sampling_interval
+                
+                # Now rescale the data loss with respect to the validity and from/to and sum it up
+                data_loss_from_previously_computed += point.data_loss * (this_validity/( to_t - from_t))
 
     # Compute total data loss    
     data_loss = data_loss_from_missing_coverage + data_loss_from_previously_computed
@@ -700,8 +685,9 @@ def os_shell(command, capture=False, verbose=False, interactive=False, silent=Fa
             return True
 
 
-    
-    
+
+
+
     
     
     
