@@ -280,6 +280,67 @@ class Series(list):
         """Disabled (reversing is not compatible with an ordering)."""
 
 
+    def print(self, limit=10):
+        """Print the series. By default limited to 10 elements.
+        
+            Args:
+                limit: the limit of elements to print, by default 10.
+        """
+        
+        print('[', end='')
+        
+        if not limit or limit > len(self):
+        
+            for i, item in enumerate(self):
+                if limit and i >= limit:
+                    break
+                else:
+                    if i==0:
+                        print(str(item)+',')
+                    elif i==len(self)-1:
+                        print(' '+str(item), end='')                        
+                    else:
+                        print(' '+str(item)+',')
+        else:
+            
+            head_n = int(limit/2)+1
+            tail_n = int(limit/2)
+
+            for i, item in enumerate(self.head(head_n)):
+                if i==0:
+                    print(str(item)+',')                       
+                else:
+                    print(' '+str(item)+',')
+
+            print(' ...')
+
+            for i, item in enumerate(self.tail(tail_n)):
+                if i==tail_n-1:
+                    print(' '+str(item), end='')                        
+                else:
+                    print(' '+str(item)+',')
+
+        print(']')
+
+    def head(self, n=5):
+        """Get the first n items of the series, 5 by default.
+        
+            Args:
+                n: the number of first elements to return .
+        """
+        
+        return list(self[0:n])
+
+    def tail(self, n=5):
+        """Get the last n items of the series, 5 by default.
+        
+            Args:
+                n: the number of last elements to return .
+        """
+        
+        return list(self[-n:])
+
+
 #======================
 #  Points
 #======================

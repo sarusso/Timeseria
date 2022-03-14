@@ -23,13 +23,13 @@ class TestSeries(unittest.TestCase):
 
     def test_Series(self):
         
-        serie = Series(1,4,5)
-        self.assertEqual(serie, [1,4,5])
-        self.assertEqual(len(serie), 3)
+        series = Series(1,4,5)
+        self.assertEqual(series, [1,4,5])
+        self.assertEqual(len(series), 3)
         
-        serie.append(8)
-        self.assertEqual(serie, [1,4,5,8])
-        self.assertEqual(len(serie), 4)  
+        series.append(8)
+        self.assertEqual(series, [1,4,5,8])
+        self.assertEqual(len(series), 4)  
         
         # Demo class that implements the __succedes__ operation
         class IntegerNumber(int):
@@ -72,10 +72,17 @@ class TestSeries(unittest.TestCase):
         with self.assertRaises(TypeError):
             FloatSeries(1.0,4.0,None,5.0)
             
-        float_serie = FloatSeries(1.0,4.0,5.0)
-        self.assertEqual(float_serie, [1.0,4.0,5.0])
-        self.assertEqual(len(float_serie), 3)
+        float_series = FloatSeries(1.0,4.0,5.0)
+        self.assertEqual(float_series, [1.0,4.0,5.0])
+        self.assertEqual(len(float_series), 3)
+        
+        # Test head & tail
+        self.assertEqual(float_series.head(2),[1.0,4.0])
+        self.assertEqual(float_series.tail(2),[4.0,5.0])
 
+        # Test print with print mock?
+        #print()
+        #float_series.print(3) 
 
 
 class TestPoints(unittest.TestCase):
