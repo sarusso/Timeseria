@@ -3,7 +3,7 @@
 
 from copy import copy, deepcopy
 from .time import s_from_dt
-from .datastructures import Series, Slot, Point, PointSeries
+from .datastructures import Series, Slot, Point, DataTimePointSeries, DataTimeSlotSeries
 from .utilities import is_close
 from .units import TimeUnit, Unit
 
@@ -202,62 +202,79 @@ class Sum(ScalarOperation):
 class Derivative(SeriesOperation):
     """Derivative operation (callable object). Must operate on a fixed resolution time series"""
     
-    def __call__(self, timeseries, inplace=False, normalize=True, diffs=False):
+    def __call__(self, series, inplace=False, normalize=True, diffs=False):
         
-        if normalize or not diffs:
-            if isinstance(timeseries, PointSeries) and timeseries.resolution == 'variable':
-                raise ValueError('Variable resolutions are not supported in this mode. Resample or slot the time series first.')
+        if normalize:
+            if series.resolution == 'variable':
+                variable_resolution = True
+                sampling_interval = series.autodetected_sampling_interval
+            else:
+                variable_resolution = False
+                if isinstance(series.resolution, TimeUnit):
+                    sampling_interval = series.resolution.duration_s(series[0].dt)               
+                elif isinstance(series.resolution, Unit):
+                    sampling_interval = series.resolution.value
+                else:
+                    sampling_interval = series.resolution           
             postfix='derivative'
         else:
             postfix='diff'
 
         if not inplace:
-            der_timeseries = timeseries.__class__()
+            der_series = series.__class__()
 
-        data_keys = timeseries.data_keys()
-        for i, item in enumerate(timeseries):
+        data_keys = series.data_keys()
+        for i, item in enumerate(series):
 
             if not inplace:
                 data = {}
             
             for key in data_keys:
-                
+                diff_left = None
+                diff_right = None
+                diff = None
                 if diffs:
                     # Just compute the diffs
                     if i == 0:
                         diff = 0
                     else:
-                        diff = timeseries[i].data[key] - timeseries[i-1].data[key]
+                        diff = series[i].data[key] - series[i-1].data[key]
                 else:
                     # Compute the derivative
                     if i == 0:
                         # Right increment for the first item
-                        diff = timeseries[i+1].data[key] - timeseries[i].data[key]
-                    elif i == len(timeseries)-1:
+                        diff_right = series[i+1].data[key] - series[i].data[key]
+                    elif i == len(series)-1:
                         # Left increment for the last item. Divide by two if not normlaizing by time resolution
-                        diff = timeseries[i].data[key] - timeseries[i-1].data[key]
+                        diff_left = series[i].data[key] - series[i-1].data[key]
                     else:
-                        # Both left and right increment for the items in the middle, averaged.
-                        diff =  ((timeseries[i+1].data[key] - timeseries[i].data[key]) + (timeseries[i].data[key] - timeseries[i-1].data[key]))
-                        diff = diff/2
+                        # Both left and right increment for the items in the middle
+                        diff_left = series[i].data[key] - series[i-1].data[key]
+                        diff_right = series[i+1].data[key] - series[i].data[key]
 
-                # Normalize the increment to get the actual derivative
-                #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                # TODO: use point timestamps, why using resolution?
-                #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-                # + move to "der" & "int"
-                
-                # der is the rigt+left variation. diff is..? 
-
+                # Combine and normalize (if required) the increments to get the actual derivative
                 if normalize:
-                    if isinstance(timeseries.resolution, TimeUnit):
-                        diff = diff / timeseries.resolution.duration_s(item.dt)               
-                    elif isinstance(timeseries.resolution, Unit):
-                        diff = diff / timeseries.resolution.value
+                    if diff is not None:
+                        diff = diff / sampling_interval 
+                    elif diff_right is None:
+                        diff = diff_left / sampling_interval
+                    elif diff_left is None:
+                        diff = diff_right / sampling_interval
                     else:
-                        diff = diff / timeseries.resolution
-
+                        if variable_resolution:
+                            diff = ((diff_left / (series[i].t - series[i-1].t)) + (diff_right / (series[i+1].t - series[i].t))) /2
+                        else:
+                            diff = ((diff_left + diff_right)/2)/sampling_interval
+                else:
+                    if diff is not None:
+                        pass
+                    elif diff_right is None:
+                        diff = diff_left
+                    elif diff_left is None:
+                        diff = diff_right
+                    else:
+                        diff = (diff_left+diff_right)/2
+                
                 # Add data
                 if not inplace:
                     data['{}_{}'.format(key, postfix)] = diff
@@ -267,42 +284,51 @@ class Derivative(SeriesOperation):
             # Create the item
             if not inplace:
 
-                if isinstance(timeseries[0], Point):
-                    der_timeseries.append(timeseries[0].__class__(t = item.t,
-                                                                  tz = item.tz,
-                                                                  data = data,
-                                                                  data_loss = item.data_loss))         
-                elif isinstance(timeseries[0], Slot):
-                    der_timeseries.append(timeseries[0].__class__(start = item.start,
-                                                                  unit = item.unit,
-                                                                  data = data,
-                                                                  data_loss = item.data_loss))                
+                if isinstance(series[0], Point):
+                    der_series.append(series[0].__class__(t = item.t,
+                                                          tz = item.tz,
+                                                          data = data,
+                                                          data_loss = item.data_loss))         
+                elif isinstance(series[0], Slot):
+                    der_series.append(series[0].__class__(start = item.start,
+                                                          unit = item.unit,
+                                                          data = data,
+                                                          data_loss = item.data_loss))                
                 else:
                     raise NotImplementedError('Working on series other than slots or points not yet implemented')
 
         if not inplace:
-            return der_timeseries
+            return der_series
 
 
 class Integral(SeriesOperation):
     """Integral operation (callable object). Must operate on a fixed resolution time series."""
     
-    def __call__(self, timeseries, inplace=False, normalize=True, c=0):
+    def __call__(self, series, inplace=False, normalize=True, c=0):
         
         if normalize:
-            if isinstance(timeseries, PointSeries) and timeseries.resolution == 'variable':
-                raise ValueError('Variable resolutions are not supported. Resample or slot the time series first.')
+            if series.resolution == 'variable':
+                variable_resolution = True
+                sampling_interval = series.autodetected_sampling_interval
+            else:
+                variable_resolution = False
+                if isinstance(series.resolution, TimeUnit):
+                    sampling_interval = series.resolution.duration_s(series[0].dt)               
+                elif isinstance(series.resolution, Unit):
+                    sampling_interval = series.resolution.value
+                else:
+                    sampling_interval = series.resolution     
             postfix='integral'
         else:
             postfix='csum'
 
         if not inplace:
-            der_timeseries = timeseries.__class__()
+            der_series = series.__class__()
 
         last_values={}
 
-        data_keys = timeseries.data_keys()
-        for i, item in enumerate(timeseries):
+        data_keys = series.data_keys()
+        for i, item in enumerate(series):
 
             if not inplace:
                 data = {}
@@ -311,26 +337,27 @@ class Integral(SeriesOperation):
                 
                 # Get the value
                 if not normalize:
-                    value = timeseries[i].data[key]
+                    value = series[i].data[key]
                 else:
                     # Compute the integral
                     if i == 0:
                         value=0
-                        prev_right_component = timeseries[i].data[key]
+                        prev_right_component = series[i].data[key]
                     else:
-                        left_component = (timeseries[i-1].data[key]*2) - prev_right_component
+                        left_component = (series[i-1].data[key]*2) - prev_right_component
                         # The "value" below is actually an increment, see below at  value = last_values[key] + value 
                         value = left_component 
                         prev_right_component = left_component
 
                 # Normalize the cumulative to get the actual integral
                 if normalize:
-                    if isinstance(timeseries.resolution, TimeUnit):
-                        value = value * timeseries.resolution.duration_s(item.dt)               
-                    elif isinstance(timeseries.resolution, Unit):
-                        value = value * timeseries.resolution.value
+                    if variable_resolution:
+                        if i == 0:
+                            value = value * sampling_interval
+                        else:
+                            value = value * (series[i].t - series[i-1].t)
                     else:
-                        value = value * timeseries.resolution
+                        value = value * sampling_interval
 
                 # Sum to previous or apply offset if any
                 try:
@@ -354,13 +381,13 @@ class Integral(SeriesOperation):
             # Create the item
             if not inplace:
 
-                if isinstance(timeseries[0], Point):
-                    der_timeseries.append(timeseries[0].__class__(t = item.t,
+                if isinstance(series[0], Point):
+                    der_series.append(series[0].__class__(t = item.t,
                                                                   tz = item.tz,
                                                                   data = data,
                                                                   data_loss = item.data_loss))         
-                elif isinstance(timeseries[0], Slot):
-                    der_timeseries.append(timeseries[0].__class__(start = item.start,
+                elif isinstance(series[0], Slot):
+                    der_series.append(series[0].__class__(start = item.start,
                                                                   unit = item.unit,
                                                                   data = data,
                                                                   data_loss = item.data_loss))                
@@ -368,25 +395,25 @@ class Integral(SeriesOperation):
                     raise NotImplementedError('Working on series other than slots or points not yet implemented')
 
         if not inplace:
-            return der_timeseries
+            return der_series
 
 
 class Diff(Derivative):
     """Incremental differences operation (callable object)."""
-    def __call__(self, timeseries, inplace=False):
-        return super(Diff, self).__call__(timeseries, inplace=inplace, normalize=False, diffs=True)
+    def __call__(self, series, inplace=False):
+        return super(Diff, self).__call__(series, inplace=inplace, normalize=False, diffs=True)
 
 
 class CSum(Integral):
     """Cumulative sum operation (callable object)."""
-    def __call__(self, timeseries, inplace=False, offset=0):
-        return super(CSum, self).__call__(timeseries, inplace=inplace, normalize=False, c=offset)
+    def __call__(self, series, inplace=False, offset=0):
+        return super(CSum, self).__call__(series, inplace=inplace, normalize=False, c=offset)
 
 
 class Normalize(SeriesOperation):
     """Normalization operation (callable object)"""
     
-    def __call__(self, timeseries, range=[0,1], inplace=False):
+    def __call__(self, series, range=[0,1], inplace=False):
         
         if range == [0,1]:
             custom_range = None
@@ -394,12 +421,12 @@ class Normalize(SeriesOperation):
             custom_range = range
         
         if not inplace:
-            normalized_timeseries = timeseries.__class__()
+            normalized_series = series.__class__()
 
-        data_keys = timeseries.data_keys()
+        data_keys = series.data_keys()
 
         # Get min and max for the data keys
-        for i, item in enumerate(timeseries):
+        for i, item in enumerate(series):
             
             if i == 0:
                 mins = {key: item.data[key] for key in data_keys}
@@ -411,7 +438,7 @@ class Normalize(SeriesOperation):
                     if item.data[key] > maxs[key]:
                         maxs[key] = item.data[key]                
         
-        for i, item in enumerate(timeseries):
+        for i, item in enumerate(series):
  
             if not inplace:
                 data = {}
@@ -433,13 +460,13 @@ class Normalize(SeriesOperation):
             # Create the item
             if not inplace:
  
-                if isinstance(timeseries[0], Point):
-                    normalized_timeseries.append(timeseries[0].__class__(t = item.t,
+                if isinstance(series[0], Point):
+                    normalized_series.append(series[0].__class__(t = item.t,
                                                                          tz = item.tz,
                                                                          data = data,
                                                                          data_loss = item.data_loss))         
-                elif isinstance(timeseries[0], Slot):
-                    normalized_timeseries.append(timeseries[0].__class__(start = item.start,
+                elif isinstance(series[0], Slot):
+                    normalized_series.append(series[0].__class__(start = item.start,
                                                                          unit = item.unit,
                                                                          data = data,
                                                                          data_loss = item.data_loss))                
@@ -447,7 +474,7 @@ class Normalize(SeriesOperation):
                     raise NotImplementedError('Working on series other than slots or points not yet implemented')
  
         if not inplace:
-            return normalized_timeseries
+            return normalized_series
 
 
 
@@ -455,14 +482,14 @@ class Normalize(SeriesOperation):
 class Rescale(SeriesOperation):
     """Rescaling operation (callable object)"""
     
-    def __call__(self, timeseries, value, inplace=False):
+    def __call__(self, series, value, inplace=False):
         
         if not inplace:
-            rescaled_timeseries = timeseries.__class__()
+            rescaled_series = series.__class__()
 
-        data_keys = timeseries.data_keys()
+        data_keys = series.data_keys()
 
-        for item in timeseries:
+        for item in series:
  
             if not inplace:
                 rescaled_data = {}
@@ -483,13 +510,13 @@ class Rescale(SeriesOperation):
                             
             else:
 
-                if isinstance(timeseries[0], Point):
-                    rescaled_timeseries.append(timeseries[0].__class__(t = item.t,
+                if isinstance(series[0], Point):
+                    rescaled_series.append(series[0].__class__(t = item.t,
                                                                          tz = item.tz,
                                                                          data = rescaled_data,
                                                                          data_loss = item.data_loss))         
-                elif isinstance(timeseries[0], Slot):
-                    rescaled_timeseries.append(timeseries[0].__class__(start = item.start,
+                elif isinstance(series[0], Slot):
+                    rescaled_series.append(series[0].__class__(start = item.start,
                                                                          unit = item.unit,
                                                                          data = rescaled_data,
                                                                          data_loss = item.data_loss))                
@@ -497,20 +524,20 @@ class Rescale(SeriesOperation):
                     raise NotImplementedError('Working on series other than slots or points not yet implemented')
  
         if not inplace:
-            return rescaled_timeseries
+            return rescaled_series
 
 
 class Offset(SeriesOperation):
     """Offsetting operation (callable object)"""
     
-    def __call__(self, timeseries, value, inplace=False):
+    def __call__(self, series, value, inplace=False):
         
         if not inplace:
-            rescaled_timeseries = timeseries.__class__()
+            rescaled_series = series.__class__()
 
-        data_keys = timeseries.data_keys()
+        data_keys = series.data_keys()
 
-        for item in timeseries:
+        for item in series:
  
             if not inplace:
                 offsetted_data = {}
@@ -531,13 +558,13 @@ class Offset(SeriesOperation):
                             
             else:
 
-                if isinstance(timeseries[0], Point):
-                    rescaled_timeseries.append(timeseries[0].__class__(t = item.t,
+                if isinstance(series[0], Point):
+                    rescaled_series.append(series[0].__class__(t = item.t,
                                                                          tz = item.tz,
                                                                          data = offsetted_data,
                                                                          data_loss = item.data_loss))         
-                elif isinstance(timeseries[0], Slot):
-                    rescaled_timeseries.append(timeseries[0].__class__(start = item.start,
+                elif isinstance(series[0], Slot):
+                    rescaled_series.append(series[0].__class__(start = item.start,
                                                                          unit = item.unit,
                                                                          data = offsetted_data,
                                                                          data_loss = item.data_loss))                
@@ -545,7 +572,7 @@ class Offset(SeriesOperation):
                     raise NotImplementedError('Working on series other than slots or points not yet implemented')
  
         if not inplace:
-            return rescaled_timeseries
+            return rescaled_series
 
 
 
@@ -553,7 +580,7 @@ class Offset(SeriesOperation):
 class MAvg(SeriesOperation):
     """Moving average operation (callable object)."""
 
-    def __call__(self, timeseries, window, inplace=False):
+    def __call__(self, series, window, inplace=False):
 
         if not window or window <1:
             raise ValueError('A integer window >0 is required (got window="{}"'.frmat(window))
@@ -563,10 +590,10 @@ class MAvg(SeriesOperation):
         
         postfix='mavg_{}'.format(window)
         
-        mavg_timeseries = timeseries.__class__()
+        mavg_series = series.__class__()
 
-        data_keys = timeseries.data_keys()
-        for i, item in enumerate(timeseries):
+        data_keys = series.data_keys()
+        for i, item in enumerate(series):
 
             if i < window-1:
                 continue
@@ -578,22 +605,22 @@ class MAvg(SeriesOperation):
                 # Compute the moving average
                 value_sum = 0
                 for j in range(i-window+1,i+1):
-                    value_sum += timeseries[j].data[key]
+                    value_sum += series[j].data[key]
                 data['{}_{}'.format(key, postfix)] = value_sum/window
 
             # Create the item
-            if isinstance(timeseries[0], Point):
-                mavg_timeseries.append(timeseries[0].__class__(t = item.t,
+            if isinstance(series[0], Point):
+                mavg_series.append(series[0].__class__(t = item.t,
                                                                tz = item.tz,
                                                                data = data))         
-            elif isinstance(timeseries[0], Slot):
-                mavg_timeseries.append(timeseries[0].__class__(start = item.start,
+            elif isinstance(series[0], Slot):
+                mavg_series.append(series[0].__class__(start = item.start,
                                                                unit = item.unit,
                                                                data = data))                
             else:
                 raise NotImplementedError('Working on series other than slots or points not yet implemented')
 
-        return mavg_timeseries
+        return mavg_series
 
 
 class Select(SeriesOperation):
@@ -684,25 +711,25 @@ class Filter(SeriesOperation):
 class Merge(SeriesOperation):
     """Merge two or more series (callable object)."""
     
-    def __call__(self, *timeseriess):
+    def __call__(self, *seriess):
         
         # Support vars
         resolution = None
-        timeseriess_starting_points_t = []
-        timeseriess_ending_points_t   = []
+        seriess_starting_points_t = []
+        seriess_ending_points_t   = []
         
         # Checks
-        for i, timeseries in enumerate(timeseriess):
+        for i, series in enumerate(seriess):
             #if not isinstance(arg, DataTimeSlotSeries):
-            #    raise TypeError('Argument #{} is not of type DataTimeSlotSeries, got "{}"'.format(i, timeseries.__class__.__name__))
+            #    raise TypeError('Argument #{} is not of type DataTimeSlotSeries, got "{}"'.format(i, series.__class__.__name__))
             if resolution is None:
-                resolution = timeseries.resolution
+                resolution = series.resolution
             else:
-                if timeseries.resolution != resolution:
+                if series.resolution != resolution:
                     abort = True
                     try:
                         # Handle floating point precision issues 
-                        if is_close(timeseries.resolution, resolution):
+                        if is_close(series.resolution, resolution):
                             abort = False
                     except (ValueError,TypeError):
                         pass
@@ -710,16 +737,16 @@ class Merge(SeriesOperation):
                         raise ValueError('DataTimeSlotSeries have different units, cannot merge')
         
             # Find min and max epoch for each series (aka start-end points)
-            timeseriess_starting_points_t.append(timeseries[0].t)
-            timeseriess_ending_points_t.append(timeseries[-1].t)
+            seriess_starting_points_t.append(series[0].t)
+            seriess_ending_points_t.append(series[-1].t)
         
-        # Find max min and min max to set the subset where timeseries are all deifned. e.g.:
+        # Find max min and min max to set the subset where series are all deifned. e.g.:
         # ======
         #    ======
         # we are looking for the second segment (max) starting point
         
         max_starting_point_t = None
-        for starting_point_t in timeseriess_starting_points_t:
+        for starting_point_t in seriess_starting_points_t:
             if max_starting_point_t is None:
                 max_starting_point_t = starting_point_t
             else:
@@ -727,7 +754,7 @@ class Merge(SeriesOperation):
                     max_starting_point_t = starting_point_t 
 
         min_ending_point_t = None
-        for ending_point_t in timeseriess_ending_points_t:
+        for ending_point_t in seriess_ending_points_t:
             if min_ending_point_t is None:
                 min_ending_point_t = ending_point_t
             else:
@@ -735,26 +762,26 @@ class Merge(SeriesOperation):
                     min_ending_point_t = ending_point_t
 
         # Find the time series with the max starting point
-        for timeseries in timeseriess:
-            if timeseries[0].t == max_starting_point_t:
-                reference_timeseries = timeseries
+        for series in seriess:
+            if series[0].t == max_starting_point_t:
+                reference_series = series
 
         # Create the (empty) result time series 
-        result_timeseries = timeseriess[0].__class__(unit=resolution)
+        result_series = seriess[0].__class__(unit=resolution)
         
         # Scroll the time series to get the offsets
         offsets = {}
-        for timeseries in timeseriess:
-            for i in range(len(timeseries)):
-                if timeseries[i].t == max_starting_point_t:
-                    offsets[timeseries] = i
+        for series in seriess:
+            for i in range(len(series)):
+                if series[i].t == max_starting_point_t:
+                    offsets[series] = i
                     break
 
         # Loop over the reference series to create the datapoints for the merge
-        for i in range(len(reference_timeseries)):
+        for i in range(len(reference_series)):
             
             # Check if we gone beyond the minimum ending point
-            if reference_timeseries[i].t > min_ending_point_t:
+            if reference_series[i].t > min_ending_point_t:
                 break  
             
             # Support vars
@@ -762,25 +789,25 @@ class Merge(SeriesOperation):
             data_loss = 0
             valid_data_losses = 0
             
-            tz = timeseriess[0][0].tz
-            if isinstance(reference_timeseries[0], Slot):
-                unit = reference_timeseries[0].unit
+            tz = seriess[0][0].tz
+            if isinstance(reference_series[0], Slot):
+                unit = reference_series[0].unit
             else:
                 unit = None  
             
             # For each time series, get data in i-th position (given the offset) and merge it
-            for timeseries in timeseriess:
+            for series in seriess:
 
                 # Data
                 if data is None:
-                    data = deepcopy(timeseries[i+offsets[timeseries]].data)
+                    data = deepcopy(series[i+offsets[series]].data)
                 else:
-                    data.update(timeseries[i+offsets[timeseries]].data)
+                    data.update(series[i+offsets[series]].data)
                  
                 # Data loss
-                if timeseries[i+offsets[timeseries]].data_loss is not None:
+                if series[i+offsets[series]].data_loss is not None:
                     valid_data_losses += 1
-                    data_loss += timeseries[i+offsets[timeseries]].data_loss
+                    data_loss += series[i+offsets[series]].data_loss
              
             # Finalize data loss if there were valid ones
             if valid_data_losses:
@@ -788,20 +815,20 @@ class Merge(SeriesOperation):
             else:
                 data_loss = None
  
-            if isinstance(reference_timeseries[0], Point):
-                result_timeseries.append(timeseriess[0][0].__class__(t = reference_timeseries[i].t,
+            if isinstance(reference_series[0], Point):
+                result_series.append(seriess[0][0].__class__(t = reference_series[i].t,
                                                                      tz = tz,
                                                                      data  = data,
                                                                      data_loss = data_loss))         
-            elif isinstance(reference_timeseries[0], Slot):
-                result_timeseries.append(timeseriess[0][0].__class__(start = reference_timeseries[i].start,
+            elif isinstance(reference_series[0], Slot):
+                result_series.append(seriess[0][0].__class__(start = reference_series[i].start,
                                                                      unit  = unit,
                                                                      data  = data,
                                                                      data_loss = data_loss))                
             else:
                 raise NotImplementedError('Working on series other than slots or points not yet implemented')
 
-        return result_timeseries
+        return result_series
 
 
 
