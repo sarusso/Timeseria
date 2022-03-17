@@ -272,34 +272,34 @@ class TestForecasters(unittest.TestCase):
     def setUp(self):
         
         # Create a minute-resolution test DataTimeSlotSeries
-        self.sine_data_time_slot_series_minute = DataTimeSlotSeries()
+        self.sine_series_minute = DataTimeSlotSeries()
         for i in range(1000):
-            self.sine_data_time_slot_series_minute.append(DataTimeSlot(start=TimePoint(i*60), end=TimePoint((i+1)*60), data={'value':sin(i/10.0)}))
+            self.sine_series_minute.append(DataTimeSlot(start=TimePoint(i*60), end=TimePoint((i+1)*60), data={'value':sin(i/10.0)}))
 
         # Create a day-resolution test DataTimeSlotSeries
-        self.sine_data_time_slot_series_day = DataTimeSlotSeries()
+        self.sine_series_day = DataTimeSlotSeries()
         for i in range(1000):
             step = 60 * 60 * 24
-            self.sine_data_time_slot_series_day.append(DataTimeSlot(start=TimePoint(i*step), end=TimePoint((i+1)*step), data={'value':sin(i/10.0)}))
+            self.sine_series_day.append(DataTimeSlot(start=TimePoint(i*step), end=TimePoint((i+1)*step), data={'value':sin(i/10.0)}))
     
     def test_PeriodicAverageForecaster(self):
                  
         forecaster = PeriodicAverageForecaster()
         
         # Fit
-        forecaster.fit(self.sine_data_time_slot_series_minute, periodicity=63)
+        forecaster.fit(self.sine_series_minute, periodicity=63)
 
         # Apply
-        sine_data_time_slot_series_minute_with_forecast = forecaster.apply(self.sine_data_time_slot_series_minute, n=3)
-        self.assertEqual(len(sine_data_time_slot_series_minute_with_forecast), 1003)
+        sine_series_minute_with_forecast = forecaster.apply(self.sine_series_minute, n=3)
+        self.assertEqual(len(sine_series_minute_with_forecast), 1003)
 
         # Predict
-        prediction = forecaster.predict(self.sine_data_time_slot_series_minute, n=3)
+        prediction = forecaster.predict(self.sine_series_minute, n=3)
         self.assertTrue(isinstance(prediction, list))
         self.assertEqual(len(prediction), 3)
 
         # Evaluate
-        evaluation = forecaster.evaluate(self.sine_data_time_slot_series_minute, steps='auto', limit=100, details=True)
+        evaluation = forecaster.evaluate(self.sine_series_minute, steps='auto', limit=100, details=True)
         self.assertEqual(forecaster.data['periodicity'], 63)
         self.assertAlmostEqual(evaluation['RMSE_1_steps'], 0.07318673229600292)
         self.assertAlmostEqual(evaluation['MAE_1_steps'], 0.06622794526818285)
@@ -309,7 +309,7 @@ class TestForecasters(unittest.TestCase):
         self.assertAlmostEqual(evaluation['MAE'], 0.06319499855337883)
 
         # Evaluate
-        evaluation = forecaster.evaluate(self.sine_data_time_slot_series_minute, steps=[1,3], limit=100, details=True)
+        evaluation = forecaster.evaluate(self.sine_series_minute, steps=[1,3], limit=100, details=True)
         self.assertEqual(forecaster.data['periodicity'], 63)
         self.assertAlmostEqual(evaluation['RMSE_1_steps'], 0.07318673229600292)
         self.assertAlmostEqual(evaluation['MAE_1_steps'], 0.06622794526818285)
@@ -317,13 +317,13 @@ class TestForecasters(unittest.TestCase):
         self.assertAlmostEqual(evaluation['MAE_3_steps'], 0.06567523200748912)     
 
         # Fit from/to
-        forecaster.fit(self.sine_data_time_slot_series_minute, from_t=20000, to_t=40000)
-        evaluation = forecaster.evaluate(self.sine_data_time_slot_series_minute, steps=[1,3], limit=100, details=True)
+        forecaster.fit(self.sine_series_minute, from_t=20000, to_t=40000)
+        evaluation = forecaster.evaluate(self.sine_series_minute, steps=[1,3], limit=100, details=True)
         self.assertAlmostEqual(evaluation['RMSE_1_steps'], 0.37831442005531923)
 
         # Fit to/from
-        forecaster.fit(self.sine_data_time_slot_series_minute, to_t=20000, from_t=40000)
-        evaluation = forecaster.evaluate(self.sine_data_time_slot_series_minute, steps=[1,3], limit=100, details=True)
+        forecaster.fit(self.sine_series_minute, to_t=20000, from_t=40000)
+        evaluation = forecaster.evaluate(self.sine_series_minute, steps=[1,3], limit=100, details=True)
         self.assertAlmostEqual(evaluation['RMSE_1_steps'], 0.36033834603736264)
 
         # Test on Points as well
@@ -343,7 +343,7 @@ class TestForecasters(unittest.TestCase):
         
         forecaster = PeriodicAverageForecaster()
         
-        forecaster.fit(self.sine_data_time_slot_series_minute, periodicity=63)
+        forecaster.fit(self.sine_series_minute, periodicity=63)
         
         model_dir = forecaster.save(TEMP_MODELS_DIR)
         
@@ -351,7 +351,7 @@ class TestForecasters(unittest.TestCase):
         
         self.assertEqual(forecaster.data['averages'], loaded_forecaster.data['averages'])
 
-        forecasted_data_time_point_series  = loaded_forecaster.apply(self.sine_data_time_slot_series_minute)
+        forecasted_data_time_point_series  = loaded_forecaster.apply(self.sine_series_minute)
 
 
 
@@ -365,18 +365,18 @@ class TestForecasters(unittest.TestCase):
          
         forecaster = ProphetForecaster()
          
-        forecaster.fit(self.sine_data_time_slot_series_day)
-        self.assertEqual(len(self.sine_data_time_slot_series_day), 1000)
+        forecaster.fit(self.sine_series_day)
+        self.assertEqual(len(self.sine_series_day), 1000)
   
-        sine_data_time_slot_series_day_with_forecast = forecaster.apply(self.sine_data_time_slot_series_day, n=3)
-        self.assertEqual(len(sine_data_time_slot_series_day_with_forecast), 1003)
+        sine_series_day_with_forecast = forecaster.apply(self.sine_series_day, n=3)
+        self.assertEqual(len(sine_series_day_with_forecast), 1003)
 
         # Test the evaluate
-        evalation_results = forecaster.evaluate(self.sine_data_time_slot_series_day, limit=10)
+        evalation_results = forecaster.evaluate(self.sine_series_day, limit=10)
         self.assertAlmostEqual(evalation_results['RMSE'], 0.8211270888684844)
         self.assertAlmostEqual(evalation_results['MAE'], 0.809400693526047)
 
-        evalation_results = forecaster.evaluate(self.sine_data_time_slot_series_day, limit=1)
+        evalation_results = forecaster.evaluate(self.sine_series_day, limit=1)
         self.assertAlmostEqual(evalation_results['RMSE'], 0.5390915558518541) # For one sample they must be the same
         self.assertAlmostEqual(evalation_results['MAE'], 0.5390915558518541) # For one sample they must be the same
         
@@ -404,25 +404,25 @@ class TestForecasters(unittest.TestCase):
         # Basic ARIMA 
         forecaster = ARIMAForecaster(p=1,d=1,q=0)
          
-        forecaster.fit(self.sine_data_time_slot_series_day)
-        self.assertEqual(len(self.sine_data_time_slot_series_day), 1000)
+        forecaster.fit(self.sine_series_day)
+        self.assertEqual(len(self.sine_series_day), 1000)
 
         # Cannot apply on a time series contiguous with the time series used for the fit
         with self.assertRaises(NonContiguityError):
-            forecaster.apply(self.sine_data_time_slot_series_day[:-1], n=3)
+            forecaster.apply(self.sine_series_day[:-1], n=3)
     
         # Can apply on a time series contiguous with the fit one
-        sine_data_time_slot_series_day_with_forecast = forecaster.apply(self.sine_data_time_slot_series_day, n=3)
-        self.assertEqual(len(sine_data_time_slot_series_day_with_forecast), 1003)
+        sine_series_day_with_forecast = forecaster.apply(self.sine_series_day, n=3)
+        self.assertEqual(len(sine_series_day_with_forecast), 1003)
 
         # Cannot evaluate on a time series not contiguous with the time series used for the fit
         with self.assertRaises(NonContiguityError):
-            forecaster.evaluate(self.sine_data_time_slot_series_day)
+            forecaster.evaluate(self.sine_series_day)
 
         # Can evaluate on a time series contiguous with the time series used for the fit
         forecaster = ARIMAForecaster(p=1,d=1,q=0)
-        forecaster.fit(self.sine_data_time_slot_series_day[0:800])                 
-        evaluation_results = forecaster.evaluate(self.sine_data_time_slot_series_day[800:1000])
+        forecaster.fit(self.sine_series_day[0:800])                 
+        evaluation_results = forecaster.evaluate(self.sine_series_day[800:1000])
         self.assertAlmostEqual(evaluation_results['RMSE'], 2.71, places=2)
         self.assertAlmostEqual(evaluation_results['MAE'], 2.52, places=2 )
  
@@ -450,25 +450,25 @@ class TestForecasters(unittest.TestCase):
         # Automatic ARIMA 
         forecaster = AARIMAForecaster()
          
-        forecaster.fit(self.sine_data_time_slot_series_day, max_p=2, max_d=1, max_q=2)
-        self.assertEqual(len(self.sine_data_time_slot_series_day), 1000)
+        forecaster.fit(self.sine_series_day, max_p=2, max_d=1, max_q=2)
+        self.assertEqual(len(self.sine_series_day), 1000)
 
         # Cannot apply on a time series contiguous with the time series used for the fit
         with self.assertRaises(NonContiguityError):
-            forecaster.apply(self.sine_data_time_slot_series_day[:-1], n=3)
+            forecaster.apply(self.sine_series_day[:-1], n=3)
     
         # Can apply on a time series contiguous with the same item as the fit one
-        sine_data_time_slot_series_day_with_forecast = forecaster.apply(self.sine_data_time_slot_series_day, n=3)
-        self.assertEqual(len(sine_data_time_slot_series_day_with_forecast), 1003)
+        sine_series_day_with_forecast = forecaster.apply(self.sine_series_day, n=3)
+        self.assertEqual(len(sine_series_day_with_forecast), 1003)
 
         # Cannot evaluate on a time series not contiguous with the time series used for the fit
         with self.assertRaises(NonContiguityError):
-            forecaster.evaluate(self.sine_data_time_slot_series_day)
+            forecaster.evaluate(self.sine_series_day)
 
         # Can evaluate on a time series contiguous with the time series used for the fit
         forecaster = AARIMAForecaster()
-        forecaster.fit(self.sine_data_time_slot_series_day[0:800], max_p=2, max_d=1, max_q=2)                 
-        evaluation_results = forecaster.evaluate(self.sine_data_time_slot_series_day[800:1000])
+        forecaster.fit(self.sine_series_day[0:800], max_p=2, max_d=1, max_q=2)                 
+        evaluation_results = forecaster.evaluate(self.sine_series_day[800:1000])
         self.assertTrue('RMSE' in evaluation_results)
         self.assertTrue('MAE' in evaluation_results)
         # Cannot test values, some random behavior which cannot be put under control is present somewhere
@@ -497,13 +497,13 @@ class TestForecasters(unittest.TestCase):
             return
 
         # Create a minute-resolution test DataTimeSlotSeries
-        sine_data_time_slot_series_minute = DataTimeSlotSeries()
+        sine_series_minute = DataTimeSlotSeries()
         for i in range(10):
-            sine_data_time_slot_series_minute.append(DataTimeSlot(start=TimePoint(i*60), end=TimePoint((i+1)*60), data={'value':sin(i/10.0)}))
+            sine_series_minute.append(DataTimeSlot(start=TimePoint(i*60), end=TimePoint((i+1)*60), data={'value':sin(i/10.0)}))
 
         forecaster = LSTMForecaster()
-        forecaster.fit(sine_data_time_slot_series_minute)
-        predicted_value = forecaster.predict(sine_data_time_slot_series_minute)['value']
+        forecaster.fit(sine_series_minute)
+        predicted_value = forecaster.predict(sine_series_minute)['value']
         
         # Give some tolerance
         self.assertTrue(predicted_value>0.5)
@@ -511,10 +511,10 @@ class TestForecasters(unittest.TestCase):
         
         # Not-existent features
         with self.assertRaises(ValueError):
-            LSTMForecaster(features=['values','not_existent_feature']).fit(sine_data_time_slot_series_minute)
+            LSTMForecaster(features=['values','not_existent_feature']).fit(sine_series_minute)
 
         # Test using another feature
-        LSTMForecaster(features=['values','diffs']).fit(sine_data_time_slot_series_minute)
+        LSTMForecaster(features=['values','diffs']).fit(sine_series_minute)
 
 
     def test_LSTMForecaster_multivariate(self):
@@ -526,13 +526,13 @@ class TestForecasters(unittest.TestCase):
             return
         
         # Create a minute-resolution test DataTimeSlotSeries
-        sine_data_time_slot_series_minute = DataTimeSlotSeries()
+        sine_series_minute = DataTimeSlotSeries()
         for i in range(10):
-            sine_data_time_slot_series_minute.append(DataTimeSlot(start=TimePoint(i*60), end=TimePoint((i+1)*60), data={'sin':sin(i/10.0), 'cos':cos(i/10.0)}))
+            sine_series_minute.append(DataTimeSlot(start=TimePoint(i*60), end=TimePoint((i+1)*60), data={'sin':sin(i/10.0), 'cos':cos(i/10.0)}))
 
         forecaster = LSTMForecaster()
-        forecaster.fit(sine_data_time_slot_series_minute)
-        predicted_data = forecaster.predict(sine_data_time_slot_series_minute)
+        forecaster.fit(sine_series_minute)
+        predicted_data = forecaster.predict(sine_series_minute)
         
         self.assertTrue('sin' in predicted_data)
         self.assertTrue('cos' in predicted_data)
@@ -547,12 +547,12 @@ class TestForecasters(unittest.TestCase):
             return
         
         # Create a minute-resolution test DataTimeSlotSeries
-        sine_data_time_slot_series_minute = DataTimeSlotSeries()
+        sine_series_minute = DataTimeSlotSeries()
         for i in range(10):
-            sine_data_time_slot_series_minute.append(DataTimeSlot(start=TimePoint(i*60), end=TimePoint((i+1)*60), data={'sin':sin(i/10.0), 'cos':cos(i/10.0)}))
+            sine_series_minute.append(DataTimeSlot(start=TimePoint(i*60), end=TimePoint((i+1)*60), data={'sin':sin(i/10.0), 'cos':cos(i/10.0)}))
 
         forecaster = LSTMForecaster()
-        forecaster.fit(sine_data_time_slot_series_minute)
+        forecaster.fit(sine_series_minute)
         
         # Save
         model_dir = forecaster.save(TEMP_MODELS_DIR)
@@ -561,7 +561,7 @@ class TestForecasters(unittest.TestCase):
         loaded_forecaster = LSTMForecaster(path=model_dir)
         
         # Predict from the loaded model 
-        predicted_data = loaded_forecaster.predict(sine_data_time_slot_series_minute)
+        predicted_data = loaded_forecaster.predict(sine_series_minute)
         
         self.assertTrue('sin' in predicted_data)
         self.assertTrue('cos' in predicted_data)   
@@ -572,25 +572,25 @@ class TestAnomalyDetectors(unittest.TestCase):
     def setUp(self):
         
         # Create a minute-resolution test DataTimeSlotSeries
-        self.sine_data_time_slot_series_minute = DataTimeSlotSeries()
+        self.sine_series_minute = DataTimeSlotSeries()
         for i in range(1000):
             if i % 100 == 0:
                 value = 2
             else:
                 value = sin(i/10.0)
 
-            self.sine_data_time_slot_series_minute.append(DataTimeSlot(start=TimePoint(i*60), end=TimePoint((i+1)*60), data={'value':value}))
+            self.sine_series_minute.append(DataTimeSlot(start=TimePoint(i*60), end=TimePoint((i+1)*60), data={'value':value}))
 
 
     def test_PeriodicAverageAnomalyDetector(self):
         
         anomaly_detector = PeriodicAverageAnomalyDetector()
         
-        anomaly_detector.fit(self.sine_data_time_slot_series_minute, periodicity=63)
+        anomaly_detector.fit(self.sine_series_minute, periodicity=63)
         
         self.assertAlmostEqual(anomaly_detector.data['AE_threshold'], 0.5914733390853167)
         
-        result_time_series = anomaly_detector.apply(self.sine_data_time_slot_series_minute)
+        result_time_series = anomaly_detector.apply(self.sine_series_minute)
 
         # Count how many anomalies were detected
         anomalies_count = 0
@@ -617,7 +617,7 @@ class TestAnomalyDetectors(unittest.TestCase):
         
         anomaly_detector = PeriodicAverageAnomalyDetector()
         
-        anomaly_detector.fit(self.sine_data_time_slot_series_minute, periodicity=63)
+        anomaly_detector.fit(self.sine_series_minute, periodicity=63)
         
         model_dir = anomaly_detector.save(TEMP_MODELS_DIR)
         
@@ -626,5 +626,5 @@ class TestAnomalyDetectors(unittest.TestCase):
         self.assertEqual(anomaly_detector.data['AE_threshold'], loaded_anomaly_detector.data['AE_threshold'])
         self.assertEqual(anomaly_detector.forecaster.data['averages'], loaded_anomaly_detector.forecaster.data['averages'])
 
-        result_time_series = loaded_anomaly_detector.apply(self.sine_data_time_slot_series_minute)
+        result_time_series = loaded_anomaly_detector.apply(self.sine_series_minute)
 

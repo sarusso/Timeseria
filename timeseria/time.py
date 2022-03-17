@@ -10,14 +10,18 @@ logger = logging.getLogger(__name__)
 UTC = pytz.UTC
 
 def timezonize(timezone):
-    """Convert a string representation of a timezone to its pytz object, or do nothing if the argument is already a pytz timezone."""
+    """Convert a string representation of a timezone to its pytz object,
+    or do nothing if the argument is already a pytz timezone."""
     
-    # Check if timezone is a valid pytz object is hard as it seems that they are spread arount the pytz package.
-    # Option 1): Try to convert if string or unicode, else try to
-    # instantiate a datetiem object with the timezone to see if it is valid 
-    # Option 2): Get all memebers of the pytz package and check for type, see
+    # Checking if somthing is a valid pytz object is hard as it seems that they are spread around the pytz package.
+    #
+    # Option 1): Try to convert if string or unicode, otherwise try to instantiate a datetieme object decorated
+    # with the timezone in order to check if it is a valid one. 
+    #
+    # Option 2): Get all members of the pytz package and check for type, see
     # http://stackoverflow.com/questions/14570802/python-check-if-object-is-instance-of-any-class-from-a-certain-module
-    # Option 3) perform a hand.made test. We go for this one, tests would fail if it gets broken
+    #
+    # Option 3) perform a hand-made test. We go for this one, tests would fail if something changes in this approach.
     
     if not 'pytz' in str(type(timezone)):
         timezone = pytz.timezone(timezone)
