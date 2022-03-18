@@ -6,6 +6,7 @@ from .time import s_from_dt
 from .datastructures import Series, Slot, Point, DataTimePointSeries, DataTimeSlotSeries
 from .utilities import is_close
 from .units import TimeUnit, Unit
+from .exceptions import ConsistencyException 
 
 # Setup logging
 import logging
@@ -204,6 +205,9 @@ class Derivative(SeriesOperation):
     
     def __call__(self, series, inplace=False, normalize=True, diffs=False):
         
+        if diffs and inplace:
+            raise NotImplementedError('Computing diffs in-place is not supported as it would change the series length')
+        
         if normalize:
             if series.resolution == 'variable':
                 variable_resolution = True
@@ -226,6 +230,10 @@ class Derivative(SeriesOperation):
         data_keys = series.data_keys()
         for i, item in enumerate(series):
 
+            # Skip the first element if computing diffs
+            if diffs and i == 0:
+                continue
+
             if not inplace:
                 data = {}
             
@@ -236,7 +244,7 @@ class Derivative(SeriesOperation):
                 if diffs:
                     # Just compute the diffs
                     if i == 0:
-                        diff = 0
+                        raise ConsistencyException('We should never get here')
                     else:
                         diff = series[i].data[key] - series[i-1].data[key]
                 else:
@@ -304,7 +312,7 @@ class Derivative(SeriesOperation):
 class Integral(SeriesOperation):
     """Integral operation (callable object). Must operate on a fixed resolution time series."""
     
-    def __call__(self, series, inplace=False, normalize=True, c=0):
+    def __call__(self, series, inplace=False, normalize=True, c=0, offset=0):
         
         if normalize:
             if series.resolution == 'variable':
@@ -323,12 +331,36 @@ class Integral(SeriesOperation):
             postfix='csum'
 
         if not inplace:
-            der_series = series.__class__()
+            int_series = series.__class__()
 
         last_values={}
 
         data_keys = series.data_keys()
         for i, item in enumerate(series):
+
+            # Do we have to create the previous point based on an offset?
+            if i==0 and offset:
+                if inplace:
+                    raise ValueError('Cannot use prev_data in in.place mode, would require to add a ppint to the series')
+                
+                if isinstance(offset,dict):
+                    data = {'{}_{}'.format(data_key,postfix): offset[data_key] for data_key in series.data_keys()} 
+                else:
+                    data = {'{}_{}'.format(data_key,postfix): offset for data_key in series.data_keys()} 
+                
+                if isinstance(item, Point):
+                    int_series.append(item.__class__(t = item.t - series.resolution,
+                                                     tz = item.tz,
+                                                     data = data,
+                                                     data_loss = 0))         
+                elif isinstance(item, Slot):
+                    int_series.append(item.__class__(start = item.start - item.unit,
+                                                     unit = item.unit,
+                                                     data = data,
+                                                     data_loss = 0))
+                # Now set the c accordingly:
+                c = offset  
+
 
             if not inplace:
                 data = {}
@@ -382,32 +414,32 @@ class Integral(SeriesOperation):
             if not inplace:
 
                 if isinstance(series[0], Point):
-                    der_series.append(series[0].__class__(t = item.t,
-                                                                  tz = item.tz,
-                                                                  data = data,
-                                                                  data_loss = item.data_loss))         
+                    int_series.append(series[0].__class__(t = item.t,
+                                                          tz = item.tz,
+                                                          data = data,
+                                                          data_loss = item.data_loss))         
                 elif isinstance(series[0], Slot):
-                    der_series.append(series[0].__class__(start = item.start,
-                                                                  unit = item.unit,
-                                                                  data = data,
-                                                                  data_loss = item.data_loss))                
+                    int_series.append(series[0].__class__(start = item.start,
+                                                          unit = item.unit,
+                                                          data = data,
+                                                          data_loss = item.data_loss))                
                 else:
                     raise NotImplementedError('Working on series other than slots or points not yet implemented')
 
         if not inplace:
-            return der_series
+            return int_series
 
 
 class Diff(Derivative):
-    """Incremental differences operation (callable object)."""
+    """Incremental differences operation (callable object). Reduces the series leght by one (the firts element), same as Pandas."""
     def __call__(self, series, inplace=False):
         return super(Diff, self).__call__(series, inplace=inplace, normalize=False, diffs=True)
 
 
 class CSum(Integral):
     """Cumulative sum operation (callable object)."""
-    def __call__(self, series, inplace=False, offset=0):
-        return super(CSum, self).__call__(series, inplace=inplace, normalize=False, c=offset)
+    def __call__(self, series, inplace=False, offset=None):
+        return super(CSum, self).__call__(series, inplace=inplace, normalize=False, offset=offset)
 
 
 class Normalize(SeriesOperation):
@@ -578,7 +610,7 @@ class Offset(SeriesOperation):
 
 
 class MAvg(SeriesOperation):
-    """Moving average operation (callable object)."""
+    """Moving average operation (callable object). Reduces the series lenght by n (the windowd length)."""
 
     def __call__(self, series, window, inplace=False):
 
@@ -586,7 +618,8 @@ class MAvg(SeriesOperation):
             raise ValueError('A integer window >0 is required (got window="{}"'.frmat(window))
 
         if inplace:
-            raise Exception('In-place operation not supported yet (padding support required)')
+            raise NotImplementedError('Computing a moving average in-place is not supported as it would change the series length')
+
         
         postfix='mavg_{}'.format(window)
         

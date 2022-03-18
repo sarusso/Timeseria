@@ -26,6 +26,8 @@ class TestMathOperations(unittest.TestCase):
   
     def test_diff_csum(self):
   
+        # TODO: duplicate the test for points/slots? At the moment points are tested at the end
+  
         # Test data        
         series = DataTimeSlotSeries()
         series.append(DataTimeSlot(start=TimePoint(0), end=TimePoint(60), data={'value':10}, data_loss=0.1))
@@ -35,17 +37,15 @@ class TestMathOperations(unittest.TestCase):
            
         # Test standard, from the series
         diff_series = diff(series)
-        self.assertEqual(len(diff_series), 4)
-        self.assertEqual(diff_series[0].data['value_diff'],0) # 2?
-        self.assertEqual(diff_series[1].data['value_diff'],2)
-        self.assertEqual(diff_series[2].data['value_diff'],3)
-        self.assertEqual(diff_series[3].data['value_diff'],1)
-        
+        self.assertEqual(len(diff_series), 3)
+        self.assertEqual(diff_series[0].data['value_diff'],2)
+        self.assertEqual(diff_series[1].data['value_diff'],3)
+        self.assertEqual(diff_series[2].data['value_diff'],1)
+                
         # Test data loss correctly carried forward by the diff
-        self.assertEqual(diff_series[0].data_loss, 0.1)
-        self.assertEqual(diff_series[1].data_loss, 0.2)
-        self.assertEqual(diff_series[2].data_loss, 0.3)
-        self.assertEqual(diff_series[3].data_loss, 0.4)
+        self.assertEqual(diff_series[0].data_loss, 0.2)
+        self.assertEqual(diff_series[1].data_loss, 0.3)
+        self.assertEqual(diff_series[2].data_loss, 0.4)
 
         # Test csum as well  
         diff_csum_series = csum(diff_series, offset=10)
@@ -55,39 +55,40 @@ class TestMathOperations(unittest.TestCase):
         self.assertEqual(diff_csum_series[3].data['value_diff_csum'], 16)
 
         # Test data loss correctly carried forward by the csum
-        self.assertEqual(diff_csum_series[0].data_loss, 0.1)
+        self.assertEqual(diff_csum_series[0].data_loss, 0) # This is the slot created by the offset, has no data loss
         self.assertEqual(diff_csum_series[1].data_loss, 0.2)
         self.assertEqual(diff_csum_series[2].data_loss, 0.3)
         self.assertEqual(diff_csum_series[3].data_loss, 0.4)
 
         # Test standalone
-        self.assertEqual(len(diff(series)), 4)
+        self.assertEqual(len(diff(series)), 3)
   
         # Test in-place  behavior
-        diff(series, inplace=True)
-        self.assertEqual(len(series), 4)
-        self.assertEqual(series[0].data['value'],10)
-        self.assertEqual(series[0].data['value_diff'],0)
-        self.assertEqual(series[1].data['value'],12)
-        self.assertEqual(series[1].data['value_diff'],2)
-        self.assertEqual(series[2].data['value'],15)
-        self.assertEqual(series[2].data['value_diff'],3)
-        self.assertEqual(series[3].data['value'],16)
-        self.assertEqual(series[3].data['value_diff'],1)
+        # TODO: disabled as not implemented anymore (would change the series length and reduce it by one)
+        #diff(series, inplace=True)
+        #self.assertEqual(len(series), 4)
+        #self.assertEqual(series[0].data['value'],10)
+        #self.assertEqual(series[0].data['value_diff'],0)
+        #self.assertEqual(series[1].data['value'],12)
+        #self.assertEqual(series[1].data['value_diff'],2)
+        #self.assertEqual(series[2].data['value'],15)
+        #self.assertEqual(series[2].data['value_diff'],3)
+        #self.assertEqual(series[3].data['value'],16)
+        #self.assertEqual(series[3].data['value_diff'],1)
 
-        # Multi-key Test data
+        # Multi-key Test data (on points)
         series = DataTimePointSeries()
         series.append(DataTimePoint(t=0, data={'value':10, 'another_value': 75}))
         series.append(DataTimePoint(t=60, data={'value':12, 'another_value': 65}))
         series.append(DataTimePoint(t=120, data={'value':6, 'another_value': 32}))
         series.append(DataTimePoint(t=180, data={'value':16, 'another_value': 10}))
         diff_series = series.diff()
-        self.assertEqual(diff_series[0].data['value_diff'],0)
-        self.assertEqual(diff_series[0].data['another_value_diff'],0)
-        self.assertEqual(diff_series[1].data['value_diff'],2)
-        self.assertEqual(diff_series[1].data['another_value_diff'],-10)
+        self.assertEqual(diff_series[0].data['value_diff'],2)
+        self.assertEqual(diff_series[0].data['another_value_diff'],-10)
+        self.assertEqual(diff_series[1].data['value_diff'],-6)
+        self.assertEqual(diff_series[1].data['another_value_diff'],-33)
 
-        # Test offset
+        # Test csum as well, with dict offset (on points)
         diff_csum_series = diff_series.csum(offset={'value_diff':10, 'another_value_diff':75})
         self.assertEqual(diff_csum_series[0].data['value_diff_csum'],10)
         self.assertEqual(diff_csum_series[0].data['another_value_diff_csum'],75)
