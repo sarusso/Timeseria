@@ -23,14 +23,42 @@ class TestSeries(unittest.TestCase):
 
     def test_Series(self):
         
+        # Test basic behaviour
         series = Series(1,4,5)
         self.assertEqual(series, [1,4,5])
         self.assertEqual(len(series), 3)
         
+        # Test append
         series.append(8)
         self.assertEqual(series, [1,4,5,8])
         self.assertEqual(len(series), 4)  
+
+        # Test unordered append
+        with self.assertRaises(ValueError):
+            series.append(2)
+
+        # Test pop
+        self.assertEqual(series.pop(), 8)
+        self.assertEqual(series.pop(1), 4)
+        self.assertEqual(series.contents(), [1,5])
         
+        # Test insert    
+        series.insert(1,3)
+        self.assertEqual(series.contents(), [1,3,5])
+
+        # Test unordered insert    
+        with self.assertRaises(ValueError):
+            series.insert(0,3)
+        with self.assertRaises(ValueError):
+            series.insert(1,1)        
+
+        # Test remove
+        series.remove(3)
+        self.assertEqual(series.contents(), [1,5])
+
+        with self.assertRaises(ValueError):
+            series.remove(18)
+
         # Demo class that implements the __succedes__ operation
         class IntegerNumber(int):
             def __succedes__(self, other):
@@ -38,10 +66,13 @@ class TestSeries(unittest.TestCase):
                     return False
                 else:
                     return True
-
+        
+        zero = IntegerNumber(0)    
         one = IntegerNumber(1)
         two = IntegerNumber(2)
         three = IntegerNumber(3)
+        four = IntegerNumber(4)
+        five = IntegerNumber(5)
 
         self.assertTrue(two.__succedes__(one))
         self.assertFalse(one.__succedes__(two))
@@ -52,13 +83,28 @@ class TestSeries(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             Series(three, two)
-
-        Series(one, two, three)
-        
-        # TODO: do we want the following behavior? (cannot mix types  even if they are child classes)
+         
+        # TODO: do we want the following behavior? (cannot mix types even if they are child classes)
         with self.assertRaises(TypeError):
             Series(one, two, three, 4)
 
+        # Define a series whose items are in succession
+        succession_series = Series(one, two, three)
+
+        # Test insert    
+        succession_series.insert(0,zero)
+        self.assertEqual(len(succession_series),4)
+        succession_series.insert(4,four)
+        self.assertEqual(len(succession_series),5)
+
+        # Test insert not in succession  
+        with self.assertRaises(IndexError):
+            succession_series.insert(1,two)
+
+        # Test remove disabled for items in a succession
+        with self.assertRaises(NotImplementedError):
+            succession_series.remove(one)
+        
         # Define a Series with fixed type
         class FloatSeries(Series):
             __TYPE__ = float
@@ -76,13 +122,18 @@ class TestSeries(unittest.TestCase):
         self.assertEqual(float_series, [1.0,4.0,5.0])
         self.assertEqual(len(float_series), 3)
         
-        # Test head & tail
+
+        # Test head, tail & content
         self.assertEqual(float_series.head(2),[1.0,4.0])
         self.assertEqual(float_series.tail(2),[4.0,5.0])
+        self.assertEqual(float_series.contents(),[1.0,4.0,5.0])
 
         # Test print with print mock?
         #print()
-        #float_series.print(3) 
+        #float_series.print(3)
+        
+        # Test edited operations
+        
 
 
 class TestPoints(unittest.TestCase):

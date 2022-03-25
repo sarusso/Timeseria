@@ -36,11 +36,6 @@ class Series(list):
     
     def __init__(self, *args, **kwargs):
 
-        #if 'accept_None' in kwargs and kwargs['accept_None']:
-        #    self.accept_None = True
-        #else:
-        #    self.accept_None = False
-
         for arg in args:
             self.append(arg)
             
@@ -48,6 +43,9 @@ class Series(list):
 
     def append(self, item):
         """Append an item to the series."""
+        
+        # TODO: move to use the insert
+        
         # logger.debug('Checking %s', item)
         
         # Set type if not already done
@@ -212,17 +210,86 @@ class Series(list):
             self._mark_title = value
 
     # Inherited methods to be edited
+    def insert(self, i, x):
+        """Insert an item at a given position. The first argument is the index of the element 
+        before which to insert, so series.insert(0, x) inserts at the front of the series, and 
+        series.insert(len(series), x) is equivalent to append(x). Order or succession are enforced."""
+        
+        if len(self) > 0:
+            
+            # Check valid type
+            if not isinstance(x, self.__TYPE__):
+                raise TypeError('Got incompatible type "{}", can only accept "{}"'.format(x.__class__.__name__, self.__TYPE__.__name__))
+        
+            # Check ordering/succession
+            if i == 0:
+                try:
+                    if not self[0].__succedes__(x):
+                        raise ValueError('Cannot insert element "{}" in position "{}" as it would break the succession'.format(x,i))
+                except AttributeError:
+                    if not self[0] > x:
+                        raise ValueError('Cannot insert element "{}" in position "{}" as not in order'.format(x,i)) from None  
+            
+            elif i == len(self):
+                try:
+                    if not x.__succedes__(self[-1]):
+                        raise ValueError('Cannot insert element "{}" in position "{}" as it would break the succession'.format(x,i))
+                except AttributeError:
+                    if not x > self[-1]:
+                        raise ValueError('Cannot insert element "{}" in position "{}" as not in order'.format(x,i)) from None 
+                            
+            else:
+                try:
+                    self[0].__succedes__
+                except AttributeError:
+                    if not x > self[i-1]:
+                        raise ValueError('Cannot insert element "{}" in position "{}" with element "{}" as not in order'.format(x,i, self[i])) from None
+                else:
+                    raise IndexError('Cannot insert an item in the middle of a series whose items follow a succession'.format(i)) 
+            
+            super(Series, self).insert(i,x)
+
+        else:
+            self.append(x) 
+                 
+    def remove(self, x):
+        """Remove the first item from the list whose value is equal to x. It raises a `ValueError` if there is no such item
+        and a `NotImplementedError` is the series items are in a succession as it would breake it.
+        """
+        try:
+            self[0].__succedes__
+            raise NotImplementedError('Remove is not implemented for series whose items are in a succession') 
+        except IndexError:
+            pass
+        except AttributeError:
+            pass
+        
+        super(Series, self).remove(x)
+
+
+
     def pop(self, i=None):
         """
-        Remove the item at the end of the series, and return it. The `i` index is kept for interface
-        compatibility, but if specified must be the index corresponding to the last element.
-        """  
-        if i and i != len(self):
-            raise NotImplementedError('Cannot pop an item in the middle')
-        super(Series, self).pop(i)
-
+        Remove the item at the given position in the list, and return it. If no index is
+        specified, removes and returns the last item in the series. If items are in a
+        succession and the index is set, a `NotImplementerError` is raised.
+        """
+        if len(self) == 0:
+            raise IndexError('Cannot pop from an empty series')
+        if i is not None:
+            if i not in [0, len(self)]:
+                try:
+                    self[0].__succedes__
+                except AttributeError:
+                    pass
+                else:
+                    raise IndexError('Cannot pop an item in the middle of a series whose items follow a succession')                    
+            return super(Series, self).pop(i)
+        else:
+            return super(Series, self).pop()
+            
     def clear(self):
-        """Remove all items from the series. Equivalent to del a[:]."""
+        """Remove all items from the series."""
         super(Series, self).clear()
 
     def index(self, x, start=None, end=None):
@@ -238,6 +305,24 @@ class Series(list):
 
     def copy(self):
         """Return a shallow copy of the series."""
+        return super(Series, self).copy()
+
+    # Inherited methods to be disabled
+    def extend(self):
+        """Disabled (use the `merge` instead)."""
+        raise NotImplementedError('Use the "merge()" instead')
+
+    def count(self, x):
+        """Disabled (there is only one item instance by design)."""
+        raise NotImplementedError('There is only one item by design')
+
+    def sort(self, key=None, reverse=False):
+        """Disabled (sorting is already guaranteed)."""
+        raise NotImplementedError('Sorting is already guaranteed')
+
+    def reverse(self):
+        """Disabled (reversing is not compatible with an ordering)."""
+        raise NotImplementedError('Reversing is not compatible with an ordering')
 
     # Operations
     def duplicate(self):
@@ -251,35 +336,16 @@ class Series(list):
 
     def filter(self, *args, **kwargs):
         # TODO: refactor this to allow generic item properties? Maybe merge witht he following select?
-        """Filter a series given item properties. Example filtering arguments: ``data_key``, ``from_t``, ``to_t``, ``from_dt``, ``to_dt``."""
+        """Filter a series given one or more properties of its elemnents. Example filtering arguments: ``data_key``, ``from_t``, ``to_t``, ``from_dt``, ``to_dt``."""
         from .operations import filter as filter_operation
         return filter_operation(self, *args, **kwargs) 
 
     def select(self, *args, **kwargs):
-        """Select items of the series given SQL-like queries."""
+        """Select one or more items of the series given an SQL-like query."""
         from .operations import select as select_operation
         return select_operation(self, *args, **kwargs)
-        
-    # Inherited methods to be disabled
-    def remove(self):
-        """Disabled (removing is not compatible with a succession)."""
-
-    def insert(self, i, x):
-        """Disabled (inserting is not compatible with a succession)."""
-
-    def extend(self):
-        """Disabled, use the `merge` instead."""
-
-    def count(self, x):
-        """Disabled (there is only one item)."""
-
-    def sort(self, key=None, reverse=False):
-        """Disabled (sorting is already guaranteed)."""
-
-    def reverse(self):
-        """Disabled (reversing is not compatible with an ordering)."""
-
-
+    
+    # Inspection utilities
     def print(self, limit=10):
         """Print the series. By default limited to 10 elements.
         
@@ -322,8 +388,13 @@ class Series(list):
 
         print(']')
 
+
+    def contents(self, n=5):
+        """Get al the items of the series as a list."""   
+        return list(self)     
+
     def head(self, n=5):
-        """Get the first n items of the series, 5 by default.
+        """Get the first n items of the series as a list, 5 by default.
         
             Args:
                 n: the number of first elements to return .
@@ -332,7 +403,7 @@ class Series(list):
         return list(self[0:n])
 
     def tail(self, n=5):
-        """Get the last n items of the series, 5 by default.
+        """Get the last n items of the series as a list, 5 by default.
         
             Args:
                 n: the number of last elements to return .
