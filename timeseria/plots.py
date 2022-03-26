@@ -722,7 +722,7 @@ animatedZooms: true,"""
        },"""
 
     # Add all non-index series to be included in the miniplot
-    for label in timeseries.data_keys():
+    for label in timeseries.data_labels():
         dygraphs_javascript += """
            '"""+str(label)+"""': {
              showInRangeSelector:true
@@ -733,7 +733,7 @@ animatedZooms: true,"""
      },"""
 
     # Force "original" Dygraph color if only one data series, or use custom color:          
-    if len(timeseries.data_keys()) <=1:
+    if len(timeseries.data_labels()) <=1:
         if color:
             dygraphs_javascript += """colors: ['"""+color+"""'],"""         
         else:

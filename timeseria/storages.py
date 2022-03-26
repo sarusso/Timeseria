@@ -29,7 +29,7 @@ class CSVFileStorage(object):
     
     def __init__(self, filename, timestamp_column='auto', timestamp_format='auto',
                  time_column=None, time_format=None, date_column=None, date_format=None,
-                 tz='UTC', data_columns='all', data_type='auto', series_type='auto', sort=False,
+                 tz='UTC', data_labels='all', data_type='auto', series_type='auto', sort=False,
                  separator=',', newline='\n', encoding='auto', skip_errors=False, silence_errors=True):
         """Ref to https://docs.python.org/3/library/datetime.html#strftime-and-strptime-format-codes
         for timestamp_format, date_format and time_format"""
@@ -41,7 +41,7 @@ class CSVFileStorage(object):
                 timestamp_column = None
 
         # Sanity checks
-        if timestamp_column is None and time_column is None and date_column is None and not data_columns:
+        if timestamp_column is None and time_column is None and date_column is None and not data_labels:
             raise ValueError('No timestamp column, time column, date column or data columns provided, cannot get anything from this CSV file')
 
         if timestamp_column and (time_column or date_column):
@@ -56,8 +56,8 @@ class CSVFileStorage(object):
         if date_column is not None and not isinstance(date_column, int) and not isinstance(date_column, str):
             raise ValueError('date_column argument must be either integer or string (got "{}")'.format(date_column.__class__.__name__))
 
-        if data_columns != 'all' and not isinstance(data_columns, list):
-            raise ValueError('data_columns argument must be a list (got "{}")'.format(data_columns.__class__.__name__))
+        if data_labels != 'all' and not isinstance(data_labels, list):
+            raise ValueError('data_labels argument must be a list (got "{}")'.format(data_labels.__class__.__name__))
 
         # File & encoding
         self.filename = filename
@@ -81,7 +81,7 @@ class CSVFileStorage(object):
         self.tz = tz   
         
         # Data
-        self.data_columns = data_columns
+        self.data_labels = data_labels
         
         # Separator and newline chars
         self.separator = separator
@@ -294,11 +294,11 @@ class CSVFileStorage(object):
                 if data_column_indexes is None:
                     
                     # Do we have to select only some data columns?
-                    if self.data_columns != 'all':
+                    if self.data_labels != 'all':
                         
-                        if is_list_of_integers(self.data_columns):
+                        if is_list_of_integers(self.data_labels):
                             # Case where we have been given a list of integers
-                            data_column_indexes =  self.data_columns
+                            data_column_indexes =  self.data_labels
                             self.data_type = list
 
                         else:
@@ -306,11 +306,11 @@ class CSVFileStorage(object):
                             if not column_labels:
                                 raise Exception('You asked for data column labels but there are no labels in this CSV file')
                             data_column_indexes = []
-                            for data_column in self.data_columns:
-                                if data_column not in column_labels:
-                                    raise Exception('Cannot find data column "{}" in CSV columns "{}"'.format(data_column, column_labels))
+                            for data_label in self.data_labels:
+                                if data_label not in column_labels:
+                                    raise Exception('Cannot find data column "{}" in CSV columns "{}"'.format(data_label, column_labels))
                                 # What is the position of this requested data column in the CSV columns?
-                                data_column_indexes.append(column_labels.index(data_column))
+                                data_column_indexes.append(column_labels.index(data_label))
 
                     else:
                         # Case where we have to automatically set data column indexes to include all data columns
@@ -571,7 +571,7 @@ class CSVFileStorage(object):
                             # We are arrived, append all the missing items and then the item we originally tried to and break
                             for j, missing_timestamp in enumerate(missing_timestamps):
                                 # Set data by interpolation
-                                interpolated_data = {data_key: (((items[i][1][data_key]-items[i-1][1][data_key])/(len(missing_timestamps)+1)) * (j+1)) + items[i-1][1][data_key]  for data_key in  items[-1][1] }
+                                interpolated_data = {data_label: (((items[i][1][data_label]-items[i-1][1][data_label])/(len(missing_timestamps)+1)) * (j+1)) + items[i-1][1][data_label]  for data_label in  items[-1][1] }
                                 timeseries.append(DataTimeSlot(t=missing_timestamp, unit=unit, data=interpolated_data, data_loss=1, tz=tz))
                             timeseries.append(DataTimeSlot(t=item[0], unit=unit, data=item[1], data_loss=0, tz=tz))
                             break
@@ -609,17 +609,17 @@ class CSVFileStorage(object):
 
 
             # 1) Dump headers
-            data_keys_part = ','.join([str(key) for key in timeseries.data_keys()])
+            data_labels_part = ','.join([str(key) for key in timeseries.data_labels()])
             indexes_part = ','.join(['__'+index for index in indexes])
             if indexes_part:
-                csv_file.write('epoch,{},{}\n'.format(data_keys_part,indexes_part))
+                csv_file.write('epoch,{},{}\n'.format(data_labels_part,indexes_part))
             else:
-                csv_file.write('epoch,{}\n'.format(data_keys_part))
+                csv_file.write('epoch,{}\n'.format(data_labels_part))
             
 
             # 2) Dump data (and indexes)
             for item in timeseries:
-                data_part = ','.join([str(item.data[key]) for key in timeseries.data_keys()])
+                data_part = ','.join([str(item.data[key]) for key in timeseries.data_labels()])
                 indexes_part = ','.join([str(getattr(item, index)) for index in indexes])
                 if indexes_part:
                     csv_file.write('{},{},{}\n'.format(item.t, data_part, indexes_part))

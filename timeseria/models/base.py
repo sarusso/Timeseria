@@ -6,7 +6,7 @@ import json
 import uuid
 import statistics
 from ..exceptions import NotFittedError
-from ..utilities import check_timeseries, check_resolution, check_data_keys, item_is_in_range
+from ..utilities import check_timeseries, check_resolution, check_data_labels, item_is_in_range
 from ..time import now_s, dt_from_s
 from ..units import TimeUnit
 from pandas import DataFrame
@@ -221,7 +221,7 @@ class TimeSeriesParametricModel(ParametricModel):
         self.data['resolution'] = timeseries.resolution
         
         # Set timeseries data keys
-        self.data['data_keys'] = timeseries.data_keys()
+        self.data['data_labels'] = timeseries.data_labels()
 
         # Return output
         return fit_output
@@ -235,7 +235,7 @@ class TimeSeriesParametricModel(ParametricModel):
         # If fitted, check resolution and keys. If not fitted, the parent init will raise.
         if self.fitted:
             check_resolution(timeseries, self.data['resolution'])
-            check_data_keys(timeseries, self.data['data_keys'])
+            check_data_labels(timeseries, self.data['data_labels'])
                 
         # Call parent predict and return output
         return super(TimeSeriesParametricModel, self).predict(timeseries, *args, **kwargs)
@@ -372,10 +372,10 @@ class ProphetModel(TimeSeriesParametricModel):
         # Create Python lists with data
         try:
             timeseries[0].data[0]
-            data_keys_are_indexes = True
+            data_labels_are_indexes = True
         except KeyError:
             timeseries[0].data.keys()
-            data_keys_are_indexes = False
+            data_labels_are_indexes = False
         
         data_as_list=[]
         for item in timeseries:
@@ -387,7 +387,7 @@ class ProphetModel(TimeSeriesParametricModel):
             except StopIteration:
                 break                
 
-            if data_keys_are_indexes:     
+            if data_labels_are_indexes:     
                 data_as_list.append([cls.remove_timezone(item.dt), item.data[0]])
             else:
                 data_as_list.append([cls.remove_timezone(item.dt), item.data[list(item.data.keys())[0]]])
@@ -486,7 +486,7 @@ class KerasModel(ParametricModel):
     #@staticmethod
     #def to_windows(timeseries):
     #    '''Compute window data values from a time series.'''
-    #    key = timeseries.data_keys()[0]
+    #    key = timeseries.data_labels()[0]
     #    window_data_values = []
     #    for item in timeseries:
     #        window_data_values.append(item.data[key])
@@ -517,7 +517,7 @@ class KerasModel(ParametricModel):
     def to_target_values_vector(timeseries, window, forecast_n):
         '''Compute target values vector from a time series.'''
     
-        data_keys = timeseries.data_keys()
+        data_labels = timeseries.data_labels()
     
         targets = []
         for i, _ in enumerate(timeseries):
@@ -529,20 +529,20 @@ class KerasModel(ParametricModel):
             # Add forecast target value(s)
             row = []
             for j in range(forecast_n):
-                for data_key in data_keys:
-                    row.append(timeseries[i+j].data[data_key])
+                for data_label in data_labels:
+                    row.append(timeseries[i+j].data[data_label])
             targets.append(row)
 
         return targets
 
 
     @staticmethod
-    def compute_window_features(window_datapoints, data_keys, features):
+    def compute_window_features(window_datapoints, data_labels, features):
         """Compute features from a list of window data points (or slots).
         
         Args:
             window_datapoints (list): The list with the data points (or slots)
-            data_keys(dict): the keys of the point (or slot) data.
+            data_labels(dict): the keys of the point (or slot) data.
             features(list): the list of the features to compute.
                 Supported values are:
                 ``values`` (use the data values), 
@@ -563,18 +563,18 @@ class KerasModel(ParametricModel):
             
             # 1) datapoint values (for all keys)
             if 'values' in features:
-                for data_key in data_keys:
-                    datapoint_features.append(window_datapoints[i].data[data_key])
+                for data_label in data_labels:
+                    datapoint_features.append(window_datapoints[i].data[data_label])
                             
             # 2) Compute diffs on normalized datapoints
             if 'diffs' in features:
-                for data_key in data_keys:
+                for data_label in data_labels:
                     if i == 0:
-                        diff = window_datapoints[1].data[data_key] - window_datapoints[0].data[data_key]
+                        diff = window_datapoints[1].data[data_label] - window_datapoints[0].data[data_label]
                     elif i == len(window_datapoints)-1:
-                        diff = window_datapoints[-1].data[data_key] - window_datapoints[-2].data[data_key]
+                        diff = window_datapoints[-1].data[data_label] - window_datapoints[-2].data[data_label]
                     else:
-                        diff = (window_datapoints[i+1].data[data_key] - window_datapoints[i-1].data[data_key]) /2
+                        diff = (window_datapoints[i+1].data[data_label] - window_datapoints[i-1].data[data_label]) /2
                     if diff == 0:
                         diff = 1
                     datapoint_features.append(diff)

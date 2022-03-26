@@ -31,14 +31,14 @@ class TestCSVFileStorage(unittest.TestCase):
         self.assertEqual(data_time_point_series[-1].data, [1040,14])
  
         # Basic iso8601 multi values no labels and filtering
-        storage = CSVFileStorage(TEST_DATA_PATH + '/csv/multi_values_with_labels.csv', data_columns=[2])
+        storage = CSVFileStorage(TEST_DATA_PATH + '/csv/multi_values_with_labels.csv', data_labels=[2])
         data_time_point_series = storage.get()
         self.assertEqual(len(data_time_point_series), 50)
         self.assertEqual(data_time_point_series[0].data, [10])
         self.assertEqual(data_time_point_series[-1].data, [14])
  
         # Basic iso8601 multi values no labels and filtering and force data type
-        storage = CSVFileStorage(TEST_DATA_PATH + '/csv/multi_values_with_labels.csv', data_columns=[1], data_type=float)
+        storage = CSVFileStorage(TEST_DATA_PATH + '/csv/multi_values_with_labels.csv', data_labels=[1], data_type=float)
         data_time_point_series = storage.get()
         self.assertEqual(len(data_time_point_series), 50)
         self.assertEqual(data_time_point_series[0].data, [1000])
@@ -52,14 +52,14 @@ class TestCSVFileStorage(unittest.TestCase):
         self.assertEqual(data_time_point_series[-1].data, {'flow': 1040.0, 'temp': 14.0})
 
         # Basic iso8601 multi values with labels
-        storage = CSVFileStorage(TEST_DATA_PATH + '/csv/multi_values_with_labels.csv', data_columns=['temp'])
+        storage = CSVFileStorage(TEST_DATA_PATH + '/csv/multi_values_with_labels.csv', data_labels=['temp'])
         data_time_point_series = storage.get()
         self.assertEqual(len(data_time_point_series), 50)
         self.assertEqual(data_time_point_series[0].data, {'temp': 10.0})
         self.assertEqual(data_time_point_series[-1].data,{'temp': 14.0})
 
         # Basic iso8601 multi values with labels
-        storage = CSVFileStorage(TEST_DATA_PATH + '/csv/multi_values_with_labels.csv', data_columns=[1])
+        storage = CSVFileStorage(TEST_DATA_PATH + '/csv/multi_values_with_labels.csv', data_labels=[1])
         data_time_point_series = storage.get()
         self.assertEqual(len(data_time_point_series), 50)
         self.assertEqual(data_time_point_series[0].data, [1000.0])
@@ -70,16 +70,16 @@ class TestCSVFileStorage(unittest.TestCase):
 
         # Test wrong datatypes:
         with self.assertRaises(Exception):
-            CSVFileStorage(TEST_DATA_PATH + '/csv/multi_values_with_labels.csv', data_columns = 0)
+            CSVFileStorage(TEST_DATA_PATH + '/csv/multi_values_with_labels.csv', data_labels = 0)
         with self.assertRaises(Exception):
-            CSVFileStorage(TEST_DATA_PATH + '/csv/multi_values_with_labels.csv', data_columns = 'flow')
+            CSVFileStorage(TEST_DATA_PATH + '/csv/multi_values_with_labels.csv', data_labels = 'flow')
         with self.assertRaises(Exception):
             CSVFileStorage(TEST_DATA_PATH + '/csv/multi_values_with_labels.csv', time_column = [0])
         with self.assertRaises(Exception):
             CSVFileStorage(TEST_DATA_PATH + '/csv/multi_values_with_labels.csv', date_column = [0])
 
         # Test requiring a not existent data column:
-        storage = CSVFileStorage(TEST_DATA_PATH + '/csv/multi_values_with_labels.csv', data_columns = ['temp', 'flow_NO'])
+        storage = CSVFileStorage(TEST_DATA_PATH + '/csv/multi_values_with_labels.csv', data_labels = ['temp', 'flow_NO'])
         with self.assertRaises(Exception):
             storage.get()
 

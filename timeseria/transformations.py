@@ -32,7 +32,7 @@ def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_poi
     # Support vars
     interval_duration = to_t-from_t
     data = {}
-    data_keys = series.data_keys()
+    data_labels = series.data_labels()
 
     # The prev can be None as lefts are included (edge case)
     if slot_prev_point_i is None:
@@ -96,10 +96,10 @@ def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_poi
                     raise ConsistencyException('Could not find any reconstructed point in a fully missing slot')
             else:
                 # Just create a point based on the series_dense_slice_extended weights (TODO: are we including the reconstructed?):
-                new_point_data = {data_key:0 for data_key in data_keys}
+                new_point_data = {data_label:0 for data_label in data_labels}
                 for point in series_dense_slice_extended:
-                    for data_key in data_keys:
-                        point.data[data_key] += point.data[data_key] * point.weight
+                    for data_label in data_labels:
+                        point.data[data_label] += point.data[data_label] * point.weight
                 new_point_t = (to_t - from_t) /2
                 series_dense_slice = DataTimePointSeries(DataTimePoint(t=new_point_t, data=new_point_data, tz=series.tz))
 
@@ -119,15 +119,15 @@ def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_poi
         
         # ...and assign them to the data value
         if isinstance(avgs, dict):
-            data = {key:avgs[key] for key in data_keys}
+            data = {key:avgs[key] for key in data_labels}
         else:
-            data = {data_keys[0]: avgs}
+            data = {data_labels[0]: avgs}
              
     #  Compute slot data
     elif target=='slot':
         
         if data_loss == 1 and fill_with:
-            for key in data_keys:
+            for key in data_labels:
                 for operation in operations:
                     data['{}_{}'.format(key, operation.__name__)] = fill_with
 
@@ -151,7 +151,7 @@ def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_poi
                     for result_key in operation_data:
                         data['{}_{}'.format(result_key, operation.__name__)] = operation_data[result_key]
                 else:
-                    data['{}_{}'.format(data_keys[0], operation.__name__)] = operation_data
+                    data['{}_{}'.format(data_labels[0], operation.__name__)] = operation_data
     
         if not data:
             raise Exception('No data computed at all?')

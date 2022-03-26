@@ -96,7 +96,7 @@ class ForecasterAnomalyDetector(AnomalyDetector):
 
     def _fit(self, timeseries, *args, stdevs=3, **kwargs):
 
-        if len(timeseries.data_keys()) > 1:
+        if len(timeseries.data_labels()) > 1:
             raise NotImplementedError('Multivariate time series are not yet supported')
 
         # Fit the forecaster
@@ -104,7 +104,7 @@ class ForecasterAnomalyDetector(AnomalyDetector):
         
         # Evaluate the forecaster for one step ahead and get AEs
         AEs = []
-        for key in timeseries.data_keys():
+        for key in timeseries.data_labels():
             
             for i, _ in enumerate(timeseries):
                 
@@ -133,12 +133,12 @@ class ForecasterAnomalyDetector(AnomalyDetector):
         if inplace:
             raise Exception('Anomaly detection cannot be run inplace')
 
-        if len(timeseries.data_keys()) > 1:
+        if len(timeseries.data_labels()) > 1:
             raise NotImplementedError('Multivariate time series are not yet supported')
         
         result_timeseries = timeseries.__class__()
 
-        for key in timeseries.data_keys():
+        for key in timeseries.data_labels():
             
             for i, item in enumerate(timeseries):
                 forecaster_window = self.forecaster.data['window']

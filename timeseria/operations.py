@@ -56,24 +56,24 @@ class Max(ScalarOperation):
     def __init__(self):
         self.built_in_max = max
     
-    def __call__(self, arg, data_key=None, **kwargs):
+    def __call__(self, arg, data_label=None, **kwargs):
         if not isinstance(arg, Series):
             return self.built_in_max(arg)
         else:
             series = arg
-            mins = {data_key: None for data_key in series.data_keys()}
+            mins = {data_label: None for data_label in series.data_labels()}
             for item in series:
-                for _data_key in mins:
-                    if mins[_data_key] is None:
-                        mins[_data_key] = item.data[_data_key]
+                for _data_label in mins:
+                    if mins[_data_label] is None:
+                        mins[_data_label] = item.data[_data_label]
                     else:
-                        if item.data[_data_key] > mins[_data_key]:
-                            mins[_data_key] = item.data[_data_key]
+                        if item.data[_data_label] > mins[_data_label]:
+                            mins[_data_label] = item.data[_data_label]
             
-            if data_key is not None:
-                return mins[data_key]
+            if data_label is not None:
+                return mins[data_label]
             if len(mins) == 1:
-                return mins[series.data_keys()[0]]
+                return mins[series.data_labels()[0]]
             else:
                 return mins
 
@@ -85,24 +85,24 @@ class Min(ScalarOperation):
     def __init__(self):
         self.built_in_min = min
     
-    def __call__(self, arg, data_key=None, **kwargs):
+    def __call__(self, arg, data_label=None, **kwargs):
         if not isinstance(arg, Series):
             return self.built_in_min(arg)
         else:
             series = arg
-            mins = {data_key: None for data_key in series.data_keys()}
+            mins = {data_label: None for data_label in series.data_labels()}
             for item in series:
-                for _data_key in mins:
-                    if mins[_data_key] is None:
-                        mins[_data_key] = item.data[_data_key]
+                for _data_label in mins:
+                    if mins[_data_label] is None:
+                        mins[_data_label] = item.data[_data_label]
                     else:
-                        if item.data[_data_key] < mins[_data_key]:
-                            mins[_data_key] = item.data[_data_key]
+                        if item.data[_data_label] < mins[_data_label]:
+                            mins[_data_label] = item.data[_data_label]
             
-            if data_key is not None:
-                return mins[data_key]
+            if data_label is not None:
+                return mins[data_label]
             if len(mins) == 1:
-                return mins[series.data_keys()[0]]
+                return mins[series.data_labels()[0]]
             else:
                 return mins
 
@@ -112,7 +112,7 @@ class Avg(ScalarOperation):
     
     supports_weights = True
 
-    def __call__(self, arg, data_key=None, **kwargs):
+    def __call__(self, arg, data_label=None, **kwargs):
 
         # Log & checks
         logger.debug('Called avg operation')
@@ -128,7 +128,7 @@ class Avg(ScalarOperation):
 
         # Prepare
         series = arg
-        sums = {data_key: None for data_key in series.data_keys()}
+        sums = {data_label: None for data_label in series.data_labels()}
         
         # Compute
         if weighted:
@@ -137,12 +137,12 @@ class Avg(ScalarOperation):
         
                 logger.debug('Point @ %s, weight: %s, data: %s', item.dt, item.weight, item.data)
         
-                for _data_key in sums:
-                    if sums[_data_key] is None:
-                        sums[_data_key] = item.data[_data_key]*item.weight
+                for _data_label in sums:
+                    if sums[_data_label] is None:
+                        sums[_data_label] = item.data[_data_label]*item.weight
                     else:
-                        sums[_data_key] += item.data[_data_key]*item.weight
-                    #logger.debug('Sums: %s',sums[_data_key])
+                        sums[_data_label] += item.data[_data_label]*item.weight
+                    #logger.debug('Sums: %s',sums[_data_label])
                 total_weights += item.weight
             
             # The sum are already the average as weugthed
@@ -151,24 +151,24 @@ class Avg(ScalarOperation):
                 avgs = sums
             else:
                 avgs = {}
-                for _data_key in sums:
-                    avgs[_data_key] = sums[_data_key] / total_weights
+                for _data_label in sums:
+                    avgs[_data_label] = sums[_data_label] / total_weights
         else:
             for item in series:
-                for _data_key in sums:
-                    if sums[_data_key] is None:
-                        sums[_data_key] = item.data[_data_key]
+                for _data_label in sums:
+                    if sums[_data_label] is None:
+                        sums[_data_label] = item.data[_data_label]
                     else:
-                        sums[_data_key] += item.data[_data_key]            
+                        sums[_data_label] += item.data[_data_label]            
             avgs = {}
-            for _data_key in sums:
-                avgs[_data_key] = sums[_data_key] / len(series)
+            for _data_label in sums:
+                avgs[_data_label] = sums[_data_label] / len(series)
             
         # FInalize and return
-        if data_key is not None:
-            return avgs[data_key]
+        if data_label is not None:
+            return avgs[data_label]
         if len(avgs) == 1:
-            return avgs[series.data_keys()[0]]
+            return avgs[series.data_labels()[0]]
         else:
             return avgs
 
@@ -179,19 +179,19 @@ class Sum(ScalarOperation):
     def __init__(self):
         self.built_in_sum = sum
     
-    def __call__(self, arg, data_key=None, **kwargs):
+    def __call__(self, arg, data_label=None, **kwargs):
         if not isinstance(arg, Series):
             return self.built_in_sum(arg)
         else:
             series = arg
-            sums = {data_key: 0 for data_key in series.data_keys()}
+            sums = {data_label: 0 for data_label in series.data_labels()}
             for item in series:
-                for _data_key in sums:
-                    sums[_data_key] += item.data[_data_key]
-            if data_key is not None:
-                return sums[data_key]
+                for _data_label in sums:
+                    sums[_data_label] += item.data[_data_label]
+            if data_label is not None:
+                return sums[data_label]
             if len(sums) == 1:
-                return sums[series.data_keys()[0]]
+                return sums[series.data_labels()[0]]
             else:
                 return sums
 
@@ -227,7 +227,7 @@ class Derivative(SeriesOperation):
         if not inplace:
             der_series = series.__class__()
 
-        data_keys = series.data_keys()
+        data_labels = series.data_labels()
         for i, item in enumerate(series):
 
             # Skip the first element if computing diffs
@@ -237,7 +237,7 @@ class Derivative(SeriesOperation):
             if not inplace:
                 data = {}
             
-            for key in data_keys:
+            for key in data_labels:
                 diff_left = None
                 diff_right = None
                 diff = None
@@ -335,7 +335,7 @@ class Integral(SeriesOperation):
 
         last_values={}
 
-        data_keys = series.data_keys()
+        data_labels = series.data_labels()
         for i, item in enumerate(series):
 
             # Do we have to create the previous point based on an offset?
@@ -344,9 +344,9 @@ class Integral(SeriesOperation):
                     raise ValueError('Cannot use prev_data in in.place mode, would require to add a ppint to the series')
                 
                 if isinstance(offset,dict):
-                    data = {'{}_{}'.format(data_key,postfix): offset[data_key] for data_key in series.data_keys()} 
+                    data = {'{}_{}'.format(data_label,postfix): offset[data_label] for data_label in series.data_labels()} 
                 else:
-                    data = {'{}_{}'.format(data_key,postfix): offset for data_key in series.data_keys()} 
+                    data = {'{}_{}'.format(data_label,postfix): offset for data_label in series.data_labels()} 
                 
                 if isinstance(item, Point):
                     int_series.append(item.__class__(t = item.t - series.resolution,
@@ -365,7 +365,7 @@ class Integral(SeriesOperation):
             if not inplace:
                 data = {}
             
-            for key in data_keys:
+            for key in data_labels:
                 
                 # Get the value
                 if not normalize:
@@ -455,16 +455,16 @@ class Normalize(SeriesOperation):
         if not inplace:
             normalized_series = series.__class__()
 
-        data_keys = series.data_keys()
+        data_labels = series.data_labels()
 
         # Get min and max for the data keys
         for i, item in enumerate(series):
             
             if i == 0:
-                mins = {key: item.data[key] for key in data_keys}
-                maxs = {key: item.data[key] for key in data_keys}        
+                mins = {key: item.data[key] for key in data_labels}
+                maxs = {key: item.data[key] for key in data_labels}        
             else:
-                for key in data_keys:
+                for key in data_labels:
                     if item.data[key] < mins[key]:
                         mins[key] = item.data[key]
                     if item.data[key] > maxs[key]:
@@ -475,7 +475,7 @@ class Normalize(SeriesOperation):
             if not inplace:
                 data = {}
              
-            for key in data_keys:
+            for key in data_labels:
 
                 # Normalize data
                 if not inplace:
@@ -519,7 +519,7 @@ class Rescale(SeriesOperation):
         if not inplace:
             rescaled_series = series.__class__()
 
-        data_keys = series.data_keys()
+        data_labels = series.data_labels()
 
         for item in series:
  
@@ -527,7 +527,7 @@ class Rescale(SeriesOperation):
                 rescaled_data = {}
             
             # Rescale data
-            for key in data_keys:
+            for key in data_labels:
                 if isinstance(value, dict):
                     if key in value:
                         rescaled_data[key] = item.data[key] * value[key]
@@ -567,7 +567,7 @@ class Offset(SeriesOperation):
         if not inplace:
             rescaled_series = series.__class__()
 
-        data_keys = series.data_keys()
+        data_labels = series.data_labels()
 
         for item in series:
  
@@ -575,7 +575,7 @@ class Offset(SeriesOperation):
                 offsetted_data = {}
             
             # Offset data
-            for key in data_keys:
+            for key in data_labels:
                 if isinstance(value, dict):
                     if key in value:
                         offsetted_data[key] = item.data[key] + value[key]
@@ -625,7 +625,7 @@ class MAvg(SeriesOperation):
         
         mavg_series = series.__class__()
 
-        data_keys = series.data_keys()
+        data_labels = series.data_labels()
         for i, item in enumerate(series):
 
             if i < window-1:
@@ -633,7 +633,7 @@ class MAvg(SeriesOperation):
 
             data = {}
 
-            for key in data_keys:
+            for key in data_labels:
  
                 # Compute the moving average
                 value_sum = 0
@@ -691,7 +691,7 @@ class Select(SeriesOperation):
 class Filter(SeriesOperation):
     """Filter a series (callable object)."""
 
-    def __call__(self, series, data_key=None, from_t=None, to_t=None, from_dt=None, to_dt=None):
+    def __call__(self, series, data_label=None, from_t=None, to_t=None, from_dt=None, to_dt=None):
         if from_dt:
             if from_t is not None:
                 raise Exception('Cannot set both from_t and from_dt')
@@ -725,10 +725,10 @@ class Filter(SeriesOperation):
                     filtered_series.append(item)
         
         # Filter based on data key if set
-        if data_key:
+        if data_label:
             for i, item in enumerate(filtered_series):
                 filtered_series[i] = copy(item)
-                filtered_series[i]._data = {data_key: item.data[data_key]}
+                filtered_series[i]._data = {data_label: item.data[data_label]}
         
         # Re-set reference data as well
         try:

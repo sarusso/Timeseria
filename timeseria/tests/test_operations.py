@@ -349,16 +349,16 @@ class TestMathOperations(unittest.TestCase):
         series.append(DataTimePoint(t=180, data={'value':16, 'another_value': 10}))
         
         self.assertEqual(series.min(), {'value': 6, 'another_value': 10})
-        self.assertEqual(series.min(data_key='value'), 6)
-        self.assertEqual(series.min(data_key='another_value'), 10)
+        self.assertEqual(series.min(data_label='value'), 6)
+        self.assertEqual(series.min(data_label='another_value'), 10)
 
         self.assertEqual(series.max(), {'value': 16, 'another_value': 75})
-        self.assertEqual(series.max(data_key='value'), 16)        
-        self.assertEqual(series.max(data_key='another_value'), 75)
+        self.assertEqual(series.max(data_label='value'), 16)        
+        self.assertEqual(series.max(data_label='another_value'), 75)
 
         self.assertEqual(series.avg(), {'value': 11, 'another_value': 45.5})
-        self.assertEqual(series.avg(data_key='value'), 11)          
-        self.assertEqual(series.avg(data_key='another_value'), 45.5)
+        self.assertEqual(series.avg(data_label='value'), 11)          
+        self.assertEqual(series.avg(data_label='another_value'), 45.5)
 
 
     def test_avg_weighted(self):
@@ -436,7 +436,7 @@ class TestSeriesOperations(unittest.TestCase):
         self.assertEqual(len(series.filter('a')), 3 )
         
         # Test that we haven't modified the original series
-        self.assertEqual(series.data_keys(), ['a', 'b'])
+        self.assertEqual(series.data_labels(), ['a', 'b'])
         self.assertEqual(series[1].data['b'], 4)
 
 

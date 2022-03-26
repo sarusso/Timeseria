@@ -373,13 +373,13 @@ def check_resolution(timeseries, resolution):
         raise ValueError('This model is fitted on "{}" resolution data, while your data has "{}" resolution.'.format(resolution, timeseries.resolution))
 
 
-def check_data_keys(timeseries, keys):
-    timeseries_data_keys = timeseries.data_keys()
-    if len(timeseries_data_keys) != len(keys):
-        raise ValueError('This model is fitted on {} data keys, while your data has {} data keys.'.format(len(keys), len(timeseries_data_keys)))
-    if timeseries_data_keys != keys:
+def check_data_labels(timeseries, keys):
+    timeseries_data_labels = timeseries.data_labels()
+    if len(timeseries_data_labels) != len(keys):
+        raise ValueError('This model is fitted on {} data keys, while your data has {} data keys.'.format(len(keys), len(timeseries_data_labels)))
+    if timeseries_data_labels != keys:
         # TODO: logger.warning?
-        raise ValueError('This model is fitted on "{}" data keys, while your data has "{}" data keys.'.format(keys, timeseries_data_keys))
+        raise ValueError('This model is fitted on "{}" data keys, while your data has "{}" data keys.'.format(keys, timeseries_data_labels))
 
 
 #==============================
@@ -391,13 +391,13 @@ def get_periodicity(timeseries):
     check_timeseries(timeseries)
     
     # TODO: fix me, data_loss must not belong as key
-    data_keys = timeseries.data_keys()
+    data_labels = timeseries.data_labels()
     
-    if len(data_keys) > 1:
+    if len(data_labels) > 1:
         raise NotImplementedError()
 
     # TODO: improve me, highly ineficcient
-    for key in data_keys:
+    for key in data_labels:
         
         # Get data as a vector
         y = []

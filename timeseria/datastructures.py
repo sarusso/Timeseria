@@ -336,7 +336,7 @@ class Series(list):
 
     def filter(self, *args, **kwargs):
         # TODO: refactor this to allow generic item properties? Maybe merge witht he following select?
-        """Filter a series given one or more properties of its elemnents. Example filtering arguments: ``data_key``, ``from_t``, ``to_t``, ``from_dt``, ``to_dt``."""
+        """Filter a series given one or more properties of its elemnents. Example filtering arguments: ``data_label``, ``from_t``, ``to_t``, ``from_dt``, ``to_dt``."""
         from .operations import filter as filter_operation
         return filter_operation(self, *args, **kwargs) 
 
@@ -761,7 +761,7 @@ class DataPointSeries(PointSeries):
             
         super(DataPointSeries, self).append(item)
 
-    def data_keys(self):
+    def data_labels(self):
         """Return the keys of the data carried by the DataPoints.
         If data is a dictionary, then these are the dictionary keys,
         if data is a list, then these are the list indexes. Other
@@ -776,7 +776,7 @@ class DataPointSeries(PointSeries):
             except AttributeError:
                 return list(range(len(self[0].data)))
 
-    def rename_data_key(self, old_key, new_key):
+    def rename_data_label(self, old_key, new_key):
         """Rename a data key."""
         for item in self:
             # TODO: move to the DataPoint/DataSlot?
@@ -791,22 +791,22 @@ class DataPointSeries(PointSeries):
     
     # Operations
     def min(self, *args, **kwargs):
-        """Get the minimum data value(s) of a series. Supports an optional ``data_key`` argument."""
+        """Get the minimum data value(s) of a series. Supports an optional ``data_label`` argument."""
         from .operations import min as min_operation
         return min_operation(self, *args, **kwargs)
 
     def max(self, *args, **kwargs):
-        """Get the maximum data value(s) of a series. Supports an optional ``data_key`` argument."""
+        """Get the maximum data value(s) of a series. Supports an optional ``data_label`` argument."""
         from .operations import max as max_operation
         return max_operation(self, *args, **kwargs)    
 
     def avg(self, *args, **kwargs):
-        """Get the average data value(s) of a series. Supports an optional ``data_key`` argument."""
+        """Get the average data value(s) of a series. Supports an optional ``data_label`` argument."""
         from .operations import avg as avg_operation
         return avg_operation(self, *args, **kwargs)   
 
     def sum(self, *args, **kwargs):
-        """Sum every data value(s) of a series. Supports an optional ``data_key`` argument."""
+        """Sum every data value(s) of a series. Supports an optional ``data_label`` argument."""
         from .operations import sum as sum_operation
         return sum_operation(self, *args, **kwargs)  
 
@@ -907,7 +907,7 @@ class DataTimePointSeries(DataPointSeries, TimePointSeries):
     @property
     def df(self):
         """The time series as a Pandas DataFrame object."""
-        data_keys = self.data_keys()
+        data_labels = self.data_labels()
         
         if self[0].data_loss is not None:
             dump_data_loss = True
@@ -915,13 +915,13 @@ class DataTimePointSeries(DataPointSeries, TimePointSeries):
             dump_data_loss = False
         
         if dump_data_loss:
-            columns = ['Timestamp'] + data_keys + ['data_loss']
+            columns = ['Timestamp'] + data_labels + ['data_loss']
         else:
-            columns = ['Timestamp'] + data_keys
+            columns = ['Timestamp'] + data_labels
             
         df = DataFrame(columns=columns)
         for item in self:
-            values = [item.data[key] for key in data_keys]
+            values = [item.data[key] for key in data_labels]
             if dump_data_loss:
                 df = df.append(DataFrame([[item.dt]+values+[item.data_loss]], columns=columns))
             else:
@@ -1367,7 +1367,7 @@ class DataSlotSeries(SlotSeries):
         
         super(DataSlotSeries, self).append(item)
     
-    def data_keys(self):
+    def data_labels(self):
         """Return the keys of the data carried by the DataSlots.
         If data is a dictionary, then these are the dictionary keys,
         if data is a list, then these are the list indexes. Other
@@ -1381,7 +1381,7 @@ class DataSlotSeries(SlotSeries):
             except AttributeError:
                 return list(range(len(self[0].data)))
 
-    def rename_data_key(self, old_key, new_key):
+    def rename_data_label(self, old_key, new_key):
         """Rename a data key."""
         for item in self:
             # TODO: move to the DataPoint/DataSlot?
@@ -1396,22 +1396,22 @@ class DataSlotSeries(SlotSeries):
 
     # Operations
     def min(self, *args, **kwargs):
-        """Get the minimum data value(s) of a series. Supports an optional ``data_key`` argument."""
+        """Get the minimum data value(s) of a series. Supports an optional ``data_label`` argument."""
         from .operations import min as min_operation
         return min_operation(self, *args, **kwargs)
 
     def max(self, *args, **kwargs):
-        """Get the maximum data value(s) of a series. Supports an optional ``data_key`` argument."""
+        """Get the maximum data value(s) of a series. Supports an optional ``data_label`` argument."""
         from .operations import max as max_operation
         return max_operation(self, *args, **kwargs)    
 
     def avg(self, *args, **kwargs):
-        """Get the average data value(s) of a series. Supports an optional ``data_key`` argument."""
+        """Get the average data value(s) of a series. Supports an optional ``data_label`` argument."""
         from .operations import avg as avg_operation
         return avg_operation(self, *args, **kwargs)   
 
     def sum(self, *args, **kwargs):
-        """Sum every data value(s) of a series. Supports an optional ``data_key`` argument."""
+        """Sum every data value(s) of a series. Supports an optional ``data_label`` argument."""
         from .operations import sum as sum_operation
         return sum_operation(self, *args, **kwargs)  
 
@@ -1536,7 +1536,7 @@ class DataTimeSlotSeries(DataSlotSeries, TimeSlotSeries):
     @property
     def df(self):
         """The time series as a Pandas DataFrame object."""
-        data_keys = self.data_keys()
+        data_labels = self.data_labels()
         
         if self[0].data_loss is not None:
             dump_data_loss = True
@@ -1544,13 +1544,13 @@ class DataTimeSlotSeries(DataSlotSeries, TimeSlotSeries):
             dump_data_loss = False
         
         if dump_data_loss:
-            columns = ['Timestamp'] + data_keys + ['data_loss']
+            columns = ['Timestamp'] + data_labels + ['data_loss']
         else:
-            columns = ['Timestamp'] + data_keys
+            columns = ['Timestamp'] + data_labels
             
         df = DataFrame(columns=columns)
         for item in self:
-            values = [item.data[key] for key in data_keys]
+            values = [item.data[key] for key in data_labels]
             if dump_data_loss:
                 df = df.append(DataFrame([[item.dt]+values+[item.data_loss]], columns=columns))
             else:
@@ -1677,21 +1677,21 @@ class SeriesSlice(Series):
                                             
                     # Compute the new point values with respect to the entire interpolation           
                     new_point_data = {}
-                    for data_key in self.series.data_keys():
+                    for data_label in self.series.data_labels():
         
                         if self.interpolation_method == 'linear':
         
                             # Compute the "growth" ratio
-                            diff = this_point.data[data_key] - prev_point.data[data_key]
+                            diff = this_point.data[data_label] - prev_point.data[data_label]
                             delta_t = this_point.t - prev_point.t
                             ratio = diff / delta_t
                             
                             # Compute the value of the data for the new point
-                            new_point_data[data_key] = prev_point.data[data_key] + ((new_point_t-prev_point.t)*ratio)
+                            new_point_data[data_label] = prev_point.data[data_label] + ((new_point_t-prev_point.t)*ratio)
         
                         elif self.interpolation_method == 'uniform':
                             raise NotImplementedError('uniform interpolation is not implemented yet')
-                            new_point_data[data_key] = (prev_point.data[data_key] + this_point.data[data_key]) /2
+                            new_point_data[data_label] = (prev_point.data[data_label] + this_point.data[data_label]) /2
                        
                         else:
                             raise Exception('Unknown interpolation method "{}"'.format(self.interpolation_method))
@@ -1730,8 +1730,8 @@ class SeriesSlice(Series):
     def resolution(self):
         return self.series.resolution
 
-    def data_keys(self):
-        return self.series.data_keys()
+    def data_labels(self):
+        return self.series.data_labels()
     
     # Generic attributes
     #def __getattribute__(self, name):

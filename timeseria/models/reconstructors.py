@@ -49,10 +49,10 @@ class Reconstructor(TimeSeriesParametricModel):
         if not inplace:
             timeseries = timeseries.duplicate()
 
-        if len(timeseries.data_keys()) > 1:
+        if len(timeseries.data_labels()) > 1:
             raise NotImplementedError('Multivariate time series are not yet supported')
 
-        for key in timeseries.data_keys():
+        for key in timeseries.data_labels():
             
             gap_started = None
             
@@ -119,7 +119,7 @@ class Reconstructor(TimeSeriesParametricModel):
         logger.info('Will evaluate model for %s steps with metrics %s', steps, metrics)
         
         # Find areas where to evaluate the model
-        for key in timeseries.data_keys():
+        for key in timeseries.data_labels():
              
             for steps_round in steps:
                 
@@ -294,7 +294,7 @@ class PeriodicAverageReconstructor(Reconstructor):
             raise Exception('Unknown offset method "{}"'.format(self.offset_method))
         self.offset_method = offset_method
     
-        if len(timeseries.data_keys()) > 1:
+        if len(timeseries.data_labels()) > 1:
             raise NotImplementedError('Multivariate time series are not yet supported')
 
         from_t, to_t = set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
@@ -313,7 +313,7 @@ class PeriodicAverageReconstructor(Reconstructor):
         self.data['periodicity']  = periodicity
         self.data['dst_affected'] = dst_affected 
                 
-        for key in timeseries.data_keys():
+        for key in timeseries.data_labels():
             sums   = {}
             totals = {}
             processed = 0
@@ -403,7 +403,7 @@ class ProphetReconstructor(Reconstructor, ProphetModel):
 
         from_t, to_t = set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
 
-        if len(timeseries.data_keys()) > 1:
+        if len(timeseries.data_labels()) > 1:
             raise NotImplementedError('Multivariate time series are not yet supported')
 
         data = self.from_timeseria_to_prophet(timeseries, from_t, to_t)

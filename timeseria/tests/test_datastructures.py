@@ -437,12 +437,12 @@ class TestPointSeries(unittest.TestCase):
                                                      DataTimePoint(dt=dt(2015,10,28,0,0,0, tzinfo='Europe/Rome'), data={'a':24.1, 'b':2}),
                                                      DataTimePoint(dt=dt(2015,10,29,0,0,0, tzinfo='Europe/Rome'), data={'a':23.1, 'b':3}))
         
-        self.assertEqual(data_time_point_series.data_keys(), ['a','b'])
-        data_time_point_series.rename_data_key('b','c')
-        self.assertEqual(data_time_point_series.data_keys(), ['a','c'])
+        self.assertEqual(data_time_point_series.data_labels(), ['a','b'])
+        data_time_point_series.rename_data_label('b','c')
+        self.assertEqual(data_time_point_series.data_labels(), ['a','c'])
         
         with self.assertRaises(KeyError):
-            data_time_point_series.rename_data_key('notexistent_key','c')
+            data_time_point_series.rename_data_label('notexistent_key','c')
 
 
 
@@ -786,12 +786,12 @@ class TestSlotSeries(unittest.TestCase):
                                                    DataTimeSlot(dt=dt(2015,10,28,0,0,0), unit='1D', data={'a':24.1, 'b':2}),
                                                    DataTimeSlot(dt=dt(2015,10,29,0,0,0), unit='1D', data={'a':23.1, 'b':3}))
         
-        self.assertEqual(data_time_slot_series.data_keys(), ['a','b'])
-        data_time_slot_series.rename_data_key('b','c')
-        self.assertEqual(data_time_slot_series.data_keys(), ['a','c'])
+        self.assertEqual(data_time_slot_series.data_labels(), ['a','b'])
+        data_time_slot_series.rename_data_label('b','c')
+        self.assertEqual(data_time_slot_series.data_labels(), ['a','c'])
         
         with self.assertRaises(KeyError):
-            data_time_slot_series.rename_data_key('notexistent_key','c')
+            data_time_slot_series.rename_data_label('notexistent_key','c')
 
 
 class TestSeriesSlices(unittest.TestCase):
@@ -829,7 +829,7 @@ class TestSeriesSlices(unittest.TestCase):
         
         # Test extra attributes
         self.assertEqual(str(series_slice.resolution), '1s')
-        self.assertEqual(series_slice.data_keys(), ['value'])
+        self.assertEqual(series_slice.data_labels(), ['value'])
         
         with self.assertRaises(AttributeError):
             series_slice.diff()
