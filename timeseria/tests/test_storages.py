@@ -50,6 +50,9 @@ class TestCSVFileStorage(unittest.TestCase):
         self.assertEqual(len(data_time_point_series), 50)
         self.assertEqual(data_time_point_series[0].data, {'flow': 1000.0, 'temp': 10.0})
         self.assertEqual(data_time_point_series[-1].data, {'flow': 1040.0, 'temp': 14.0})
+        
+        # Test we don't have any extra data index as well
+        self.assertEqual(data_time_point_series.data_indexes(), [])
 
         # Basic iso8601 multi values with labels
         storage = CSVFileStorage(TEST_DATA_PATH + '/csv/multi_values_with_labels.csv', data_labels=['temp'])
@@ -204,10 +207,10 @@ class TestCSVFileStorage(unittest.TestCase):
         # Check last
         self.assertEqual(data_time_slot_series[-1].t, 1205798400)
 
-        # Check all others have data_loss = 0
+        # Check all others have data_loss = None
         for i, item in enumerate(data_time_slot_series):
             if i not in [52, 80, 82, 84, 85]:
-                self.assertEqual(item.data_loss, 0, 'Failed for i={}'.format(i))
+                self.assertEqual(item.data_loss, None, 'Failed for i={}'.format(i))
             else:
                 self.assertEqual(item.data_loss, 1, 'Failed for i={}'.format(i))
 

@@ -78,7 +78,7 @@ def _to_dg_time(dt):
         return 'new Date(Date.UTC({}, {}, {}, {}, {}, {}))'.format(dt.year, dt.month-1, dt.day, dt.hour, dt.minute, dt.second)
 
 
-def _to_dg_data(serie,  indexes_to_plot, aggregate_by=0):
+def _to_dg_data(serie,  data_indexes_to_plot, aggregate_by=0):
     '''{% for timestamp,value in metric_data.items %}{{timestamp}},{{value}}\n{%endfor%}}'''
     
     dg_data=''
@@ -108,7 +108,7 @@ def _to_dg_data(serie,  indexes_to_plot, aggregate_by=0):
             data_sums = [0 for key in keys]
             data_mins = [None for key in keys]
             data_maxs = [None for key in keys]
-            index_sums = [0 for index in indexes_to_plot]
+            index_sums = [0 for index in data_indexes_to_plot]
             
 
         #====================
@@ -166,14 +166,13 @@ def _to_dg_data(serie,  indexes_to_plot, aggregate_by=0):
                     if data > data_maxs[j]:
                         data_maxs[j] = data
 
-            # Loop over series indexes and add data
-            for j, index in enumerate(indexes_to_plot):
-                # TODO: plot only some indexes, now we plot all of them
+            # Loop over series data_indexes and add data
+            for j, index in enumerate(data_indexes_to_plot):
                 try:
-                    index_value = getattr(item, index)
+                    index_value = item.data_indexes[index]
                     if index_value is not None:
                         index_sums[j] += index_value
-                except AttributeError:
+                except KeyError:
                     pass
 
             # Dump aggregated data?
@@ -193,12 +192,12 @@ def _to_dg_data(serie,  indexes_to_plot, aggregate_by=0):
                     #else:
                     data_part+='[{},{},{}],'.format( data_mins[i], avg, data_maxs[i])
 
-                # Indexes
-                for i, index in enumerate(indexes_to_plot):
+                # data_indexes
+                for i, index in enumerate(data_indexes_to_plot):
                     if index_sums[i] is not None:
                         data_part+='[0,{0},{0}],'.format(index_sums[i]/aggregate_by)
                     else:
-                        data_part+='[,,],'
+                        data_part+='[null,null,null],'
 
                 # Do we have a mark?
                 if serie.mark and RENDER_MARK_AS_INDEX:
@@ -219,7 +218,7 @@ def _to_dg_data(serie,  indexes_to_plot, aggregate_by=0):
                 data_sums = [0 for key in keys]
                 data_mins = [None for key in keys]
                 data_maxs = [None for key in keys]
-                index_sums = [0 for index in indexes_to_plot]
+                index_sums = [0 for index in data_indexes_to_plot]
                 first_t = None
 
         #====================
@@ -251,17 +250,16 @@ def _to_dg_data(serie,  indexes_to_plot, aggregate_by=0):
                     if data > global_max:
                         global_max = data
                 
-            # Loop over series indexes and add data
-            for index in indexes_to_plot:
-                # TODO: plot only some indexes, now we plot all of them
+            # Loop over series data_indexes and add data
+            for index in data_indexes_to_plot:
                 try:
-                    index_value = getattr(item, index)
+                    index_value = item.data_indexes[index]
                     if index_value is not None:
                         data_part+='{},'.format(index_value)
                     else:
-                        data_part+=','
-                except AttributeError:
-                    data_part+=','
+                        data_part+='null,'
+                except KeyError:
+                    data_part+='null,'
 
             # Do we have a mark?
             if serie.mark and RENDER_MARK_AS_INDEX:
@@ -288,13 +286,13 @@ def _to_dg_data(serie,  indexes_to_plot, aggregate_by=0):
 #  Dygraphs plot
 #=================
 
-def dygraphs_plot(timeseries, indexes=None, aggregate=None, aggregate_by=None, color=None, height=None, 
+def dygraphs_plot(timeseries, data_indexes=None, aggregate=None, aggregate_by=None, color=None, height=None, 
                   interactive=DEFAULT_PLOT_INTERACTIVE, save_to=None, image_resolution='1280x400', return_dygraph_html=False):
     """Plot a timeseries using Dygraphs.
     
        Args:
            timeseries(DataTimePointSeries/DataTimeSlotSeries): the time series to plot.
-           indexes(list): a list of indexes as the ``data_loss``, ``data_reconstructed`` etc.
+           data_indexes(list): a list of data_indexes as the ``data_loss``, ``data_reconstructed`` etc.
                           To disable plotting them, use an empty list.
            aggregate(bool): if to aggregate the time series, in order to speed up plotting.
                             By default, above 10000 data points the time series starts to
@@ -416,8 +414,10 @@ function legendFormatter(data) {
       var g = data.dygraph;
 
       if (g.getOption('showLabelsOnHighlight') !== true) return '';
-
+      
+      var data_indexes = """+str(timeseries.data_indexes())+""";
       var sepLines = g.getOption('labelsSeparateLines');
+      var first_data_index = true;
       var html;
 
       if (typeof data.x === 'undefined') {
@@ -437,8 +437,12 @@ function legendFormatter(data) {
           // Add some initial stuff
           if (html !== '') html += sepLines ? '<br/>' : ' ';
           
-
-          if ((series.label=='data_reconstructed') || (series.label=='data_loss') || (series.label=='forecast') || (series.label=='anomaly')){
+          if (data_indexes.includes(series.label)){
+              // The following was used to inlcude the "indexes" word in the legend
+              /* if (first_data_index){
+                  html += "<span style='margin-left:15px'>indexes:</span>"
+                  first_data_index=false
+              }*/
               html += "<span style='margin-left:15px; background: " + series.color + ";'>&nbsp;" + series.labelHTML + "&nbsp</span>, ";
           }
           else {
@@ -493,7 +497,14 @@ function legendFormatter(data) {
         */
         
         //decoration = ' style="background-color: #fcf8b0"'
-        if ((series.label=='data_reconstructed') || (series.label=='data_loss') || (series.label=='forecast') || (series.label=='anomaly')){
+        if (data_indexes.includes(series.label)){
+            // The following was used to inlcude the "indexes" word in the legend
+            /*if (first_data_index){
+                // Remove last comma and space
+                html = html.substring(0, html.length - 2);
+                html += "<span style='margin-left:15px'>indexes:</span>"
+                first_data_index=false
+            }*/
             html += "<span" + decoration + "> <span style='background: " + series.color + ";'>&nbsp" + series.labelHTML + "&nbsp</span>:&#160;" + series.yHTML*100 + "%</span>, ";
         
         }
@@ -534,24 +545,24 @@ function legendFormatter(data) {
     else:
         labels='value'
 
-    # Handle series indexes
-    if indexes is None:
-        # Plot alls eries indexes
-        indexes_to_plot = timeseries.indexes
+    # Handle series data_indexes
+    if data_indexes is None:
+        # Plot all the series data_indexes
+        data_indexes_to_plot = timeseries.data_indexes()
     else:
-        # Check that the indexes are of the right type and that are present in the series indexes
-        indexes_to_plot = []
-        if not isinstance(indexes, list):
-            raise TypeError('The "indexes" argument must be a list')
-        for index in indexes:
+        # Check that the data_indexes are of the right type and that are present in the series data_indexes
+        data_indexes_to_plot = []
+        if not isinstance(data_indexes, list):
+            raise TypeError('The "data_indexes" argument must be a list')
+        for index in data_indexes:
             if not isinstance(index, str):
-                raise TypeError('The "indexes" list items must be string (got type "{}")'.format(index.__class__.__name__))
-            if not index in timeseries.indexes:
-                raise ValueError('The index "{}" is not present in the series indexes ({})'.format(index, timeseries.indexes))
-            indexes_to_plot.append(index)
+                raise TypeError('The "data_indexes" list items must be string (got type "{}")'.format(index.__class__.__name__))
+            if not index in timeseries.data_indexes():
+                raise ValueError('The data index "{}" is not present in the series data indexes ({})'.format(index, timeseries.data_indexes()))
+            data_indexes_to_plot.append(index)
     
     # Set index labels
-    for index in indexes_to_plot:
+    for index in data_indexes_to_plot:
         labels+=',{}'.format(index)
 
     # Handle series mark (as index)
@@ -562,7 +573,7 @@ function legendFormatter(data) {
     labels_list = ['Timestamp'] + labels.split(',')
 
     # Get series data in Dygraphs format (and aggregate if too much data and find global min and max)
-    global_min, global_max, dg_data = _to_dg_data(timeseries, indexes_to_plot, aggregate_by)
+    global_min, global_max, dg_data = _to_dg_data(timeseries, data_indexes_to_plot, aggregate_by)
     if height:
         global_max = height
     if global_max != global_min:
@@ -650,7 +661,7 @@ animatedZooms: true,"""
      series: {"""
     
     # Data reconstructed index series
-    if 'data_reconstructed' in indexes_to_plot:
+    if 'data_reconstructed' in data_indexes_to_plot:
         dygraphs_javascript += """
        'data_reconstructed': {
          //customBars: false, // Does not work?
@@ -664,7 +675,7 @@ animatedZooms: true,"""
        },"""
     
     # Data loss index series
-    if 'data_loss' in indexes_to_plot:
+    if 'data_loss' in data_indexes_to_plot:
         # Add data loss special timeseries
         dygraphs_javascript += """
        'data_loss': {
@@ -680,7 +691,7 @@ animatedZooms: true,"""
        },"""
 
     # Data forecast index series
-    if 'forecast' in indexes_to_plot:
+    if 'forecast' in data_indexes_to_plot:
         dygraphs_javascript += """
        'forecast': {
          //customBars: false, // Does not work?
@@ -695,7 +706,7 @@ animatedZooms: true,"""
        },"""
 
     # Add anomaly index series
-    if 'anomaly' in indexes_to_plot:
+    if 'anomaly' in data_indexes_to_plot:
         dygraphs_javascript += """
         'anomaly': {
          //customBars: false, // Does not work?

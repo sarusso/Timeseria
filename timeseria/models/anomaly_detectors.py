@@ -161,9 +161,9 @@ class ForecasterAnomalyDetector(AnomalyDetector):
                 if AE > AE_threshold: 
                     if logs:
                         logger.info('Detected anomaly for item starting @ {} ({}) with AE="{:.3f}..."'.format(item.t, item.dt, AE))
-                    item.anomaly = 1
+                    item.data_indexes['anomaly'] = 1
                 else:
-                    item.anomaly = 0
+                    item.data_indexes['anomaly'] = 0
                 
                 # Add details?
                 if details:

@@ -118,57 +118,30 @@ class Series(list):
         else:
             return super(Series, self).__getitem__(key)
 
-    # Indexes
-    @property
-    def indexes(self):
-        """Return the indexes of the series, to be intended as custom
+    # data_indexes
+    def data_indexes(self):
+        """Return all the data_indexes of the series, to be intended as custom
         defined indicators (i.e. data_loss, anomaly_index, etc.)."""
         
-        # TODO: this approach does not allow for custom-defined indexes.
-        #       Maybe move indexes from item attributes to a dictionary?
-        # Moreover, should not be here but at least in the DataSeries...
-        if not self:
-            return []
-        else:
-            _indexes = []
-
-            # Do we have data reconstructed indexes?
-            try:
-                for item in self:
-                    if item.data_reconstructed is not None:
-                        _indexes.append('data_reconstructed')
-                        break
-            except AttributeError:
-                pass
-
-            # Do we have data loss indexes?
-            try:
-                for item in self:
-                    if item.data_loss is not None:
-                        _indexes.append('data_loss')
-                        break
-            except AttributeError:
-                pass
-
-            # Do we have an anomaly index?
-            try:
-                for item in self:
-                    if item.anomaly is not None:
-                        _indexes.append('anomaly')
-                        break
-            except AttributeError:
-                pass
-
-            # Do we have a forecast index?
-            try:
-                for item in self:
-                    if item.forecast is not None:
-                        _indexes.append('forecast')
-                        break
-            except AttributeError:
-                pass
+        # TODO: move this to the Data*Series...?
+        data_index_names = []
+        for item in self:
+            for index_name in item.data_indexes:
+                if index_name not in data_index_names:
+                    data_index_names.append(index_name)
+        
+        # Reorder according to legacy indexes behaviour
+        ordered_data_index_names = []
+        legacy_indexes = ['data_reconstructed', 'data_loss', 'anomaly', 'forecast']
+        for legacy_index in legacy_indexes:
+            if legacy_index in data_index_names:
+                ordered_data_index_names.append(legacy_index)
+                data_index_names.remove(legacy_index)
+        
+        # Merge and sort
+        ordered_data_index_names += sorted(data_index_names)
             
-            return _indexes
+        return ordered_data_index_names
 
     @property
     def mark(self):
@@ -561,25 +534,45 @@ class DataPoint(Point):
            data: the data.
     """
     
-    
     def __init__(self, *args, **kwargs):
+
+        # Data
         try:
             self._data = kwargs.pop('data')
         except KeyError:
             raise Exception('A DataPoint requires a special "data" argument (got only "{}")'.format(kwargs))
-        
+
+        # Data indexes 
+        try:
+            data_indexes = kwargs.pop('data_indexes')
+            if data_indexes is None:
+                data_indexes = {}
+            else:
+                if not isinstance(data_indexes, dict):
+                    raise ValueError('Got type "{}" for data_indexes, was expecitng a dict'.format(data_indexes.__class__.__name__))
+        except KeyError:
+            data_indexes = {}
+        #else:
+        #    if None in data_indexes.values():
+        #        raise ValueError('Cannot have an index set to None: do not set it at all ({})'.format(data_indexes))
+
+        # Special data loss index
         try:
             data_loss = kwargs.pop('data_loss')
         except KeyError:
             pass
         else:
-            self._data_loss = data_loss
+            data_indexes['data_loss'] = data_loss
         
+        # Set data indexes
+        self.data_indexes = data_indexes
+        
+        # Call parent init
         super(DataPoint, self).__init__(*args, **kwargs)
 
     def __repr__(self):
         if self.data_loss is not None:
-            return '{} with data "{}" and data_loss="{}"'.format(super(DataPoint, self).__repr__(), self.data, self._data_loss)            
+            return '{} with data "{}" and data_loss="{}"'.format(super(DataPoint, self).__repr__(), self.data, self.data_loss)            
         else:
             return '{} with data "{}"'.format(super(DataPoint, self).__repr__(), self.data)
     
@@ -591,27 +584,27 @@ class DataPoint(Point):
     @property
     def data(self):
         """The data."""
+        # Data is set like this as it cannot be set if not in the init (read: changed after created)
+        # to prevent this to happend when the point is in a series where they are all supposed
+        # to carry the same data type and with the same number of elements. TODO: check!
         return self._data
 
     @property
     def data_loss(self):
         """The data loss index, if any. Usually computed out from resampling transformations."""
         try:
-            return self._data_loss
-        except AttributeError:
+            return self.data_indexes['data_loss']
+        except KeyError:
+            #raise AttributeError('No data loss index set for this point')
             return None
-
-    @property
-    def data_reconstructed(self):
-        """The data reconstruction index, if any. Usually computed out from reconstruction models."""
+        
+    def data_labels(self):
+        """Return the data labels. If data is a dictionary, then these are the dictionary keys,
+        if data is a list, then these are the list indexes. Other formats are not supported."""
         try:
-            return self._data_reconstructed
+            return sorted(list(self.data.keys()))
         except AttributeError:
-            return None
-
-    @data_reconstructed.setter
-    def data_reconstructed(self, value):
-        self._data_reconstructed = value
+            return list(range(len(self.data)))
 
 
 class DataTimePoint(DataPoint, TimePoint):
@@ -786,7 +779,7 @@ class DataPointSeries(PointSeries):
         """Return a new series without the ``data_loss`` index."""
         new_series = self.duplicate()
         for item in new_series:
-            item._data_loss = None
+            item.data_indexes.pop('data_loss', None)
         return new_series
     
     # Operations
@@ -1179,18 +1172,39 @@ class DataSlot(Slot):
     """
 
     def __init__(self, **kwargs):
+        
+        # Data
         try:
             self._data = kwargs.pop('data')
         except KeyError:
             raise Exception('A DataSlot requires a special "data" argument (got only "{}")'.format(kwargs))
 
+        # Data indexes 
+        try:
+            data_indexes = kwargs.pop('data_indexes')
+            if data_indexes is None:
+                data_indexes = {}
+            else:
+                if not isinstance(data_indexes, dict):
+                    raise ValueError('Got type "{}" for data_indexes, was expecitng a dict'.format(data_indexes.__class__.__name__))
+        except KeyError:
+            data_indexes = {}
+        #else:
+        #    if None in data_indexes.values():
+        #        raise ValueError('Cannot have an index set to None: do not set it at all ({})'.format(data_indexes))
+
+        # Special data loss index
         try:
             data_loss = kwargs.pop('data_loss')
         except KeyError:
             pass
         else:
-            self._data_loss = data_loss
+            data_indexes['data_loss'] = data_loss
+        
+        # Set data indexes
+        self.data_indexes = data_indexes
 
+        # Call parent init
         super(DataSlot, self).__init__(**kwargs)
 
     def __repr__(self):
@@ -1203,29 +1217,28 @@ class DataSlot(Slot):
 
     @property
     def data(self):
-        """The slot data."""
+        """The data."""
+        # Data is set like this as it cannot be set if not in the init (read: changed after created)
+        # to prevent this to happend when the point is in a series where they are all supposed
+        # to carry the same data type and with the same number of elements. TODO: check!
         return self._data
 
     @property
     def data_loss(self):
-        """The data loss index, if any. Usually computed out from slotting transformations."""
+        """The data loss index, if any. Usually computed out from resampling transformations."""
         try:
-            return self._data_loss
-        except AttributeError:
+            return self.data_indexes['data_loss']
+        except KeyError:
+            #raise AttributeError('No data loss index set for this point')
             return None
-    
-    @property
-    def data_reconstructed(self):
-        """The data reconstruction index, if any. Usually computed out from reconstruction models."""
 
+    def data_labels(self):
+        """Return the data labels. If data is a dictionary, then these are the dictionary keys,
+        if data is a list, then these are the list indexes. Other formats are not supported."""
         try:
-            return self._data_reconstructed
+            return sorted(list(self.data.keys()))
         except AttributeError:
-            return None
-    
-    @data_reconstructed.setter
-    def data_reconstructed(self, value):
-        self._data_reconstructed = value
+            return list(range(len(self.data)))    
 
 
 class DataTimeSlot(DataSlot, TimeSlot):
@@ -1391,7 +1404,7 @@ class DataSlotSeries(SlotSeries):
         """Return a new series without the ``data_loss`` index."""
         new_series = self.duplicate()
         for item in new_series:
-            item._data_loss = None
+            item.data_indexes.pop('data_loss', None)
         return new_series
 
     # Operations

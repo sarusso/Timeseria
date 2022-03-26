@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 #==========================
 
 def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_point_i, slot_prev_point_i, slot_next_point_i,
-                 unit, point_validity, timezone, fill_with, force_data_loss, fill_gaps, series_indexes, series_resolution,
+                 unit, point_validity, timezone, fill_with, force_data_loss, fill_gaps, series_data_indexes, series_resolution,
                  force_compute_data_loss, interpolation_method, operations=None):
     
     # Log. Note: if slot_first_point_i < slot_last_point_i, this means that the prev and next are outside the slot.
@@ -181,8 +181,8 @@ def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_poi
     else:
         raise ValueError('No idea how to create a new "{}"'.format(target))
 
-    # Handle indexes TODO: check math and everything here
-    for index in series_indexes:
+    # Handle data_indexes TODO: check math and everything here
+    for index in series_data_indexes:
 
         # Skip the data loss as it is recomputed with different logics
         if index == 'data_loss':
@@ -195,7 +195,7 @@ def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_poi
                 
                 # Get index value
                 try:
-                    index_value = getattr(point, index)
+                    index_value = point.data_indexes[index]
                 except:
                     pass
                 else:
@@ -204,7 +204,7 @@ def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_poi
                         index_total += index_value * point.weight
                         #logger.critical('%s@%s: %s * %s', index, point.dt, index_value, point.weight)
     
-            # Compute the new index value (if there were indexes not None)
+            # Compute the new index value (if there were data_indexes not None)
             if index_total_weights > 0:
                 
                 # Project (rescale/normalize), because we could have some points without the index at all
@@ -217,11 +217,8 @@ def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_poi
         else:
             new_element_index_value = None
             
-        # Set the index. Handle special case for data_reconstructed
-        if index == 'data_reconstructed':
-            setattr(new_element, '_data_reconstructed', new_element_index_value)
-        else:
-            setattr(new_element, index, new_element_index_value)                
+        # Set the index in the data indexes
+        new_element.data_indexes[index] = new_element_index_value
 
     # Return
     return new_element
@@ -364,8 +361,8 @@ class SlottedTransformation(Transformation):
         count = 0
         first = True
 
-        # Indexes & resolution shortcuts
-        series_indexes = series.indexes
+        # data_indexes & resolution shortcuts
+        series_data_indexes = series.data_indexes()
         series_resolution = series.resolution
         
         # Set operations if slots
@@ -489,7 +486,7 @@ class SlottedTransformation(Transformation):
                                                       fill_with = fill_with,
                                                       force_data_loss = force_data_loss,
                                                       fill_gaps = fill_gaps,
-                                                      series_indexes = series_indexes,
+                                                      series_data_indexes = series_data_indexes,
                                                       series_resolution = series_resolution,
                                                       force_compute_data_loss = True if first else False,
                                                       interpolation_method=self.interpolation_method,

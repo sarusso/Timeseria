@@ -18,7 +18,7 @@ HARD_DEBUG = False
 
 POSSIBLE_TIMESTAMP_COLUMNS = ['timestamp', 'epoch']
 NO_DATA_PLACEHOLDERS = ['na', 'nan', 'null', 'nd', 'undef']
-
+DEFAULT_SLOT_DATA_LOSS = None
 
 #======================
 #  CSV File Storage
@@ -496,30 +496,20 @@ class CSVFileStorage(object):
             
             for item in items:
                 try:
-                    data_loss = None
-                    indexes = None
-                    if isinstance (item[1], dict):
-                        # Handle indexes and special data loss case
-                        indexes = {}
+                    # Handle data_indexes (including the data_loss)
+                    data_indexes = None
+                    if isinstance (item[1], dict):      
+                        data_indexes = {}
                         for key in item[1]:
                             if key.startswith('__'):
-                                if key=='__data_loss':
-                                    data_loss = item[1][key]
-                                else:
-                                    indexes[key] = item[1][key]
-                                    
-                        # Remove indexes and data loss from item data
-                        for index in indexes:       
+                                data_indexes[key] = item[1][key]
+                        # Remove data_indexes from item data 
+                        for index in data_indexes:       
                             item[1].pop(index)
-                        item[1].pop('__data_loss',None)   
                                 
-                    # Create DataTimePoint, set data loss and set indexes
-                    data_time_point = DataTimePoint(t=item[0], data=item[1], data_loss=data_loss, tz=tz)
-                    if indexes:
-                        for index in indexes: 
-                            # Set index. The [2:] removes the two trailing underscores
-                            setattr(data_time_point, index[2:], indexes[index])
-                            
+                    # Create DataTimePoint, set data and data_indexes
+                    data_time_point = DataTimePoint(t=item[0], data=item[1], data_indexes=data_indexes, tz=tz)
+
                     # Append
                     timeseries.append(data_time_point)
 
@@ -535,29 +525,24 @@ class CSVFileStorage(object):
             
             for i, item in enumerate(items):
                 try:
-                    data_loss = 0
-                    if isinstance (item[1], dict):
-                        # Handle indexes and special data loss case
-                        indexes = {}
+                    # Handle data_indexes (including the data_loss)
+                    data_indexes = None
+                    if isinstance (item[1], dict):      
+                        data_indexes = {}
                         for key in item[1]:
                             if key.startswith('__'):
-                                if key=='__data_loss':
-                                    data_loss = item[1][key]
-                                else:
-                                    indexes[key] = item[1][key]
-                                    
-                        # Remove indexes and data loss from item data
-                        for index in indexes:       
+                                data_indexes[key] = item[1][key]
+                        # Remove data_indexes from item data 
+                        for index in data_indexes:       
                             item[1].pop(index)
-                        item[1].pop('__data_loss',None)     
-                            
-                    # Create DataTimeSlot, set data loss and set indexes
-                    data_time_slot = DataTimeSlot(t=item[0], unit=unit, data=item[1], data_loss=data_loss, tz=tz)
-                    if indexes:
-                        for index in indexes: 
-                            # Set index. The [2:] removes the two trailing underscores
-                            setattr(data_time_slot, index[2:], indexes[index])
-                            
+                    
+                    if DEFAULT_SLOT_DATA_LOSS is not None and 'data_loss' not in data_indexes:
+                        data_indexes['data_loss'] = DEFAULT_SLOT_DATA_LOSS
+                                                
+                    # Create DataTimeSlot, set data and data_indexes
+                    data_time_slot = DataTimeSlot(t=item[0], unit=unit, data=item[1], data_indexes=data_indexes, tz=tz)
+                    
+                    # Append
                     timeseries.append(data_time_slot)
                     
                 except ValueError as e:
@@ -573,7 +558,7 @@ class CSVFileStorage(object):
                                 # Set data by interpolation
                                 interpolated_data = {data_label: (((items[i][1][data_label]-items[i-1][1][data_label])/(len(missing_timestamps)+1)) * (j+1)) + items[i-1][1][data_label]  for data_label in  items[-1][1] }
                                 timeseries.append(DataTimeSlot(t=missing_timestamp, unit=unit, data=interpolated_data, data_loss=1, tz=tz))
-                            timeseries.append(DataTimeSlot(t=item[0], unit=unit, data=item[1], data_loss=0, tz=tz))
+                            timeseries.append(DataTimeSlot(t=item[0], unit=unit, data=item[1], data_loss=DEFAULT_SLOT_DATA_LOSS, tz=tz))
                             break
                         
                         else:
@@ -588,8 +573,8 @@ class CSVFileStorage(object):
         if os.path.isfile(self.filename) and not overwrite:
             raise Exception('File already exists. use overwrite=True to overwrite.')
 
-        # Set indexes here once for all or thre will be a slowndowd afterwards
-        indexes = timeseries.indexes
+        # Set data_indexes here once for all or thre will be a slowndowd afterwards
+        data_indexes = timeseries.data_indexes()
 
         with open(self.filename, 'w') as csv_file:
        
@@ -610,19 +595,19 @@ class CSVFileStorage(object):
 
             # 1) Dump headers
             data_labels_part = ','.join([str(key) for key in timeseries.data_labels()])
-            indexes_part = ','.join(['__'+index for index in indexes])
-            if indexes_part:
-                csv_file.write('epoch,{},{}\n'.format(data_labels_part,indexes_part))
+            data_indexes_part = ','.join(['__'+index for index in data_indexes])
+            if data_indexes_part:
+                csv_file.write('epoch,{},{}\n'.format(data_labels_part,data_indexes_part))
             else:
                 csv_file.write('epoch,{}\n'.format(data_labels_part))
             
 
-            # 2) Dump data (and indexes)
+            # 2) Dump data (and data_indexes)
             for item in timeseries:
                 data_part = ','.join([str(item.data[key]) for key in timeseries.data_labels()])
-                indexes_part = ','.join([str(getattr(item, index)) for index in indexes])
-                if indexes_part:
-                    csv_file.write('{},{},{}\n'.format(item.t, data_part, indexes_part))
+                data_indexes_part = ','.join([str(getattr(item, index)) for index in data_indexes])
+                if data_indexes_part:
+                    csv_file.write('{},{},{}\n'.format(item.t, data_part, data_indexes_part))
                 else:
                     csv_file.write('{},{}\n'.format(item.t, data_part))
                     

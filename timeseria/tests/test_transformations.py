@@ -290,7 +290,7 @@ class TestResampler(unittest.TestCase):
         # TODO: is that what we want for the extremes?
 
 
-    def test_resampler_indexes(self):
+    def test_resampler_data_indexes(self):
         
         # Time series from 16:58:00 to 17:32:00 (Europe/Rome)
         series = DataTimePointSeries()
@@ -319,22 +319,22 @@ class TestResampler(unittest.TestCase):
                                   data = {'temperature': 154+i, 'humidity': 5},
                                   data_loss = data_loss)
             
-            # Add extra indexes as if something operated on the time series
-            point.anomaly = anomaly
-            point.forecast = forecast
-            point._data_reconstructed = data_reconstructed
+            # Add extra data_indexes as if something operated on the time series
+            point.data_indexes['data_reconstructed'] = data_reconstructed
+            point.data_indexes['anomaly'] = anomaly
+            point.data_indexes['forecast'] = forecast
             
             # Append
             series.append(point)
                 
-        # This is an indirect test of the series indexes. TODO: move it away.
-        self.assertEqual(series.indexes, ['data_reconstructed', 'data_loss', 'anomaly', 'forecast'])
+        # This is an indirect test of the series data_indexes. TODO: move it away.
+        self.assertEqual(series.data_indexes(), ['data_reconstructed', 'data_loss', 'anomaly', 'forecast'])
         
         # Slot the time series
         resampled_series = Resampler('600s').process(series)        
 
-        # Check that we have all the indexes
-        self.assertEqual(resampled_series.indexes, ['data_reconstructed', 'data_loss', 'anomaly', 'forecast'])
+        # Check that we have all the data_indexes
+        self.assertEqual(resampled_series.data_indexes(), ['data_reconstructed', 'data_loss', 'anomaly', 'forecast'])
 
         #print('===========================================')
         #for i, item in enumerate(series):
@@ -344,22 +344,22 @@ class TestResampler(unittest.TestCase):
         #    print(item)
         #print('===========================================')
 
-        # Check indexes math
-        self.assertAlmostEqual(resampled_series[0].data_reconstructed, 0.4)
-        self.assertAlmostEqual(resampled_series[0].anomaly, 0.275)
-        self.assertAlmostEqual(resampled_series[0].forecast, 0)
+        # Check data_indexes math
+        self.assertAlmostEqual(resampled_series[0].data_indexes['data_reconstructed'], 0.4)
+        self.assertAlmostEqual(resampled_series[0].data_indexes['anomaly'], 0.275)
+        self.assertAlmostEqual(resampled_series[0].data_indexes['forecast'], 0)
         # TODO: data loss is computed by compute_data_loss and not exact. expected 0.46
         self.assertAlmostEqual(resampled_series[0].data_loss, 0.47)
         
-        self.assertAlmostEqual(resampled_series[1].data_reconstructed, 0)
-        self.assertAlmostEqual(resampled_series[1].anomaly, 0.7)
-        self.assertAlmostEqual(resampled_series[1].forecast, 0.65)
+        self.assertAlmostEqual(resampled_series[1].data_indexes['data_reconstructed'], 0)
+        self.assertAlmostEqual(resampled_series[1].data_indexes['anomaly'], 0.7)
+        self.assertAlmostEqual(resampled_series[1].data_indexes['forecast'], 0.65)
         # TODO: data loss is computed by compute_data_loss. Data losses not present are treated as zero. Are we sure? 
         self.assertAlmostEqual(resampled_series[1].data_loss, 0.04)
  
-        # Now resample at the same sampling interval and check indexes are still there
+        # Now resample at the same sampling interval and check data_indexes are still there
         same_resampled_series = series[0:5].resample(60)
-        self.assertEqual(same_resampled_series.indexes, ['data_reconstructed', 'data_loss', 'anomaly', 'forecast'])
+        self.assertEqual(same_resampled_series.data_indexes(), ['data_reconstructed', 'data_loss', 'anomaly', 'forecast'])
 
 
 
@@ -659,7 +659,7 @@ class TestSlotter(unittest.TestCase):
         #slotted_series = Slotter('30s').process(series)        
         
 
-    def test_slot_indexes(self):
+    def test_slot_data_indexes(self):
         
         # Time series from 16:58:00 to 17:32:00 (Europe/Rome)
         series = DataTimePointSeries()
@@ -688,22 +688,22 @@ class TestSlotter(unittest.TestCase):
                                   data = {'temperature': 154+i, 'humidity': 5},
                                   data_loss = data_loss)
             
-            # Add extra indexes as if something operated on the time series
-            point.anomaly = anomaly
-            point.forecast = forecast
-            point._data_reconstructed = data_reconstructed
+            # Add extra data_indexes as if something operated on the time series
+            point.data_indexes['data_reconstructed'] = data_reconstructed
+            point.data_indexes['anomaly'] = anomaly
+            point.data_indexes['forecast'] = forecast
             
             # Append
             series.append(point)
                 
-        # This is an indirect test of the series indexes. TODO: move it away.
-        self.assertEqual(series.indexes, ['data_reconstructed', 'data_loss', 'anomaly', 'forecast'])
+        # This is an indirect test of the series data_indexes. TODO: move it away.
+        self.assertEqual(series.data_indexes(), ['data_reconstructed', 'data_loss', 'anomaly', 'forecast'])
         
         # Slot the time series
         slotted_series = Slotter('600s').process(series)
 
-        # Check that we have all the indexes
-        self.assertEqual(slotted_series.indexes, ['data_reconstructed', 'data_loss', 'anomaly', 'forecast'])
+        # Check that we have all the data_indexes
+        self.assertEqual(slotted_series.data_indexes(), ['data_reconstructed', 'data_loss', 'anomaly', 'forecast'])
 
         #print('===========================================')
         #for i, item in enumerate(series):
@@ -713,18 +713,18 @@ class TestSlotter(unittest.TestCase):
         #    print(item)
         #print('===========================================')
 
-        # Check indexes math
-        self.assertAlmostEqual(slotted_series[0].anomaly, 0.0375)
-        self.assertAlmostEqual(slotted_series[0].data_reconstructed, 0.15)
-        self.assertAlmostEqual(slotted_series[0].forecast, 0)
+        # Check data_indexes math
+        self.assertAlmostEqual(slotted_series[0].data_indexes['anomaly'], 0.0375)
+        self.assertAlmostEqual(slotted_series[0].data_indexes['data_reconstructed'], 0.15)
+        self.assertAlmostEqual(slotted_series[0].data_indexes['forecast'], 0)
          
-        self.assertAlmostEqual(slotted_series[1].anomaly, 0.5676, 4)
-        self.assertAlmostEqual(slotted_series[1].data_reconstructed, 0.25)
-        self.assertAlmostEqual(slotted_series[1].forecast, 0.15)
+        self.assertAlmostEqual(slotted_series[1].data_indexes['anomaly'], 0.5676, 4)
+        self.assertAlmostEqual(slotted_series[1].data_indexes['data_reconstructed'], 0.25)
+        self.assertAlmostEqual(slotted_series[1].data_indexes['forecast'], 0.15)
  
-        self.assertEqual(slotted_series[2].anomaly, None)
-        self.assertAlmostEqual(slotted_series[2].data_reconstructed, 0)
-        self.assertEqual(slotted_series[2].forecast, 1)
+        self.assertEqual(slotted_series[2].data_indexes['anomaly'], None)
+        self.assertAlmostEqual(slotted_series[2].data_indexes['data_reconstructed'], 0)
+        self.assertEqual(slotted_series[2].data_indexes['forecast'], 1)
  
         # The following is re-computed from missing coverage only, and not marked as None.
         # See the compute_data_loss function fore more details and some more comments.

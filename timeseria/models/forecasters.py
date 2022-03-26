@@ -336,7 +336,7 @@ class Forecaster(TimeSeriesParametricModel):
         
         # Add the forecast index
         for item in forecast_timeseries:
-            item.forecast = 0
+            item.data_indexes['forecast'] = 0
         
         # Call model forecasting logic
         try:
@@ -345,7 +345,7 @@ class Forecaster(TimeSeriesParametricModel):
                 forecast_timeseries.append(forecast_model_results)
             else:
                 for item in forecast_model_results:
-                    item.forecast = 1
+                    item.data_indexes['forecast'] = 1
                     forecast_timeseries.append(item)
 
         except NotImplementedError:
@@ -356,7 +356,7 @@ class Forecaster(TimeSeriesParametricModel):
                 forecast_model_results = self.forecast(timeseries = forecast_timeseries, n=1)
 
                 # Add forecasted index
-                forecast_model_results.forecast = 1
+                forecast_model_results.data_indexes['forecast'] = 1
 
                 # Add the forecast to the forecasts time series
                 forecast_timeseries.append(forecast_model_results)

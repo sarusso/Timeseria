@@ -227,6 +227,30 @@ class TestPoints(unittest.TestCase):
         
         self.assertEqual(data_point_1, data_point_2)
         self.assertNotEqual(data_point_1, data_point_3)
+        
+        # Test list and dict data labels
+        data_point = DataPoint(1, 2, data=['hello', 'hola'])
+        self.assertEqual(data_point.data_labels(), [0,1])
+        
+        data_point = DataPoint(1, 2, data={'label1':'hello', 'label2':'hola'})
+        self.assertEqual(data_point.data_labels(), ['label1','label2'])
+
+        # Test with data loss index
+        data_point = DataPoint(1, 2, data='hello', data_loss=0.5)
+        self.assertEqual(data_point.data_loss,0.5)
+        self.assertEqual(data_point.data_indexes['data_loss'],0.5)
+        
+        # Test with generic indexes
+        data_point = DataPoint(1, 2, data='hello', data_indexes={'data_loss':0.5, 'my_index':0.3})
+        self.assertEqual(data_point.data_loss,0.5)
+        self.assertEqual(data_point.data_indexes['data_loss'],0.5)
+        self.assertEqual(data_point.data_indexes['my_index'],0.3)
+
+        # Test None index
+        #with self.assertRaises(ValueError):
+        DataPoint(1, 2, data='hello', data_indexes={'data_loss':None, 'my_index':0.3})
+
+                 
 
 
     def test_DataTimePoint(self):
@@ -574,6 +598,29 @@ class TestSlots(unittest.TestCase):
 
         data_slot_with_data_loss = DataSlot(start=Point(1), end=Point(2), data='hello', data_loss=0.98)
         self.assertEqual(data_slot_with_data_loss.data_loss,0.98)
+
+        # Test list and dict data labels
+        data_slot = DataSlot(start=Point(1), end=Point(2), data=['hello', 'hola'])
+        self.assertEqual(data_slot.data_labels(), [0,1])
+        
+        data_slot = DataSlot(start=Point(1), end=Point(2), data={'label1':'hello', 'label2':'hola'})
+        self.assertEqual(data_slot.data_labels(), ['label1','label2'])
+
+        # Test with data loss index
+        data_slot = DataSlot(start=Point(1), end=Point(2), data='hello', data_loss=0.5)
+        self.assertEqual(data_slot.data_loss,0.5)
+        self.assertEqual(data_slot.data_indexes['data_loss'],0.5)
+        
+        # Test with generic indexes
+        data_slot = DataSlot(start=Point(1), end=Point(2), data='hello', data_indexes={'data_loss':0.5, 'my_index':0.3})
+        self.assertEqual(data_slot.data_loss,0.5)
+        self.assertEqual(data_slot.data_indexes['data_loss'],0.5)
+        self.assertEqual(data_slot.data_indexes['my_index'],0.3)
+        
+        # Test None index
+        #with self.assertRaises(ValueError):
+        DataSlot(start=Point(1), end=Point(2), data='hello', data_indexes={'data_loss':None, 'my_index':0.3})
+
     
 
     def test_DataTimeSlots(self):
