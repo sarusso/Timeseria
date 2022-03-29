@@ -531,6 +531,8 @@ class DataPoint(Point):
        Args:
            *args (list): the coordinates.
            data: the data.
+           data_indexes(dict): data indexes.
+           data_loss(float): the data loss index, if any. 
     """
     
     def __init__(self, *args, **kwargs):
@@ -564,7 +566,7 @@ class DataPoint(Point):
             data_indexes['data_loss'] = data_loss
         
         # Set data indexes
-        self.data_indexes = data_indexes
+        self._data_indexes = data_indexes
         
         # Call parent init
         super(DataPoint, self).__init__(*args, **kwargs)
@@ -588,6 +590,15 @@ class DataPoint(Point):
         # to carry the same data type and with the same number of elements. TODO: check!
         return self._data
 
+    @property
+    def data_indexes(self):
+        """The data indexes."""
+        return self._data_indexes
+
+    @data_indexes.setter
+    def data_indexes(self, value):
+        self._data_indexes = value 
+ 
     @property
     def data_loss(self):
         """The data loss index, if any. Usually computed out from resampling transformations."""
@@ -613,6 +624,8 @@ class DataTimePoint(DataPoint, TimePoint):
            t (float): epoch timestamp, decimals for sub-second precision.
            dt (datetime): a datetime object timestamp.
            data: the data.
+           data_indexes(dict): data indexes.
+           data_loss(float): the data loss index, if any.
     """
     pass
 
@@ -1167,7 +1180,9 @@ class DataSlot(Slot):
            start(Point): the slot starting point.
            end(Point): the slot ending point.
            unit(Unit): the slot unit.
-           data: the slot data.
+           data: the data.
+           data_indexes(dict): data indexes.
+           data_loss(float): the data loss index, if any.
     """
 
     def __init__(self, **kwargs):
@@ -1201,7 +1216,7 @@ class DataSlot(Slot):
             data_indexes['data_loss'] = data_loss
         
         # Set data indexes
-        self.data_indexes = data_indexes
+        self._data_indexes = data_indexes
 
         # Call parent init
         super(DataSlot, self).__init__(**kwargs)
@@ -1221,6 +1236,15 @@ class DataSlot(Slot):
         # to prevent this to happend when the point is in a series where they are all supposed
         # to carry the same data type and with the same number of elements. TODO: check!
         return self._data
+
+    @property
+    def data_indexes(self):
+        """The data indexes."""
+        return self._data_indexes
+
+    @data_indexes.setter
+    def data_indexes(self, value):
+        self._data_indexes = value 
 
     @property
     def data_loss(self):
@@ -1251,6 +1275,8 @@ class DataTimeSlot(DataSlot, TimeSlot):
            end(TimePoint): the slot ending time point.
            unit(TimeUnit): the slot time unit.
            data: the data.
+           data_indexes(dict): data indexes.
+           data_loss(float): the data loss index, if any.
     """
 
 
