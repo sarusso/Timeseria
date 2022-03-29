@@ -23,10 +23,10 @@ DEFAULT_PLOT_TYPE = os.environ.get('DEFAULT_PLOT_TYPE', None)
 if DEFAULT_PLOT_TYPE:
     if DEFAULT_PLOT_TYPE == 'interactive':
         logger.debug('Setting default plot type to "interactive"')
-        DEFAULT_PLOT_AS_IMAGE = True
+        DEFAULT_PLOT_AS_IMAGE = False
     elif DEFAULT_PLOT_TYPE == 'image':
         logger.debug('Setting default plot type to "image"')
-        DEFAULT_PLOT_AS_IMAGE = False         
+        DEFAULT_PLOT_AS_IMAGE = True         
     else:
         raise ValueError('Unknown plot type "{}" for DEFAULT_PLOT_TYPE'.forat(DEFAULT_PLOT_TYPE))
 else:
@@ -287,7 +287,7 @@ def _to_dg_data(serie,  data_indexes_to_plot, aggregate_by=0):
 #=================
 
 def dygraphs_plot(timeseries, data_indexes=None, aggregate=None, aggregate_by=None, color=None, height=None, 
-                  image=DEFAULT_PLOT_AS_IMAGE, image_resolution='1152x380', html=False, save_to=None):
+                  image=DEFAULT_PLOT_AS_IMAGE, image_resolution='1280x380', html=False, save_to=None):
     """Plot a time series using Dygraphs interactive plots.
     
        Args:
