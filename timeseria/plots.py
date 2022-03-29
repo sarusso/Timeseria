@@ -286,14 +286,15 @@ def _to_dg_data(serie,  data_indexes_to_plot, aggregate_by=0):
 #  Dygraphs plot
 #=================
 
-def dygraphs_plot(timeseries, data_indexes=None, aggregate=None, aggregate_by=None, color=None, height=None, 
+def dygraphs_plot(timeseries, data_indexes='all', aggregate=None, aggregate_by=None, color=None, height=None, 
                   image=DEFAULT_PLOT_AS_IMAGE, image_resolution='1280x380', html=False, save_to=None):
     """Plot a time series using Dygraphs interactive plots.
     
        Args:
            timeseries(DataTimePointSeries/DataTimeSlotSeries): the time series to plot.
            data_indexes(list): a list of data_indexes as the ``data_loss``, ``data_reconstructed`` etc.
-                          To disable plotting them, use an empty list.
+                               to plot. By default set to all the data indexes of the series. To disable
+                               plotting data indexes entirely, use None or an empty list.
            aggregate(bool): if to aggregate the time series, in order to speed up plotting.
                             By default, above 10000 data points the time series starts to
                             get aggregated by a factor of ten for each order of magnitude. 
@@ -331,7 +332,6 @@ def dygraphs_plot(timeseries, data_indexes=None, aggregate=None, aggregate_by=No
             if not save_to.endswith('.html'):
                 logger.warning('You are saving to "{}" in interactive (HTML) format, but the file name does not end with ".html"'.format(save_to))
    
-   
     if aggregate_by is None:
         # Set default aggregate_by if not explicitly set to something
         if len(timeseries)  > AGGREGATE_THRESHOLD:
@@ -347,6 +347,24 @@ def dygraphs_plot(timeseries, data_indexes=None, aggregate=None, aggregate_by=No
 
     #if show_data_reconstructed:
     #    show_data_loss=False
+
+    # Handle series data_indexes
+    if data_indexes == 'all':
+        # Plot all the series data_indexes
+        data_indexes_to_plot = timeseries._all_data_indexes()
+    elif data_indexes is None:
+        data_indexes_to_plot = []
+    else:
+        # Check that the data_indexes are of the right type and that are present in the series data_indexes
+        data_indexes_to_plot = []
+        if not isinstance(data_indexes, list):
+            raise TypeError('The "data_indexes" argument must be a list or the magic word "all" (got type "{}")'.format(data_indexes.__class__.__name__))
+        for index in data_indexes:
+            if not isinstance(index, str):
+                raise TypeError('The "data_indexes" list items must be string (got type "{}")'.format(index.__class__.__name__))
+            if not index in timeseries._all_data_indexes():
+                raise ValueError('The data index "{}" is not present in the series data indexes ({})'.format(index, timeseries._all_data_indexes()))
+            data_indexes_to_plot.append(index)
 
     # Checks
     if isinstance(timeseries, DataTimePointSeries):
@@ -553,22 +571,6 @@ function legendFormatter(data) {
         labels = labels[0:-1]
     else:
         labels='value'
-
-    # Handle series data_indexes
-    if data_indexes is None:
-        # Plot all the series data_indexes
-        data_indexes_to_plot = timeseries._all_data_indexes()
-    else:
-        # Check that the data_indexes are of the right type and that are present in the series data_indexes
-        data_indexes_to_plot = []
-        if not isinstance(data_indexes, list):
-            raise TypeError('The "data_indexes" argument must be a list')
-        for index in data_indexes:
-            if not isinstance(index, str):
-                raise TypeError('The "data_indexes" list items must be string (got type "{}")'.format(index.__class__.__name__))
-            if not index in timeseries._all_data_indexes():
-                raise ValueError('The data index "{}" is not present in the series data indexes ({})'.format(index, timeseries._all_data_indexes()))
-            data_indexes_to_plot.append(index)
     
     # Set index labels
     for index in data_indexes_to_plot:
