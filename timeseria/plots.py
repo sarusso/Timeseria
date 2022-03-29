@@ -287,7 +287,7 @@ def _to_dg_data(serie,  data_indexes_to_plot, aggregate_by=0):
 #=================
 
 def dygraphs_plot(timeseries, data_indexes=None, aggregate=None, aggregate_by=None, color=None, height=None, 
-                  image=DEFAULT_PLOT_AS_IMAGE, image_resolution='1280x500', html=False, save_to=None):
+                  image=DEFAULT_PLOT_AS_IMAGE, image_resolution='1152x380', html=False, save_to=None):
     """Plot a time series using Dygraphs interactive plots.
     
        Args:
