@@ -424,7 +424,7 @@ function legendFormatter(data) {
 
       if (g.getOption('showLabelsOnHighlight') !== true) return '';
       
-      var data_indexes = """+str(timeseries.data_indexes())+""";
+      var data_indexes = """+str(timeseries._all_data_indexes())+""";
       var sepLines = g.getOption('labelsSeparateLines');
       var first_data_index = true;
       var html;
@@ -557,7 +557,7 @@ function legendFormatter(data) {
     # Handle series data_indexes
     if data_indexes is None:
         # Plot all the series data_indexes
-        data_indexes_to_plot = timeseries.data_indexes()
+        data_indexes_to_plot = timeseries._all_data_indexes()
     else:
         # Check that the data_indexes are of the right type and that are present in the series data_indexes
         data_indexes_to_plot = []
@@ -566,8 +566,8 @@ function legendFormatter(data) {
         for index in data_indexes:
             if not isinstance(index, str):
                 raise TypeError('The "data_indexes" list items must be string (got type "{}")'.format(index.__class__.__name__))
-            if not index in timeseries.data_indexes():
-                raise ValueError('The data index "{}" is not present in the series data indexes ({})'.format(index, timeseries.data_indexes()))
+            if not index in timeseries._all_data_indexes():
+                raise ValueError('The data index "{}" is not present in the series data indexes ({})'.format(index, timeseries._all_data_indexes()))
             data_indexes_to_plot.append(index)
     
     # Set index labels

@@ -362,7 +362,7 @@ class SlottedTransformation(Transformation):
         first = True
 
         # data_indexes & resolution shortcuts
-        series_data_indexes = series.data_indexes()
+        series_data_indexes = series._all_data_indexes()
         series_resolution = series.resolution
         
         # Set operations if slots

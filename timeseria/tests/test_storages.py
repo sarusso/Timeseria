@@ -52,7 +52,7 @@ class TestCSVFileStorage(unittest.TestCase):
         self.assertEqual(data_time_point_series[-1].data, {'flow': 1040.0, 'temp': 14.0})
         
         # Test we don't have any extra data index as well
-        self.assertEqual(data_time_point_series.data_indexes(), [])
+        self.assertEqual(data_time_point_series._all_data_indexes(), [])
 
         # Basic iso8601 multi values with labels
         storage = CSVFileStorage(TEST_DATA_PATH + '/csv/multi_values_with_labels.csv', data_labels=['temp'])

@@ -328,13 +328,13 @@ class TestResampler(unittest.TestCase):
             series.append(point)
                 
         # This is an indirect test of the series data_indexes. TODO: move it away.
-        self.assertEqual(series.data_indexes(), ['data_reconstructed', 'data_loss', 'anomaly', 'forecast'])
+        self.assertEqual(series._all_data_indexes(), ['data_reconstructed', 'data_loss', 'anomaly', 'forecast'])
         
         # Slot the time series
         resampled_series = Resampler('600s').process(series)        
 
         # Check that we have all the data_indexes
-        self.assertEqual(resampled_series.data_indexes(), ['data_reconstructed', 'data_loss', 'anomaly', 'forecast'])
+        self.assertEqual(resampled_series._all_data_indexes(), ['data_reconstructed', 'data_loss', 'anomaly', 'forecast'])
 
         #print('===========================================')
         #for i, item in enumerate(series):
@@ -359,7 +359,7 @@ class TestResampler(unittest.TestCase):
  
         # Now resample at the same sampling interval and check data_indexes are still there
         same_resampled_series = series[0:5].resample(60)
-        self.assertEqual(same_resampled_series.data_indexes(), ['data_reconstructed', 'data_loss', 'anomaly', 'forecast'])
+        self.assertEqual(same_resampled_series._all_data_indexes(), ['data_reconstructed', 'data_loss', 'anomaly', 'forecast'])
 
 
 
@@ -697,13 +697,13 @@ class TestSlotter(unittest.TestCase):
             series.append(point)
                 
         # This is an indirect test of the series data_indexes. TODO: move it away.
-        self.assertEqual(series.data_indexes(), ['data_reconstructed', 'data_loss', 'anomaly', 'forecast'])
+        self.assertEqual(series._all_data_indexes(), ['data_reconstructed', 'data_loss', 'anomaly', 'forecast'])
         
         # Slot the time series
         slotted_series = Slotter('600s').process(series)
 
         # Check that we have all the data_indexes
-        self.assertEqual(slotted_series.data_indexes(), ['data_reconstructed', 'data_loss', 'anomaly', 'forecast'])
+        self.assertEqual(slotted_series._all_data_indexes(), ['data_reconstructed', 'data_loss', 'anomaly', 'forecast'])
 
         #print('===========================================')
         #for i, item in enumerate(series):

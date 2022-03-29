@@ -118,8 +118,7 @@ class Series(list):
         else:
             return super(Series, self).__getitem__(key)
 
-    # data_indexes
-    def data_indexes(self):
+    def _all_data_indexes(self):
         """Return all the data_indexes of the series, to be intended as custom
         defined indicators (i.e. data_loss, anomaly_index, etc.)."""
         

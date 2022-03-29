@@ -722,7 +722,7 @@ class CSVFileStorage(Storage):
             raise Exception('File already exists. use overwrite=True to overwrite.')
 
         # Set data_indexes here once for all or thre will be a slowndowd afterwards
-        data_indexes = timeseries.data_indexes()
+        data_indexes = timeseries._all_data_indexes()
 
         with open(self.filename, 'w') as csv_file:
        
