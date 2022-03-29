@@ -61,7 +61,7 @@ class CSVFileStorage(Storage):
     (https://datatracker.ietf.org/doc/html/rfc4180) for more details on the CSV file format specification.
     
     Args:
-        filename: the file name including its path.  
+        filename: the file name (including its path).  
         timestamp_label: the column label to be used as timestamp. Either use this or the time_label and/or date_label parameters.
         timestamp_format: the timestamp column format.
         time_label: the column label to be used as the time part of the timestamp.

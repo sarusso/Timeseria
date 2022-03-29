@@ -306,9 +306,9 @@ def dygraphs_plot(timeseries, data_indexes=None, aggregate=None, aggregate_by=No
            image_resolution(str): the image resolution, if generating an image rendering of the plot.
            html(bool): if to return the HTML code for the plot instead of generating an interactive or image one.
                        Useful for embedding it in a website or for generating multi-plot HTML pages.
-           save_to(str): a file name (with path) where to save the plot. If the plot is generated as interactive,
-                         then it is saved as a self-consistent HTML page which can be opened in a web browser. If
-                         the plot is generated as an image, then it is saved in PNG format.
+           save_to(str): a file name (including its path) where to save the plot. If the plot is generated as 
+                         interactive, then it is saved as a self-consistent HTML page which can be opened in a 
+                         web browser. If the plot is generated as an image, then it is saved in PNG format.
     """
     # Credits: the interactive plot is based on the work here: https://www.stefaanlippens.net/jupyter-custom-d3-visualization.html.
 
