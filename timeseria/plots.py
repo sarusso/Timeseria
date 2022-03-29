@@ -23,14 +23,14 @@ DEFAULT_PLOT_TYPE = os.environ.get('DEFAULT_PLOT_TYPE', None)
 if DEFAULT_PLOT_TYPE:
     if DEFAULT_PLOT_TYPE == 'interactive':
         logger.debug('Setting default plot type to "interactive"')
-        DEFAULT_PLOT_INTERACTIVE = True
+        DEFAULT_PLOT_AS_IMAGE = False
     elif DEFAULT_PLOT_TYPE == 'image':
         logger.debug('Setting default plot type to "image"')
-        DEFAULT_PLOT_INTERACTIVE = False         
+        DEFAULT_PLOT_AS_IMAGE = True         
     else:
         raise ValueError('Unknown plot type "{}" for DEFAULT_PLOT_TYPE'.forat(DEFAULT_PLOT_TYPE))
 else:
-    DEFAULT_PLOT_INTERACTIVE=True
+    DEFAULT_PLOT_AS_IMAGE=False
 
 #=================
 #   Utilities
@@ -78,7 +78,7 @@ def _to_dg_time(dt):
         return 'new Date(Date.UTC({}, {}, {}, {}, {}, {}))'.format(dt.year, dt.month-1, dt.day, dt.hour, dt.minute, dt.second)
 
 
-def _to_dg_data(serie,  indexes_to_plot, aggregate_by=0):
+def _to_dg_data(serie,  data_indexes_to_plot, aggregate_by=0):
     '''{% for timestamp,value in metric_data.items %}{{timestamp}},{{value}}\n{%endfor%}}'''
     
     dg_data=''
@@ -108,7 +108,7 @@ def _to_dg_data(serie,  indexes_to_plot, aggregate_by=0):
             data_sums = [0 for key in keys]
             data_mins = [None for key in keys]
             data_maxs = [None for key in keys]
-            index_sums = [0 for index in indexes_to_plot]
+            index_sums = [0 for index in data_indexes_to_plot]
             
 
         #====================
@@ -166,14 +166,13 @@ def _to_dg_data(serie,  indexes_to_plot, aggregate_by=0):
                     if data > data_maxs[j]:
                         data_maxs[j] = data
 
-            # Loop over series indexes and add data
-            for j, index in enumerate(indexes_to_plot):
-                # TODO: plot only some indexes, now we plot all of them
+            # Loop over series data_indexes and add data
+            for j, index in enumerate(data_indexes_to_plot):
                 try:
-                    index_value = getattr(item, index)
+                    index_value = item.data_indexes[index]
                     if index_value is not None:
                         index_sums[j] += index_value
-                except AttributeError:
+                except KeyError:
                     pass
 
             # Dump aggregated data?
@@ -193,12 +192,12 @@ def _to_dg_data(serie,  indexes_to_plot, aggregate_by=0):
                     #else:
                     data_part+='[{},{},{}],'.format( data_mins[i], avg, data_maxs[i])
 
-                # Indexes
-                for i, index in enumerate(indexes_to_plot):
+                # data_indexes
+                for i, index in enumerate(data_indexes_to_plot):
                     if index_sums[i] is not None:
                         data_part+='[0,{0},{0}],'.format(index_sums[i]/aggregate_by)
                     else:
-                        data_part+='[,,],'
+                        data_part+='[null,null,null],'
 
                 # Do we have a mark?
                 if serie.mark and RENDER_MARK_AS_INDEX:
@@ -219,7 +218,7 @@ def _to_dg_data(serie,  indexes_to_plot, aggregate_by=0):
                 data_sums = [0 for key in keys]
                 data_mins = [None for key in keys]
                 data_maxs = [None for key in keys]
-                index_sums = [0 for index in indexes_to_plot]
+                index_sums = [0 for index in data_indexes_to_plot]
                 first_t = None
 
         #====================
@@ -251,17 +250,16 @@ def _to_dg_data(serie,  indexes_to_plot, aggregate_by=0):
                     if data > global_max:
                         global_max = data
                 
-            # Loop over series indexes and add data
-            for index in indexes_to_plot:
-                # TODO: plot only some indexes, now we plot all of them
+            # Loop over series data_indexes and add data
+            for index in data_indexes_to_plot:
                 try:
-                    index_value = getattr(item, index)
+                    index_value = item.data_indexes[index]
                     if index_value is not None:
                         data_part+='{},'.format(index_value)
                     else:
-                        data_part+=','
-                except AttributeError:
-                    data_part+=','
+                        data_part+='null,'
+                except KeyError:
+                    data_part+='null,'
 
             # Do we have a mark?
             if serie.mark and RENDER_MARK_AS_INDEX:
@@ -288,42 +286,51 @@ def _to_dg_data(serie,  indexes_to_plot, aggregate_by=0):
 #  Dygraphs plot
 #=================
 
-def dygraphs_plot(timeseries, indexes=None, aggregate=None, aggregate_by=None, color=None, height=None, 
-                  interactive=DEFAULT_PLOT_INTERACTIVE, save_to=None, image_resolution='1280x400', return_dygraph_html=False):
-    """Plot a timeseries using Dygraphs.
+def dygraphs_plot(timeseries, data_indexes='all', aggregate=None, aggregate_by=None, color=None, height=None, 
+                  image=DEFAULT_PLOT_AS_IMAGE, image_resolution='1280x380', html=False, save_to=None):
+    """Plot a time series using Dygraphs interactive plots.
     
        Args:
            timeseries(DataTimePointSeries/DataTimeSlotSeries): the time series to plot.
-           indexes(list): a list of indexes as the ``data_loss``, ``data_reconstructed`` etc.
-                          To disable plotting them, use an empty list.
+           data_indexes(list): a list of data_indexes as the ``data_loss``, ``data_reconstructed`` etc.
+                               to plot. By default set to all the data indexes of the series. To disable
+                               plotting data indexes entirely, use None or an empty list.
            aggregate(bool): if to aggregate the time series, in order to speed up plotting.
                             By default, above 10000 data points the time series starts to
                             get aggregated by a factor of ten for each order of magnitude. 
            aggregate_by(int): a custom aggregation factor.
            color(str): the color of the time series in the plot. Only supported for univariate time series.
            height(int): force a plot height, in the time series data units.
-           interactive(bool): if to generate an interactive plot (default) or an image rendering. For the
-                              image rendering, an headless Chromium web browser is downloaded on the
-                              fly in order to render the plot as a PNG image.
-           save_to(str): a path where to save the plot. If the plot is generated as interactive, then it
-                         is saved as a self-consistent HTML page which can be opened in a web browser. If
-                         the plot is not generated as interactive, then it is saved as PNG image.
-           image_resolution(str): the image resolution for non interactive plots.
-           return_dygraph_html(bool): if to return the HTML code for the plot. Useful for embedding it
-                                      in a website or for generating an HTML page with more than one plot.
+           image(bool): if to generate an image rendering of the plot instead of the default interactive one.
+                        To generate the image rendering, an headless Chromium web browser is downloaded on the
+                        fly in order to render the plot as a PNG image.
+           image_resolution(str): the image resolution, if generating an image rendering of the plot.
+           html(bool): if to return the HTML code for the plot instead of generating an interactive or image one.
+                       Useful for embedding it in a website or for generating multi-plot HTML pages.
+           save_to(str): a file name (including its path) where to save the plot. If the plot is generated as 
+                         interactive, then it is saved as a self-consistent HTML page which can be opened in a 
+                         web browser. If the plot is generated as an image, then it is saved in PNG format.
     """
     # Credits: the interactive plot is based on the work here: https://www.stefaanlippens.net/jupyter-custom-d3-visualization.html.
 
     from IPython.display import display, Javascript, HTML, Image
     
-    if return_dygraph_html and not interactive:
-        raise ValueError('Setting return_dygraph_html=True is not compatible with interactive=False.')
+    if html and image:
+        raise ValueError('Setting both image and html to True is not supported.')
 
-    if return_dygraph_html and save_to:
-        raise ValueError('Setting return_dygraph_html=True is not compatible with setting a save_to value.')    
+    if html and save_to:
+        raise ValueError('Setting html=True is not compatible with setting a save_to value.')    
     
     if len(timeseries)==0:
         raise Exception('Cannot plot empty timeseries')
+   
+    if save_to:
+        if image:
+            if not save_to.endswith('.png'):
+                logger.warning('You are saving to "{}" in image (PNG) format, but the file name does not end with ".png"'.format(save_to))
+        else:
+            if not save_to.endswith('.html'):
+                logger.warning('You are saving to "{}" in interactive (HTML) format, but the file name does not end with ".html"'.format(save_to))
    
     if aggregate_by is None:
         # Set default aggregate_by if not explicitly set to something
@@ -340,6 +347,24 @@ def dygraphs_plot(timeseries, indexes=None, aggregate=None, aggregate_by=None, c
 
     #if show_data_reconstructed:
     #    show_data_loss=False
+
+    # Handle series data_indexes
+    if data_indexes == 'all':
+        # Plot all the series data_indexes
+        data_indexes_to_plot = timeseries._all_data_indexes()
+    elif data_indexes is None:
+        data_indexes_to_plot = []
+    else:
+        # Check that the data_indexes are of the right type and that are present in the series data_indexes
+        data_indexes_to_plot = []
+        if not isinstance(data_indexes, list):
+            raise TypeError('The "data_indexes" argument must be a list or the magic word "all" (got type "{}")'.format(data_indexes.__class__.__name__))
+        for index in data_indexes:
+            if not isinstance(index, str):
+                raise TypeError('The "data_indexes" list items must be string (got type "{}")'.format(index.__class__.__name__))
+            if not index in timeseries._all_data_indexes():
+                raise ValueError('The data index "{}" is not present in the series data indexes ({})'.format(index, timeseries._all_data_indexes()))
+            data_indexes_to_plot.append(index)
 
     # Checks
     if isinstance(timeseries, DataTimePointSeries):
@@ -416,8 +441,10 @@ function legendFormatter(data) {
       var g = data.dygraph;
 
       if (g.getOption('showLabelsOnHighlight') !== true) return '';
-
+      
+      var data_indexes = """+str(timeseries._all_data_indexes())+""";
       var sepLines = g.getOption('labelsSeparateLines');
+      var first_data_index = true;
       var html;
 
       if (typeof data.x === 'undefined') {
@@ -437,8 +464,12 @@ function legendFormatter(data) {
           // Add some initial stuff
           if (html !== '') html += sepLines ? '<br/>' : ' ';
           
-
-          if ((series.label=='data_reconstructed') || (series.label=='data_loss') || (series.label=='forecast') || (series.label=='anomaly')){
+          if (data_indexes.includes(series.label)){
+              // The following was used to inlcude the "indexes" word in the legend
+              /* if (first_data_index){
+                  html += "<span style='margin-left:15px'>indexes:</span>"
+                  first_data_index=false
+              }*/
               html += "<span style='margin-left:15px; background: " + series.color + ";'>&nbsp;" + series.labelHTML + "&nbsp</span>, ";
           }
           else {
@@ -493,7 +524,14 @@ function legendFormatter(data) {
         */
         
         //decoration = ' style="background-color: #fcf8b0"'
-        if ((series.label=='data_reconstructed') || (series.label=='data_loss') || (series.label=='forecast') || (series.label=='anomaly')){
+        if (data_indexes.includes(series.label)){
+            // The following was used to inlcude the "indexes" word in the legend
+            /*if (first_data_index){
+                // Remove last comma and space
+                html = html.substring(0, html.length - 2);
+                html += "<span style='margin-left:15px'>indexes:</span>"
+                first_data_index=false
+            }*/
             html += "<span" + decoration + "> <span style='background: " + series.color + ";'>&nbsp" + series.labelHTML + "&nbsp</span>:&#160;" + series.yHTML*100 + "%</span>, ";
         
         }
@@ -533,25 +571,9 @@ function legendFormatter(data) {
         labels = labels[0:-1]
     else:
         labels='value'
-
-    # Handle series indexes
-    if indexes is None:
-        # Plot alls eries indexes
-        indexes_to_plot = timeseries.indexes
-    else:
-        # Check that the indexes are of the right type and that are present in the series indexes
-        indexes_to_plot = []
-        if not isinstance(indexes, list):
-            raise TypeError('The "indexes" argument must be a list')
-        for index in indexes:
-            if not isinstance(index, str):
-                raise TypeError('The "indexes" list items must be string (got type "{}")'.format(index.__class__.__name__))
-            if not index in timeseries.indexes:
-                raise ValueError('The index "{}" is not present in the series indexes ({})'.format(index, timeseries.indexes))
-            indexes_to_plot.append(index)
     
     # Set index labels
-    for index in indexes_to_plot:
+    for index in data_indexes_to_plot:
         labels+=',{}'.format(index)
 
     # Handle series mark (as index)
@@ -562,7 +584,7 @@ function legendFormatter(data) {
     labels_list = ['Timestamp'] + labels.split(',')
 
     # Get series data in Dygraphs format (and aggregate if too much data and find global min and max)
-    global_min, global_max, dg_data = _to_dg_data(timeseries, indexes_to_plot, aggregate_by)
+    global_min, global_max, dg_data = _to_dg_data(timeseries, data_indexes_to_plot, aggregate_by)
     if height:
         global_max = height
     if global_max != global_min:
@@ -589,7 +611,7 @@ stepPlot: """+stepPlot_value+""",
 fillGraph: false,
 fillAlpha: 0.5,
 colorValue: 0.5,
-showRangeSelector: """+('true' if interactive else 'false')+""",
+showRangeSelector: """+('true' if not image else 'false')+""",
 //rangeSelectorHeight: 30,
 hideOverlayOnMouseOut: true,
 interactionModel: Dygraph.defaultInteractionModel,
@@ -650,7 +672,7 @@ animatedZooms: true,"""
      series: {"""
     
     # Data reconstructed index series
-    if 'data_reconstructed' in indexes_to_plot:
+    if 'data_reconstructed' in data_indexes_to_plot:
         dygraphs_javascript += """
        'data_reconstructed': {
          //customBars: false, // Does not work?
@@ -664,7 +686,7 @@ animatedZooms: true,"""
        },"""
     
     # Data loss index series
-    if 'data_loss' in indexes_to_plot:
+    if 'data_loss' in data_indexes_to_plot:
         # Add data loss special timeseries
         dygraphs_javascript += """
        'data_loss': {
@@ -680,7 +702,7 @@ animatedZooms: true,"""
        },"""
 
     # Data forecast index series
-    if 'forecast' in indexes_to_plot:
+    if 'forecast' in data_indexes_to_plot:
         dygraphs_javascript += """
        'forecast': {
          //customBars: false, // Does not work?
@@ -695,7 +717,7 @@ animatedZooms: true,"""
        },"""
 
     # Add anomaly index series
-    if 'anomaly' in indexes_to_plot:
+    if 'anomaly' in data_indexes_to_plot:
         dygraphs_javascript += """
         'anomaly': {
          //customBars: false, // Does not work?
@@ -722,7 +744,7 @@ animatedZooms: true,"""
        },"""
 
     # Add all non-index series to be included in the miniplot
-    for label in timeseries.data_keys():
+    for label in timeseries.data_labels():
         dygraphs_javascript += """
            '"""+str(label)+"""': {
              showInRangeSelector:true
@@ -733,7 +755,7 @@ animatedZooms: true,"""
      },"""
 
     # Force "original" Dygraph color if only one data series, or use custom color:          
-    if len(timeseries.data_keys()) <=1:
+    if len(timeseries.data_labels()) <=1:
         if color:
             dygraphs_javascript += """colors: ['"""+color+"""'],"""         
         else:
@@ -788,7 +810,7 @@ define('"""+graph_id+"""', ['dgenv'], function (Dygraph) {
     # By defualt we show the plot
     show_plot = True
 
-    if (not interactive) or save_to or return_dygraph_html:
+    if image or save_to or html:
 
         # Generate random UUID
         rnd_uuid=str(uuid.uuid4())
@@ -799,26 +821,26 @@ define('"""+graph_id+"""', ['dgenv'], function (Dygraph) {
         
         # Set destination file values
         if save_to:
-            if interactive:
+            if image:
+                # Dump as image
+                html_dest = '/tmp/{}.html'.format(rnd_uuid)
+                png_dest = save_to
+            else:
                 # Interactive, dump as html
                 html_dest = save_to
                 png_dest=None
-            else:
-                # Not interactive, dump as image
-                html_dest = '/tmp/{}.html'.format(rnd_uuid)
-                png_dest = save_to
         else:
-            if interactive:
-                # Will never get here, directly rendered in iPython
-                pass
-            else:
-                # Not interactive, dump as image
+            if image:
+                # Dump as image
                 html_dest = '/tmp/{}.html'.format(rnd_uuid)
                 png_dest = '/tmp/{}.png'.format(rnd_uuid)
+            else:
+                # Will never get here, directly rendered in iPython
+                pass
 
         # Start building HTML content
         html_content = ''
-        if not return_dygraph_html:
+        if not html:
             html_content += '<html><head>'
             with open(STATIC_DATA_PATH+'/js/dygraph-2.1.0.min.js') as dg_js_file:
                 html_content += '<script type="text/javascript">'+dg_js_file.read()+'</script>\n'
@@ -828,7 +850,7 @@ define('"""+graph_id+"""', ['dgenv'], function (Dygraph) {
             html_content += '<div style="height:36px; padding:0; margin-left:0px; margin-top:10px">\n'
         html_content += '<div id="{}" style="width:100%"></div></div>\n'.format(legend_div_id)
         html_content += '<div id="{}" style="width:100%; margin-right:0px"></div>\n'.format(graph_div_id)
-        if not return_dygraph_html:
+        if not html:
             html_content += '</body></html>\n'
         html_content += '<script>{}</script>\n'.format(dygraphs_javascript)
         
@@ -840,7 +862,7 @@ define('"""+graph_id+"""', ['dgenv'], function (Dygraph) {
             pass
         
         # Also render if not interactive mode
-        if not interactive:
+        if image:
 
             # Get OS and architecture
             _os = os.uname()[0]
@@ -874,15 +896,15 @@ define('"""+graph_id+"""', ['dgenv'], function (Dygraph) {
             if show_plot:
                 return (Image(filename=png_dest))
         
-        if return_dygraph_html:
+        if html:
             return html_content
         
         # Log 
         if save_to:
-            if interactive:
-                logger.info('Saved interactive plot in html format to "{}".'.format(html_dest))
+            if image:
+                logger.info('Saved image plot in PNG format to "{}"'.format(png_dest))
             else:
-                logger.info('Saved static plot in png format to "{}".'.format(png_dest))
+                logger.info('Saved interactive plot in HTML format to "{}"'.format(html_dest))
                     
     else:
 

@@ -110,7 +110,7 @@ class Forecaster(TimeSeriesParametricModel):
             model_values = []
             processed_samples = 0
     
-            for key in timeseries.data_keys():
+            for key in timeseries.data_labels():
                 
                 # If the model has no window, evaluate on the entire time series
                 if not self.data['window']:
@@ -336,7 +336,7 @@ class Forecaster(TimeSeriesParametricModel):
         
         # Add the forecast index
         for item in forecast_timeseries:
-            item.forecast = 0
+            item.data_indexes['forecast'] = 0
         
         # Call model forecasting logic
         try:
@@ -345,7 +345,7 @@ class Forecaster(TimeSeriesParametricModel):
                 forecast_timeseries.append(forecast_model_results)
             else:
                 for item in forecast_model_results:
-                    item.forecast = 1
+                    item.data_indexes['forecast'] = 1
                     forecast_timeseries.append(item)
 
         except NotImplementedError:
@@ -356,7 +356,7 @@ class Forecaster(TimeSeriesParametricModel):
                 forecast_model_results = self.forecast(timeseries = forecast_timeseries, n=1)
 
                 # Add forecasted index
-                forecast_model_results.forecast = 1
+                forecast_model_results.data_indexes['forecast'] = 1
 
                 # Add the forecast to the forecasts time series
                 forecast_timeseries.append(forecast_model_results)
@@ -442,7 +442,7 @@ class PeriodicAverageForecaster(Forecaster):
         
     def _fit(self, timeseries, window=None, periodicity=None, dst_affected=False, from_t=None, to_t=None, from_dt=None, to_dt=None):
 
-        if len(timeseries.data_keys()) > 1:
+        if len(timeseries.data_labels()) > 1:
             raise NotImplementedError('Multivariate time series are not yet supported')
 
         from_t, to_t = set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
@@ -468,7 +468,7 @@ class PeriodicAverageForecaster(Forecaster):
             logger.info('Using a window of "{}"'.format(periodicity))
             self.data['window'] = periodicity
 
-        for key in timeseries.data_keys():
+        for key in timeseries.data_labels():
             sums   = {}
             totals = {}
             processed = 0
@@ -502,7 +502,7 @@ class PeriodicAverageForecaster(Forecaster):
     def _predict(self, timeseries, n=1, forecast_start=None):
       
         # Univariate is enforced by the fit
-        key = self.data['data_keys'][0]
+        key = self.data['data_labels'][0]
       
         # Set forecast starting item
         if forecast_start is None:
@@ -578,7 +578,7 @@ Prophet is robust to missing data and shifts in the trend, and typically handles
 
     def _fit(self, timeseries, from_t=None, to_t=None, from_dt=None, to_dt=None):
 
-        if len(timeseries.data_keys()) > 1:
+        if len(timeseries.data_labels()) > 1:
             raise Exception('Multivariate time series are not yet supported')
 
         from fbprophet import Prophet
@@ -602,7 +602,7 @@ Prophet is robust to missing data and shifts in the trend, and typically handles
 
     def _predict(self, timeseries, n=1):
 
-        key = self.data['data_keys'][0]
+        key = self.data['data_labels'][0]
 
         # Prepare a dataframe with all the timestamps to forecast
         last_item    = timeseries[-1]
@@ -656,9 +656,9 @@ class ARIMAForecaster(Forecaster, ARIMAModel):
 
         import statsmodels.api as sm
 
-        if len(timeseries.data_keys()) > 1:
+        if len(timeseries.data_labels()) > 1:
             raise Exception('Multivariate time series require to have the key of the prediction specified')
-        key=timeseries.data_keys()[0]
+        key=timeseries.data_labels()[0]
                             
         data = array(timeseries.df[key])
         
@@ -675,7 +675,7 @@ class ARIMAForecaster(Forecaster, ARIMAModel):
         
     def _predict(self, timeseries, n=1):
 
-        key = self.data['data_keys'][0]
+        key = self.data['data_labels'][0]
 
         # Chack that we are applying on a time series ending with the same datapoint where the fit timeseries was
         if self.fit_timeseries[-1].t != timeseries[-1].t:
@@ -696,9 +696,9 @@ class AARIMAForecaster(Forecaster):
         
         import pmdarima as pm
 
-        if len(timeseries.data_keys()) > 1:
+        if len(timeseries.data_labels()) > 1:
             raise Exception('Multivariate time series require to have the key of the prediction specified')
-        key=timeseries.data_keys()[0]
+        key=timeseries.data_labels()[0]
                             
         data = array(timeseries.df[key])
 
@@ -728,7 +728,7 @@ class AARIMAForecaster(Forecaster):
 
     def _predict(self, timeseries, n=1):
 
-        key = self.data['data_keys'][0]
+        key = self.data['data_labels'][0]
 
         # Chack that we are applying on a time series ending with the same datapoint where the fit timeseries was
         if self.fit_timeseries[-1].t != timeseries[-1].t:
@@ -786,7 +786,7 @@ class LSTMForecaster(KerasModel, Forecaster):
             verbose=0
 
         # Data keys shortcut
-        data_keys = timeseries.data_keys()
+        data_labels = timeseries.data_labels()
 
         if normalize:
             # Set min and max
@@ -796,15 +796,15 @@ class LSTMForecaster(KerasModel, Forecaster):
             # Fix some debeatable behaviour (which is, that min and max return different things for univariate and multivariate data)
             # TODO: fix me!
             if not isinstance(min_values, dict):
-                min_values = {timeseries.data_keys()[0]:min_values}
+                min_values = {timeseries.data_labels()[0]:min_values}
             if not isinstance(max_values, dict):
-                max_values = {timeseries.data_keys()[0]:max_values}
+                max_values = {timeseries.data_labels()[0]:max_values}
             
             # Normalize data
             timeseries_normalized = timeseries.duplicate()
             for datapoint in timeseries_normalized:
-                for data_key in datapoint.data:
-                    datapoint.data[data_key] = (datapoint.data[data_key] - min_values[data_key]) / (max_values[data_key] - min_values[data_key])
+                for data_label in datapoint.data:
+                    datapoint.data[data_label] = (datapoint.data[data_label] - min_values[data_label]) / (max_values[data_label] - min_values[data_label])
         
             # Store normalization factors
             self.data['min_values'] = min_values
@@ -823,7 +823,7 @@ class LSTMForecaster(KerasModel, Forecaster):
         window_features = []
         for window_datapoints in window_datapoints_matrix:
             window_features.append(self.compute_window_features(window_datapoints,
-                                                                data_keys = data_keys,
+                                                                data_labels = data_labels,
                                                                 features=self.data['features']))
 
         # Obtain the number of features based on compute_window_features() output
@@ -869,29 +869,29 @@ class LSTMForecaster(KerasModel, Forecaster):
         else:
             normalize = True
             for datapoint in window_timeseries:
-                for data_key in datapoint.data:
-                    datapoint.data[data_key] = (datapoint.data[data_key] - self.data['min_values'][data_key]) / (self.data['max_values'][data_key] - self.data['min_values'][data_key])
+                for data_label in datapoint.data:
+                    datapoint.data[data_label] = (datapoint.data[data_label] - self.data['min_values'][data_label]) / (self.data['max_values'][data_label] - self.data['min_values'][data_label])
 
         # Compute window features
-        window_features = self.compute_window_features(window_timeseries, data_keys=self.data['data_keys'], features=self.data['features'])
+        window_features = self.compute_window_features(window_timeseries, data_labels=self.data['data_labels'], features=self.data['features'])
 
         # Perform the predict and set prediction data
         yhat = self.keras_model.predict(array([window_features]), verbose=verbose)
 
         predicted_data = {}
-        for i, data_key in enumerate(self.data['data_keys']):
+        for i, data_label in enumerate(self.data['data_labels']):
             
             # Get the prediction
             predicted_value_normalized = yhat[0][i]
         
             # De-normalize if we have to
             if normalize:
-                predicted_value = (predicted_value_normalized*(self.data['max_values'][data_key] - self.data['min_values'][data_key])) + self.data['min_values'][data_key]
+                predicted_value = (predicted_value_normalized*(self.data['max_values'][data_label] - self.data['min_values'][data_label])) + self.data['min_values'][data_label]
             else:
                 predicted_value = predicted_value_normalized
             
             # Append to prediction data
-            predicted_data[data_key] = predicted_value
+            predicted_data[data_label] = predicted_value
 
         # Return
         return predicted_data

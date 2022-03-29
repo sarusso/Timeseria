@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 #==========================
 
 def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_point_i, slot_prev_point_i, slot_next_point_i,
-                 unit, point_validity, timezone, fill_with, force_data_loss, fill_gaps, series_indexes, series_resolution,
+                 unit, point_validity, timezone, fill_with, force_data_loss, fill_gaps, series_data_indexes, series_resolution,
                  force_compute_data_loss, interpolation_method, operations=None):
     
     # Log. Note: if slot_first_point_i < slot_last_point_i, this means that the prev and next are outside the slot.
@@ -32,7 +32,7 @@ def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_poi
     # Support vars
     interval_duration = to_t-from_t
     data = {}
-    data_keys = series.data_keys()
+    data_labels = series.data_labels()
 
     # The prev can be None as lefts are included (edge case)
     if slot_prev_point_i is None:
@@ -96,10 +96,10 @@ def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_poi
                     raise ConsistencyException('Could not find any reconstructed point in a fully missing slot')
             else:
                 # Just create a point based on the series_dense_slice_extended weights (TODO: are we including the reconstructed?):
-                new_point_data = {data_key:0 for data_key in data_keys}
+                new_point_data = {data_label:0 for data_label in data_labels}
                 for point in series_dense_slice_extended:
-                    for data_key in data_keys:
-                        point.data[data_key] += point.data[data_key] * point.weight
+                    for data_label in data_labels:
+                        point.data[data_label] += point.data[data_label] * point.weight
                 new_point_t = (to_t - from_t) /2
                 series_dense_slice = DataTimePointSeries(DataTimePoint(t=new_point_t, data=new_point_data, tz=series.tz))
 
@@ -119,15 +119,15 @@ def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_poi
         
         # ...and assign them to the data value
         if isinstance(avgs, dict):
-            data = {key:avgs[key] for key in data_keys}
+            data = {key:avgs[key] for key in data_labels}
         else:
-            data = {data_keys[0]: avgs}
+            data = {data_labels[0]: avgs}
              
     #  Compute slot data
     elif target=='slot':
         
         if data_loss == 1 and fill_with:
-            for key in data_keys:
+            for key in data_labels:
                 for operation in operations:
                     data['{}_{}'.format(key, operation.__name__)] = fill_with
 
@@ -151,7 +151,7 @@ def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_poi
                     for result_key in operation_data:
                         data['{}_{}'.format(result_key, operation.__name__)] = operation_data[result_key]
                 else:
-                    data['{}_{}'.format(data_keys[0], operation.__name__)] = operation_data
+                    data['{}_{}'.format(data_labels[0], operation.__name__)] = operation_data
     
         if not data:
             raise Exception('No data computed at all?')
@@ -181,8 +181,8 @@ def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_poi
     else:
         raise ValueError('No idea how to create a new "{}"'.format(target))
 
-    # Handle indexes TODO: check math and everything here
-    for index in series_indexes:
+    # Handle data_indexes TODO: check math and everything here
+    for index in series_data_indexes:
 
         # Skip the data loss as it is recomputed with different logics
         if index == 'data_loss':
@@ -195,7 +195,7 @@ def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_poi
                 
                 # Get index value
                 try:
-                    index_value = getattr(point, index)
+                    index_value = point.data_indexes[index]
                 except:
                     pass
                 else:
@@ -204,7 +204,7 @@ def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_poi
                         index_total += index_value * point.weight
                         #logger.critical('%s@%s: %s * %s', index, point.dt, index_value, point.weight)
     
-            # Compute the new index value (if there were indexes not None)
+            # Compute the new index value (if there were data_indexes not None)
             if index_total_weights > 0:
                 
                 # Project (rescale/normalize), because we could have some points without the index at all
@@ -217,11 +217,8 @@ def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_poi
         else:
             new_element_index_value = None
             
-        # Set the index. Handle special case for data_reconstructed
-        if index == 'data_reconstructed':
-            setattr(new_element, '_data_reconstructed', new_element_index_value)
-        else:
-            setattr(new_element, index, new_element_index_value)                
+        # Set the index in the data indexes
+        new_element.data_indexes[index] = new_element_index_value
 
     # Return
     return new_element
@@ -354,7 +351,7 @@ class SlottedTransformation(Transformation):
         slot_end_dt = None
         process_ended = False
         slot_prev_point_i = None 
-        resampled_series = DataTimePointSeries() if target=='points' else DataTimeSlotSeries()
+        new_series = DataTimePointSeries() if target=='points' else DataTimeSlotSeries()
 
         # Set timezone
         timezone  = series.tz
@@ -364,8 +361,8 @@ class SlottedTransformation(Transformation):
         count = 0
         first = True
 
-        # Indexes & resolution shortcuts
-        series_indexes = series.indexes
+        # data_indexes & resolution shortcuts
+        series_data_indexes = series._all_data_indexes()
         series_resolution = series.resolution
         
         # Set operations if slots
@@ -474,35 +471,35 @@ class SlottedTransformation(Transformation):
                         # slot_last_point_i+1 is the "next" (and the index where we are at the moment)
                         logger.debug('This slot is closed: start=%s (%s) and end=%s (%s). Now computing it..', slot_start_t, slot_start_dt, slot_end_t, slot_end_dt)
                         
-                        # Compute the slot...
-                        computed_point = _compute_new(target = 'point' if target=='points' else 'slot',
-                                                      series = series,
-                                                      slot_first_point_i = slot_first_point_i,
-                                                      slot_last_point_i = slot_last_point_i ,                                                     
-                                                      slot_prev_point_i = slot_prev_point_i,
-                                                      slot_next_point_i = slot_next_point_i,
-                                                      from_t = slot_start_t,
-                                                      to_t = slot_end_t,
-                                                      unit = self.time_unit,
-                                                      point_validity = validity,
-                                                      timezone = timezone,
-                                                      fill_with = fill_with,
-                                                      force_data_loss = force_data_loss,
-                                                      fill_gaps = fill_gaps,
-                                                      series_indexes = series_indexes,
-                                                      series_resolution = series_resolution,
-                                                      force_compute_data_loss = True if first else False,
-                                                      interpolation_method=self.interpolation_method,
-                                                      operations = operations)
+                        # Compute the new item...
+                        new_item = _compute_new(target = 'point' if target=='points' else 'slot',
+                                                series = series,
+                                                slot_first_point_i = slot_first_point_i,
+                                                slot_last_point_i = slot_last_point_i ,                                                     
+                                                slot_prev_point_i = slot_prev_point_i,
+                                                slot_next_point_i = slot_next_point_i,
+                                                from_t = slot_start_t,
+                                                to_t = slot_end_t,
+                                                unit = self.time_unit,
+                                                point_validity = validity,
+                                                timezone = timezone,
+                                                fill_with = fill_with,
+                                                force_data_loss = force_data_loss,
+                                                fill_gaps = fill_gaps,
+                                                series_data_indexes = series_data_indexes,
+                                                series_resolution = series_resolution,
+                                                force_compute_data_loss = True if first else False,
+                                                interpolation_method=self.interpolation_method,
+                                                operations = operations)
                         
                         # Set first to false
                         if first:
                             first = False
                         
                         # .. and append results
-                        if computed_point:
-                            logger.debug('Computed point: %s',computed_point )
-                            resampled_series.append(computed_point)
+                        if new_item:
+                            logger.debug('Computed new item: %s',new_item )
+                            new_series.append(new_item)
 
                     # Create a new slot. This is where all the "conventional" time logic kicks-in, and where the time zone is required.
                     slot_start_t = slot_end_t
@@ -522,16 +519,23 @@ class SlottedTransformation(Transformation):
                 if point.dt >= to_dt:
                     process_ended = True
         
-        logger.info('Resampled %s DataTimePoints in %s DataTimePoints', count, len(resampled_series))
-        return resampled_series
+        if target == 'points':
+            logger.info('Resampled %s DataTimePoints in %s DataTimePoints', count, len(new_series))
+        else:
+            if isinstance(series, DataTimePointSeries):
+                logger.info('Aggregated %s DataTimePoints in %s DataTimeSlots', count, len(new_series))
+            else:
+                logger.info('Aggregated %s DataTimeSlots in %s DataTimeSlots', count, len(new_series))
+                
+        return new_series
 
 
 #==========================
-#  Resampler Transformation
+#   Resampler
 #==========================
 
 class Resampler(SlottedTransformation):
-    """Resampler transformation."""
+    """Resampling transformation."""
 
     def __init__(self, unit, interpolation_method='linear'):
 
@@ -552,11 +556,11 @@ class Resampler(SlottedTransformation):
 
 
 #==========================
-#  Slotter Transformation
+#   Aggregator
 #==========================
 
-class Slotter(SlottedTransformation):
-    """Slotter transformation."""
+class Aggregator(SlottedTransformation):
+    """Aggregation transformation."""
 
     def __init__(self, unit, operations=[avg], interpolation_method='linear'):
         
@@ -586,7 +590,7 @@ class Slotter(SlottedTransformation):
 
     def process(self, *args, **kwargs):
         kwargs['target'] = 'slots'
-        return super(Slotter, self).process(*args, **kwargs) 
+        return super(Aggregator, self).process(*args, **kwargs) 
 
 
 

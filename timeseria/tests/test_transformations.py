@@ -1,7 +1,7 @@
 import unittest
 import os
 from ..datastructures import DataTimePoint, DataTimePointSeries
-from ..transformations import Resampler, Slotter 
+from ..transformations import Resampler, Aggregator 
 from ..time import dt, s_from_dt, dt_from_str
 from ..units import TimeUnit
 
@@ -290,7 +290,7 @@ class TestResampler(unittest.TestCase):
         # TODO: is that what we want for the extremes?
 
 
-    def test_resampler_indexes(self):
+    def test_resampler_data_indexes(self):
         
         # Time series from 16:58:00 to 17:32:00 (Europe/Rome)
         series = DataTimePointSeries()
@@ -319,22 +319,22 @@ class TestResampler(unittest.TestCase):
                                   data = {'temperature': 154+i, 'humidity': 5},
                                   data_loss = data_loss)
             
-            # Add extra indexes as if something operated on the time series
-            point.anomaly = anomaly
-            point.forecast = forecast
-            point._data_reconstructed = data_reconstructed
+            # Add extra data_indexes as if something operated on the time series
+            point.data_indexes['data_reconstructed'] = data_reconstructed
+            point.data_indexes['anomaly'] = anomaly
+            point.data_indexes['forecast'] = forecast
             
             # Append
             series.append(point)
                 
-        # This is an indirect test of the series indexes. TODO: move it away.
-        self.assertEqual(series.indexes, ['data_reconstructed', 'data_loss', 'anomaly', 'forecast'])
+        # This is an indirect test of the series data_indexes. TODO: move it away.
+        self.assertEqual(series._all_data_indexes(), ['data_reconstructed', 'data_loss', 'anomaly', 'forecast'])
         
-        # Slot the time series
+        # Resample the time series
         resampled_series = Resampler('600s').process(series)        
 
-        # Check that we have all the indexes
-        self.assertEqual(resampled_series.indexes, ['data_reconstructed', 'data_loss', 'anomaly', 'forecast'])
+        # Check that we have all the data_indexes
+        self.assertEqual(resampled_series._all_data_indexes(), ['data_reconstructed', 'data_loss', 'anomaly', 'forecast'])
 
         #print('===========================================')
         #for i, item in enumerate(series):
@@ -344,26 +344,26 @@ class TestResampler(unittest.TestCase):
         #    print(item)
         #print('===========================================')
 
-        # Check indexes math
-        self.assertAlmostEqual(resampled_series[0].data_reconstructed, 0.4)
-        self.assertAlmostEqual(resampled_series[0].anomaly, 0.275)
-        self.assertAlmostEqual(resampled_series[0].forecast, 0)
+        # Check data_indexes math
+        self.assertAlmostEqual(resampled_series[0].data_indexes['data_reconstructed'], 0.4)
+        self.assertAlmostEqual(resampled_series[0].data_indexes['anomaly'], 0.275)
+        self.assertAlmostEqual(resampled_series[0].data_indexes['forecast'], 0)
         # TODO: data loss is computed by compute_data_loss and not exact. expected 0.46
         self.assertAlmostEqual(resampled_series[0].data_loss, 0.47)
         
-        self.assertAlmostEqual(resampled_series[1].data_reconstructed, 0)
-        self.assertAlmostEqual(resampled_series[1].anomaly, 0.7)
-        self.assertAlmostEqual(resampled_series[1].forecast, 0.65)
+        self.assertAlmostEqual(resampled_series[1].data_indexes['data_reconstructed'], 0)
+        self.assertAlmostEqual(resampled_series[1].data_indexes['anomaly'], 0.7)
+        self.assertAlmostEqual(resampled_series[1].data_indexes['forecast'], 0.65)
         # TODO: data loss is computed by compute_data_loss. Data losses not present are treated as zero. Are we sure? 
         self.assertAlmostEqual(resampled_series[1].data_loss, 0.04)
  
-        # Now resample at the same sampling interval and check indexes are still there
+        # Now resample at the same sampling interval and check data_indexes are still there
         same_resampled_series = series[0:5].resample(60)
-        self.assertEqual(same_resampled_series.indexes, ['data_reconstructed', 'data_loss', 'anomaly', 'forecast'])
+        self.assertEqual(same_resampled_series._all_data_indexes(), ['data_reconstructed', 'data_loss', 'anomaly', 'forecast'])
 
 
 
-class TestSlotter(unittest.TestCase):
+class TestAggregator(unittest.TestCase):
 
     def setUp(self):       
                 
@@ -445,7 +445,7 @@ class TestSlotter(unittest.TestCase):
     def test_slot(self):
           
         # Time series at 1m resolution from 14:58:00 to 15:32:00 (UTC), no from/to
-        series = Slotter('600s').process(self.series_1)        
+        series = Aggregator('600s').process(self.series_1)        
         self.assertEqual(len(series), 3)
         self.assertEqual(series[0].start.dt, dt_from_str('2015-07-04 15:00:00+00:00'))
         self.assertEqual(series[1].start.dt, dt_from_str('2015-07-04 15:10:00+00:00'))
@@ -453,7 +453,7 @@ class TestSlotter(unittest.TestCase):
           
         # Time series at 1m resolution from 14:58:00 to 15:32:00 (UTC), no from/to, extremes included.
         # Disabled as extremes included is at the moment not implemented
-        #series = Slotter('10m').process(self.series_1, include_extremes=True)
+        #series = Aggregator('10m').process(self.series_1, include_extremes=True)
         #self.assertEqual(len(series), 5)
         #self.assertEqual(series[0].start.dt, dt_from_str('2015-07-04 14:50:00+00:00'))
         #self.assertEqual(series[1].start.dt, dt_from_str('2015-07-04 15:00:00+00:00'))
@@ -464,7 +464,7 @@ class TestSlotter(unittest.TestCase):
  
         # Time series at 1m resolution from 14:58:00 to 17:32:00 (Europe/Rome), from 15:50 to 17:40
         # Disabled as it would require to include the extremes which is at the moment not implemented
-        #series = Slotter('10m').process(self.series_1,
+        #series = Aggregator('10m').process(self.series_1,
         #                            from_t = s_from_dt(dt_from_str('2015-07-04 14:50:00+00:00')),
         #                            to_t   = s_from_dt(dt_from_str('2015-07-04 15:40:00+00:00')))
         #self.assertEqual(len(series), 5)
@@ -476,7 +476,7 @@ class TestSlotter(unittest.TestCase):
 
         # Time series at 1m resolution from 14:58:00 to 15:32:00 (UTC), from 13:00 to 16:00
         # Disabled as it would require to include the extremes which is at the moment not implemented
-        #series = Slotter('10m').process(self.series_1,
+        #series = Aggregator('10m').process(self.series_1,
         #                            from_t = s_from_dt(dt_from_str('2015-07-04 13:00:00+00:00')),
         #                            to_t   = s_from_dt(dt_from_str('2015-07-04 16:00:00+00:00')))
         # Here from and to are capped with the time series data points
@@ -484,16 +484,16 @@ class TestSlotter(unittest.TestCase):
         #self.assertEqual(str(series[-1].start.dt), str('2015-07-04 15:30:00+00:00'))
 
         # Time series at 15m resolution from 01:00 to 06:00 (Europe/Rome), slot in 1h
-        series = Slotter('1h').process(self.series_6)
+        series = Aggregator('1h').process(self.series_6)
         self.assertEqual(len(series), 4)
         self.assertEqual(str(series[0].start.dt), str('2019-10-01 01:00:00+02:00'))
         self.assertEqual(str(series[1].start.dt), str('2019-10-01 02:00:00+02:00'))
         self.assertEqual(str(series[2].start.dt), str('2019-10-01 03:00:00+02:00'))
         self.assertEqual(str(series[3].start.dt), str('2019-10-01 04:00:00+02:00'))
  
-        # Test changing timezone of the series
-        self.series_6.tz = 'America/New_York'
-        series = Slotter('1h').process(self.series_6)
+        # Test with changing timezone of the series
+        self.series_6.change_timezone('America/New_York')
+        series = Aggregator('1h').process(self.series_6)
         self.assertEqual(len(series), 4)
         self.assertEqual(str(series[0].start.dt), str('2019-09-30 19:00:00-04:00'))
         self.assertEqual(str(series[1].start.dt), str('2019-09-30 20:00:00-04:00'))
@@ -501,7 +501,7 @@ class TestSlotter(unittest.TestCase):
         self.assertEqual(str(series[3].start.dt), str('2019-09-30 22:00:00-04:00'))
          
         # Time series from 2019,10,24,0,0,0 to 2019,10,31,0,0,0 (Europe/Rome), DST off -> 2 AM repeated
-        series = Slotter('1h').process(self.series_7)
+        series = Aggregator('1h').process(self.series_7)
         #print('=====================================')
         #for item in self.series_7:
         #    print(item)
@@ -517,7 +517,7 @@ class TestSlotter(unittest.TestCase):
         self.assertEqual(series[76].data['temperature_avg'],230.5)
 
         # Time series from 2019,10,24,0,0,0 to 2019,10,31,0,0,0 (Europe/Rome), DST off -> 2 AM repeated
-        series = Slotter('1D').process(self.series_7)
+        series = Aggregator('1D').process(self.series_7)
         self.assertEqual(len(series), 6)
         self.assertEqual(str(series[0].start.dt), str('2019-10-24 00:00:00+02:00'))
         self.assertEqual(str(series[-1].start.dt), str('2019-10-29 00:00:00+01:00')) # Last one not included as right excluded
@@ -534,12 +534,12 @@ class TestSlotter(unittest.TestCase):
         #for item in series: print(item)
         
         # This is a uplotting (upsampling), and there are data losses and strange values that should not be there.
-        slotter = Slotter('10m')
-        slotted_series = slotter.process(series)
-        self.assertEqual(len(slotted_series), 12)
+        aggregator = Aggregator('10m')
+        aggregated_series = aggregator.process(series)
+        self.assertEqual(len(aggregated_series), 12)
         
         #print('--------------------------------------------')
-        #for i, item in enumerate(slotted_series): print(i, item)
+        #for i, item in enumerate(aggregated_series): print(i, item)
         #print('============================================')
   
         # TODO: this is all wrong...
@@ -571,7 +571,7 @@ class TestSlotter(unittest.TestCase):
             series.append(point)
  
         # Add extra operations
-        slotted_series = Slotter('600s', operations=[avg, min,max]).process(series)
+        slotted_series = Aggregator('600s', operations=[avg, min,max]).process(series)
         self.assertAlmostEqual(slotted_series[0].data['temperature_min'], 156)
         self.assertAlmostEqual(slotted_series[0].data['temperature_max'], 165)
         self.assertAlmostEqual(slotted_series[0].data['temperature_avg'], 161)
@@ -580,7 +580,7 @@ class TestSlotter(unittest.TestCase):
         self.assertAlmostEqual(slotted_series[0].data['humidity_avg'], 5)
  
         # Entirely change the operation
-        slotted_series = Slotter('600s', operations=[sum]).process(series)
+        slotted_series = Aggregator('600s', operations=[sum]).process(series)
         # >>> (156*0.5)+157+158+159+160+161+162+163+164+165+(166*0.5)
         #1610.0
         #>>> 156+157+158+159+160+161+162+163+164+165
@@ -591,7 +591,7 @@ class TestSlotter(unittest.TestCase):
         self.assertEqual(slotted_series[1].data['humidity_sum'], 50)
  
         # Operations as string
-        slotted_series = Slotter('600s', operations=['avg','min',max]).process(series)    
+        slotted_series = Aggregator('600s', operations=['avg','min',max]).process(series)    
         self.assertAlmostEqual(slotted_series[0].data['temperature_min'], 156)
         self.assertAlmostEqual(slotted_series[0].data['temperature_max'], 165)
         self.assertAlmostEqual(slotted_series[0].data['temperature_avg'], 161)
@@ -609,7 +609,7 @@ class TestSlotter(unittest.TestCase):
                                       data = {'temperature': 154+i, 'humidity': 5})
                 series.append(point)
 
-        slotted_series = Slotter('600s', operations=[avg, min,max]).process(series)   
+        slotted_series = Aggregator('600s', operations=[avg, min,max]).process(series)   
         self.assertEqual(len(slotted_series), 3)
         
         self.assertAlmostEqual(slotted_series[0].data['humidity_min'], 5)
@@ -636,7 +636,7 @@ class TestSlotter(unittest.TestCase):
                                       data = {'temperature': 154+i, 'humidity': 5})
                 series.append(point)
 
-        slotted_series = Slotter('600s', operations=[avg, min,max]).process(series)
+        slotted_series = Aggregator('600s', operations=[avg, min,max]).process(series)
         self.assertEqual(len(slotted_series), 5)
   
         self.assertEqual(slotted_series[0].data['temperature_min'], 156)
@@ -647,7 +647,7 @@ class TestSlotter(unittest.TestCase):
         self.assertEqual(slotted_series[3].data['temperature_avg'], 191.0)
 
         # Re-slotting with the same time unit as the original points
-        slotted_series = Slotter('60s').process(series)
+        slotted_series = Aggregator('60s').process(series)
         # TODO: well.. tests it?
 
         # TODO: directly load a day-resolution time series in this test
@@ -655,11 +655,11 @@ class TestSlotter(unittest.TestCase):
         # TODO: well.. tests it?
 
         # TODO: upsampling (upslotting) not supported yet if missing data
-        #slotted_series = Slotter('60s').process(series)
-        #slotted_series = Slotter('30s').process(series)        
+        #slotted_series = Aggregator('60s').process(series)
+        #slotted_series = Aggregator('30s').process(series)        
         
 
-    def test_slot_indexes(self):
+    def test_slot_data_indexes(self):
         
         # Time series from 16:58:00 to 17:32:00 (Europe/Rome)
         series = DataTimePointSeries()
@@ -688,22 +688,22 @@ class TestSlotter(unittest.TestCase):
                                   data = {'temperature': 154+i, 'humidity': 5},
                                   data_loss = data_loss)
             
-            # Add extra indexes as if something operated on the time series
-            point.anomaly = anomaly
-            point.forecast = forecast
-            point._data_reconstructed = data_reconstructed
+            # Add extra data_indexes as if something operated on the time series
+            point.data_indexes['data_reconstructed'] = data_reconstructed
+            point.data_indexes['anomaly'] = anomaly
+            point.data_indexes['forecast'] = forecast
             
             # Append
             series.append(point)
                 
-        # This is an indirect test of the series indexes. TODO: move it away.
-        self.assertEqual(series.indexes, ['data_reconstructed', 'data_loss', 'anomaly', 'forecast'])
+        # This is an indirect test of the series data_indexes. TODO: move it away.
+        self.assertEqual(series._all_data_indexes(), ['data_reconstructed', 'data_loss', 'anomaly', 'forecast'])
         
         # Slot the time series
-        slotted_series = Slotter('600s').process(series)
+        slotted_series = Aggregator('600s').process(series)
 
-        # Check that we have all the indexes
-        self.assertEqual(slotted_series.indexes, ['data_reconstructed', 'data_loss', 'anomaly', 'forecast'])
+        # Check that we have all the data_indexes
+        self.assertEqual(slotted_series._all_data_indexes(), ['data_reconstructed', 'data_loss', 'anomaly', 'forecast'])
 
         #print('===========================================')
         #for i, item in enumerate(series):
@@ -713,18 +713,18 @@ class TestSlotter(unittest.TestCase):
         #    print(item)
         #print('===========================================')
 
-        # Check indexes math
-        self.assertAlmostEqual(slotted_series[0].anomaly, 0.0375)
-        self.assertAlmostEqual(slotted_series[0].data_reconstructed, 0.15)
-        self.assertAlmostEqual(slotted_series[0].forecast, 0)
+        # Check data_indexes math
+        self.assertAlmostEqual(slotted_series[0].data_indexes['anomaly'], 0.0375)
+        self.assertAlmostEqual(slotted_series[0].data_indexes['data_reconstructed'], 0.15)
+        self.assertAlmostEqual(slotted_series[0].data_indexes['forecast'], 0)
          
-        self.assertAlmostEqual(slotted_series[1].anomaly, 0.5676, 4)
-        self.assertAlmostEqual(slotted_series[1].data_reconstructed, 0.25)
-        self.assertAlmostEqual(slotted_series[1].forecast, 0.15)
+        self.assertAlmostEqual(slotted_series[1].data_indexes['anomaly'], 0.5676, 4)
+        self.assertAlmostEqual(slotted_series[1].data_indexes['data_reconstructed'], 0.25)
+        self.assertAlmostEqual(slotted_series[1].data_indexes['forecast'], 0.15)
  
-        self.assertEqual(slotted_series[2].anomaly, None)
-        self.assertAlmostEqual(slotted_series[2].data_reconstructed, 0)
-        self.assertEqual(slotted_series[2].forecast, 1)
+        self.assertEqual(slotted_series[2].data_indexes['anomaly'], None)
+        self.assertAlmostEqual(slotted_series[2].data_indexes['data_reconstructed'], 0)
+        self.assertEqual(slotted_series[2].data_indexes['forecast'], 1)
  
         # The following is re-computed from missing coverage only, and not marked as None.
         # See the compute_data_loss function fore more details and some more comments.

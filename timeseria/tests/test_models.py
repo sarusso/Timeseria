@@ -10,7 +10,7 @@ from ..models import ARIMAForecaster, AARIMAForecaster
 from ..models import LSTMForecaster
 from ..exceptions import NotFittedError, NonContiguityError
 from ..storages import CSVFileStorage
-from ..transformations import Slotter, Resampler
+from ..transformations import Resampler, Aggregator
 from ..time import dt
 
 # Setup logging
@@ -246,7 +246,7 @@ class TestReconstructors(unittest.TestCase):
             
         # Get test data        
         data_time_point_series = CSVFileStorage(TEST_DATA_PATH + '/csv/temperature.csv').get(limit=200)
-        data_time_slot_series = Slotter('3600s').process(data_time_point_series)
+        data_time_slot_series = Aggregator('3600s').process(data_time_point_series)
         
         # Instantiate
         prophet_reconstructor = ProphetReconstructor()
@@ -595,7 +595,7 @@ class TestAnomalyDetectors(unittest.TestCase):
         # Count how many anomalies were detected
         anomalies_count = 0
         for slot in result_time_series:
-            if slot.anomaly:
+            if slot.data_indexes['anomaly']:
                 anomalies_count += 1
         self.assertEqual(anomalies_count, 9)
 

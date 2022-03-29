@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Data storages."""
+"""Data storages, as the CSV file and SQLite database."""
 
 import os
 import datetime
@@ -7,7 +7,7 @@ from .utilities import detect_encoding, sanitize_string, is_list_of_integers, to
 from .units import TimeUnit
 from .datastructures import DataTimePoint, DataTimePointSeries, TimePointSeries, TimePoint, DataTimeSlot, DataTimeSlotSeries
 from .time import dt_from_str, dt_from_s, s_from_dt, timezonize, now_dt
-from .exceptions import NoDataException, FloatConversionError
+from .exceptions import NoDataException, FloatConversionError, ConsistencyException
 
 
 # Setup logging
@@ -16,48 +16,110 @@ logger = logging.getLogger(__name__)
 
 HARD_DEBUG = False
 
-POSSIBLE_TIMESTAMP_COLUMNS = ['timestamp', 'epoch']
+POSSIBLE_TIMESTAMP_labelS = ['timestamp', 'epoch']
 NO_DATA_PLACEHOLDERS = ['na', 'nan', 'null', 'nd', 'undef']
+DEFAULT_SLOT_DATA_LOSS = None
+
+
+#======================
+#  Base Storage class
+#======================
+class Storage(object):
+    """The base storage class. Can be implemented to store one or more time serieses. If storing more than
+    one, then the id of which serises to load must be provided in the ``get()`` and ``put()`` methods."""
+    
+    def get(self, *args, **kwargs):
+        raise NotImplementedError()
+    
+    def put(self, *args, **kwargs):
+        raise NotImplementedError()
 
 
 #======================
 #  CSV File Storage
 #======================
 
-class CSVFileStorage(object):
-    """A CSV file data storage."""
+class CSVFileStorage(Storage):
+    """A CSV file storage. Supports creating both point and slot time series.
     
-    def __init__(self, filename, timestamp_column='auto', timestamp_format='auto',
-                 time_column=None, time_format=None, date_column=None, date_format=None,
-                 tz='UTC', data_columns='all', data_type='auto', series_type='auto', sort=False,
-                 separator=',', newline='\n', encoding='auto', skip_errors=False, silence_errors=True):
-        """Ref to https://docs.python.org/3/library/datetime.html#strftime-and-strptime-format-codes
-        for timestamp_format, date_format and time_format"""
+    The file encoding, the series type and the tiemstamp columns are all auto-detect with an heuristic approach
+    by defaaul, and asked to be set by ony if the euristic fails. In particular, wether to create point or solot
+    series is based on the sampling interval automatically detected: if this is above 24 hours, then slots are used.
+    
+    The header with the column labels is optional, and if not present the column numbers are used as labels.
+    Comments in the CSV file are supported Comments in the CSV file only as full-line coments, where the line starts
+    with one of the charatchers listed as comment characheter (``#`` and ``;`` by default).
+    
+    The ``timestamp_format``, ``date_format`` and ``time_format`` arguments can be set using Python strptime format codes
+    (https://docs.python.org/3/library/datetime.html#strftime-and-strptime-format-codes), but the ``timestamp_format``
+    also supports two special formats:
+    
+        * ``epoch``: the epoch timestamp, intended as the number of seconds from the 1st January 1970 UTC with decimals for sub-second precision.
+        * ``iso8601``: the ISO 8601 timestamp format (see https://www.w3.org/TR/NOTE-datetime)
+    
+    Data can be simply comma-separated (or using a custom separator) as well as single or double quoted, check out the RFC4180
+    (https://datatracker.ietf.org/doc/html/rfc4180) for more details on the CSV file format specification.
+    
+    Args:
+        filename: the file name (including its path).  
+        timestamp_label: the column label to be used as timestamp. Either use this or the time_label and/or date_label parameters.
+        timestamp_format: the timestamp column format.
+        time_label: the column label to be used as the time part of the timestamp.
+        time_format: the time column format.
+        date_label: the column label to be used as the date part of the timestamp.
+        date_format: the date column format. 
+        tz: the time zone on which to create the time series on.
+        data_labels: the column labels to be used as data by default. Excpected as a list of 
+                     strings or list of integers, in which case are treated as column numbers.
+        data_type: the data type (``list`` or ``dict``), set automatically by default.
+        series_type: the default type of the series, if ``points`` or ``slots``. Automatically set by default.
+        sort: if to sort the data file before creating the series.
+        separator: the separator for the records (fields), ``,`` by default.
+        newline: the newline charachter, ``\\n`` by default.
+        comment_chars: the charachters used to mark a comment line. Defaulted to ``#`` and ``;``. 
+        encoding: the encoding of the file, automatically detected by default.
+        skip_errors: if to skip errors or raise an exception.
+        silence_errors: if to completely silence errors when skipping them or not.     
+    """
+    
+    def __init__(self, filename, timestamp_label='auto', timestamp_format='auto',
+                 time_label=None, time_format=None, date_label=None, date_format=None,
+                 tz='UTC', data_labels='all', data_type='auto', series_type='auto', sort=False,
+                 separator=',', newline='\n', comment_chars = ['#', ';'],  encoding='auto',
+                 skip_errors=False, silence_errors=False):
 
-
-        # Handle setting a time column
-        if time_column or date_column:
-            if timestamp_column == 'auto':
-                timestamp_column = None
-
-        # Sanity checks
-        if timestamp_column is None and time_column is None and date_column is None and not data_columns:
+        # Parameters sanity checks and adjustments
+        if timestamp_label is None and time_label is None and date_label is None and not data_labels:
             raise ValueError('No timestamp column, time column, date column or data columns provided, cannot get anything from this CSV file')
 
-        if timestamp_column and (time_column or date_column):
+        if timestamp_label != 'auto' and (time_label or date_label):
             raise ValueError('Got both timestamp column and time/date columns, choose which approach to use.')
 
-        if timestamp_column is not None and not isinstance(timestamp_column, int) and not isinstance(timestamp_column, str):
-            raise ValueError('timestamp_column argument must be either integer or string (got "{}")'.format(timestamp_column.__class__.__name__))
+        if timestamp_label is not None and not isinstance(timestamp_label, int) and not isinstance(timestamp_label, str):
+            raise ValueError('timestamp_label argument must be a string (or integer for coulmn number) (got "{}")'.format(timestamp_label.__class__.__name__))
 
-        if time_column is not None and not isinstance(time_column, int) and not isinstance(time_column, str):
-            raise ValueError('time_column argument must be either integer or string (got "{}")'.format(time_column.__class__.__name__))
+        if time_label is not None:
+            if not isinstance(time_label, int) and not isinstance(time_label, str):
+                raise ValueError('time_label argument must be a string (or integer for coulmn number) (got "{}")'.format(time_label.__class__.__name__))
+            if not time_format:
+                raise ValueError('If giving a time_label, a time_format is required as well')
+            
+            # Disble the timestamp label if a time (or date) label is set
+            timestamp_label = None
+            timestamp_format = None
 
-        if date_column is not None and not isinstance(date_column, int) and not isinstance(date_column, str):
-            raise ValueError('date_column argument must be either integer or string (got "{}")'.format(date_column.__class__.__name__))
+        if date_label is not None:
+            if not isinstance(date_label, int) and not isinstance(date_label, str):
+                raise ValueError('date_label argument must be a string (or integer for coulmn number) (got "{}")'.format(date_label.__class__.__name__))
+            if not date_format:
+                raise ValueError('If giving a date_label, a date_format is required as well')
+ 
+            # Disble the timestamp label if a date (or time) label is set
+            timestamp_label = None
+            timestamp_format = None           
 
-        if data_columns != 'all' and not isinstance(data_columns, list):
-            raise ValueError('data_columns argument must be a list (got "{}")'.format(data_columns.__class__.__name__))
+        if data_labels != 'all' and not isinstance(data_labels, list):
+            raise ValueError('data_labels argument must be a list (got "{}")'.format(data_labels.__class__.__name__))
 
         # File & encoding
         self.filename = filename
@@ -66,26 +128,26 @@ class CSVFileStorage(object):
         else:
             self.encoding = encoding
 
-        # Time
-        if timestamp_column:
-            # We use "time" also for the timestamp. TODO: unroll this?
-            self.time_column = timestamp_column
-            self.time_format = timestamp_format  
-        else:
-            self.time_column = time_column
-            self.time_format = time_format
-        self.date_column = date_column
-        self.date_format = date_format 
+        # Set time parameters
+        self.timestamp_label = timestamp_label
+        self.timestamp_format = timestamp_format
+        
+        self.date_label = date_label
+        self.date_format = date_format        
+        
+        self.time_label = time_label
+        self.time_format = time_format
         
         # Time zone
         self.tz = tz   
         
-        # Data
-        self.data_columns = data_columns
+        # Data TODO: allow for columns mapping here? i.e data_labels = {1:'flow',2:'temperature'}
+        self.data_labels = data_labels
         
-        # Separator and newline chars
+        # Separator, newline and comment chars
         self.separator = separator
         self.newline = newline
+        self.comment_chars = comment_chars
 
         # Other
         self.skip_errors = skip_errors
@@ -97,7 +159,28 @@ class CSVFileStorage(object):
         self.series_type = series_type
 
 
-    def get(self, limit=None, as_tz=None, as_series_type=None):
+    def get(self, limit=None, as_tz=None, as_points=None, as_slots=None, data_labels='all', data_label=None):
+        """Get the data out from the CSV file.
+
+        Args:
+            limit: a row number limit.  
+            as_tz: force a specific time zone.
+            as_points: force generating points.
+            as_slots: force generating slots.
+            data_labels: get only specific data labels.
+            data_label: get only a specific data label.
+        """
+        
+        
+        # TODO: add from_dt / to_dt /from_t / to_t. Cfr series.filter()
+
+        # Sanity checks
+        if as_points and as_slots:
+            raise ValueError('Got both as_points and as_slots, set only one or none')
+
+        # Use the data label if given
+        if data_label is not None:
+            data_labels=[data_label]
 
         # Line counter
         line_number=0
@@ -106,11 +189,15 @@ class CSVFileStorage(object):
         column_indexes = None
         column_labels = None
         
-        time_column_index = None
-        date_column_index = None
+        timestamp_label_index = None
+        time_label_index = None
+        date_label_index = None
         
-        data_column_indexes = None
-        data_column_labels = None
+        data_label_indexes = None
+        data_label_names = None
+        
+        # Data type
+        data_type = None
 
         # Detect encoding if not set
         if not self.encoding:
@@ -136,8 +223,7 @@ class CSVFileStorage(object):
                 #    continue 
                                 
                 # Is this line a comment? 
-                comment_chars = ['#', ';'] 
-                if line[0] in comment_chars:
+                if line[0] in self.comment_chars:
                     logger.debug('Skipping line "%s" as marked as comment line', line)
                     continue
 
@@ -183,168 +269,225 @@ class CSVFileStorage(object):
                 #  Time part
                 #====================
 
-                # Set time column index if not already done
-                if time_column_index is None:
-                    if self.time_column=='auto':
+                # Set timestamp column index if not already done
+                if self.timestamp_label is not None and timestamp_label_index is None:
+                    if self.timestamp_label=='auto':
                         # TODO: improve this auto-detect: try different column names and formats.
                         #       Maybe, fix position as the first element for the timestamp.
                         if column_labels:
-                            for posssible_time_column_name in POSSIBLE_TIMESTAMP_COLUMNS:
-                                if posssible_time_column_name in column_labels:
-                                    time_column_index = column_labels.index(posssible_time_column_name)
-                                    self.time_column = posssible_time_column_name
+                            for posssible_timestamp_label_name in POSSIBLE_TIMESTAMP_labelS:
+                                if posssible_timestamp_label_name in column_labels:
+                                    timestamp_label_index = column_labels.index(posssible_timestamp_label_name)
+                                    self.timestamp_label = posssible_timestamp_label_name
                                     break                                
-                            if time_column_index is None:
+                            if timestamp_label_index is None:
                                 #raise Exception('Cannot auto-detect timestamp column') 
-                                time_column_index = 0
+                                timestamp_label_index = 0
                         else:
-                            time_column_index = 0
+                            timestamp_label_index = 0
                         # TODO: Try to convert to timestamp here?
                     else:
-                        if isinstance(self.time_column, int):
-                            time_column_index = self.time_column
+                        if isinstance(self.timestamp_label, int):
+                            timestamp_label_index = self.timestamp_label
                         else:
-                            if self.time_column in column_labels:
-                                time_column_index = column_labels.index(self.time_column)
+                            if self.timestamp_label in column_labels:
+                                timestamp_label_index = column_labels.index(self.timestamp_label)
                             else:
-                                raise Exception('Cannot find requested time column "{}" in labels (got "{}")'.format(self.time_column, column_labels))                             
-                    logger.debug('Set time column index = "%s"', time_column_index)
-
-                # Set date column index if required and not already done
-                if self.date_column is not None and date_column_index is None:
-                    if isinstance(self.date_column, int):
-                        date_column_index = self.date_column
+                                if self.timestamp_label is not None:
+                                    raise Exception('Cannot find requested timestamp column "{}" in labels (got "{}")'.format(self.timestamp_label, column_labels))                             
+                                elif self.timestamp_label is not None:
+                                    raise Exception('Cannot find requested time column "{}" in labels (got "{}")'.format(self.timestamp_label, column_labels))                             
+                                else:
+                                    pass
+                    logger.debug('Set time column index = "%s"', timestamp_label_index)
+                    
+                # Set time column index if required and not already done
+                if self.time_label is not None and time_label_index is None:
+                    if isinstance(self.time_label, int):
+                        time_label_index = self.time_label
                     else:
-                        if self.date_column in column_labels:
-                            date_column_index = column_labels.index(self.date_column)
+                        if self.time_label in column_labels:
+                            time_label_index = column_labels.index(self.time_label)
                         else:
-                            raise Exception('Cannot find requested time column "{}" in labels (got "{}")'.format(self.time_column, column_labels))                             
-                    logger.debug('Set date column index = "%s"', date_column_index)
+                            raise Exception('Cannot find requested time column "{}" in labels (got "{}")'.format(self.time_label, column_labels))                             
+                    logger.debug('Set date column index = "%s"', time_label_index)                    
+                    
+                # Set date column index if required and not already done
+                if self.date_label is not None and date_label_index is None:
+                    if isinstance(self.date_label, int):
+                        date_label_index = self.date_label
+                    else:
+                        if self.date_label in column_labels:
+                            date_label_index = column_labels.index(self.date_label)
+                        else:
+                            raise Exception('Cannot find requested time column "{}" in labels (got "{}")'.format(self.time_label, column_labels))                             
+                    logger.debug('Set date column index = "%s"', date_label_index)
 
+                # If all the three of timestamp_label_index, time_label_index and date_label_index are None, there is something wrong:
+                if timestamp_label_index is None and time_label_index is None and date_label_index is None:
+                    raise ConsistencyException('Could not set timestamp_label_index nor time_label_index nor date_label_index, somehting wrong happened.')
 
-                # Time part
-                time_part=''
-                if time_column_index is not None:
-                    time_part = sanitize_string(line_items[time_column_index],NO_DATA_PLACEHOLDERS)
+                # Ok,now get the timestamp as string
+                if timestamp_label_index is not None:
+                    # Just use the Timestamp column
+                    timestamp = sanitize_string(line_items[timestamp_label_index],NO_DATA_PLACEHOLDERS)
 
-
-                # Date part
-                date_part=''
-                if date_column_index is not None:
-                    date_part = sanitize_string(line_items[date_column_index],NO_DATA_PLACEHOLDERS)
-                                   
-                # Assemble timestamp
-                if self.date_column is not None:
-                    timestamp = date_part + '\t' + time_part
                 else:
-                    timestamp = time_part
-                  
+                    # Time part
+                    time_part=None
+                    if time_label_index is not None:
+                        time_part = sanitize_string(line_items[time_label_index],NO_DATA_PLACEHOLDERS)
+    
+                    # Date part
+                    date_part=None
+                    if date_label_index is not None:
+                        date_part = sanitize_string(line_items[date_label_index],NO_DATA_PLACEHOLDERS)
+                                       
+                    # Assemble timestamp
+                    if time_part is not None and date_part is not None:
+                        timestamp = date_part + '\t' + time_part
+                    elif date_part is None:
+                        timestamp = time_part
+                    elif time_part is None:
+                        timestamp = date_part
+                    else:
+                        raise ConsistencyException('Got both time_part and date_part as None, somehting wrong happened.')
+                      
                 # Convert timestamp to epoch seconds
                 logger.debug('Will process timestamp "%s"', timestamp)
                 try:
                     
-                    if self.time_format == 'auto':
-                        logger.debug('Auto-detecting timestamp format')
-
-                        # Is this an epoch?
-                        try:
-                            t = float(timestamp)
-                            logger.debug('Auto-detected timestamp format: epoch')
-                            self.time_format = 'epoch'
-                        except:
-                            try:
-                                # is this an iso8601?
-                                t = s_from_dt(dt_from_str(timestamp))
-                                logger.debug('Auto-detected timestamp format: iso8601')
-                                self.time_format = 'iso8601'
-                            except:
-                                raise Exception('Cannot auto-detect timestamp format (got "{}")'.format(timestamp)) from None
+                    # Both time and date labels
+                    if self.time_label is not None and self.date_label is not None:
+                        dt = datetime.datetime.strptime(timestamp, self.date_format + '\t' + self.time_format)
+                        t = s_from_dt(dt)
                     
-                    elif self.time_format == 'epoch':
-                        t = float(timestamp)
+                    # Only date label
+                    elif self.date_label is not None:
+                        dt = datetime.datetime.strptime(timestamp, self.date_format)
+                        t = s_from_dt(dt)                        
 
-                    elif self.time_format == 'iso8601':
-                        t = s_from_dt(dt_from_str(timestamp))
+                    # Only time label (TODO: does this make sense?)
+                    elif self.time_label is not None:
+                        dt = datetime.datetime.strptime(timestamp, self.time_format)
+                        t = s_from_dt(dt)    
                     
+                    # Use the timestamp label and format
                     else:
-                        if self.date_column is not None:
-                            dt = datetime.datetime.strptime(timestamp, self.date_format + '\t' + self.time_format)
-                            t = s_from_dt(dt)
-                        else:
-                            dt = datetime.datetime.strptime(timestamp, self.time_format)
-                            t = s_from_dt(dt)
+                        
+                        # Autodetect?
+                        if self.timestamp_format == 'auto':
+                            logger.debug('Auto-detecting timestamp format')
     
-                        if not dt.tzinfo:
-                            # TODO: we should not do this check here, but above.
-                            # Also maybe is not necessary at all if s_from_dt accepts timezone-unaware datetimes.
-                            import pytz
-                            dt = pytz.timezone('UTC').localize(dt)
-                            #t = s_from_dt(dt)
+                            # Is this an epoch?
+                            try:
+                                t = float(timestamp)
+                                logger.debug('Auto-detected timestamp format: epoch')
+                                self.timestamp_format = 'epoch'
+                            except:
+                                try:
+                                    # is this an iso8601?
+                                    t = s_from_dt(dt_from_str(timestamp))
+                                    logger.debug('Auto-detected timestamp format: iso8601')
+                                    self.timestamp_format = 'iso8601'
+                                except:
+                                    raise Exception('Cannot auto-detect timestamp format (got "{}")'.format(timestamp)) from None
+                        
+                        # Epoch format?
+                        elif self.timestamp_format == 'epoch':
+                            t = float(timestamp)
+    
+                        # ISO8601 fromat?
+                        elif self.timestamp_format == 'iso8601':
+                            t = s_from_dt(dt_from_str(timestamp))
+                        
+                        # Custom format?
+                        else:
+                            dt = datetime.datetime.strptime(timestamp, self.timestamp_format)
+                            t = s_from_dt(dt)    
+
                 except Exception as e:
                     if self.skip_errors:
                         logger.debug('Cannot parse timestamp "%s" (%s) in line #%s, skipping the line.', timestamp, e, line_number)
                         continue
                     else:
-                        raise Exception('Cannot parse timestamp "{}" ({}) in line #%{}, aborting. Set "skip_errors=True" to drop them instead.'.format(timestamp, e, line_number)) from None
+                        raise ValueError('Cannot parse timestamp "{}" ({}) in line #%{}, aborting. Set "skip_errors=True" to drop them instead.'.format(timestamp, e, line_number)) from None
 
                 #====================
                 #  Data part
                 #====================
                 
-                if data_column_indexes is None:
+                if data_label_indexes is None:
+                    
+                    # If the requested data labels are all o the (default) ones, use the internal value
+                    if data_labels == 'all':
+                        data_labels = self.data_labels
                     
                     # Do we have to select only some data columns?
-                    if self.data_columns != 'all':
+                    if data_labels != 'all':
                         
-                        if is_list_of_integers(self.data_columns):
+                        if is_list_of_integers(data_labels):
                             # Case where we have been given a list of integers
-                            data_column_indexes =  self.data_columns
+                            data_label_indexes = data_labels
                             self.data_type = list
 
                         else:
                             # Case where we have been given a list of labels
                             if not column_labels:
                                 raise Exception('You asked for data column labels but there are no labels in this CSV file')
-                            data_column_indexes = []
-                            for data_column in self.data_columns:
-                                if data_column not in column_labels:
-                                    raise Exception('Cannot find data column "{}" in CSV columns "{}"'.format(data_column, column_labels))
+                            data_label_indexes = []
+                            for data_label in data_labels:
+                                if data_label not in column_labels:
+                                    raise Exception('Cannot find data column "{}" in CSV columns "{}"'.format(data_label, column_labels))
                                 # What is the position of this requested data column in the CSV columns?
-                                data_column_indexes.append(column_labels.index(data_column))
+                                data_label_indexes.append(column_labels.index(data_label))
 
                     else:
                         # Case where we have to automatically set data column indexes to include all data columns
                         
-                        # Initialize the data_column_indexes equal to the column_indexes
-                        data_column_indexes = column_indexes
+                        # Initialize the data_label_indexes equal to the column_indexes
+                        data_label_indexes = column_indexes
                         
-                        # Remove time and date indexes from the data_column_indexes
-                        if time_column_index is not None:
-                            data_column_indexes.remove(time_column_index)
-                        
-                        if date_column_index is not None:
-                            data_column_indexes.remove(date_column_index)
-
-                    # Ok, now based on the data_column_indexes fill the data_column_labels if we have column labels
-                    if column_labels:
-                        data_column_labels=[]
-                        for data_column_index in data_column_indexes:
-                            data_column_labels.append(column_labels[data_column_index])
+                        # Remove timestamp, time and date indexes from the data_label_indexes
+                        if timestamp_label_index is not None:
+                            data_label_indexes.remove(timestamp_label_index)
                             
-                    logger.debug('Set data_column_indexes="%s" and data_column_labels="%s"', data_column_indexes, data_column_labels)
+                        if time_label_index is not None:
+                            data_label_indexes.remove(time_label_index)
+                        
+                        if date_label_index is not None:
+                            data_label_indexes.remove(date_label_index)
 
+                    # Ok, now based on the data_label_indexes fill the data_label_names if we have column labels
+                    if column_labels:
+                        data_label_names=[]
+                        for data_label_index in data_label_indexes:
+                            data_label_names.append(column_labels[data_label_index])
+                            
+                    logger.debug('Set data_label_indexes="%s" and data_label_names="%s"', data_label_indexes, data_label_names)
+
+                # Set data type
+                if not data_type:
+                    if data_label_names and len(data_label_names) > 1 and self.data_type == float:
+                        raise Exception('Requested data format as float but got more than 1 value')
+                    if self.data_type=='auto':
+                        if not data_label_names:
+                            data_type = list
+                        else:
+                            data_type = dict
+                    else:
+                        data_type = self.data_type
 
                 # Set data
                 try:
-                    if data_column_labels and len(data_column_labels) > 1 and self.data_type == float:
-                        raise Exception('Requested data format as float but got more than 1 value')
-                    if self.data_type == float:
-                        data = to_float(line_items[data_column_indexes[0]],NO_DATA_PLACEHOLDERS)
-                    elif self.data_type == list or not data_column_labels:
-                        data = [to_float(line_items[index],NO_DATA_PLACEHOLDERS) for index in data_column_indexes]
-                    else:
-                        data = {column_labels[index]: to_float(line_items[index],NO_DATA_PLACEHOLDERS,column_labels[index]) for index in data_column_indexes}
-               
+                    
+                    if data_type == float:
+                        data = to_float(line_items[data_label_indexes[0]],NO_DATA_PLACEHOLDERS)
+                    elif data_type == list:
+                        data = [to_float(line_items[index],NO_DATA_PLACEHOLDERS) for index in data_label_indexes]
+                    elif data_type == dict:
+                        data = {column_labels[index]: to_float(line_items[index],NO_DATA_PLACEHOLDERS,column_labels[index]) for index in data_label_indexes}
+                
                 # TODO: here we drop the entire line. Instead, should we use a "None" and allow "Nones" in the DataPoints data? 
                 except FloatConversionError as e:
                     if self.skip_errors:
@@ -383,15 +526,20 @@ class CSVFileStorage(object):
         autodetect_series_type = False
 
         # Set series type
-        if not as_series_type and self.series_type != 'auto':
-            # Use the object one
-            series_type = self.series_type
-        elif as_series_type != 'auto':
-            # Use this one
-            series_type = as_series_type
+        if as_points:
+            # Were we requested to generate points?
+            series_type = 'points'
+        elif as_slots:
+            # Were we requested to generate slots?
+            series_type = 'slots'
         else:
-            # Go in auto mode
-            series_type = None
+            # Do we have a series type set?     
+            if self.series_type != 'auto':
+                # Use the object one
+                series_type = self.series_type
+            else:
+                # Go in auto mode
+                series_type = None
             
         # Otherwise, auto-detect
         if not series_type or series_type=='slots':
@@ -496,30 +644,20 @@ class CSVFileStorage(object):
             
             for item in items:
                 try:
-                    data_loss = None
-                    indexes = None
-                    if isinstance (item[1], dict):
-                        # Handle indexes and special data loss case
-                        indexes = {}
+                    # Handle data_indexes (including the data_loss)
+                    data_indexes = None
+                    if isinstance (item[1], dict):      
+                        data_indexes = {}
                         for key in item[1]:
                             if key.startswith('__'):
-                                if key=='__data_loss':
-                                    data_loss = item[1][key]
-                                else:
-                                    indexes[key] = item[1][key]
-                                    
-                        # Remove indexes and data loss from item data
-                        for index in indexes:       
+                                data_indexes[key] = item[1][key]
+                        # Remove data_indexes from item data 
+                        for index in data_indexes:       
                             item[1].pop(index)
-                        item[1].pop('__data_loss',None)   
                                 
-                    # Create DataTimePoint, set data loss and set indexes
-                    data_time_point = DataTimePoint(t=item[0], data=item[1], data_loss=data_loss, tz=tz)
-                    if indexes:
-                        for index in indexes: 
-                            # Set index. The [2:] removes the two trailing underscores
-                            setattr(data_time_point, index[2:], indexes[index])
-                            
+                    # Create DataTimePoint, set data and data_indexes
+                    data_time_point = DataTimePoint(t=item[0], data=item[1], data_indexes=data_indexes, tz=tz)
+
                     # Append
                     timeseries.append(data_time_point)
 
@@ -535,29 +673,24 @@ class CSVFileStorage(object):
             
             for i, item in enumerate(items):
                 try:
-                    data_loss = 0
-                    if isinstance (item[1], dict):
-                        # Handle indexes and special data loss case
-                        indexes = {}
+                    # Handle data_indexes (including the data_loss)
+                    data_indexes = None
+                    if isinstance (item[1], dict):      
+                        data_indexes = {}
                         for key in item[1]:
                             if key.startswith('__'):
-                                if key=='__data_loss':
-                                    data_loss = item[1][key]
-                                else:
-                                    indexes[key] = item[1][key]
-                                    
-                        # Remove indexes and data loss from item data
-                        for index in indexes:       
+                                data_indexes[key] = item[1][key]
+                        # Remove data_indexes from item data 
+                        for index in data_indexes:       
                             item[1].pop(index)
-                        item[1].pop('__data_loss',None)     
-                            
-                    # Create DataTimeSlot, set data loss and set indexes
-                    data_time_slot = DataTimeSlot(t=item[0], unit=unit, data=item[1], data_loss=data_loss, tz=tz)
-                    if indexes:
-                        for index in indexes: 
-                            # Set index. The [2:] removes the two trailing underscores
-                            setattr(data_time_slot, index[2:], indexes[index])
-                            
+                    
+                    if DEFAULT_SLOT_DATA_LOSS is not None and 'data_loss' not in data_indexes:
+                        data_indexes['data_loss'] = DEFAULT_SLOT_DATA_LOSS
+                                                
+                    # Create DataTimeSlot, set data and data_indexes
+                    data_time_slot = DataTimeSlot(t=item[0], unit=unit, data=item[1], data_indexes=data_indexes, tz=tz)
+                    
+                    # Append
                     timeseries.append(data_time_slot)
                     
                 except ValueError as e:
@@ -571,9 +704,9 @@ class CSVFileStorage(object):
                             # We are arrived, append all the missing items and then the item we originally tried to and break
                             for j, missing_timestamp in enumerate(missing_timestamps):
                                 # Set data by interpolation
-                                interpolated_data = {data_key: (((items[i][1][data_key]-items[i-1][1][data_key])/(len(missing_timestamps)+1)) * (j+1)) + items[i-1][1][data_key]  for data_key in  items[-1][1] }
+                                interpolated_data = {data_label: (((items[i][1][data_label]-items[i-1][1][data_label])/(len(missing_timestamps)+1)) * (j+1)) + items[i-1][1][data_label]  for data_label in  items[-1][1] }
                                 timeseries.append(DataTimeSlot(t=missing_timestamp, unit=unit, data=interpolated_data, data_loss=1, tz=tz))
-                            timeseries.append(DataTimeSlot(t=item[0], unit=unit, data=item[1], data_loss=0, tz=tz))
+                            timeseries.append(DataTimeSlot(t=item[0], unit=unit, data=item[1], data_loss=DEFAULT_SLOT_DATA_LOSS, tz=tz))
                             break
                         
                         else:
@@ -588,8 +721,8 @@ class CSVFileStorage(object):
         if os.path.isfile(self.filename) and not overwrite:
             raise Exception('File already exists. use overwrite=True to overwrite.')
 
-        # Set indexes here once for all or thre will be a slowndowd afterwards
-        indexes = timeseries.indexes
+        # Set data_indexes here once for all or thre will be a slowndowd afterwards
+        data_indexes = timeseries._all_data_indexes()
 
         with open(self.filename, 'w') as csv_file:
        
@@ -609,20 +742,20 @@ class CSVFileStorage(object):
 
 
             # 1) Dump headers
-            data_keys_part = ','.join([str(key) for key in timeseries.data_keys()])
-            indexes_part = ','.join(['__'+index for index in indexes])
-            if indexes_part:
-                csv_file.write('epoch,{},{}\n'.format(data_keys_part,indexes_part))
+            data_labels_part = ','.join([str(key) for key in timeseries.data_labels()])
+            data_indexes_part = ','.join(['__'+index for index in data_indexes])
+            if data_indexes_part:
+                csv_file.write('epoch,{},{}\n'.format(data_labels_part,data_indexes_part))
             else:
-                csv_file.write('epoch,{}\n'.format(data_keys_part))
+                csv_file.write('epoch,{}\n'.format(data_labels_part))
             
 
-            # 2) Dump data (and indexes)
+            # 2) Dump data (and data_indexes)
             for item in timeseries:
-                data_part = ','.join([str(item.data[key]) for key in timeseries.data_keys()])
-                indexes_part = ','.join([str(getattr(item, index)) for index in indexes])
-                if indexes_part:
-                    csv_file.write('{},{},{}\n'.format(item.t, data_part, indexes_part))
+                data_part = ','.join([str(item.data[key]) for key in timeseries.data_labels()])
+                data_indexes_part = ','.join([str(getattr(item, index)) for index in data_indexes])
+                if data_indexes_part:
+                    csv_file.write('{},{},{}\n'.format(item.t, data_part, data_indexes_part))
                 else:
                     csv_file.write('{},{}\n'.format(item.t, data_part))
                     

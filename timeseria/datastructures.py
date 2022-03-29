@@ -118,57 +118,29 @@ class Series(list):
         else:
             return super(Series, self).__getitem__(key)
 
-    # Indexes
-    @property
-    def indexes(self):
-        """Return the indexes of the series, to be intended as custom
+    def _all_data_indexes(self):
+        """Return all the data_indexes of the series, to be intended as custom
         defined indicators (i.e. data_loss, anomaly_index, etc.)."""
         
-        # TODO: this approach does not allow for custom-defined indexes.
-        #       Maybe move indexes from item attributes to a dictionary?
-        # Moreover, should not be here but at least in the DataSeries...
-        if not self:
-            return []
-        else:
-            _indexes = []
-
-            # Do we have data reconstructed indexes?
-            try:
-                for item in self:
-                    if item.data_reconstructed is not None:
-                        _indexes.append('data_reconstructed')
-                        break
-            except AttributeError:
-                pass
-
-            # Do we have data loss indexes?
-            try:
-                for item in self:
-                    if item.data_loss is not None:
-                        _indexes.append('data_loss')
-                        break
-            except AttributeError:
-                pass
-
-            # Do we have an anomaly index?
-            try:
-                for item in self:
-                    if item.anomaly is not None:
-                        _indexes.append('anomaly')
-                        break
-            except AttributeError:
-                pass
-
-            # Do we have a forecast index?
-            try:
-                for item in self:
-                    if item.forecast is not None:
-                        _indexes.append('forecast')
-                        break
-            except AttributeError:
-                pass
+        # TODO: move this to the Data*Series...?
+        data_index_names = []
+        for item in self:
+            for index_name in item.data_indexes:
+                if index_name not in data_index_names:
+                    data_index_names.append(index_name)
+        
+        # Reorder according to legacy indexes behaviour
+        ordered_data_index_names = []
+        legacy_indexes = ['data_reconstructed', 'data_loss', 'anomaly', 'forecast']
+        for legacy_index in legacy_indexes:
+            if legacy_index in data_index_names:
+                ordered_data_index_names.append(legacy_index)
+                data_index_names.remove(legacy_index)
+        
+        # Merge and sort
+        ordered_data_index_names += sorted(data_index_names)
             
-            return _indexes
+        return ordered_data_index_names
 
     @property
     def mark(self):
@@ -336,7 +308,7 @@ class Series(list):
 
     def filter(self, *args, **kwargs):
         # TODO: refactor this to allow generic item properties? Maybe merge witht he following select?
-        """Filter a series given one or more properties of its elemnents. Example filtering arguments: ``data_key``, ``from_t``, ``to_t``, ``from_dt``, ``to_dt``."""
+        """Filter a series given one or more properties of its elemnents. Example filtering arguments: ``data_label``, ``from_t``, ``to_t``, ``from_dt``, ``to_dt``."""
         from .operations import filter as filter_operation
         return filter_operation(self, *args, **kwargs) 
 
@@ -346,13 +318,13 @@ class Series(list):
         return select_operation(self, *args, **kwargs)
     
     # Inspection utilities
-    def print(self, limit=10):
-        """Print the series. By default limited to 10 elements.
+    def inspect(self, limit=10):
+        """Prints a summary of the series and its elements, limited to 10 items by default.
         
             Args:
                 limit: the limit of elements to print, by default 10.
         """
-        
+        print(str(self)+':\n')
         print('[', end='')
         
         if not limit or limit > len(self):
@@ -388,8 +360,51 @@ class Series(list):
 
         print(']')
 
+    def inspect_as_str(self, limit=10):
+        """Return a summary of the series and its elements, limited to 10 items by default.
+        
+            Args:
+                limit: the limit of elements to print, by default 10.
+        """
+        
+        string = str(self)+':\n\n'
+        string+='['
+        
+        if not limit or limit > len(self):
+        
+            for i, item in enumerate(self):
+                if limit and i >= limit:
+                    break
+                else:
+                    if i==0:
+                        string+=str(item)+',\n'
+                    elif i==len(self)-1:
+                        string+=' '+str(item)                        
+                    else:
+                        string+=' '+str(item)+',\n'
+        else:
+            
+            head_n = int(limit/2)+1
+            tail_n = int(limit/2)
 
-    def contents(self, n=5):
+            for i, item in enumerate(self.head(head_n)):
+                if i==0:
+                    string+=str(item)+',\n'                       
+                else:
+                    string+=' '+str(item)+',\n'
+
+            string+=' ...\n'
+
+            for i, item in enumerate(self.tail(tail_n)):
+                if i==tail_n-1:
+                    string+=' '+str(item)                        
+                else:
+                    string+=' '+str(item)+',\n'
+
+        string+=']'
+        return string
+
+    def contents(self):
         """Get al the items of the series as a list."""   
         return list(self)     
 
@@ -540,7 +555,7 @@ class TimePoint(Point):
             return UTC
     
     def change_timezone(self, new_timezone):
-        """Change the time zone of the Point."""
+        """Change the time zone of the point, in-place."""
         self._tz = timezonize(new_timezone)
 
     @property
@@ -559,27 +574,49 @@ class DataPoint(Point):
        Args:
            *args (list): the coordinates.
            data: the data.
+           data_indexes(dict): data indexes.
+           data_loss(float): the data loss index, if any. 
     """
     
-    
     def __init__(self, *args, **kwargs):
+
+        # Data
         try:
             self._data = kwargs.pop('data')
         except KeyError:
             raise Exception('A DataPoint requires a special "data" argument (got only "{}")'.format(kwargs))
-        
+
+        # Data indexes 
+        try:
+            data_indexes = kwargs.pop('data_indexes')
+            if data_indexes is None:
+                data_indexes = {}
+            else:
+                if not isinstance(data_indexes, dict):
+                    raise ValueError('Got type "{}" for data_indexes, was expecitng a dict'.format(data_indexes.__class__.__name__))
+        except KeyError:
+            data_indexes = {}
+        #else:
+        #    if None in data_indexes.values():
+        #        raise ValueError('Cannot have an index set to None: do not set it at all ({})'.format(data_indexes))
+
+        # Special data loss index
         try:
             data_loss = kwargs.pop('data_loss')
         except KeyError:
             pass
         else:
-            self._data_loss = data_loss
+            data_indexes['data_loss'] = data_loss
         
+        # Set data indexes
+        self._data_indexes = data_indexes
+        
+        # Call parent init
         super(DataPoint, self).__init__(*args, **kwargs)
 
     def __repr__(self):
         if self.data_loss is not None:
-            return '{} with data "{}" and data_loss="{}"'.format(super(DataPoint, self).__repr__(), self.data, self._data_loss)            
+            return '{} with data "{}" and data_loss="{}"'.format(super(DataPoint, self).__repr__(), self.data, self.data_loss)            
         else:
             return '{} with data "{}"'.format(super(DataPoint, self).__repr__(), self.data)
     
@@ -591,27 +628,36 @@ class DataPoint(Point):
     @property
     def data(self):
         """The data."""
+        # Data is set like this as it cannot be set if not in the init (read: changed after created)
+        # to prevent this to happend when the point is in a series where they are all supposed
+        # to carry the same data type and with the same number of elements. TODO: check!
         return self._data
 
+    @property
+    def data_indexes(self):
+        """The data indexes."""
+        return self._data_indexes
+
+    @data_indexes.setter
+    def data_indexes(self, value):
+        self._data_indexes = value 
+ 
     @property
     def data_loss(self):
         """The data loss index, if any. Usually computed out from resampling transformations."""
         try:
-            return self._data_loss
-        except AttributeError:
+            return self.data_indexes['data_loss']
+        except KeyError:
+            #raise AttributeError('No data loss index set for this point')
             return None
-
-    @property
-    def data_reconstructed(self):
-        """The data reconstruction index, if any. Usually computed out from reconstruction models."""
+        
+    def data_labels(self):
+        """Return the data labels. If data is a dictionary, then these are the dictionary keys,
+        if data is a list, then these are the list indexes. Other formats are not supported."""
         try:
-            return self._data_reconstructed
+            return sorted(list(self.data.keys()))
         except AttributeError:
-            return None
-
-    @data_reconstructed.setter
-    def data_reconstructed(self, value):
-        self._data_reconstructed = value
+            return list(range(len(self.data)))
 
 
 class DataTimePoint(DataPoint, TimePoint):
@@ -621,6 +667,8 @@ class DataTimePoint(DataPoint, TimePoint):
            t (float): epoch timestamp, decimals for sub-second precision.
            dt (datetime): a datetime object timestamp.
            data: the data.
+           data_indexes(dict): data indexes.
+           data_loss(float): the data loss index, if any.
     """
     pass
 
@@ -697,7 +745,7 @@ class TimePointSeries(PointSeries):
             return self._tz
         except AttributeError:
             # Detect time zone on the fly
-            # TODO: this takes forever, why do we compare with ALL data points/slots time zones?
+            # TODO: this ensure each ppint is on the sam etime zone. Do we want this?
             detected_tz = None
             for item in self:
                 if not detected_tz:
@@ -708,15 +756,11 @@ class TimePointSeries(PointSeries):
                         return UTC
             return detected_tz
     
-    @tz.setter
-    def tz(self, value):
-        self._tz = timezonize(value) 
-
     def change_timezone(self, new_timezone):
-        """Change the time zone od the series."""
+        """Change the time zone of the series, in-place."""
         for time_point in self:
             time_point.change_timezone(new_timezone)
-        self.tz = time_point.tz
+        self._tz = time_point.tz
 
     def as_timezone(self, timezone):
         """Get a copy of the series on a new time zone.""" 
@@ -729,7 +773,7 @@ class TimePointSeries(PointSeries):
         """The (temporal) resolution of the time series."""
         return self._resolution
 
-    
+   
 class DataPointSeries(PointSeries):
     """A series of data points, where each item is guaranteed to be ordered and to carry the same data type.
 
@@ -741,28 +785,25 @@ class DataPointSeries(PointSeries):
 
     # Check data compatibility
     def append(self, item):
+        
         try:
-            # logger.debug('Checking data compatibility: %s ', item.data)
-            #if item.data is None and self.accept_None:
-            #    pass
-            #else:
-            if not type(self.item_data_reference) == type(item.data):
-                raise TypeError('Got different data: {} vs {}'.format(self.item_data_reference.__class__.__name__, item.data.__class__.__name__))
-            if isinstance(self.item_data_reference, list):
-                if len(self.item_data_reference) != len(item.data):
-                    raise ValueError('Got different data lengths: {} vs {}'.format(len(self.item_data_reference), len(item.data)))
-            if isinstance(self.item_data_reference, dict):
-                if set(self.item_data_reference.keys()) != set(item.data.keys()):
-                    raise ValueError('Got different data keys: {} vs {}'.format(self.item_data_reference.keys(), item.data.keys()))
+            if not type(self._item_data_reference) == type(item.data):
+                raise TypeError('Got different data: {} vs {}'.format(self._item_data_reference.__class__.__name__, item.data.__class__.__name__))
+            if isinstance(self._item_data_reference, list):
+                if len(self._item_data_reference) != len(item.data):
+                    raise ValueError('Got different data lengths: {} vs {}'.format(len(self._item_data_reference), len(item.data)))
+            if isinstance(self._item_data_reference, dict):
+                if set(self._item_data_reference.keys()) != set(item.data.keys()):
+                    raise ValueError('Got different data keys: {} vs {}'.format(self._item_data_reference.keys(), item.data.keys()))
             
         except AttributeError:
             # logger.debug('Setting data reference: %s', item.data)
-            self.item_data_reference = item.data
+            self._item_data_reference = item.data
             
         super(DataPointSeries, self).append(item)
 
-    def data_keys(self):
-        """Return the keys of the data carried by the DataPoints.
+    def data_labels(self):
+        """Return the labels of the data carried by the DataPoints.
         If data is a dictionary, then these are the dictionary keys,
         if data is a list, then these are the list indexes. Other
         data formats are not supported."""
@@ -776,37 +817,40 @@ class DataPointSeries(PointSeries):
             except AttributeError:
                 return list(range(len(self[0].data)))
 
-    def rename_data_key(self, old_key, new_key):
-        """Rename a data key."""
+    def rename_data_label(self, old_key, new_key):
+        """Rename a data key, in-place."""
         for item in self:
             # TODO: move to the DataPoint/DataSlot?
             item.data[new_key] = item.data.pop(old_key)
 
     def remove_data_loss(self):
-        """Return a new series without the ``data_loss`` index."""
-        new_series = self.duplicate()
-        for item in new_series:
-            item._data_loss = None
-        return new_series
-    
+        """Remove the ``data_loss`` index, in-place."""
+        for item in self:
+            item.data_indexes.pop('data_loss', None)
+
+    def remove_data_index(self, data_index):
+        """Remove a data index, in-place."""
+        for item in self:
+            item.data_indexes.pop(data_index, None)        
+
     # Operations
     def min(self, *args, **kwargs):
-        """Get the minimum data value(s) of a series. Supports an optional ``data_key`` argument."""
+        """Get the minimum data value(s) of a series. Supports an optional ``data_label`` argument."""
         from .operations import min as min_operation
         return min_operation(self, *args, **kwargs)
 
     def max(self, *args, **kwargs):
-        """Get the maximum data value(s) of a series. Supports an optional ``data_key`` argument."""
+        """Get the maximum data value(s) of a series. Supports an optional ``data_label`` argument."""
         from .operations import max as max_operation
         return max_operation(self, *args, **kwargs)    
 
     def avg(self, *args, **kwargs):
-        """Get the average data value(s) of a series. Supports an optional ``data_key`` argument."""
+        """Get the average data value(s) of a series. Supports an optional ``data_label`` argument."""
         from .operations import avg as avg_operation
         return avg_operation(self, *args, **kwargs)   
 
     def sum(self, *args, **kwargs):
-        """Sum every data value(s) of a series. Supports an optional ``data_key`` argument."""
+        """Sum every data value(s) of a series. Supports an optional ``data_label`` argument."""
         from .operations import sum as sum_operation
         return sum_operation(self, *args, **kwargs)  
 
@@ -907,7 +951,7 @@ class DataTimePointSeries(DataPointSeries, TimePointSeries):
     @property
     def df(self):
         """The time series as a Pandas DataFrame object."""
-        data_keys = self.data_keys()
+        data_labels = self.data_labels()
         
         if self[0].data_loss is not None:
             dump_data_loss = True
@@ -915,13 +959,13 @@ class DataTimePointSeries(DataPointSeries, TimePointSeries):
             dump_data_loss = False
         
         if dump_data_loss:
-            columns = ['Timestamp'] + data_keys + ['data_loss']
+            columns = ['Timestamp'] + data_labels + ['data_loss']
         else:
-            columns = ['Timestamp'] + data_keys
+            columns = ['Timestamp'] + data_labels
             
         df = DataFrame(columns=columns)
         for item in self:
-            values = [item.data[key] for key in data_keys]
+            values = [item.data[key] for key in data_labels]
             if dump_data_loss:
                 df = df.append(DataFrame([[item.dt]+values+[item.data_loss]], columns=columns))
             else:
@@ -930,8 +974,8 @@ class DataTimePointSeries(DataPointSeries, TimePointSeries):
         return df
         
     def plot(self, engine='dg', *args, **kwargs):
-        """Plot the time series. The default plotting engine is Dygraphs (engine=\'dg\'),
-           limited support for Matplotplib (engine=\'mp\') is also available.
+        """Plot the time series. The default plotting engine is Dygraphs (``engine=\'dg\'``),
+           limited support for Matplotplib (``engine=\'mp\'``) is also available.
            For plotting options for Dygraphs, see :func:`~.plots.dygraphs_plot`, while for
            plotting options for Matplotlib, see :func:`~.plots.matplotlib_plot`.""" 
         if engine=='mp':
@@ -973,16 +1017,16 @@ class DataTimePointSeries(DataPointSeries, TimePointSeries):
             return 'Time series of #0 points'
 
     # Transformations
-    def slot(self, *args, **kwargs):
-        """Slot the series in slots of a length set by the ``unit`` parameter."""
-        from .transformations import Slotter
-        slotter = Slotter(*args, **kwargs)
-        return slotter.process(self)  
+    def aggregate(self, unit, *args, **kwargs):
+        """Aggregate the series in slots of a length set by the ``unit`` parameter."""
+        from .transformations import Aggregator
+        aggregator = Aggregator(unit, *args, **kwargs)
+        return aggregator.process(self)  
 
-    def resample(self, *args, **kwargs):
+    def resample(self, unit, *args, **kwargs):
         """Resample the series using a sampling interval of a length set by the ``unit`` parameter."""
         from .transformations import Resampler
-        resampler = Resampler(*args, **kwargs)
+        resampler = Resampler(unit, *args, **kwargs)
         return resampler.process(self)  
 
 
@@ -1141,7 +1185,7 @@ class TimeSlot(Slot):
             return True
 
     def change_timezone(self, new_timezone):
-        """Change the time zone of the slot."""
+        """Change the time zone of the slot, in-place."""
         self.start.change_timezone(new_timezone)
         self.end.change_timezone(new_timezone)
         self.tz = self.start.tz
@@ -1175,22 +1219,45 @@ class DataSlot(Slot):
            start(Point): the slot starting point.
            end(Point): the slot ending point.
            unit(Unit): the slot unit.
-           data: the slot data.
+           data: the data.
+           data_indexes(dict): data indexes.
+           data_loss(float): the data loss index, if any.
     """
 
     def __init__(self, **kwargs):
+        
+        # Data
         try:
             self._data = kwargs.pop('data')
         except KeyError:
             raise Exception('A DataSlot requires a special "data" argument (got only "{}")'.format(kwargs))
 
+        # Data indexes 
+        try:
+            data_indexes = kwargs.pop('data_indexes')
+            if data_indexes is None:
+                data_indexes = {}
+            else:
+                if not isinstance(data_indexes, dict):
+                    raise ValueError('Got type "{}" for data_indexes, was expecitng a dict'.format(data_indexes.__class__.__name__))
+        except KeyError:
+            data_indexes = {}
+        #else:
+        #    if None in data_indexes.values():
+        #        raise ValueError('Cannot have an index set to None: do not set it at all ({})'.format(data_indexes))
+
+        # Special data loss index
         try:
             data_loss = kwargs.pop('data_loss')
         except KeyError:
             pass
         else:
-            self._data_loss = data_loss
+            data_indexes['data_loss'] = data_loss
+        
+        # Set data indexes
+        self._data_indexes = data_indexes
 
+        # Call parent init
         super(DataSlot, self).__init__(**kwargs)
 
     def __repr__(self):
@@ -1203,29 +1270,37 @@ class DataSlot(Slot):
 
     @property
     def data(self):
-        """The slot data."""
+        """The data."""
+        # Data is set like this as it cannot be set if not in the init (read: changed after created)
+        # to prevent this to happend when the point is in a series where they are all supposed
+        # to carry the same data type and with the same number of elements. TODO: check!
         return self._data
 
     @property
-    def data_loss(self):
-        """The data loss index, if any. Usually computed out from slotting transformations."""
-        try:
-            return self._data_loss
-        except AttributeError:
-            return None
-    
-    @property
-    def data_reconstructed(self):
-        """The data reconstruction index, if any. Usually computed out from reconstruction models."""
+    def data_indexes(self):
+        """The data indexes."""
+        return self._data_indexes
 
+    @data_indexes.setter
+    def data_indexes(self, value):
+        self._data_indexes = value 
+
+    @property
+    def data_loss(self):
+        """The data loss index, if any. Usually computed out from resampling transformations."""
         try:
-            return self._data_reconstructed
-        except AttributeError:
+            return self.data_indexes['data_loss']
+        except KeyError:
+            #raise AttributeError('No data loss index set for this point')
             return None
-    
-    @data_reconstructed.setter
-    def data_reconstructed(self, value):
-        self._data_reconstructed = value
+
+    def data_labels(self):
+        """Return the data labels. If data is a dictionary, then these are the dictionary keys,
+        if data is a list, then these are the list indexes. Other formats are not supported."""
+        try:
+            return sorted(list(self.data.keys()))
+        except AttributeError:
+            return list(range(len(self.data)))    
 
 
 class DataTimeSlot(DataSlot, TimeSlot):
@@ -1239,6 +1314,8 @@ class DataTimeSlot(DataSlot, TimeSlot):
            end(TimePoint): the slot ending time point.
            unit(TimeUnit): the slot time unit.
            data: the data.
+           data_indexes(dict): data indexes.
+           data_loss(float): the data loss index, if any.
     """
 
 
@@ -1311,9 +1388,17 @@ class TimeSlotSeries(SlotSeries):
                 raise ValueError('Cannot add items on different time zones (I have "{}" and you tried to add "{}")'.format(self.tz, item.start.tz))
 
         super(TimeSlotSeries, self).append(item)
+ 
+    @property
+    def tz(self):
+        """The time zone of the time series."""
+        try:
+            return self._tz
+        except AttributeError:
+            return None
         
     def change_timezone(self, new_timezone):
-        """Change the time zone of the series."""
+        """Change the time zone of the series, in-place."""
         for time_slot in self:
             time_slot.change_timezone(new_timezone)
         self._tz = time_slot.tz
@@ -1329,14 +1414,6 @@ class TimeSlotSeries(SlotSeries):
         """The (temporal) resolution of the time series."""
         return self._resolution
 
-    @property
-    def tz(self):
-        """The time zone of the time series."""
-        try:
-            return self._tz
-        except AttributeError:
-            return None
-
 
 class DataSlotSeries(SlotSeries):
     """A series of data slots, where each item is guaranteed to be in succession and to carry the same data type.
@@ -1350,25 +1427,24 @@ class DataSlotSeries(SlotSeries):
     # Check data compatibility
     def append(self, item):
         
-        # Check for data compatibility
         try:
-            if not type(self.item_data_reference) == type(item.data):
-                raise TypeError('Got different data: {} vs {}'.format(self.item_data_reference.__class__.__name__, item.data.__class__.__name__))
-            if isinstance(self.item_data_reference, list):
-                if len(self.item_data_reference) != len(item.data):
-                    raise ValueError('Got different data lengths: {} vs {}'.format(len(self.item_data_reference), len(item.data)))
-            if isinstance(self.item_data_reference, dict):
-                if set(self.item_data_reference.keys()) != set(item.data.keys()):
-                    raise ValueError('Got different data keys: {} vs {}'.format(self.item_data_reference.keys(), item.data.keys()))
+            if not type(self._item_data_reference) == type(item.data):
+                raise TypeError('Got different data: {} vs {}'.format(self._item_data_reference.__class__.__name__, item.data.__class__.__name__))
+            if isinstance(self._item_data_reference, list):
+                if len(self._item_data_reference) != len(item.data):
+                    raise ValueError('Got different data lengths: {} vs {}'.format(len(self._item_data_reference), len(item.data)))
+            if isinstance(self._item_data_reference, dict):
+                if set(self._item_data_reference.keys()) != set(item.data.keys()):
+                    raise ValueError('Got different data keys: {} vs {}'.format(self._item_data_reference.keys(), item.data.keys()))
 
         except AttributeError:
-            # TODO: uniform self.tz, self._resolution, self.item_data_reference
-            self.item_data_reference = item.data
+            # TODO: uniform self.tz, self._resolution, self._item_data_reference
+            self._item_data_reference = item.data
         
         super(DataSlotSeries, self).append(item)
     
-    def data_keys(self):
-        """Return the keys of the data carried by the DataSlots.
+    def data_labels(self):
+        """Return the labels of the data carried by the DataSlots.
         If data is a dictionary, then these are the dictionary keys,
         if data is a list, then these are the list indexes. Other
         data formats are not supported."""
@@ -1381,37 +1457,40 @@ class DataSlotSeries(SlotSeries):
             except AttributeError:
                 return list(range(len(self[0].data)))
 
-    def rename_data_key(self, old_key, new_key):
-        """Rename a data key."""
+    def rename_data_label(self, old_key, new_key):
+        """Rename a data key, in-place."""
         for item in self:
             # TODO: move to the DataPoint/DataSlot?
             item.data[new_key] = item.data.pop(old_key)
 
     def remove_data_loss(self):
-        """Return a new series without the ``data_loss`` index."""
-        new_series = self.duplicate()
-        for item in new_series:
-            item._data_loss = None
-        return new_series
+        """Remove the ``data_loss`` index, in-place."""
+        for item in self:
+            item.data_indexes.pop('data_loss', None)
+    
+    def remove_data_index(self, data_index):
+        """Remove a data index, in-place."""
+        for item in self:
+            item.data_indexes.pop(data_index, None)        
 
     # Operations
     def min(self, *args, **kwargs):
-        """Get the minimum data value(s) of a series. Supports an optional ``data_key`` argument."""
+        """Get the minimum data value(s) of a series. Supports an optional ``data_label`` argument."""
         from .operations import min as min_operation
         return min_operation(self, *args, **kwargs)
 
     def max(self, *args, **kwargs):
-        """Get the maximum data value(s) of a series. Supports an optional ``data_key`` argument."""
+        """Get the maximum data value(s) of a series. Supports an optional ``data_label`` argument."""
         from .operations import max as max_operation
         return max_operation(self, *args, **kwargs)    
 
     def avg(self, *args, **kwargs):
-        """Get the average data value(s) of a series. Supports an optional ``data_key`` argument."""
+        """Get the average data value(s) of a series. Supports an optional ``data_label`` argument."""
         from .operations import avg as avg_operation
         return avg_operation(self, *args, **kwargs)   
 
     def sum(self, *args, **kwargs):
-        """Sum every data value(s) of a series. Supports an optional ``data_key`` argument."""
+        """Sum every data value(s) of a series. Supports an optional ``data_label`` argument."""
         from .operations import sum as sum_operation
         return sum_operation(self, *args, **kwargs)  
 
@@ -1536,7 +1615,7 @@ class DataTimeSlotSeries(DataSlotSeries, TimeSlotSeries):
     @property
     def df(self):
         """The time series as a Pandas DataFrame object."""
-        data_keys = self.data_keys()
+        data_labels = self.data_labels()
         
         if self[0].data_loss is not None:
             dump_data_loss = True
@@ -1544,13 +1623,13 @@ class DataTimeSlotSeries(DataSlotSeries, TimeSlotSeries):
             dump_data_loss = False
         
         if dump_data_loss:
-            columns = ['Timestamp'] + data_keys + ['data_loss']
+            columns = ['Timestamp'] + data_labels + ['data_loss']
         else:
-            columns = ['Timestamp'] + data_keys
+            columns = ['Timestamp'] + data_labels
             
         df = DataFrame(columns=columns)
         for item in self:
-            values = [item.data[key] for key in data_keys]
+            values = [item.data[key] for key in data_labels]
             if dump_data_loss:
                 df = df.append(DataFrame([[item.dt]+values+[item.data_loss]], columns=columns))
             else:
@@ -1559,8 +1638,8 @@ class DataTimeSlotSeries(DataSlotSeries, TimeSlotSeries):
         return df
 
     def plot(self, engine='dg', *args, **kwargs):
-        """Plot the time series. The default plotting engine is Dygraphs (engine=\'dg\'),
-           limited support for Matplotplib (engine=\'mp\') is also available.
+        """Plot the time series. The default plotting engine is Dygraphs (``engine=\'dg\'``ƒ),
+           limited support for Matplotplib (``engine=\'mp\'``) is also available.
            For plotting options for Dygraphs, see :func:`~.plots.dygraphs_plot`, while for
            plotting options for Matplotlib, see :func:`~.plots.matplotlib_plot`.""" 
         if engine=='mp':
@@ -1581,13 +1660,11 @@ class DataTimeSlotSeries(DataSlotSeries, TimeSlotSeries):
             return 'Time series of #0 slots'
 
     # Transformations
-    def slot(self, *args, **kwargs):
-        """Slot the series in slots of a length set by the ``unit`` parameter."""
-        from .transformations import Slotter
-        slotter = Slotter(*args, **kwargs)
-        return slotter.process(self)  
-
-
+    def slot(self, unit, *args, **kwargs):
+        """Re-agregate the series in slots of a length set by the ``unit`` parameter."""
+        from .transformations import Aggregator
+        aggregator = Aggregator(unit, *args, **kwargs)
+        return aggregator.process(self)  
 
 
 
@@ -1677,21 +1754,21 @@ class SeriesSlice(Series):
                                             
                     # Compute the new point values with respect to the entire interpolation           
                     new_point_data = {}
-                    for data_key in self.series.data_keys():
+                    for data_label in self.series.data_labels():
         
                         if self.interpolation_method == 'linear':
         
                             # Compute the "growth" ratio
-                            diff = this_point.data[data_key] - prev_point.data[data_key]
+                            diff = this_point.data[data_label] - prev_point.data[data_label]
                             delta_t = this_point.t - prev_point.t
                             ratio = diff / delta_t
                             
                             # Compute the value of the data for the new point
-                            new_point_data[data_key] = prev_point.data[data_key] + ((new_point_t-prev_point.t)*ratio)
+                            new_point_data[data_label] = prev_point.data[data_label] + ((new_point_t-prev_point.t)*ratio)
         
                         elif self.interpolation_method == 'uniform':
                             raise NotImplementedError('uniform interpolation is not implemented yet')
-                            new_point_data[data_key] = (prev_point.data[data_key] + this_point.data[data_key]) /2
+                            new_point_data[data_label] = (prev_point.data[data_label] + this_point.data[data_label]) /2
                        
                         else:
                             raise Exception('Unknown interpolation method "{}"'.format(self.interpolation_method))
@@ -1730,8 +1807,8 @@ class SeriesSlice(Series):
     def resolution(self):
         return self.series.resolution
 
-    def data_keys(self):
-        return self.series.data_keys()
+    def data_labels(self):
+        return self.series.data_labels()
     
     # Generic attributes
     #def __getattribute__(self, name):

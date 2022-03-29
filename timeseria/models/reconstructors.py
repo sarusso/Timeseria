@@ -49,10 +49,10 @@ class Reconstructor(TimeSeriesParametricModel):
         if not inplace:
             timeseries = timeseries.duplicate()
 
-        if len(timeseries.data_keys()) > 1:
+        if len(timeseries.data_labels()) > 1:
             raise NotImplementedError('Multivariate time series are not yet supported')
 
-        for key in timeseries.data_keys():
+        for key in timeseries.data_labels():
             
             gap_started = None
             
@@ -70,7 +70,7 @@ class Reconstructor(TimeSeriesParametricModel):
                     if to_t is not None and timeseries[i].t > to_t:
                         break                
 
-                if item.data_loss >= data_loss_threshold:
+                if item.data_loss is not None and item.data_loss >= data_loss_threshold:
                     # This is the beginning of an area we want to reconstruct according to the data_loss_threshold
                     if gap_started is None:
                         gap_started = i
@@ -82,10 +82,10 @@ class Reconstructor(TimeSeriesParametricModel):
                         self._reconstruct(from_index=gap_started, to_index=i, timeseries=timeseries, key=key)
                         gap_started = None
                     
-                    item._data_reconstructed = 0
+                    item.data_indexes['data_reconstructed'] = 0
                     
                 if remove_data_loss:
-                    item._data_loss = 0
+                    item.data_indexes.pop('data_loss', None)
             
             # Reconstruct the last gap as well if left "open"
             if gap_started is not None:
@@ -119,7 +119,7 @@ class Reconstructor(TimeSeriesParametricModel):
         logger.info('Will evaluate model for %s steps with metrics %s', steps, metrics)
         
         # Find areas where to evaluate the model
-        for key in timeseries.data_keys():
+        for key in timeseries.data_labels():
              
             for steps_round in steps:
                 
@@ -146,13 +146,13 @@ class Reconstructor(TimeSeriesParametricModel):
 
                     # Is this a "good area" where to test or do we have to stop?
                     stop = False
-                    if timeseries[i-1].data_loss >= data_loss_threshold:
+                    if timeseries[i-1].data_loss is not None and timeseries[i-1].data_loss >= data_loss_threshold:
                         stop = True
                     for j in range(steps_round):
-                        if timeseries[i+j].data_loss >= data_loss_threshold:
+                        if timeseries[i+j].data_loss is not None and timeseries[i+j].data_loss >= data_loss_threshold:
                             stop = True
                             break
-                    if timeseries[i+steps_round].data_loss >= data_loss_threshold:
+                    if timeseries[i+steps_round].data_loss is not None and timeseries[i+steps_round].data_loss >= data_loss_threshold:
                         stop = True
                     if stop:
                         continue
@@ -174,7 +174,7 @@ class Reconstructor(TimeSeriesParametricModel):
                     for j in range(steps_round):
                         item = copy.deepcopy(timeseries[i+j])
                         # Set the data_loss to one so the item will be reconstructed
-                        item._data_loss = 1
+                        item.data_indexes['data_loss'] = 1
                         item.data[key] = average_value
                         timeseries_to_reconstruct.append(item)
                         
@@ -294,7 +294,7 @@ class PeriodicAverageReconstructor(Reconstructor):
             raise Exception('Unknown offset method "{}"'.format(self.offset_method))
         self.offset_method = offset_method
     
-        if len(timeseries.data_keys()) > 1:
+        if len(timeseries.data_labels()) > 1:
             raise NotImplementedError('Multivariate time series are not yet supported')
 
         from_t, to_t = set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
@@ -313,7 +313,7 @@ class PeriodicAverageReconstructor(Reconstructor):
         self.data['periodicity']  = periodicity
         self.data['dst_affected'] = dst_affected 
                 
-        for key in timeseries.data_keys():
+        for key in timeseries.data_labels():
             sums   = {}
             totals = {}
             processed = 0
@@ -326,8 +326,8 @@ class PeriodicAverageReconstructor(Reconstructor):
                 except StopIteration:
                     break
                 
-                # Process
-                if item.data_loss < data_loss_threshold:
+                # Process. Note: we do fit on data losses = None!
+                if item.data_loss is None or item.data_loss < data_loss_threshold:
                     periodicity_index = get_periodicity_index(item, timeseries._resolution, periodicity, dst_affected=dst_affected)
                     if not periodicity_index in sums:
                         sums[periodicity_index] = item.data[key]
@@ -378,7 +378,7 @@ class PeriodicAverageReconstructor(Reconstructor):
             item_to_reconstruct = timeseries[j]
             periodicity_index = get_periodicity_index(item_to_reconstruct, timeseries._resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])
             item_to_reconstruct.data[key] = self.data['averages'][periodicity_index] + offset
-            item_to_reconstruct._data_reconstructed = 1
+            item_to_reconstruct.data_indexes['data_reconstructed'] = 1
                         
 
     def _plot_averages(self, timeseries, **kwargs):   
@@ -403,7 +403,7 @@ class ProphetReconstructor(Reconstructor, ProphetModel):
 
         from_t, to_t = set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
 
-        if len(timeseries.data_keys()) > 1:
+        if len(timeseries.data_labels()) > 1:
             raise NotImplementedError('Multivariate time series are not yet supported')
 
         data = self.from_timeseria_to_prophet(timeseries, from_t, to_t)
@@ -434,5 +434,5 @@ class ProphetReconstructor(Reconstructor, ProphetModel):
             #logger.debug('Reconstructing item #{} with reconstucted item #{}'.format(j,i))
             item_to_reconstruct = timeseries[j]
             item_to_reconstruct.data[key] = forecast['yhat'][i]
-            item_to_reconstruct._data_reconstructed = 1
+            item_to_reconstruct.data_indexes['data_reconstructed'] = 1
 

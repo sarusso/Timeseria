@@ -227,6 +227,30 @@ class TestPoints(unittest.TestCase):
         
         self.assertEqual(data_point_1, data_point_2)
         self.assertNotEqual(data_point_1, data_point_3)
+        
+        # Test list and dict data labels
+        data_point = DataPoint(1, 2, data=['hello', 'hola'])
+        self.assertEqual(data_point.data_labels(), [0,1])
+        
+        data_point = DataPoint(1, 2, data={'label1':'hello', 'label2':'hola'})
+        self.assertEqual(data_point.data_labels(), ['label1','label2'])
+
+        # Test with data loss index
+        data_point = DataPoint(1, 2, data='hello', data_loss=0.5)
+        self.assertEqual(data_point.data_loss,0.5)
+        self.assertEqual(data_point.data_indexes['data_loss'],0.5)
+        
+        # Test with generic indexes
+        data_point = DataPoint(1, 2, data='hello', data_indexes={'data_loss':0.5, 'my_index':0.3})
+        self.assertEqual(data_point.data_loss,0.5)
+        self.assertEqual(data_point.data_indexes['data_loss'],0.5)
+        self.assertEqual(data_point.data_indexes['my_index'],0.3)
+
+        # Test None index
+        #with self.assertRaises(ValueError):
+        DataPoint(1, 2, data='hello', data_indexes={'data_loss':None, 'my_index':0.3})
+
+                 
 
 
     def test_DataTimePoint(self):
@@ -260,79 +284,79 @@ class TestPointSeries(unittest.TestCase):
 
     def test_TimePointSeries(self):
         
-        time_point_serie = TimePointSeries()
-        time_point_serie.append(TimePoint(t=60))
+        time_point_series = TimePointSeries()
+        time_point_series.append(TimePoint(t=60))
                 
         # Test for UTC time zone (autodetect)
-        time_point_serie = TimePointSeries()
-        time_point_serie.append(TimePoint(t=5))         
-        self.assertEqual(time_point_serie.tz, UTC)
-        self.assertEqual(type(time_point_serie.tz), type(UTC))
-        time_point_serie.append(TimePoint(t=10)) 
-        self.assertEqual(time_point_serie.tz, UTC)
-        self.assertEqual(type(time_point_serie.tz), type(UTC))
-        time_point_serie.append(TimePoint(t=15, tz='Europe/Rome')) # This will get ignored and timezone will stay on UTC
-        self.assertEqual(time_point_serie.tz, UTC)
-        self.assertEqual(type(time_point_serie.tz), type(UTC))
+        time_point_series = TimePointSeries()
+        time_point_series.append(TimePoint(t=5))         
+        self.assertEqual(time_point_series.tz, UTC)
+        self.assertEqual(type(time_point_series.tz), type(UTC))
+        time_point_series.append(TimePoint(t=10)) 
+        self.assertEqual(time_point_series.tz, UTC)
+        self.assertEqual(type(time_point_series.tz), type(UTC))
+        time_point_series.append(TimePoint(t=15, tz='Europe/Rome')) # This will get ignored and timezone will stay on UTC
+        self.assertEqual(time_point_series.tz, UTC)
+        self.assertEqual(type(time_point_series.tz), type(UTC))
 
         # Test for Europe/Rome timezone
-        time_point_serie = TimePointSeries() 
-        time_point_serie.append(TimePoint(t=15, tz='Europe/Rome'))
-        self.assertEqual(str(time_point_serie.tz), 'Europe/Rome')
+        time_point_series = TimePointSeries() 
+        time_point_series.append(TimePoint(t=15, tz='Europe/Rome'))
+        self.assertEqual(str(time_point_series.tz), 'Europe/Rome')
 
         # Test for Europe/Rome timezone
-        time_point_serie = TimePointSeries() 
-        time_point_serie.append(TimePoint(dt=dt(2015,3,5,9,27,tz='Europe/Rome')))
-        self.assertEqual(str(time_point_serie.tz), 'Europe/Rome')
-        data_time_point_series = DataTimePointSeries(DataTimePoint(dt=dt(2015,10,25,0,0,0, tz='Europe/Rome'), data={'a':23.8}),
+        time_point_series = TimePointSeries() 
+        time_point_series.append(TimePoint(dt=dt(2015,3,5,9,27,tz='Europe/Rome')))
+        self.assertEqual(str(time_point_series.tz), 'Europe/Rome')
+        data_time_point_seriess = DataTimePointSeries(DataTimePoint(dt=dt(2015,10,25,0,0,0, tz='Europe/Rome'), data={'a':23.8}),
                                                      DataTimePoint(dt=dt(2015,10,26,0,0,0, tz='Europe/Rome'), data={'a':23.8}))
-        self.assertEqual(str(data_time_point_series.tz), 'Europe/Rome')
+        self.assertEqual(str(data_time_point_seriess.tz), 'Europe/Rome')
                
-        # Change  tz
-        time_point_serie = TimePointSeries()
-        time_point_serie.append(TimePoint(t=5))
-        time_point_serie.append(TimePoint(t=10))
-        time_point_serie.tz = 'Europe/Rome'
-        self.assertEqual(str(time_point_serie.tz), 'Europe/Rome')
-        self.assertEqual(str(type(time_point_serie.tz)), "<class 'pytz.tzfile.Europe/Rome'>")
-        self.assertEqual(str(time_point_serie[0].tz), 'UTC') # This stays on UTC. TODO: seems a bug, actually!
+        # Change timezone
+        time_point_series = TimePointSeries()
+        time_point_series.append(TimePoint(t=5))
+        time_point_series.append(TimePoint(t=10))
+        time_point_series.change_timezone('Europe/Rome')
+        self.assertEqual(str(time_point_series.tz), 'Europe/Rome')
+        self.assertEqual(str(type(time_point_series.tz)), "<class 'pytz.tzfile.Europe/Rome'>")
+        self.assertEqual(str(time_point_series[0].tz), 'Europe/Rome')
 
         # Test for Europe/Rome time zone (set)
-        time_point_serie = TimePointSeries(tz = 'Europe/Rome')
-        self.assertEqual(str(time_point_serie.tz), 'Europe/Rome')
-        self.assertEqual(str(type(time_point_serie.tz)), "<class 'pytz.tzfile.Europe/Rome'>")
-        time_point_serie.append(TimePoint(t=5))
-        self.assertEqual(str(time_point_serie.tz), 'Europe/Rome')
-        self.assertEqual(str(type(time_point_serie.tz)), "<class 'pytz.tzfile.Europe/Rome'>")        
+        time_point_series = TimePointSeries(tz = 'Europe/Rome')
+        self.assertEqual(str(time_point_series.tz), 'Europe/Rome')
+        self.assertEqual(str(type(time_point_series.tz)), "<class 'pytz.tzfile.Europe/Rome'>")
+        time_point_series.append(TimePoint(t=5))
+        self.assertEqual(str(time_point_series.tz), 'Europe/Rome')
+        self.assertEqual(str(type(time_point_series.tz)), "<class 'pytz.tzfile.Europe/Rome'>")        
          
         # Test for Europe/Rome time zone  (autodetect)
-        time_point_serie = TimePointSeries()
-        time_point_serie.append(TimePoint(t=1569897900, tz='Europe/Rome')) 
-        self.assertEqual(str(time_point_serie.tz), 'Europe/Rome')
-        self.assertEqual(str(type(time_point_serie.tz)), "<class 'pytz.tzfile.Europe/Rome'>")
-        time_point_serie.append(TimePoint(t=1569897910, tz='Europe/Rome')) 
-        self.assertEqual(str(time_point_serie.tz), 'Europe/Rome')
-        self.assertEqual(str(type(time_point_serie.tz)), "<class 'pytz.tzfile.Europe/Rome'>")
-        time_point_serie.append(TimePoint(t=1569897920))
-        self.assertEqual(time_point_serie.tz, UTC)
-        self.assertEqual(type(time_point_serie.tz), type(UTC))
-        time_point_serie.tz = 'Europe/Rome'
-        self.assertEqual(str(time_point_serie.tz), 'Europe/Rome')
-        self.assertEqual(str(type(time_point_serie.tz)), "<class 'pytz.tzfile.Europe/Rome'>")  
+        time_point_series = TimePointSeries()
+        time_point_series.append(TimePoint(t=1569897900, tz='Europe/Rome')) 
+        self.assertEqual(str(time_point_series.tz), 'Europe/Rome')
+        self.assertEqual(str(type(time_point_series.tz)), "<class 'pytz.tzfile.Europe/Rome'>")
+        time_point_series.append(TimePoint(t=1569897910, tz='Europe/Rome')) 
+        self.assertEqual(str(time_point_series.tz), 'Europe/Rome')
+        self.assertEqual(str(type(time_point_series.tz)), "<class 'pytz.tzfile.Europe/Rome'>")
+        time_point_series.append(TimePoint(t=1569897920))
+        self.assertEqual(time_point_series.tz, UTC)
+        self.assertEqual(type(time_point_series.tz), type(UTC))
+        time_point_series.change_timezone('Europe/Rome')
+        self.assertEqual(str(time_point_series.tz), 'Europe/Rome')
+        self.assertEqual(str(type(time_point_series.tz)), "<class 'pytz.tzfile.Europe/Rome'>")  
         
         # Test resolution 
-        time_point_serie = TimePointSeries(TimePoint(t=60))
-        self.assertEqual(time_point_serie._resolution, None)
+        time_point_series = TimePointSeries(TimePoint(t=60))
+        self.assertEqual(time_point_series._resolution, None)
         
-        time_point_serie = TimePointSeries(TimePoint(t=60),TimePoint(t=121))
-        self.assertEqual(time_point_serie._resolution, 61)
+        time_point_series = TimePointSeries(TimePoint(t=60),TimePoint(t=121))
+        self.assertEqual(time_point_series._resolution, 61)
         
-        time_point_serie = TimePointSeries(TimePoint(t=60),TimePoint(t=120),TimePoint(t=130))
-        self.assertEqual(time_point_serie._resolution, 'variable')
+        time_point_series = TimePointSeries(TimePoint(t=60),TimePoint(t=120),TimePoint(t=130))
+        self.assertEqual(time_point_series._resolution, 'variable')
         
-        time_point_serie = TimePointSeries(TimePoint(t=60),TimePoint(t=120),TimePoint(t=180))
-        self.assertEqual(time_point_serie.duplicate().resolution, 60)
-        self.assertEqual(time_point_serie[0:2].resolution, 60)
+        time_point_series = TimePointSeries(TimePoint(t=60),TimePoint(t=120),TimePoint(t=180))
+        self.assertEqual(time_point_series.duplicate().resolution, 60)
+        self.assertEqual(time_point_series[0:2].resolution, 60)
         
         
 
@@ -437,12 +461,12 @@ class TestPointSeries(unittest.TestCase):
                                                      DataTimePoint(dt=dt(2015,10,28,0,0,0, tzinfo='Europe/Rome'), data={'a':24.1, 'b':2}),
                                                      DataTimePoint(dt=dt(2015,10,29,0,0,0, tzinfo='Europe/Rome'), data={'a':23.1, 'b':3}))
         
-        self.assertEqual(data_time_point_series.data_keys(), ['a','b'])
-        data_time_point_series.rename_data_key('b','c')
-        self.assertEqual(data_time_point_series.data_keys(), ['a','c'])
+        self.assertEqual(data_time_point_series.data_labels(), ['a','b'])
+        data_time_point_series.rename_data_label('b','c')
+        self.assertEqual(data_time_point_series.data_labels(), ['a','c'])
         
         with self.assertRaises(KeyError):
-            data_time_point_series.rename_data_key('notexistent_key','c')
+            data_time_point_series.rename_data_label('notexistent_key','c')
 
 
 
@@ -574,6 +598,29 @@ class TestSlots(unittest.TestCase):
 
         data_slot_with_data_loss = DataSlot(start=Point(1), end=Point(2), data='hello', data_loss=0.98)
         self.assertEqual(data_slot_with_data_loss.data_loss,0.98)
+
+        # Test list and dict data labels
+        data_slot = DataSlot(start=Point(1), end=Point(2), data=['hello', 'hola'])
+        self.assertEqual(data_slot.data_labels(), [0,1])
+        
+        data_slot = DataSlot(start=Point(1), end=Point(2), data={'label1':'hello', 'label2':'hola'})
+        self.assertEqual(data_slot.data_labels(), ['label1','label2'])
+
+        # Test with data loss index
+        data_slot = DataSlot(start=Point(1), end=Point(2), data='hello', data_loss=0.5)
+        self.assertEqual(data_slot.data_loss,0.5)
+        self.assertEqual(data_slot.data_indexes['data_loss'],0.5)
+        
+        # Test with generic indexes
+        data_slot = DataSlot(start=Point(1), end=Point(2), data='hello', data_indexes={'data_loss':0.5, 'my_index':0.3})
+        self.assertEqual(data_slot.data_loss,0.5)
+        self.assertEqual(data_slot.data_indexes['data_loss'],0.5)
+        self.assertEqual(data_slot.data_indexes['my_index'],0.3)
+        
+        # Test None index
+        #with self.assertRaises(ValueError):
+        DataSlot(start=Point(1), end=Point(2), data='hello', data_indexes={'data_loss':None, 'my_index':0.3})
+
     
 
     def test_DataTimeSlots(self):
@@ -786,12 +833,12 @@ class TestSlotSeries(unittest.TestCase):
                                                    DataTimeSlot(dt=dt(2015,10,28,0,0,0), unit='1D', data={'a':24.1, 'b':2}),
                                                    DataTimeSlot(dt=dt(2015,10,29,0,0,0), unit='1D', data={'a':23.1, 'b':3}))
         
-        self.assertEqual(data_time_slot_series.data_keys(), ['a','b'])
-        data_time_slot_series.rename_data_key('b','c')
-        self.assertEqual(data_time_slot_series.data_keys(), ['a','c'])
+        self.assertEqual(data_time_slot_series.data_labels(), ['a','b'])
+        data_time_slot_series.rename_data_label('b','c')
+        self.assertEqual(data_time_slot_series.data_labels(), ['a','c'])
         
         with self.assertRaises(KeyError):
-            data_time_slot_series.rename_data_key('notexistent_key','c')
+            data_time_slot_series.rename_data_label('notexistent_key','c')
 
 
 class TestSeriesSlices(unittest.TestCase):
@@ -829,7 +876,7 @@ class TestSeriesSlices(unittest.TestCase):
         
         # Test extra attributes
         self.assertEqual(str(series_slice.resolution), '1s')
-        self.assertEqual(series_slice.data_keys(), ['value'])
+        self.assertEqual(series_slice.data_labels(), ['value'])
         
         with self.assertRaises(AttributeError):
             series_slice.diff()

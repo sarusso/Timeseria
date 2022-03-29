@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Provides time manipulation utilities, with a particular focus on proper timezone handling."""
+"""Provides time manipulation utilities, with a particular focus on proper timezone and DST handling."""
 
 import datetime, calendar, pytz
 
@@ -177,7 +177,7 @@ def dt_from_str(string, timezone=None):
     elif ' ' in string:
         date, time = string.split(' ')
     else:
-        raise ValueError('Cannot find andy date/time separator (lookign for "T" or " " in "{}"'.format(string))
+        raise ValueError('Cannot find andy date/time separator (looking for "T" or " " in "{}"'.format(string))
         
     
     if time.endswith('Z'):
