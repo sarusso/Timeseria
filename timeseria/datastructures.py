@@ -974,16 +974,16 @@ class DataTimePointSeries(DataPointSeries, TimePointSeries):
             return 'Time series of #0 points'
 
     # Transformations
-    def slot(self, *args, **kwargs):
-        """Slot the series in slots of a length set by the ``unit`` parameter."""
-        from .transformations import Slotter
-        slotter = Slotter(*args, **kwargs)
-        return slotter.process(self)  
+    def aggregate(self, unit, *args, **kwargs):
+        """Aggregate the series in slots of a length set by the ``unit`` parameter."""
+        from .transformations import Aggregator
+        aggregator = Aggregator(unit, *args, **kwargs)
+        return aggregator.process(self)  
 
-    def resample(self, *args, **kwargs):
+    def resample(self, unit, *args, **kwargs):
         """Resample the series using a sampling interval of a length set by the ``unit`` parameter."""
         from .transformations import Resampler
-        resampler = Resampler(*args, **kwargs)
+        resampler = Resampler(unit, *args, **kwargs)
         return resampler.process(self)  
 
 
@@ -1617,13 +1617,11 @@ class DataTimeSlotSeries(DataSlotSeries, TimeSlotSeries):
             return 'Time series of #0 slots'
 
     # Transformations
-    def slot(self, *args, **kwargs):
-        """Slot the series in slots of a length set by the ``unit`` parameter."""
-        from .transformations import Slotter
-        slotter = Slotter(*args, **kwargs)
-        return slotter.process(self)  
-
-
+    def slot(self, unit, *args, **kwargs):
+        """Re-agregate the series in slots of a length set by the ``unit`` parameter."""
+        from .transformations import Aggregator
+        aggregator = Aggregator(unit, *args, **kwargs)
+        return aggregator.process(self)  
 
 
 

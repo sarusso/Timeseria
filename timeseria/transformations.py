@@ -351,7 +351,7 @@ class SlottedTransformation(Transformation):
         slot_end_dt = None
         process_ended = False
         slot_prev_point_i = None 
-        resampled_series = DataTimePointSeries() if target=='points' else DataTimeSlotSeries()
+        new_series = DataTimePointSeries() if target=='points' else DataTimeSlotSeries()
 
         # Set timezone
         timezone  = series.tz
@@ -471,35 +471,35 @@ class SlottedTransformation(Transformation):
                         # slot_last_point_i+1 is the "next" (and the index where we are at the moment)
                         logger.debug('This slot is closed: start=%s (%s) and end=%s (%s). Now computing it..', slot_start_t, slot_start_dt, slot_end_t, slot_end_dt)
                         
-                        # Compute the slot...
-                        computed_point = _compute_new(target = 'point' if target=='points' else 'slot',
-                                                      series = series,
-                                                      slot_first_point_i = slot_first_point_i,
-                                                      slot_last_point_i = slot_last_point_i ,                                                     
-                                                      slot_prev_point_i = slot_prev_point_i,
-                                                      slot_next_point_i = slot_next_point_i,
-                                                      from_t = slot_start_t,
-                                                      to_t = slot_end_t,
-                                                      unit = self.time_unit,
-                                                      point_validity = validity,
-                                                      timezone = timezone,
-                                                      fill_with = fill_with,
-                                                      force_data_loss = force_data_loss,
-                                                      fill_gaps = fill_gaps,
-                                                      series_data_indexes = series_data_indexes,
-                                                      series_resolution = series_resolution,
-                                                      force_compute_data_loss = True if first else False,
-                                                      interpolation_method=self.interpolation_method,
-                                                      operations = operations)
+                        # Compute the new item...
+                        new_item = _compute_new(target = 'point' if target=='points' else 'slot',
+                                                series = series,
+                                                slot_first_point_i = slot_first_point_i,
+                                                slot_last_point_i = slot_last_point_i ,                                                     
+                                                slot_prev_point_i = slot_prev_point_i,
+                                                slot_next_point_i = slot_next_point_i,
+                                                from_t = slot_start_t,
+                                                to_t = slot_end_t,
+                                                unit = self.time_unit,
+                                                point_validity = validity,
+                                                timezone = timezone,
+                                                fill_with = fill_with,
+                                                force_data_loss = force_data_loss,
+                                                fill_gaps = fill_gaps,
+                                                series_data_indexes = series_data_indexes,
+                                                series_resolution = series_resolution,
+                                                force_compute_data_loss = True if first else False,
+                                                interpolation_method=self.interpolation_method,
+                                                operations = operations)
                         
                         # Set first to false
                         if first:
                             first = False
                         
                         # .. and append results
-                        if computed_point:
-                            logger.debug('Computed point: %s',computed_point )
-                            resampled_series.append(computed_point)
+                        if new_item:
+                            logger.debug('Computed new item: %s',new_item )
+                            new_series.append(new_item)
 
                     # Create a new slot. This is where all the "conventional" time logic kicks-in, and where the time zone is required.
                     slot_start_t = slot_end_t
@@ -519,16 +519,23 @@ class SlottedTransformation(Transformation):
                 if point.dt >= to_dt:
                     process_ended = True
         
-        logger.info('Resampled %s DataTimePoints in %s DataTimePoints', count, len(resampled_series))
-        return resampled_series
+        if target == 'points':
+            logger.info('Resampled %s DataTimePoints in %s DataTimePoints', count, len(new_series))
+        else:
+            if isinstance(series, DataTimePointSeries):
+                logger.info('Aggregated %s DataTimePoints in %s DataTimeSlots', count, len(new_series))
+            else:
+                logger.info('Aggregated %s DataTimeSlots in %s DataTimeSlots', count, len(new_series))
+                
+        return new_series
 
 
 #==========================
-#  Resampler Transformation
+#   Resampler
 #==========================
 
 class Resampler(SlottedTransformation):
-    """Resampler transformation."""
+    """Resampling transformation."""
 
     def __init__(self, unit, interpolation_method='linear'):
 
@@ -549,11 +556,11 @@ class Resampler(SlottedTransformation):
 
 
 #==========================
-#  Slotter Transformation
+#   Aggregator
 #==========================
 
-class Slotter(SlottedTransformation):
-    """Slotter transformation."""
+class Aggregator(SlottedTransformation):
+    """Aggregation transformation."""
 
     def __init__(self, unit, operations=[avg], interpolation_method='linear'):
         
@@ -583,7 +590,7 @@ class Slotter(SlottedTransformation):
 
     def process(self, *args, **kwargs):
         kwargs['target'] = 'slots'
-        return super(Slotter, self).process(*args, **kwargs) 
+        return super(Aggregator, self).process(*args, **kwargs) 
 
 
 
