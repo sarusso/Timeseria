@@ -366,7 +366,7 @@ class TestDetectSamplingInterval(unittest.TestCase):
         data_time_point_series = CSVFileStorage(TEST_DATA_PATH + '/csv/humitemp_short.csv').get()
         self.assertEqual(detect_sampling_interval(data_time_point_series), 61)
         
-        data_time_point_series = CSVFileStorage(TEST_DATA_PATH + '/csv/shampoo_sales.csv', time_column = 'Month', time_format = '%y-%m').get()
+        data_time_point_series = CSVFileStorage(TEST_DATA_PATH + '/csv/shampoo_sales.csv', date_label = 'Month', date_format = '%y-%m').get()
         self.assertEqual(detect_sampling_interval(data_time_point_series), 2678400)  # 2678400/60/60/24 = 31 Days (the most frequent)
 
         data_time_point_series = CSVFileStorage(TEST_DATA_PATH + '/csv/temperature.csv').get()
