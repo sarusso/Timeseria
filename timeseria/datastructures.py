@@ -318,13 +318,13 @@ class Series(list):
         return select_operation(self, *args, **kwargs)
     
     # Inspection utilities
-    def print(self, limit=10):
-        """Print the series. By default limited to 10 elements.
+    def inspect(self, limit=10):
+        """Prints a summary of the series and its elements, limited to 10 items by default.
         
             Args:
                 limit: the limit of elements to print, by default 10.
         """
-        
+        print(str(self)+':\n')
         print('[', end='')
         
         if not limit or limit > len(self):
@@ -360,8 +360,51 @@ class Series(list):
 
         print(']')
 
+    def inspect_as_str(self, limit=10):
+        """Return a summary of the series and its elements, limited to 10 items by default.
+        
+            Args:
+                limit: the limit of elements to print, by default 10.
+        """
+        
+        string = str(self)+':\n\n'
+        string+='['
+        
+        if not limit or limit > len(self):
+        
+            for i, item in enumerate(self):
+                if limit and i >= limit:
+                    break
+                else:
+                    if i==0:
+                        string+=str(item)+',\n'
+                    elif i==len(self)-1:
+                        string+=' '+str(item)                        
+                    else:
+                        string+=' '+str(item)+',\n'
+        else:
+            
+            head_n = int(limit/2)+1
+            tail_n = int(limit/2)
 
-    def contents(self, n=5):
+            for i, item in enumerate(self.head(head_n)):
+                if i==0:
+                    string+=str(item)+',\n'                       
+                else:
+                    string+=' '+str(item)+',\n'
+
+            string+=' ...\n'
+
+            for i, item in enumerate(self.tail(tail_n)):
+                if i==tail_n-1:
+                    string+=' '+str(item)                        
+                else:
+                    string+=' '+str(item)+',\n'
+
+        string+=']'
+        return string
+
+    def contents(self):
         """Get al the items of the series as a list."""   
         return list(self)     
 
