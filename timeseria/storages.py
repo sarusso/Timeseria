@@ -172,7 +172,7 @@ class CSVFileStorage(Storage):
         """
         
         
-        # TODO: add from_dt / to_dt /from_t / to_t
+        # TODO: add from_dt / to_dt /from_t / to_t. Cfr series.filter()
 
         # Sanity checks
         if as_points and as_slots:

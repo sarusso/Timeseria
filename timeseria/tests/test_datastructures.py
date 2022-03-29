@@ -284,79 +284,79 @@ class TestPointSeries(unittest.TestCase):
 
     def test_TimePointSeries(self):
         
-        time_point_serie = TimePointSeries()
-        time_point_serie.append(TimePoint(t=60))
+        time_point_series = TimePointSeries()
+        time_point_series.append(TimePoint(t=60))
                 
         # Test for UTC time zone (autodetect)
-        time_point_serie = TimePointSeries()
-        time_point_serie.append(TimePoint(t=5))         
-        self.assertEqual(time_point_serie.tz, UTC)
-        self.assertEqual(type(time_point_serie.tz), type(UTC))
-        time_point_serie.append(TimePoint(t=10)) 
-        self.assertEqual(time_point_serie.tz, UTC)
-        self.assertEqual(type(time_point_serie.tz), type(UTC))
-        time_point_serie.append(TimePoint(t=15, tz='Europe/Rome')) # This will get ignored and timezone will stay on UTC
-        self.assertEqual(time_point_serie.tz, UTC)
-        self.assertEqual(type(time_point_serie.tz), type(UTC))
+        time_point_series = TimePointSeries()
+        time_point_series.append(TimePoint(t=5))         
+        self.assertEqual(time_point_series.tz, UTC)
+        self.assertEqual(type(time_point_series.tz), type(UTC))
+        time_point_series.append(TimePoint(t=10)) 
+        self.assertEqual(time_point_series.tz, UTC)
+        self.assertEqual(type(time_point_series.tz), type(UTC))
+        time_point_series.append(TimePoint(t=15, tz='Europe/Rome')) # This will get ignored and timezone will stay on UTC
+        self.assertEqual(time_point_series.tz, UTC)
+        self.assertEqual(type(time_point_series.tz), type(UTC))
 
         # Test for Europe/Rome timezone
-        time_point_serie = TimePointSeries() 
-        time_point_serie.append(TimePoint(t=15, tz='Europe/Rome'))
-        self.assertEqual(str(time_point_serie.tz), 'Europe/Rome')
+        time_point_series = TimePointSeries() 
+        time_point_series.append(TimePoint(t=15, tz='Europe/Rome'))
+        self.assertEqual(str(time_point_series.tz), 'Europe/Rome')
 
         # Test for Europe/Rome timezone
-        time_point_serie = TimePointSeries() 
-        time_point_serie.append(TimePoint(dt=dt(2015,3,5,9,27,tz='Europe/Rome')))
-        self.assertEqual(str(time_point_serie.tz), 'Europe/Rome')
-        data_time_point_series = DataTimePointSeries(DataTimePoint(dt=dt(2015,10,25,0,0,0, tz='Europe/Rome'), data={'a':23.8}),
+        time_point_series = TimePointSeries() 
+        time_point_series.append(TimePoint(dt=dt(2015,3,5,9,27,tz='Europe/Rome')))
+        self.assertEqual(str(time_point_series.tz), 'Europe/Rome')
+        data_time_point_seriess = DataTimePointSeries(DataTimePoint(dt=dt(2015,10,25,0,0,0, tz='Europe/Rome'), data={'a':23.8}),
                                                      DataTimePoint(dt=dt(2015,10,26,0,0,0, tz='Europe/Rome'), data={'a':23.8}))
-        self.assertEqual(str(data_time_point_series.tz), 'Europe/Rome')
+        self.assertEqual(str(data_time_point_seriess.tz), 'Europe/Rome')
                
-        # Change  tz
-        time_point_serie = TimePointSeries()
-        time_point_serie.append(TimePoint(t=5))
-        time_point_serie.append(TimePoint(t=10))
-        time_point_serie.tz = 'Europe/Rome'
-        self.assertEqual(str(time_point_serie.tz), 'Europe/Rome')
-        self.assertEqual(str(type(time_point_serie.tz)), "<class 'pytz.tzfile.Europe/Rome'>")
-        self.assertEqual(str(time_point_serie[0].tz), 'UTC') # This stays on UTC. TODO: seems a bug, actually!
+        # Change timezone
+        time_point_series = TimePointSeries()
+        time_point_series.append(TimePoint(t=5))
+        time_point_series.append(TimePoint(t=10))
+        time_point_series.change_timezone('Europe/Rome')
+        self.assertEqual(str(time_point_series.tz), 'Europe/Rome')
+        self.assertEqual(str(type(time_point_series.tz)), "<class 'pytz.tzfile.Europe/Rome'>")
+        self.assertEqual(str(time_point_series[0].tz), 'Europe/Rome')
 
         # Test for Europe/Rome time zone (set)
-        time_point_serie = TimePointSeries(tz = 'Europe/Rome')
-        self.assertEqual(str(time_point_serie.tz), 'Europe/Rome')
-        self.assertEqual(str(type(time_point_serie.tz)), "<class 'pytz.tzfile.Europe/Rome'>")
-        time_point_serie.append(TimePoint(t=5))
-        self.assertEqual(str(time_point_serie.tz), 'Europe/Rome')
-        self.assertEqual(str(type(time_point_serie.tz)), "<class 'pytz.tzfile.Europe/Rome'>")        
+        time_point_series = TimePointSeries(tz = 'Europe/Rome')
+        self.assertEqual(str(time_point_series.tz), 'Europe/Rome')
+        self.assertEqual(str(type(time_point_series.tz)), "<class 'pytz.tzfile.Europe/Rome'>")
+        time_point_series.append(TimePoint(t=5))
+        self.assertEqual(str(time_point_series.tz), 'Europe/Rome')
+        self.assertEqual(str(type(time_point_series.tz)), "<class 'pytz.tzfile.Europe/Rome'>")        
          
         # Test for Europe/Rome time zone  (autodetect)
-        time_point_serie = TimePointSeries()
-        time_point_serie.append(TimePoint(t=1569897900, tz='Europe/Rome')) 
-        self.assertEqual(str(time_point_serie.tz), 'Europe/Rome')
-        self.assertEqual(str(type(time_point_serie.tz)), "<class 'pytz.tzfile.Europe/Rome'>")
-        time_point_serie.append(TimePoint(t=1569897910, tz='Europe/Rome')) 
-        self.assertEqual(str(time_point_serie.tz), 'Europe/Rome')
-        self.assertEqual(str(type(time_point_serie.tz)), "<class 'pytz.tzfile.Europe/Rome'>")
-        time_point_serie.append(TimePoint(t=1569897920))
-        self.assertEqual(time_point_serie.tz, UTC)
-        self.assertEqual(type(time_point_serie.tz), type(UTC))
-        time_point_serie.tz = 'Europe/Rome'
-        self.assertEqual(str(time_point_serie.tz), 'Europe/Rome')
-        self.assertEqual(str(type(time_point_serie.tz)), "<class 'pytz.tzfile.Europe/Rome'>")  
+        time_point_series = TimePointSeries()
+        time_point_series.append(TimePoint(t=1569897900, tz='Europe/Rome')) 
+        self.assertEqual(str(time_point_series.tz), 'Europe/Rome')
+        self.assertEqual(str(type(time_point_series.tz)), "<class 'pytz.tzfile.Europe/Rome'>")
+        time_point_series.append(TimePoint(t=1569897910, tz='Europe/Rome')) 
+        self.assertEqual(str(time_point_series.tz), 'Europe/Rome')
+        self.assertEqual(str(type(time_point_series.tz)), "<class 'pytz.tzfile.Europe/Rome'>")
+        time_point_series.append(TimePoint(t=1569897920))
+        self.assertEqual(time_point_series.tz, UTC)
+        self.assertEqual(type(time_point_series.tz), type(UTC))
+        time_point_series.change_timezone('Europe/Rome')
+        self.assertEqual(str(time_point_series.tz), 'Europe/Rome')
+        self.assertEqual(str(type(time_point_series.tz)), "<class 'pytz.tzfile.Europe/Rome'>")  
         
         # Test resolution 
-        time_point_serie = TimePointSeries(TimePoint(t=60))
-        self.assertEqual(time_point_serie._resolution, None)
+        time_point_series = TimePointSeries(TimePoint(t=60))
+        self.assertEqual(time_point_series._resolution, None)
         
-        time_point_serie = TimePointSeries(TimePoint(t=60),TimePoint(t=121))
-        self.assertEqual(time_point_serie._resolution, 61)
+        time_point_series = TimePointSeries(TimePoint(t=60),TimePoint(t=121))
+        self.assertEqual(time_point_series._resolution, 61)
         
-        time_point_serie = TimePointSeries(TimePoint(t=60),TimePoint(t=120),TimePoint(t=130))
-        self.assertEqual(time_point_serie._resolution, 'variable')
+        time_point_series = TimePointSeries(TimePoint(t=60),TimePoint(t=120),TimePoint(t=130))
+        self.assertEqual(time_point_series._resolution, 'variable')
         
-        time_point_serie = TimePointSeries(TimePoint(t=60),TimePoint(t=120),TimePoint(t=180))
-        self.assertEqual(time_point_serie.duplicate().resolution, 60)
-        self.assertEqual(time_point_serie[0:2].resolution, 60)
+        time_point_series = TimePointSeries(TimePoint(t=60),TimePoint(t=120),TimePoint(t=180))
+        self.assertEqual(time_point_series.duplicate().resolution, 60)
+        self.assertEqual(time_point_series[0:2].resolution, 60)
         
         
 

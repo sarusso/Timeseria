@@ -732,11 +732,11 @@ class Filter(SeriesOperation):
         
         # Re-set reference data as well
         try:
-            filtered_series.item_data_reference
+            filtered_series._item_data_reference
         except AttributeError:
             pass
         else:
-            filtered_series.item_data_reference = filtered_series[0].data
+            filtered_series._item_data_reference = filtered_series[0].data
 
         return filtered_series 
 

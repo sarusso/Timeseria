@@ -512,7 +512,7 @@ class TimePoint(Point):
             return UTC
     
     def change_timezone(self, new_timezone):
-        """Change the time zone of the Point."""
+        """Change the time zone of the point, in-place."""
         self._tz = timezonize(new_timezone)
 
     @property
@@ -702,7 +702,7 @@ class TimePointSeries(PointSeries):
             return self._tz
         except AttributeError:
             # Detect time zone on the fly
-            # TODO: this takes forever, why do we compare with ALL data points/slots time zones?
+            # TODO: this ensure each ppint is on the sam etime zone. Do we want this?
             detected_tz = None
             for item in self:
                 if not detected_tz:
@@ -713,15 +713,11 @@ class TimePointSeries(PointSeries):
                         return UTC
             return detected_tz
     
-    @tz.setter
-    def tz(self, value):
-        self._tz = timezonize(value) 
-
     def change_timezone(self, new_timezone):
-        """Change the time zone od the series."""
+        """Change the time zone of the series, in-place."""
         for time_point in self:
             time_point.change_timezone(new_timezone)
-        self.tz = time_point.tz
+        self._tz = time_point.tz
 
     def as_timezone(self, timezone):
         """Get a copy of the series on a new time zone.""" 
@@ -734,7 +730,7 @@ class TimePointSeries(PointSeries):
         """The (temporal) resolution of the time series."""
         return self._resolution
 
-    
+   
 class DataPointSeries(PointSeries):
     """A series of data points, where each item is guaranteed to be ordered and to carry the same data type.
 
@@ -746,28 +742,25 @@ class DataPointSeries(PointSeries):
 
     # Check data compatibility
     def append(self, item):
+        
         try:
-            # logger.debug('Checking data compatibility: %s ', item.data)
-            #if item.data is None and self.accept_None:
-            #    pass
-            #else:
-            if not type(self.item_data_reference) == type(item.data):
-                raise TypeError('Got different data: {} vs {}'.format(self.item_data_reference.__class__.__name__, item.data.__class__.__name__))
-            if isinstance(self.item_data_reference, list):
-                if len(self.item_data_reference) != len(item.data):
-                    raise ValueError('Got different data lengths: {} vs {}'.format(len(self.item_data_reference), len(item.data)))
-            if isinstance(self.item_data_reference, dict):
-                if set(self.item_data_reference.keys()) != set(item.data.keys()):
-                    raise ValueError('Got different data keys: {} vs {}'.format(self.item_data_reference.keys(), item.data.keys()))
+            if not type(self._item_data_reference) == type(item.data):
+                raise TypeError('Got different data: {} vs {}'.format(self._item_data_reference.__class__.__name__, item.data.__class__.__name__))
+            if isinstance(self._item_data_reference, list):
+                if len(self._item_data_reference) != len(item.data):
+                    raise ValueError('Got different data lengths: {} vs {}'.format(len(self._item_data_reference), len(item.data)))
+            if isinstance(self._item_data_reference, dict):
+                if set(self._item_data_reference.keys()) != set(item.data.keys()):
+                    raise ValueError('Got different data keys: {} vs {}'.format(self._item_data_reference.keys(), item.data.keys()))
             
         except AttributeError:
             # logger.debug('Setting data reference: %s', item.data)
-            self.item_data_reference = item.data
+            self._item_data_reference = item.data
             
         super(DataPointSeries, self).append(item)
 
     def data_labels(self):
-        """Return the keys of the data carried by the DataPoints.
+        """Return the labels of the data carried by the DataPoints.
         If data is a dictionary, then these are the dictionary keys,
         if data is a list, then these are the list indexes. Other
         data formats are not supported."""
@@ -782,18 +775,21 @@ class DataPointSeries(PointSeries):
                 return list(range(len(self[0].data)))
 
     def rename_data_label(self, old_key, new_key):
-        """Rename a data key."""
+        """Rename a data key, in-place."""
         for item in self:
             # TODO: move to the DataPoint/DataSlot?
             item.data[new_key] = item.data.pop(old_key)
 
     def remove_data_loss(self):
-        """Return a new series without the ``data_loss`` index."""
-        new_series = self.duplicate()
-        for item in new_series:
+        """Remove the ``data_loss`` index, in-place."""
+        for item in self:
             item.data_indexes.pop('data_loss', None)
-        return new_series
-    
+
+    def remove_data_index(self, data_index):
+        """Remove a data index, in-place."""
+        for item in self:
+            item.data_indexes.pop(data_index, None)        
+
     # Operations
     def min(self, *args, **kwargs):
         """Get the minimum data value(s) of a series. Supports an optional ``data_label`` argument."""
@@ -935,8 +931,8 @@ class DataTimePointSeries(DataPointSeries, TimePointSeries):
         return df
         
     def plot(self, engine='dg', *args, **kwargs):
-        """Plot the time series. The default plotting engine is Dygraphs (engine=\'dg\'),
-           limited support for Matplotplib (engine=\'mp\') is also available.
+        """Plot the time series. The default plotting engine is Dygraphs (``engine=\'dg\'``),
+           limited support for Matplotplib (``engine=\'mp\'``) is also available.
            For plotting options for Dygraphs, see :func:`~.plots.dygraphs_plot`, while for
            plotting options for Matplotlib, see :func:`~.plots.matplotlib_plot`.""" 
         if engine=='mp':
@@ -1146,7 +1142,7 @@ class TimeSlot(Slot):
             return True
 
     def change_timezone(self, new_timezone):
-        """Change the time zone of the slot."""
+        """Change the time zone of the slot, in-place."""
         self.start.change_timezone(new_timezone)
         self.end.change_timezone(new_timezone)
         self.tz = self.start.tz
@@ -1349,9 +1345,17 @@ class TimeSlotSeries(SlotSeries):
                 raise ValueError('Cannot add items on different time zones (I have "{}" and you tried to add "{}")'.format(self.tz, item.start.tz))
 
         super(TimeSlotSeries, self).append(item)
+ 
+    @property
+    def tz(self):
+        """The time zone of the time series."""
+        try:
+            return self._tz
+        except AttributeError:
+            return None
         
     def change_timezone(self, new_timezone):
-        """Change the time zone of the series."""
+        """Change the time zone of the series, in-place."""
         for time_slot in self:
             time_slot.change_timezone(new_timezone)
         self._tz = time_slot.tz
@@ -1367,14 +1371,6 @@ class TimeSlotSeries(SlotSeries):
         """The (temporal) resolution of the time series."""
         return self._resolution
 
-    @property
-    def tz(self):
-        """The time zone of the time series."""
-        try:
-            return self._tz
-        except AttributeError:
-            return None
-
 
 class DataSlotSeries(SlotSeries):
     """A series of data slots, where each item is guaranteed to be in succession and to carry the same data type.
@@ -1388,25 +1384,24 @@ class DataSlotSeries(SlotSeries):
     # Check data compatibility
     def append(self, item):
         
-        # Check for data compatibility
         try:
-            if not type(self.item_data_reference) == type(item.data):
-                raise TypeError('Got different data: {} vs {}'.format(self.item_data_reference.__class__.__name__, item.data.__class__.__name__))
-            if isinstance(self.item_data_reference, list):
-                if len(self.item_data_reference) != len(item.data):
-                    raise ValueError('Got different data lengths: {} vs {}'.format(len(self.item_data_reference), len(item.data)))
-            if isinstance(self.item_data_reference, dict):
-                if set(self.item_data_reference.keys()) != set(item.data.keys()):
-                    raise ValueError('Got different data keys: {} vs {}'.format(self.item_data_reference.keys(), item.data.keys()))
+            if not type(self._item_data_reference) == type(item.data):
+                raise TypeError('Got different data: {} vs {}'.format(self._item_data_reference.__class__.__name__, item.data.__class__.__name__))
+            if isinstance(self._item_data_reference, list):
+                if len(self._item_data_reference) != len(item.data):
+                    raise ValueError('Got different data lengths: {} vs {}'.format(len(self._item_data_reference), len(item.data)))
+            if isinstance(self._item_data_reference, dict):
+                if set(self._item_data_reference.keys()) != set(item.data.keys()):
+                    raise ValueError('Got different data keys: {} vs {}'.format(self._item_data_reference.keys(), item.data.keys()))
 
         except AttributeError:
-            # TODO: uniform self.tz, self._resolution, self.item_data_reference
-            self.item_data_reference = item.data
+            # TODO: uniform self.tz, self._resolution, self._item_data_reference
+            self._item_data_reference = item.data
         
         super(DataSlotSeries, self).append(item)
     
     def data_labels(self):
-        """Return the keys of the data carried by the DataSlots.
+        """Return the labels of the data carried by the DataSlots.
         If data is a dictionary, then these are the dictionary keys,
         if data is a list, then these are the list indexes. Other
         data formats are not supported."""
@@ -1420,17 +1415,20 @@ class DataSlotSeries(SlotSeries):
                 return list(range(len(self[0].data)))
 
     def rename_data_label(self, old_key, new_key):
-        """Rename a data key."""
+        """Rename a data key, in-place."""
         for item in self:
             # TODO: move to the DataPoint/DataSlot?
             item.data[new_key] = item.data.pop(old_key)
 
     def remove_data_loss(self):
-        """Return a new series without the ``data_loss`` index."""
-        new_series = self.duplicate()
-        for item in new_series:
+        """Remove the ``data_loss`` index, in-place."""
+        for item in self:
             item.data_indexes.pop('data_loss', None)
-        return new_series
+    
+    def remove_data_index(self, data_index):
+        """Remove a data index, in-place."""
+        for item in self:
+            item.data_indexes.pop(data_index, None)        
 
     # Operations
     def min(self, *args, **kwargs):
@@ -1597,8 +1595,8 @@ class DataTimeSlotSeries(DataSlotSeries, TimeSlotSeries):
         return df
 
     def plot(self, engine='dg', *args, **kwargs):
-        """Plot the time series. The default plotting engine is Dygraphs (engine=\'dg\'),
-           limited support for Matplotplib (engine=\'mp\') is also available.
+        """Plot the time series. The default plotting engine is Dygraphs (``engine=\'dg\'``ƒ),
+           limited support for Matplotplib (``engine=\'mp\'``) is also available.
            For plotting options for Dygraphs, see :func:`~.plots.dygraphs_plot`, while for
            plotting options for Matplotlib, see :func:`~.plots.matplotlib_plot`.""" 
         if engine=='mp':

@@ -491,8 +491,8 @@ class TestSlotter(unittest.TestCase):
         self.assertEqual(str(series[2].start.dt), str('2019-10-01 03:00:00+02:00'))
         self.assertEqual(str(series[3].start.dt), str('2019-10-01 04:00:00+02:00'))
  
-        # Test changing timezone of the series
-        self.series_6.tz = 'America/New_York'
+        # Test with changing timezone of the series
+        self.series_6.change_timezone('America/New_York')
         series = Slotter('1h').process(self.series_6)
         self.assertEqual(len(series), 4)
         self.assertEqual(str(series[0].start.dt), str('2019-09-30 19:00:00-04:00'))
