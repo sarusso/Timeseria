@@ -1,11 +1,9 @@
 # Timeseria
 
 
-Timeseria is a time series processing library which aims at making it easy to manipulate time series data and to build statistical and machine learning models on top of it.
+Timeseria is an object-oriented time series processing library which aims at making it easy to manipulate time series data and to build statistical and machine learning models on top of it.
 
-Unlike common numerical and data analyisis frameworks, it is fully object-oriented and quite Pythonic. It adopts a strategy of implementing building blocks that can be easily composed together, and integrates a powerful plotting engine based on Dygraphs.
-
-It comes with a built-in set of common operations (resampling, slotting, differencing etc.) and models (reconstruction, forecasting and anomaly detection) which can cover a variety of simple use-cases. Moreover, both custom operations and models can be easily plugged in.
+It comes with a built-in set of common operations (resampling, aggregating, differencing etc.) and models (reconstruction, forecasting and anomaly detection) which can cover a variety of simple use-cases. Moreover, both custom operations and models can be easily plugged in.
 
 Timeseria also addresses by design all those annoying things which are often left as an implementation detail but that actually cause wasting massive amounts of time - as handling data losses, non-uniform sampling rates, differences between time-slotted (aggregated) data and punctual observations, variable time units, timezones, DST changes and so on.
 
