@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Series transformations as slotting and resampling."""
+"""Series transformations as resampling and aggregation."""
 
 from .time import dt_from_s, s_from_dt, as_timezone
 from .datastructures import DataTimeSlot, DataTimeSlotSeries, TimePoint, DataTimePointSeries, DataTimePoint, SeriesSlice, SeriesDenseSlice
