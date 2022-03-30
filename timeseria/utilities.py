@@ -461,7 +461,7 @@ def get_periodicity(timeseries):
         return int(round(max_peak_frequency))
 
 def mean_absolute_percentage_error(list1, list2):
-    '''Computes the MAPE, list 1 are true values, list2 arepredicted values'''
+    '''Computes the MAPE, list 1 are true values, list2 are predicted values'''
     if len(list1) != len(list2):
         raise ValueError('Lists have different lengths, cannot continue')
     p_error_sum = 0
@@ -477,11 +477,11 @@ def get_periodicity_index(item, resolution, periodicity, dst_affected=False):
         resolution_s = resolution.duration_s(item.dt)
     elif isinstance(resolution, Unit):  
         if isinstance(resolution.value, list):
-            raise NotImplementedError('Sorry, periodicty in multi-dimensional spaces are not defined')
+            raise NotImplementedError('Sorry, periodocity in multi-dimensional spaces are not defined')
         resolution_s = resolution.value
     else:
         if isinstance(resolution, list):
-            raise NotImplementedError('Sorry, periodicty in multi-dimensional spaces are not defined')
+            raise NotImplementedError('Sorry, periodocity in multi-dimensional spaces are not defined')
         resolution_s = resolution
 
     # Compute periodicity index

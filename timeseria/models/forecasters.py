@@ -363,7 +363,7 @@ class Forecaster(TimeSeriesParametricModel):
     
         # Do we have missing forecasts?
         if input_timeseries_len + steps != len(forecast_timeseries):
-            raise ValueError('There are missing forecasts. If your model does not support multi-step forecasting, raise a NotImplementedError if n>1 and Timeseria will handle it for you.')
+            raise ValueError('There are missing forecasts. If your model does not support multi-step forecasting, raise a NotImplementedError if steps>1 and Timeseria will handle it for you.')
  
         if not inplace:
             return forecast_timeseries
