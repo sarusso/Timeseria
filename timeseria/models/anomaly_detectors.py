@@ -75,14 +75,14 @@ class ForecasterAnomalyDetector(AnomalyDetector):
         
         try:
             # Try the optimized predict call (which just use the data as-is)
-            prediction = self.forecaster.predict(timeseries, n=1, forecast_start = i-1)
+            prediction = self.forecaster.predict(timeseries, steps=1, forecast_start = i-1)
             
         except TypeError as e:
             if '_predict() got an unexpected keyword argument \'forecast_start\'' in str(e):
                 # Otherwise, create on the fly a slice of the time series for the window.
                 # Datapoints are only linked, not copied - so this is just a minor overhead.
                 window_timeseries = timeseries[i-forecaster_window:i]
-                prediction = self.forecaster.predict(window_timeseries, n=1)
+                prediction = self.forecaster.predict(window_timeseries, steps=1)
             else:
                 raise e
 

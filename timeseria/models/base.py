@@ -494,14 +494,14 @@ class KerasModel(ParametricModel):
 
         
     @staticmethod
-    def to_window_datapoints_matrix(timeseries, window, forecast_n, encoder=None):
+    def to_window_datapoints_matrix(timeseries, window, steps, encoder=None):
         '''Compute window datapoints matrix from a time series.'''
-    
+        # steps to be intended as steps ahead (for the forecaster)
         window_datapoints = []
         for i, _ in enumerate(timeseries):
             if i <  window:
                 continue
-            if i == len(timeseries) + 1 - forecast_n:
+            if i == len(timeseries) + 1 - steps:
                 break
                     
             # Add window values
@@ -514,8 +514,9 @@ class KerasModel(ParametricModel):
 
     
     @staticmethod
-    def to_target_values_vector(timeseries, window, forecast_n):
+    def to_target_values_vector(timeseries, window, steps):
         '''Compute target values vector from a time series.'''
+        # steps to be intended as steps ahead (for the forecaster)
     
         data_labels = timeseries.data_labels()
     
@@ -523,12 +524,12 @@ class KerasModel(ParametricModel):
         for i, _ in enumerate(timeseries):
             if i <  window:
                 continue
-            if i == len(timeseries) + 1 - forecast_n:
+            if i == len(timeseries) + 1 - steps:
                 break
             
             # Add forecast target value(s)
             row = []
-            for j in range(forecast_n):
+            for j in range(steps):
                 for data_label in data_labels:
                     row.append(timeseries[i+j].data[data_label])
             targets.append(row)

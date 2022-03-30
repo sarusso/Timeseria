@@ -113,7 +113,7 @@ class TestBaseModelClasses(unittest.TestCase):
 
 
         # Test window generation functions
-        window_matrix = KerasModelMock.to_window_datapoints_matrix(data_time_point_series, window=2, forecast_n=1, encoder=None)
+        window_matrix = KerasModelMock.to_window_datapoints_matrix(data_time_point_series, window=2, steps=1, encoder=None)
         
         # What to expect (using the timestamp to represent a datapoint):
         # 1,2
@@ -135,14 +135,11 @@ class TestBaseModelClasses(unittest.TestCase):
         self.assertEqual(window_matrix[-1][0].t, 4)
         self.assertEqual(window_matrix[-1][1].t, 5)
         
-        target_vector = KerasModelMock.to_target_values_vector(data_time_point_series, window=2, forecast_n=1)
+        target_vector = KerasModelMock.to_target_values_vector(data_time_point_series, window=2, steps=1)
 
         # What to expect (using the data value to represent a datapoint):
         # [0.3], [0.4], [0.5], [0.6] Note that they are lists in order to support multi-step forecast
         self.assertEqual(target_vector, [[0.3], [0.4], [0.5], [0.6]])
-        
-        
-        
         
 
 
@@ -290,11 +287,11 @@ class TestForecasters(unittest.TestCase):
         forecaster.fit(self.sine_series_minute, periodicity=63)
 
         # Apply
-        sine_series_minute_with_forecast = forecaster.apply(self.sine_series_minute, n=3)
+        sine_series_minute_with_forecast = forecaster.apply(self.sine_series_minute, steps=3)
         self.assertEqual(len(sine_series_minute_with_forecast), 1003)
 
         # Predict
-        prediction = forecaster.predict(self.sine_series_minute, n=3)
+        prediction = forecaster.predict(self.sine_series_minute, steps=3)
         self.assertTrue(isinstance(prediction, list))
         self.assertEqual(len(prediction), 3)
 
@@ -354,7 +351,6 @@ class TestForecasters(unittest.TestCase):
         forecasted_data_time_point_series  = loaded_forecaster.apply(self.sine_series_minute)
 
 
-
     def test_ProphetForecaster(self):
 
         try:
@@ -368,7 +364,7 @@ class TestForecasters(unittest.TestCase):
         forecaster.fit(self.sine_series_day)
         self.assertEqual(len(self.sine_series_day), 1000)
   
-        sine_series_day_with_forecast = forecaster.apply(self.sine_series_day, n=3)
+        sine_series_day_with_forecast = forecaster.apply(self.sine_series_day, steps=3)
         self.assertEqual(len(sine_series_day_with_forecast), 1003)
 
         # Test the evaluate
@@ -409,10 +405,10 @@ class TestForecasters(unittest.TestCase):
 
         # Cannot apply on a time series contiguous with the time series used for the fit
         with self.assertRaises(NonContiguityError):
-            forecaster.apply(self.sine_series_day[:-1], n=3)
+            forecaster.apply(self.sine_series_day[:-1], steps=3)
     
         # Can apply on a time series contiguous with the fit one
-        sine_series_day_with_forecast = forecaster.apply(self.sine_series_day, n=3)
+        sine_series_day_with_forecast = forecaster.apply(self.sine_series_day, steps=3)
         self.assertEqual(len(sine_series_day_with_forecast), 1003)
 
         # Cannot evaluate on a time series not contiguous with the time series used for the fit
@@ -455,10 +451,10 @@ class TestForecasters(unittest.TestCase):
 
         # Cannot apply on a time series contiguous with the time series used for the fit
         with self.assertRaises(NonContiguityError):
-            forecaster.apply(self.sine_series_day[:-1], n=3)
+            forecaster.apply(self.sine_series_day[:-1], steps=3)
     
         # Can apply on a time series contiguous with the same item as the fit one
-        sine_series_day_with_forecast = forecaster.apply(self.sine_series_day, n=3)
+        sine_series_day_with_forecast = forecaster.apply(self.sine_series_day, steps=3)
         self.assertEqual(len(sine_series_day_with_forecast), 1003)
 
         # Cannot evaluate on a time series not contiguous with the time series used for the fit
@@ -566,6 +562,7 @@ class TestForecasters(unittest.TestCase):
         self.assertTrue('sin' in predicted_data)
         self.assertTrue('cos' in predicted_data)   
         
+
 
 class TestAnomalyDetectors(unittest.TestCase):
 

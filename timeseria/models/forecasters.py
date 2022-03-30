@@ -166,7 +166,7 @@ class Forecaster(TimeSeriesParametricModel):
                     processed_samples = evaluate_samples
              
                     # Apply the forecasting model with a length equal to the original series minus the first element
-                    self._apply(forecast_timeseries, n=evaluate_samples, inplace=True)
+                    self._apply(forecast_timeseries, steps=evaluate_samples, inplace=True)
 
                     # Save the model and the original value to be compared later on. Create the arrays by skipping the fist item
                     # and move through the forecast time series comparing with the input time series, shifted by one since in the
@@ -222,7 +222,7 @@ class Forecaster(TimeSeriesParametricModel):
                             #forecast_timeseries.append(timeseries[j])
      
                         # Apply the forecasting model
-                        self._apply(forecast_timeseries, n=steps_round, inplace=True)
+                        self._apply(forecast_timeseries, steps=steps_round, inplace=True)
     
                         # Plot results time series?
                         if plots:
@@ -324,7 +324,7 @@ class Forecaster(TimeSeriesParametricModel):
             return results
 
 
-    def _apply(self, timeseries, n=1, inplace=False):
+    def _apply(self, timeseries, steps=1, inplace=False):
 
 
         input_timeseries_len = len(timeseries)
@@ -340,7 +340,7 @@ class Forecaster(TimeSeriesParametricModel):
         
         # Call model forecasting logic
         try:
-            forecast_model_results = self.forecast(timeseries = forecast_timeseries, n=n)
+            forecast_model_results = self.forecast(timeseries = forecast_timeseries, steps=steps)
             if not isinstance(forecast_model_results, list):
                 forecast_timeseries.append(forecast_model_results)
             else:
@@ -350,10 +350,10 @@ class Forecaster(TimeSeriesParametricModel):
 
         except NotImplementedError:
             
-            for _ in range(n):
+            for _ in range(steps):
     
                 # Call the forecast only on the last point
-                forecast_model_results = self.forecast(timeseries = forecast_timeseries, n=1)
+                forecast_model_results = self.forecast(timeseries = forecast_timeseries, steps=1)
 
                 # Add forecasted index
                 forecast_model_results.data_indexes['forecast'] = 1
@@ -362,7 +362,7 @@ class Forecaster(TimeSeriesParametricModel):
                 forecast_timeseries.append(forecast_model_results)
     
         # Do we have missing forecasts?
-        if input_timeseries_len + n != len(forecast_timeseries):
+        if input_timeseries_len + steps != len(forecast_timeseries):
             raise ValueError('There are missing forecasts. If your model does not support multi-step forecasting, raise a NotImplementedError if n>1 and Timeseria will handle it for you.')
  
         if not inplace:
@@ -371,7 +371,7 @@ class Forecaster(TimeSeriesParametricModel):
             return None
 
 
-    def forecast(self, timeseries, n=1, forecast_start=None):
+    def forecast(self, timeseries, steps=1, forecast_start=None):
 
         # Set forecast starting item
         if forecast_start is not None:
@@ -382,14 +382,14 @@ class Forecaster(TimeSeriesParametricModel):
         # Handle forecast start
         if forecast_start is not None:
             try:
-                predicted_data = self.predict(timeseries=timeseries, n=n, forecast_start=forecast_start)
+                predicted_data = self.predict(timeseries=timeseries, steps=steps, forecast_start=forecast_start)
             except TypeError as e:
                 if 'unexpected keyword argument' and  'forecast_start' in str(e):
                     raise NotImplementedError('The model does not support the "forecast_start" parameter, cannot proceed')           
                 else:
                     raise
         else:
-            predicted_data = self.predict(timeseries=timeseries, n=n)
+            predicted_data = self.predict(timeseries=timeseries, steps=steps)
                 
         # List of predictions or single prediction?
         if isinstance(predicted_data,list):
@@ -499,7 +499,7 @@ class PeriodicAverageForecaster(Forecaster):
         logger.debug('Processed %s items', processed)
 
 
-    def _predict(self, timeseries, n=1, forecast_start=None):
+    def _predict(self, timeseries, steps=1, forecast_start=None):
       
         # Univariate is enforced by the fit
         key = self.data['data_labels'][0]
@@ -527,7 +527,7 @@ class PeriodicAverageForecaster(Forecaster):
         offset = diffs/j
 
         # Perform the forecast
-        for i in range(n):
+        for i in range(steps):
             step = i + 1
 
             # Set forecast timestamp
@@ -600,7 +600,7 @@ Prophet is robust to missing data and shifts in the trend, and typically handles
         self.data['window'] = 0
 
 
-    def _predict(self, timeseries, n=1):
+    def _predict(self, timeseries, steps=1):
 
         key = self.data['data_labels'][0]
 
@@ -610,7 +610,7 @@ Prophet is robust to missing data and shifts in the trend, and typically handles
         last_item_dt = last_item.dt
         data_to_forecast = []
         
-        for _ in range(n):
+        for _ in range(steps):
             if isinstance (timeseries._resolution, TimeUnit):
                 new_item_dt = last_item_dt + timeseries._resolution
                 data_to_forecast.append(self.remove_timezone(new_item_dt))
@@ -628,7 +628,7 @@ Prophet is robust to missing data and shifts in the trend, and typically handles
             
         # Re arrange predict results
         forecasted_items = []
-        for i in range(n):
+        for i in range(steps):
             forecasted_items.append({key: float(forecast['yhat'][i])})
 
         # Return
@@ -673,7 +673,7 @@ class ARIMAForecaster(Forecaster, ARIMAModel):
         self.data['window'] = 0
         
         
-    def _predict(self, timeseries, n=1):
+    def _predict(self, timeseries, steps=1):
 
         key = self.data['data_labels'][0]
 
@@ -682,7 +682,7 @@ class ARIMAForecaster(Forecaster, ARIMAModel):
             raise NonContiguityError('Sorry, this model can be applied only on a time series ending with the same timestamp as the time series used for the fit.')
 
         # Return the predicion. We need the [0] to access yhat, other indexes are erorrs etc.
-        return [{key: value} for value in self.model_res.forecast(n)[0]] 
+        return [{key: value} for value in self.model_res.forecast(steps)[0]] 
 
 
 
@@ -726,7 +726,7 @@ class AARIMAForecaster(Forecaster):
         self.data['window'] = 0
         
 
-    def _predict(self, timeseries, n=1):
+    def _predict(self, timeseries, steps=1):
 
         key = self.data['data_labels'][0]
 
@@ -735,7 +735,7 @@ class AARIMAForecaster(Forecaster):
             raise NonContiguityError('Sorry, this model can be applied only on a time series ending with the same timestamp as the time series used for the fit.')
 
         # Return the predicion. We need the [0] to access yhat, other indexes are erorrs etc.
-        return [{key: value} for value in self.model.predict(n)]
+        return [{key: value} for value in self.model.predict(steps)]
 
 
 
@@ -816,8 +816,8 @@ class LSTMForecaster(KerasModel, Forecaster):
 
         # Move to "matrix" of windows plus "vector" of targets data representation. Or, in other words:
         # window_datapoints is a list of lists (matrix) where each nested list (row) is a list of window datapoints.
-        window_datapoints_matrix = self.to_window_datapoints_matrix(timeseries_normalized, window=self.data['window'], forecast_n=1)
-        target_values_vector = self.to_target_values_vector(timeseries_normalized, window=self.data['window'], forecast_n=1)
+        window_datapoints_matrix = self.to_window_datapoints_matrix(timeseries_normalized, window=self.data['window'], steps=1)
+        target_values_vector = self.to_target_values_vector(timeseries_normalized, window=self.data['window'], steps=1)
 
         # Compute window features
         window_features = []
@@ -844,9 +844,9 @@ class LSTMForecaster(KerasModel, Forecaster):
         self.keras_model.fit(array(window_features), array(target_values_vector), epochs=epochs, verbose=verbose)
 
 
-    def _predict(self, timeseries, n=1, verbose=False):
+    def _predict(self, timeseries, steps=1, verbose=False):
 
-        if n>1:
+        if steps>1:
             raise NotImplementedError('This forecaster does not support multi-step predictions.')
 
         # Set verbose switch
