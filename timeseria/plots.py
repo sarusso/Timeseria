@@ -11,7 +11,7 @@ from .units import TimeUnit
 from .utilities import is_numerical, os_shell
 try:
     from pyppeteer.chromium_downloader import download_chromium,chromium_executable
-    image_plot_support=False  
+    image_plot_support=True  
 except ImportError:
     image_plot_support=False            
 
