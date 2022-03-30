@@ -147,11 +147,16 @@ def s_from_dt(dt):
     if not (isinstance(dt, datetime.datetime)):
         raise Exception('t_from_dt function called without datetime argument, got type "{}" instead.'.format(dt.__class__.__name__))
     try:
-        return dt.timestamp()
-    except AttributeError:
-        # Python 2.7
+        # This is the only safe approach. Some versions of Python around 3.4.4 - 3.7.3
+        # get the datetime.timestamp() wrong and compute seconds on local time zone.
         microseconds_part = (dt.microsecond/1000000.0) if dt.microsecond else 0
         return (calendar.timegm(dt.utctimetuple()) + microseconds_part)
+    
+    except TypeError:
+        # This catch and tris to circumnavigate a specific bug in Pandas Timestamp():
+        # TypeError: an integer is required (https://github.com/pandas-dev/pandas/issues/32174)
+        return dt.timestamp()
+
 
 
 def dt_from_str(string, timezone=None):

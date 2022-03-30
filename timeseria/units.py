@@ -560,7 +560,10 @@ class TimeUnit(Unit):
                     years_to_add = years_to_add -1
     
                 time_shifted_dt = time_shifted_dt.replace(year=time_shifted_dt.year + years_to_add)
-                time_shifted_dt = time_shifted_dt.replace(month=new_month)
+                try:
+                    time_shifted_dt = time_shifted_dt.replace(month=new_month)
+                except ValueError as e:
+                    raise ValueError('{} for {}'.format(e, time_shifted_dt))
             
             # Check DST offset consistency and fix if not respected
             if not check_dt_consistency(time_shifted_dt):

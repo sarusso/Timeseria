@@ -1,6 +1,7 @@
 import unittest
 import datetime
-from ..time import dt, correct_dt_dst, dt_to_str, dt_from_str, s_from_dt, change_tz, timezonize
+import pytz
+from ..time import dt, correct_dt_dst, dt_to_str, dt_from_str, s_from_dt, dt_from_s, change_tz, timezonize
 from pandas import Timestamp as PandasTimestamp
 
 # Setup logging
@@ -84,10 +85,33 @@ class TestTime(unittest.TestCase):
         date_time = dt(2001,12,1,16,46,10,6575, tzinfo='Europe/Rome')
         self.assertEqual(s_from_dt(date_time), 1007221570.006575)
         
+        # With some combinations of Python/Pands versions i.e. Pandas 0.22.0  and Python 3.4.4 this is created as
+        # 2001-12-01 16:56:10.006575+01:00 (note the minutes): it is a bug. Probably because of setting the time zone.
         date_time_pandas = PandasTimestamp(year=2001,month=12,day=1,hour=16,minute=46,second=10,microsecond=6575, tzinfo=timezonize('Europe/Rome'))
         self.assertEqual(s_from_dt(date_time_pandas), 1007221570.006575)
 
 
+    def test_s_from_dt_naive(self):
+        
+        # Create a naive timestamp without the time zone and test
+        date_time = datetime.datetime.strptime('2007-12-10', '%Y-%m-%d')
+        self.assertEqual(s_from_dt(date_time),1197244800)
+        
+        # Now set the time zone and test
+        date_time = date_time.replace(tzinfo = pytz.utc)
+        self.assertEqual(s_from_dt(date_time),1197244800)
+        
+        # Note: some versiosn of Python 3 assume a naive datetime on local time
+        # when using the .timestamp() or the .strftime('%s') methods.
+        # For this timestamp: 1197244800.0 (UTC) vs 1197241200.0 (Europe/Rome)
+
+    def test_dt_from_s(self):
+
+        self.assertEqual(dt_from_s(1197244800), dt(2007,12,10,0,0, tz='UTC'))
+
+        self.assertEqual(dt_from_s(1197241200, tz='Europe/Rome'), dt(2007,12,10,0,0, tz='Europe/Rome'))
+
+        
     def test_str_conversions(self):
 
         # Note: there is no way to reconstruct the original timezone from an ISO time format. It has to be set separately.
