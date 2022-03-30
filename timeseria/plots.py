@@ -9,8 +9,11 @@ from .time import dt_from_s, dt_to_str, dt_from_str
 from .datastructures import DataTimePointSeries, DataTimeSlotSeries
 from .units import TimeUnit
 from .utilities import is_numerical, os_shell
-from pyppeteer.chromium_downloader import download_chromium,chromium_executable
-            
+try:
+    from pyppeteer.chromium_downloader import download_chromium,chromium_executable
+    image_plot_support=False  
+except ImportError:
+    image_plot_support=False            
 
 # Setup logging
 import logging
@@ -863,6 +866,9 @@ define('"""+graph_id+"""', ['dgenv'], function (Dygraph) {
         
         # Also render if not interactive mode
         if image:
+
+            if not image_plot_support:
+                raise ValueError('Sorry, image plots are not supported since the package "pyppeteer" could be imported')
 
             # Get OS and architecture
             _os = os.uname()[0]

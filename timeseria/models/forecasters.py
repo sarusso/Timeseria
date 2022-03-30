@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 try:
     import tensorflow as tf
     tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
-except ImportError:
+except (ImportError,AttributeError):
     pass
 
 # Also suppress absl warnings as default behavior
