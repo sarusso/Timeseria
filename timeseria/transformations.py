@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Series transformations as slotting and resampling."""
 
-from .time import dt_from_s, s_from_dt, change_tz
+from .time import dt_from_s, s_from_dt, as_timezone
 from .datastructures import DataTimeSlot, DataTimeSlotSeries, TimePoint, DataTimePointSeries, DataTimePoint, SeriesSlice, SeriesDenseSlice
 from .utilities import compute_data_loss, compute_validity_regions
 from .operations import avg
@@ -322,8 +322,8 @@ class SlottedTransformation(Transformation):
                 raise ValueError('Don\'t know how to target "{}"'.format(target))           
         
         # Set/fix timezone
-        from_dt = change_tz(from_dt, series.tz)
-        to_dt = change_tz(to_dt, series.tz)
+        from_dt = as_timezone(from_dt, series.tz)
+        to_dt = as_timezone(to_dt, series.tz)
         
         # Log
         logger.debug('Computed from: %s', from_dt)
@@ -501,7 +501,7 @@ class SlottedTransformation(Transformation):
                             logger.debug('Computed new item: %s',new_item )
                             new_series.append(new_item)
 
-                    # Create a new slot. This is where all the "conventional" time logic kicks-in, and where the time zone is required.
+                    # Create a new slot. This is where all the "conventional" time logic kicks-in, and where the timezone is required.
                     slot_start_t = slot_end_t
                     slot_start_dt = dt_from_s(slot_start_t, tz=timezone)
                     # TODO: if not calendar time unit, we can just use seconds and maybe speed up a bit.

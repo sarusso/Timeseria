@@ -1,7 +1,7 @@
 import unittest
 import datetime
 import pytz
-from ..time import dt, correct_dt_dst, dt_to_str, dt_from_str, s_from_dt, dt_from_s, change_tz, timezonize
+from ..time import dt, correct_dt_dst, dt_to_str, dt_from_str, s_from_dt, dt_from_s, as_timezone, timezonize
 from pandas import Timestamp as PandasTimestamp
 
 # Setup logging
@@ -86,18 +86,18 @@ class TestTime(unittest.TestCase):
         self.assertEqual(s_from_dt(date_time), 1007221570.006575)
         
         # With some combinations of Python/Pands versions i.e. Pandas 0.22.0  and Python 3.4.4 this is created as
-        # 2001-12-01 16:56:10.006575+01:00 (note the minutes): it is a bug. Probably because of setting the time zone.
+        # 2001-12-01 16:56:10.006575+01:00 (note the minutes): it is a bug. Probably because of setting the timezone.
         date_time_pandas = PandasTimestamp(year=2001,month=12,day=1,hour=16,minute=46,second=10,microsecond=6575, tzinfo=timezonize('Europe/Rome'))
         self.assertEqual(s_from_dt(date_time_pandas), 1007221570.006575)
 
 
     def test_s_from_dt_naive(self):
         
-        # Create a naive timestamp without the time zone and test
+        # Create a naive timestamp without the timezone and test
         date_time = datetime.datetime.strptime('2007-12-10', '%Y-%m-%d')
         self.assertEqual(s_from_dt(date_time),1197244800)
         
-        # Now set the time zone and test
+        # Now set the timezone and test
         date_time = date_time.replace(tzinfo = pytz.utc)
         self.assertEqual(s_from_dt(date_time),1197244800)
         
@@ -152,8 +152,8 @@ class TestTime(unittest.TestCase):
         self.assertEqual(str(dt_from_str('1986-08-01T16:46:00-07:00')), '1986-08-01 16:46:00-07:00')
 
 
-    def test_change_tz(self):
-        self.assertEqual(str(change_tz(dt_from_str('1986-08-01T16:46:00.362752+02:00'), 'UTC')), '1986-08-01 14:46:00.362752+00:00')
+    def test_as_timezone(self):
+        self.assertEqual(str(as_timezone(dt_from_str('1986-08-01T16:46:00.362752+02:00'), 'UTC')), '1986-08-01 14:46:00.362752+00:00')
 
 
     def tearDown(self):

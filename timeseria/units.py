@@ -422,7 +422,7 @@ class TimeUnit(Unit):
             raise ValueError('Sorry, only simple TimeUnits are supported by the rebase operation')
 
         if not time_dt.tzinfo:
-            raise ValueError('The time zone of the datetime is required')    
+            raise ValueError('The timezone of the datetime is required')    
                 
         # Handle physical time 
         if self.type == self._PHYSICAL:

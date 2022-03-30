@@ -68,7 +68,7 @@ class CSVFileStorage(Storage):
         time_format: the time column format.
         date_label: the column label to be used as the date part of the timestamp.
         date_format: the date column format. 
-        tz: the time zone on which to create the time series on.
+        tz: the timezone on which to create the time series on.
         data_labels: the column labels to be used as data by default. Excpected as a list of 
                      strings or list of integers, in which case are treated as column numbers.
         data_type: the data type (``list`` or ``dict``), set automatically by default.
@@ -138,7 +138,7 @@ class CSVFileStorage(Storage):
         self.time_label = time_label
         self.time_format = time_format
         
-        # Time zone
+        # Timezone
         self.tz = tz   
         
         # Data TODO: allow for columns mapping here? i.e data_labels = {1:'flow',2:'temperature'}
@@ -164,7 +164,7 @@ class CSVFileStorage(Storage):
 
         Args:
             limit: a row number limit.  
-            as_tz: force a specific time zone.
+            as_tz: force a specific timezone.
             as_points: force generating points.
             as_slots: force generating slots.
             data_labels: get only specific data labels.

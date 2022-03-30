@@ -488,7 +488,7 @@ class TimePoint(Point):
     
     def __init__(self, *args, **kwargs):
 
-        # Handle time zone if any (removing it from kwargs)
+        # Handle timezone if any (removing it from kwargs)
         tz = kwargs.pop('tz', None)
         if tz:
             self._tz = timezonize(tz)
@@ -505,7 +505,7 @@ class TimePoint(Point):
                 # Ok, will convert the datetime to epoch and then create the point in the standard way
                 t = s_from_dt(kwargs['dt'])
                 
-                # If we do not have a time zone, can we use the one from the dt used to initialize this TimePoint?
+                # If we do not have a timezone, can we use the one from the dt used to initialize this TimePoint?
                 try:
                     self._tz
                 except AttributeError:
@@ -548,15 +548,15 @@ class TimePoint(Point):
 
     @property
     def tz(self):
-        """The time zone."""
+        """The timezone."""
         try:
             return self._tz
         except AttributeError:
             return UTC
     
-    def change_timezone(self, new_timezone):
-        """Change the time zone of the point, in-place."""
-        self._tz = timezonize(new_timezone)
+    def change_timezone(self, tz):
+        """Change the timezone of the point, in-place."""
+        self._tz = timezonize(tz)
 
     @property
     def dt(self):
@@ -738,14 +738,14 @@ class TimePointSeries(PointSeries):
 
     @property
     def tz(self):
-        """The time zone of the time series."""
+        """The timezone of the series."""
         # Note: we compute the tz on the fly beacuse for point time series we assume to use the tz
         # attribute way lass than the slot time series, where the tz is instead computed at append-time.
         try:
             return self._tz
         except AttributeError:
-            # Detect time zone on the fly
-            # TODO: this ensure each ppint is on the sam etime zone. Do we want this?
+            # Detect timezone on the fly
+            # TODO: this ensure each ppint is on the same timezone. Do we want this?
             detected_tz = None
             for item in self:
                 if not detected_tz:
@@ -756,16 +756,16 @@ class TimePointSeries(PointSeries):
                         return UTC
             return detected_tz
     
-    def change_timezone(self, new_timezone):
-        """Change the time zone of the series, in-place."""
+    def change_timezone(self, tz):
+        """Change the timezone of the series, in-place."""
         for time_point in self:
-            time_point.change_timezone(new_timezone)
+            time_point.change_timezone(tz)
         self._tz = time_point.tz
 
-    def as_timezone(self, timezone):
-        """Get a copy of the series on a new time zone.""" 
+    def as_timezone(self, tz):
+        """Get a copy of the series on a new timezone.""" 
         new_series = self.duplicate() 
-        new_series.change_timezone(new_timezone=timezone)
+        new_series.change_timezone(tz)
         return new_series
 
     @property
@@ -1152,13 +1152,13 @@ class TimeSlot(Slot):
 
         try:
             if start.tz != end.tz:
-                raise ValueError('{} start and end must have the same time zone (got start.tz="{}", end.tz="{}")'.format(self.__class__.__name__, start.tz, end.tz))
+                raise ValueError('{} start and end must have the same timezone (got start.tz="{}", end.tz="{}")'.format(self.__class__.__name__, start.tz, end.tz))
         except AttributeError:
             if end is None:
                 # We are using the Unit, use the start
                 self.tz = start.tz
             else:
-                # If we don't have a time zone, we don't have TimePoints, the parent will make the Slot creation fail with a TypeError
+                # If we don't have a timezone, we don't have TimePoints, the parent will make the Slot creation fail with a TypeError
                 pass
         else:    
             self.tz = start.tz
@@ -1184,10 +1184,10 @@ class TimeSlot(Slot):
         else:
             return True
 
-    def change_timezone(self, new_timezone):
-        """Change the time zone of the slot, in-place."""
-        self.start.change_timezone(new_timezone)
-        self.end.change_timezone(new_timezone)
+    def change_timezone(self, tz):
+        """Change the timezone of the slot, in-place."""
+        self.start.change_timezone(tz)
+        self.end.change_timezone(tz)
         self.tz = self.start.tz
 
     @property
@@ -1383,30 +1383,30 @@ class TimeSlotSeries(SlotSeries):
             self._tz = item.tz
             
         else:
-            # Else, check for the same time zone
+            # Else, check for the same timezone
             if self._tz != item.tz:
-                raise ValueError('Cannot add items on different time zones (I have "{}" and you tried to add "{}")'.format(self.tz, item.start.tz))
+                raise ValueError('Cannot add items on different timezones (I have "{}" and you tried to add "{}")'.format(self.tz, item.start.tz))
 
         super(TimeSlotSeries, self).append(item)
  
     @property
     def tz(self):
-        """The time zone of the time series."""
+        """The timezone of the time series."""
         try:
             return self._tz
         except AttributeError:
             return None
         
-    def change_timezone(self, new_timezone):
-        """Change the time zone of the series, in-place."""
+    def change_timezone(self, tz):
+        """Change the timezone of the series, in-place."""
         for time_slot in self:
-            time_slot.change_timezone(new_timezone)
+            time_slot.change_timezone(tz)
         self._tz = time_slot.tz
 
-    def as_timezone(self, timezone):
-        """Get a copy of the series on a new time zone.""" 
+    def as_timezone(self, tz):
+        """Get a copy of the series on a new timezone.""" 
         new_series = self.duplicate() 
-        new_series.change_timezone(new_timezone=timezone)
+        new_series.change_timezone(tz)
         return new_series
 
     @property
