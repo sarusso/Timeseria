@@ -611,7 +611,7 @@ class TimeUnit(Unit):
         else:
             raise ConsistencyException('Unknown TimeUnit type "{}"'.format(self.type))
         
-        return time_unit_s
+        return float(time_unit_s)
 
     # Get start/end/center
     def _get_start(self, end=None, center=None):

@@ -344,20 +344,28 @@ class TestPointSeries(unittest.TestCase):
         self.assertEqual(str(time_point_series.tz), 'Europe/Rome')
         self.assertEqual(str(type(time_point_series.tz)), "<class 'pytz.tzfile.Europe/Rome'>")  
         
-        # Test resolution 
+        # Test resolution: not defined as just one point
         time_point_series = TimePointSeries(TimePoint(t=60))
-        self.assertEqual(time_point_series._resolution, None)
-        
+        self.assertEqual(time_point_series.resolution, None)
+
+        # Test resolution: defined, two points       
         time_point_series = TimePointSeries(TimePoint(t=60),TimePoint(t=121))
-        self.assertEqual(time_point_series._resolution, 61)
         
+        self.assertTrue(isinstance(time_point_series.resolution,TimeUnit))
+        self.assertEqual(str(time_point_series.resolution), '61s')
+        self.assertEqual(time_point_series.resolution, 61) # TimeUnits support math
+
+        self.assertTrue(isinstance(time_point_series.resolution.value,float))
+        self.assertEqual(time_point_series.resolution.value, 61.0)
+
+        # Test resolution: variable, threee points       
         time_point_series = TimePointSeries(TimePoint(t=60),TimePoint(t=120),TimePoint(t=130))
-        self.assertEqual(time_point_series._resolution, 'variable')
+        self.assertEqual(time_point_series.resolution, 'variable')
         
+        # Test resolution: defined, threee points               
         time_point_series = TimePointSeries(TimePoint(t=60),TimePoint(t=120),TimePoint(t=180))
         self.assertEqual(time_point_series.duplicate().resolution, 60)
         self.assertEqual(time_point_series[0:2].resolution, 60)
-        
         
 
     def test_DataPointSeries(self):
