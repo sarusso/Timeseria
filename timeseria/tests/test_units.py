@@ -76,10 +76,10 @@ class TestTimeUnits(unittest.TestCase):
         self.assertEqual(TimeUnit('1h').hours, 1)
 
         # Test floating point seconds init
-        self.assertEqual(TimeUnit('1.2345s').duration_s(), 1.2345)
-        self.assertEqual(TimeUnit('1.234s').duration_s(), 1.234)
-        self.assertEqual(TimeUnit('1.02s').duration_s(), 1.02)
-        self.assertEqual(TimeUnit('1.000005s').duration_s(), 1.000005)
+        self.assertEqual(TimeUnit('1.2345s').as_seconds(), 1.2345)
+        self.assertEqual(TimeUnit('1.234s').as_seconds(), 1.234)
+        self.assertEqual(TimeUnit('1.02s').as_seconds(), 1.02)
+        self.assertEqual(TimeUnit('1.000005s').as_seconds(), 1.000005)
         self.assertEqual(TimeUnit('67.000005s').seconds, 67)
         self.assertEqual(TimeUnit('67.000005s').microseconds, 5)
   
@@ -193,33 +193,33 @@ class TestTimeUnits(unittest.TestCase):
         # Day unit
         time_unit = TimeUnit('1D')
         with self.assertRaises(ValueError):
-            time_unit.duration_s()
-        self.assertEqual(time_unit.duration_s(date_time1), 86400) # No DST, standard day
-        self.assertEqual(time_unit.duration_s(date_time2), 90000) # DST, change
+            time_unit.as_seconds()
+        self.assertEqual(time_unit.as_seconds(date_time1), 86400) # No DST, standard day
+        self.assertEqual(time_unit.as_seconds(date_time2), 90000) # DST, change
                  
         # Week unit
         time_unit = TimeUnit('1W')
         with self.assertRaises(ValueError):
-            time_unit.duration_s()
-        self.assertEqual(time_unit.duration_s(date_time1), (86400*7)+3600)
-        self.assertEqual(time_unit.duration_s(date_time3), (86400*7))
+            time_unit.as_seconds()
+        self.assertEqual(time_unit.as_seconds(date_time1), (86400*7)+3600)
+        self.assertEqual(time_unit.as_seconds(date_time3), (86400*7))
          
         # Month Unit
         time_unit = TimeUnit('1M')
         with self.assertRaises(ValueError):
-            time_unit.duration_s()
-        self.assertEqual(time_unit.duration_s(date_time1), ((86400*31)+3600)) # October has 31 days, but here we have a DST change in the middle
-        self.assertEqual(time_unit.duration_s(date_time3), (86400*31)) # October has 31 days
+            time_unit.as_seconds()
+        self.assertEqual(time_unit.as_seconds(date_time1), ((86400*31)+3600)) # October has 31 days, but here we have a DST change in the middle
+        self.assertEqual(time_unit.as_seconds(date_time3), (86400*31)) # October has 31 days
 
         # Year Unit
         time_unit = TimeUnit('1Y')
         with self.assertRaises(ValueError):
-            time_unit.duration_s()
-        self.assertEqual(time_unit.duration_s(dt(2014,10,24,0,15,0, tzinfo='Europe/Rome')), (86400*365)) # Standard year
-        self.assertEqual(time_unit.duration_s(dt(2015,10,24,0,15,0, tzinfo='Europe/Rome')), (86400*366)) # Leap year
+            time_unit.as_seconds()
+        self.assertEqual(time_unit.as_seconds(dt(2014,10,24,0,15,0, tzinfo='Europe/Rome')), (86400*365)) # Standard year
+        self.assertEqual(time_unit.as_seconds(dt(2015,10,24,0,15,0, tzinfo='Europe/Rome')), (86400*366)) # Leap year
 
         # Test duration with composite point seconds init
-        self.assertEqual(TimeUnit(minutes=1, seconds=3).duration_s(), 63)
+        self.assertEqual(TimeUnit(minutes=1, seconds=3).as_seconds(), 63)
                 
 
     def test_TimeUnit_shift_dt(self):

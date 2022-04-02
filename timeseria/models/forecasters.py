@@ -534,7 +534,7 @@ class PeriodicAverageForecaster(Forecaster):
                     forecast_timestamps.append(forecast_timestamp)
 
             else:
-                forecast_timestamp = TimePoint(t = forecast_start_item.t + (timeseries._resolution.duration_s()*step), tz = forecast_start_item.tz )
+                forecast_timestamp = TimePoint(t = forecast_start_item.t + (timeseries._resolution.as_seconds()*step), tz = forecast_start_item.tz )
     
             # Compute the real forecast data
             periodicity_index = get_periodicity_index(forecast_timestamp, timeseries._resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])        

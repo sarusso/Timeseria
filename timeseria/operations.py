@@ -215,7 +215,7 @@ class Derivative(SeriesOperation):
             else:
                 variable_resolution = False
                 if isinstance(series.resolution, TimeUnit):
-                    sampling_interval = series.resolution.duration_s(series[0].dt)               
+                    sampling_interval = series.resolution.as_seconds(series[0].dt)               
                 elif isinstance(series.resolution, Unit):
                     sampling_interval = series.resolution.value
                 else:
@@ -321,7 +321,7 @@ class Integral(SeriesOperation):
             else:
                 variable_resolution = False
                 if isinstance(series.resolution, TimeUnit):
-                    sampling_interval = series.resolution.duration_s(series[0].dt)               
+                    sampling_interval = series.resolution.as_seconds(series[0].dt)               
                 elif isinstance(series.resolution, Unit):
                     sampling_interval = series.resolution.value
                 else:

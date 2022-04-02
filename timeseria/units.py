@@ -263,8 +263,8 @@ class TimeUnit(Unit):
         #    return self._value
         #except AttributeError:
         #    if self.type == self._CALENDAR:
-        #        raise TypeError('Sorry, the value of a calendar TimeUnit is not defined. use duration_s() providing the starting point.') from None
-        #    self._value = self.duration_s()
+        #        raise TypeError('Sorry, the value of a calendar TimeUnit is not defined. use as_seconds() providing the starting point.') from None
+        #    self._value = self.as_seconds()
         #    return self._value
 
 
@@ -306,7 +306,7 @@ class TimeUnit(Unit):
             return TimePoint(dt=self.shift_dt(other.dt, times=1))
         
         elif is_numerical(other):
-            return other + self.duration_s()
+            return other + self.as_seconds()
             
         else:
             raise NotImplementedError('Adding TimeUnits with objects of class "{}" is not implemented'.format(other.__class__.__name__))
@@ -333,7 +333,7 @@ class TimeUnit(Unit):
             return TimePoint(dt=self.shift_dt(other.dt, times=-1))
 
         elif is_numerical(other):
-            return other - self.duration_s()
+            return other - self.as_seconds()
 
         else:
             raise NotImplementedError('Subracting TimeUnits with objects of class "{}" is not implemented'.format(other.__class__.__name__))
@@ -378,7 +378,7 @@ class TimeUnit(Unit):
                 return True
             else:
                 # Check using the duration in seconds, as 15m and 900s are actually the same unit
-                if self.duration_s() == other.duration_s():
+                if self.as_seconds() == other.as_seconds():
                     return True
 
   
@@ -393,7 +393,7 @@ class TimeUnit(Unit):
         
         # Check for duration as seconds equality, i.e. comparing with a float
         try:
-            if self.duration_s() == other:
+            if self.as_seconds() == other:
                 return True
         except TypeError:
             # Raised if this or the other other TimeUnit is of calendar type
@@ -415,8 +415,8 @@ class TimeUnit(Unit):
     #        return self._value
     #    except AttributeError:
     #        if self.type == self._CALENDAR:
-    #            raise TypeError('Sorry, the value of a calendar TimeUnit is not defined. use duration_s() providing the starting point.') from None
-    #        self._value = self.duration_s()
+    #            raise TypeError('Sorry, the value of a calendar TimeUnit is not defined. use as_seconds() providing the starting point.') from None
+    #        self._value = self.as_seconds()
     #        return self._value
 
     @property
@@ -465,7 +465,7 @@ class TimeUnit(Unit):
             tz_offset_s = get_tz_offset_s(time_dt)
             
             # Get TimeUnit duration in seconds
-            time_unit_s = self.duration_s(time_dt)
+            time_unit_s = self.as_seconds(time_dt)
 
             # Apply modular math (including timezone time translation trick if required (multiple hours))
             # TODO: check for correctness, the time shift should be always done...
@@ -554,7 +554,7 @@ class TimeUnit(Unit):
         if self.type == self._PHYSICAL:
             
             # Get TimeUnit duration in seconds
-            time_unit_s = self.duration_s()
+            time_unit_s = self.as_seconds()
 
             time_shifted_s = time_s + ( time_unit_s * times )
             time_shifted_dt = dt_from_s(time_shifted_s, tz=time_dt.tzinfo)
@@ -609,7 +609,7 @@ class TimeUnit(Unit):
         # Return
         return time_shifted_dt   
 
-    def duration_s(self, start_dt=None):
+    def as_seconds(self, start_dt=None):
         """The duration of the TimeUnit in seconds."""
 
         if self.type == self._CALENDAR:

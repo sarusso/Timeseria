@@ -276,10 +276,10 @@ class SlottedTransformation(Transformation):
                 raise ValueError('The provided from_dt is not consistent with the self.time_unit of "{}" (Got "{}")'.format(self.time_unit, from_dt))   
         else:
             if target == 'points':
-                from_t = series[0].t  - (self.time_unit.duration_s() /2)
+                from_t = series[0].t  - (self.time_unit.as_seconds() /2)
                 from_dt = dt_from_s(from_t, tz=series.tz)
                 from_dt = self.time_unit.round_dt(from_dt, how='floor' if include_extremes else 'ceil')
-                from_t = s_from_dt(from_dt) + (self.time_unit.duration_s() /2)
+                from_t = s_from_dt(from_dt) + (self.time_unit.as_seconds() /2)
                 from_dt = dt_from_s(from_t)
                 
             elif target == 'slots':
@@ -307,10 +307,10 @@ class SlottedTransformation(Transformation):
                 raise ValueError('The provided to_dt is not consistent with the self.time_unit of "{}" (Got "{}")'.format(self.time_unit, to_dt))   
         else:
             if target == 'points':
-                to_t = series[-1].t  + (self.time_unit.duration_s() /2)
+                to_t = series[-1].t  + (self.time_unit.as_seconds() /2)
                 to_dt = dt_from_s(to_t, tz=series.tz)
                 from_dt = self.time_unit.round_dt(from_dt, how='ceil' if include_extremes else 'floor')
-                to_t = s_from_dt(to_dt) - (self.time_unit.duration_s() /2)
+                to_t = s_from_dt(to_dt) - (self.time_unit.as_seconds() /2)
                 to_dt = dt_from_s(to_t)  
             elif target == 'slots':
                 to_t = series[-1].t
@@ -335,7 +335,7 @@ class SlottedTransformation(Transformation):
             logger.info('Using auto-detected sampling interval: %ss', validity)
 
         # Check if upsamplimg (with some tolearance):
-        if validity > (self.time_unit.duration_s(series[0].dt) * 1.10):
+        if validity > (self.time_unit.as_seconds(series[0].dt) * 1.10):
             logger.warning('You are upsampling, which is not well tested yet. Expect potential issues.')
 
         # Compute validity regions
