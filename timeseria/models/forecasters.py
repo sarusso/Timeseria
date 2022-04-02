@@ -404,7 +404,7 @@ class Forecaster(TimeSeriesParametricModel):
                                                  #tz = timeseries.tz,
                                                  data  = data))
                 else:
-                    forecast.append(DataTimePoint(t = last_item.t + timeseries._resolution.value,
+                    forecast.append(DataTimePoint(t = last_item.t + timeseries._resolution,
                                                   tz = timeseries.tz,
                                                   data  = data))
                 last_item = forecast[-1]
@@ -416,7 +416,7 @@ class Forecaster(TimeSeriesParametricModel):
                                         #tz = timeseries.tz,
                                         data  = predicted_data)
             else:
-                forecast = DataTimePoint(t = forecast_start_item.t + timeseries._resolution.value,
+                forecast = DataTimePoint(t = forecast_start_item.t + timeseries._resolution,
                                          tz = timeseries.tz,
                                          data  = predicted_data)
             
@@ -450,13 +450,7 @@ class PeriodicAverageForecaster(Forecaster):
         # Set or detect periodicity
         if periodicity is None:        
             periodicity =  get_periodicity(timeseries)
-            try:
-                if isinstance(timeseries._resolution, TimeUnit):
-                    logger.info('Detected periodicity: %sx %s', periodicity, timeseries._resolution)
-                else:
-                    logger.info('Detected periodicity: %sx %ss', periodicity, timeseries._resolution)
-            except AttributeError:
-                logger.info('Detected periodicity: %sx %ss', periodicity, timeseries._resolution)
+            logger.info('Detected periodicity: %sx %s', periodicity, timeseries._resolution)
                 
         self.data['periodicity']  = periodicity
         self.data['dst_affected'] = dst_affected
@@ -533,18 +527,14 @@ class PeriodicAverageForecaster(Forecaster):
             # Set forecast timestamp
             if isinstance(timeseries[0], Slot):
                 try:
-                    if isinstance(timeseries._resolution, Unit):
-                        forecast_timestamp = forecast_timestamps[-1] + timeseries._resolution
-                    else:
-                        forecast_timestamp = TimePoint(forecast_timestamps[-1].t + timeseries._resolution)
-                        
+                    forecast_timestamp = forecast_timestamps[-1] + timeseries._resolution
                     forecast_timestamps.append(forecast_timestamp)
                 except IndexError:
                     forecast_timestamp = forecast_start_item.end
                     forecast_timestamps.append(forecast_timestamp)
 
             else:
-                forecast_timestamp = TimePoint(t = forecast_start_item.t + (timeseries._resolution*step), tz = forecast_start_item.tz )
+                forecast_timestamp = TimePoint(t = forecast_start_item.t + (timeseries._resolution.duration_s()*step), tz = forecast_start_item.tz )
     
             # Compute the real forecast data
             periodicity_index = get_periodicity_index(forecast_timestamp, timeseries._resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])        
@@ -611,15 +601,10 @@ Prophet is robust to missing data and shifts in the trend, and typically handles
         data_to_forecast = []
         
         for _ in range(steps):
-            if isinstance (timeseries._resolution, TimeUnit):
-                new_item_dt = last_item_dt + timeseries._resolution
-                data_to_forecast.append(self.remove_timezone(new_item_dt))
-                last_item_dt = new_item_dt
-            else:
-                new_item_t = last_item_t + timeseries._resolution
-                new_item_dt = dt_from_s(new_item_t, tz=timeseries.tz)
-                data_to_forecast.append(self.remove_timezone(new_item_dt))
-                last_item_t = new_item_t  
+            new_item_dt = last_item_dt + timeseries._resolution
+            data_to_forecast.append(self.remove_timezone(new_item_dt))
+            last_item_dt = new_item_dt
+
         dataframe_to_forecast = DataFrame(data_to_forecast, columns = ['ds'])
                     
         # Call Prophet predict 

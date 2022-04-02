@@ -355,8 +355,8 @@ class TestPointSeries(unittest.TestCase):
         self.assertEqual(str(time_point_series.resolution), '61s')
         self.assertEqual(time_point_series.resolution, 61) # TimeUnits support math
 
-        self.assertTrue(isinstance(time_point_series.resolution.value,float))
-        self.assertEqual(time_point_series.resolution.value, 61.0)
+        self.assertTrue(isinstance(time_point_series.resolution.value, str))
+        self.assertEqual(time_point_series.resolution.value, '61s')
 
         # Test resolution: variable, threee points       
         time_point_series = TimePointSeries(TimePoint(t=60),TimePoint(t=120),TimePoint(t=130))
