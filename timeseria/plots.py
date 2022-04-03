@@ -378,10 +378,10 @@ def dygraphs_plot(timeseries, data_indexes='all', aggregate=None, aggregate_by=N
         else:
             legend_pre = 'Point at '
     elif isinstance(timeseries, DataTimeSlotSeries):
-        if isinstance(timeseries._resolution, TimeUnit):
-            serie_unit_string = str(timeseries._resolution)
+        if isinstance(timeseries.resolution, TimeUnit):
+            serie_unit_string = str(timeseries.resolution)
         else:
-            serie_unit_string = str(timeseries._resolution) #.split('.')[0]+'s'
+            serie_unit_string = str(timeseries.resolution) #.split('.')[0]+'s'
         #if aggregate_by: 
         #    raise NotImplementedError('Plotting slots with a plot-level aggregation is not yet supported')
         stepPlot_value   = 'true'

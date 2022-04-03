@@ -186,7 +186,7 @@ class Reconstructor(TimeSeriesParametricModel):
                     # Do we have a 1-point only timeseries? If so, manually set the resolution
                     # as otherwise it would be not defined. # TODO: does it make sense?
                     if len(timeseries_to_reconstruct) == 1:
-                        timeseries_to_reconstruct._resolution = timeseries._resolution
+                        timeseries_to_reconstruct._resolution = timeseries.resolution
 
                     # Apply model inplace
                     self._apply(timeseries_to_reconstruct, inplace=True)
@@ -303,12 +303,12 @@ class PeriodicAverageReconstructor(Reconstructor):
         if periodicity is None:
             periodicity =  get_periodicity(timeseries)
             try:
-                if isinstance(timeseries._resolution, TimeUnit):
-                    logger.info('Detected periodicity: %sx %s', periodicity, timeseries._resolution)
+                if isinstance(timeseries.resolution, TimeUnit):
+                    logger.info('Detected periodicity: %sx %s', periodicity, timeseries.resolution)
                 else:
-                    logger.info('Detected periodicity: %sx %ss', periodicity, timeseries._resolution)
+                    logger.info('Detected periodicity: %sx %ss', periodicity, timeseries.resolution)
             except AttributeError:
-                logger.info('Detected periodicity: %sx %ss', periodicity, timeseries._resolution)
+                logger.info('Detected periodicity: %sx %ss', periodicity, timeseries.resolution)
                 
         self.data['periodicity']  = periodicity
         self.data['dst_affected'] = dst_affected 
@@ -328,7 +328,7 @@ class PeriodicAverageReconstructor(Reconstructor):
                 
                 # Process. Note: we do fit on data losses = None!
                 if item.data_loss is None or item.data_loss < data_loss_threshold:
-                    periodicity_index = get_periodicity_index(item, timeseries._resolution, periodicity, dst_affected=dst_affected)
+                    periodicity_index = get_periodicity_index(item, timeseries.resolution, periodicity, dst_affected=dst_affected)
                     if not periodicity_index in sums:
                         sums[periodicity_index] = item.data[key]
                         totals[periodicity_index] = 1
@@ -353,7 +353,7 @@ class PeriodicAverageReconstructor(Reconstructor):
             diffs=0
             for j in range(from_index, to_index):
                 real_value = timeseries[j].data[key]
-                periodicity_index = get_periodicity_index(timeseries[j], timeseries._resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])
+                periodicity_index = get_periodicity_index(timeseries[j], timeseries.resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])
                 reconstructed_value = self.data['averages'][periodicity_index]
                 diffs += (real_value - reconstructed_value)
             offset = diffs/(to_index-from_index)
@@ -364,7 +364,7 @@ class PeriodicAverageReconstructor(Reconstructor):
             try:
                 for j in [from_index-1, to_index+1]:
                     real_value = timeseries[j].data[key]
-                    periodicity_index = get_periodicity_index(timeseries[j], timeseries._resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])
+                    periodicity_index = get_periodicity_index(timeseries[j], timeseries.resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])
                     reconstructed_value = self.data['averages'][periodicity_index]
                     diffs += (real_value - reconstructed_value)
                 offset = diffs/2
@@ -376,7 +376,7 @@ class PeriodicAverageReconstructor(Reconstructor):
         # Actually reconstruct
         for j in range(from_index, to_index):
             item_to_reconstruct = timeseries[j]
-            periodicity_index = get_periodicity_index(item_to_reconstruct, timeseries._resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])
+            periodicity_index = get_periodicity_index(item_to_reconstruct, timeseries.resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])
             item_to_reconstruct.data[key] = self.data['averages'][periodicity_index] + offset
             item_to_reconstruct.data_indexes['data_reconstructed'] = 1
                         
@@ -384,7 +384,7 @@ class PeriodicAverageReconstructor(Reconstructor):
     def _plot_averages(self, timeseries, **kwargs):   
         averages_timeseries = copy.deepcopy(timeseries)
         for item in averages_timeseries:
-            value = self.data['averages'][get_periodicity_index(item, averages_timeseries._resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])]
+            value = self.data['averages'][get_periodicity_index(item, averages_timeseries.resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])]
             if not value:
                 value = 0
             item.data['average'] =value 

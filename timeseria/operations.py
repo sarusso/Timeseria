@@ -209,13 +209,13 @@ class Derivative(SeriesOperation):
             raise NotImplementedError('Computing diffs in-place is not supported as it would change the series length')
         
         if normalize:
-            if series.resolution == 'variable':
+            if series.resolution.is_variable():
                 variable_resolution = True
                 sampling_interval = series.autodetected_sampling_interval
             else:
                 variable_resolution = False
                 if isinstance(series.resolution, TimeUnit):
-                    sampling_interval = series.resolution.duration_s(series[0].dt)               
+                    sampling_interval = series.resolution.as_seconds(series[0].dt)               
                 elif isinstance(series.resolution, Unit):
                     sampling_interval = series.resolution.value
                 else:
@@ -315,13 +315,13 @@ class Integral(SeriesOperation):
     def __call__(self, series, inplace=False, normalize=True, c=0, offset=0):
         
         if normalize:
-            if series.resolution == 'variable':
+            if series.resolution.is_variable():
                 variable_resolution = True
                 sampling_interval = series.autodetected_sampling_interval
             else:
                 variable_resolution = False
                 if isinstance(series.resolution, TimeUnit):
-                    sampling_interval = series.resolution.duration_s(series[0].dt)               
+                    sampling_interval = series.resolution.as_seconds(series[0].dt)               
                 elif isinstance(series.resolution, Unit):
                     sampling_interval = series.resolution.value
                 else:

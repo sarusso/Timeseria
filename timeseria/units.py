@@ -234,26 +234,40 @@ class TimeUnit(Unit):
                 # Cast to int & set
                 self.microseconds = int(decimal_seconds_str)   
 
-                return
+            else:
             
-            # Parse string using regex
-            self.strings = string.split("_")
-            regex = re.compile('^([0-9]+)([YMDWhmsu]{1,2})$')
-            
-            for string in self.strings:
-                try:
-                    groups   =  regex.match(string).groups()
-                except AttributeError:
-                    raise ValueError('Cannot parse string representation for the TimeUnit, unknown format ("{}")'.format(string)) from None
-
-                setattr(self, self._mapping_table[groups[1]], int(groups[0]))
+                # Parse string using regex
+                self.strings = string.split("_")
+                regex = re.compile('^([0-9]+)([YMDWhmsu]{1,2})$')
+                
+                for string in self.strings:
+                    try:
+                        groups   =  regex.match(string).groups()
+                    except AttributeError:
+                        raise ValueError('Cannot parse string representation for the TimeUnit, unknown format ("{}")'.format(string)) from None
+    
+                    setattr(self, self._mapping_table[groups[1]], int(groups[0]))
 
         if not trustme:  
                      
             # If nothing set, raise error
             if not self.years and not self.weeks and not self.months and not self.days and not self.hours and not self.minutes and not self.seconds and not self.microseconds:
                 raise ValueError('Detected zero-duration TimeUnit!')
- 
+
+    @property
+    def value(self):
+        """The value of the TimeUnit, as its string representation."""
+        return(str(self))
+        
+        #try:
+        #    return self._value
+        #except AttributeError:
+        #    if self.type == self._CALENDAR:
+        #        raise TypeError('Sorry, the value of a calendar TimeUnit is not defined. use as_seconds() providing the starting point.') from None
+        #    self._value = self.as_seconds()
+        #    return self._value
+
+
     def __repr__(self):
         string = ''
         if self.years: string += str(self.years)               + 'Y' + '_'
@@ -292,7 +306,7 @@ class TimeUnit(Unit):
             return TimePoint(dt=self.shift_dt(other.dt, times=1))
         
         elif is_numerical(other):
-            return other + self.value
+            return other + self.as_seconds()
             
         else:
             raise NotImplementedError('Adding TimeUnits with objects of class "{}" is not implemented'.format(other.__class__.__name__))
@@ -319,7 +333,7 @@ class TimeUnit(Unit):
             return TimePoint(dt=self.shift_dt(other.dt, times=-1))
 
         elif is_numerical(other):
-            return other - self.value
+            return other - self.as_seconds()
 
         else:
             raise NotImplementedError('Subracting TimeUnits with objects of class "{}" is not implemented'.format(other.__class__.__name__))
@@ -327,45 +341,64 @@ class TimeUnit(Unit):
     def __sub__(self, other):
         raise NotImplementedError('Cannot subrtact anything from a TimeUnit. Only a TimeUnit from something else.')
 
+    def __truediv__(self, other):
+        raise NotImplementedError('Division for TimeUnits is not implemented yet')
+
+    def __rtruediv__(self, other):
+        raise NotImplementedError('Division for TimeUnits is not implemented yet')
+
+    def __mul__(self, other):
+        raise NotImplementedError('Multiplication for TimeUnits is not implemented yet')
+
+    def __rmul__(self, other):
+        return self.__mul__(other)
+    
     def __eq__(self, other):
 
-        # Check for the quickest first (value)
+        # Check against another TimeUnit
+        if isinstance(other, TimeUnit):
+            if self.is_calendar() and other.is_calendar():
+                # Check using the calendar components
+                if self.years != other.years:
+                    return False
+                if self.months != other.months:
+                    return False
+                if self.weeks != other.weeks:
+                    return False
+                if self.days != other.days:
+                    return False
+                if self.hours != other.hours:
+                    return False
+                if self.minutes != other.minutes:
+                    return False
+                if self.seconds != other.seconds:
+                    return False
+                if self.microseconds != other.microseconds:
+                    return False
+                return True
+            else:
+                # Check using the duration in seconds, as 15m and 900s are actually the same unit
+                if self.as_seconds() == other.as_seconds():
+                    return True
+
+  
+        # Check for direct equality with value, i.e. comparing with a string
+        if self.value == other:
+            return True
+
+        # Check for equality on the same "registered" value
+        if isinstance(other, Unit):
+            if self.value == other.value:
+                return True
+        
+        # Check for duration as seconds equality, i.e. comparing with a float
         try:
-            if self.value == other:
+            if self.as_seconds() == other:
                 return True
         except TypeError:
-            # Raised if this TimeUnit is of calendar type
-            pass
-        
-        # Check against another Unit with value
-        if isinstance(other, Unit):
-            try:
-                if self.value == other.value:
-                    return True
-            except TypeError:
-                # Raised if this or the other other TimeUnit is of calendar type
-                pass
-          
-        # Check against another TimeUnit using datetime components
-        if isinstance(other, TimeUnit):
-            if self.years != other.years:
-                return False
-            if self.months != other.months:
-                return False
-            if self.weeks != other.weeks:
-                return False
-            if self.days != other.days:
-                return False
-            if self.hours != other.hours:
-                return False
-            if self.minutes != other.minutes:
-                return False
-            if self.seconds != other.seconds:
-                return False
-            if self.microseconds != other.microseconds:
-                return False
-            return True
-        
+            # Raised if this or the other other TimeUnit is of calendar type
+            pass            
+
         # If everything fails, return false:
         return False
 
@@ -375,16 +408,16 @@ class TimeUnit(Unit):
             if getattr(self, self._mapping_table[item]): types +=1
         return True if types > 1 else False 
 
-    @property
-    def value(self):
-        """The value of the TimeUnit, in seconds. Not defined for calendar time units (as they have variable duration)."""
-        try:
-            return self._value
-        except AttributeError:
-            if self.type == self._CALENDAR:
-                raise TypeError('Sorry, the value of a calendar TimeUnit is not defined. use duration_s() providing the starting point.') from None
-            self._value = self.duration_s()
-            return self._value
+    #@property
+    #def value(self):
+    #    """The value of the TimeUnit, in seconds. Not defined for calendar time units (as they have variable duration)."""
+    #    try:
+    #        return self._value
+    #    except AttributeError:
+    #        if self.type == self._CALENDAR:
+    #            raise TypeError('Sorry, the value of a calendar TimeUnit is not defined. use as_seconds() providing the starting point.') from None
+    #        self._value = self.as_seconds()
+    #        return self._value
 
     @property
     def type(self):
@@ -432,7 +465,7 @@ class TimeUnit(Unit):
             tz_offset_s = get_tz_offset_s(time_dt)
             
             # Get TimeUnit duration in seconds
-            time_unit_s = self.duration_s(time_dt)
+            time_unit_s = self.as_seconds(time_dt)
 
             # Apply modular math (including timezone time translation trick if required (multiple hours))
             # TODO: check for correctness, the time shift should be always done...
@@ -521,7 +554,7 @@ class TimeUnit(Unit):
         if self.type == self._PHYSICAL:
             
             # Get TimeUnit duration in seconds
-            time_unit_s = self.duration_s()
+            time_unit_s = self.as_seconds()
 
             time_shifted_s = time_s + ( time_unit_s * times )
             time_shifted_dt = dt_from_s(time_shifted_s, tz=time_dt.tzinfo)
@@ -576,13 +609,13 @@ class TimeUnit(Unit):
         # Return
         return time_shifted_dt   
 
-    def duration_s(self, start_dt=None):
+    def as_seconds(self, start_dt=None):
         """The duration of the TimeUnit in seconds."""
 
         if self.type == self._CALENDAR:
 
             if not start_dt:
-                raise ValueError('With a calendar TimeUnit you can ask for duration only if you provide the starting point')
+                raise ValueError('You can ask to get a calendar TimeUnit as seconds only if you provide the unit starting point')
 
             if self._is_composite():
                 raise ValueError('Sorry, only simple TimeUnits are supported by this operation')
@@ -611,7 +644,7 @@ class TimeUnit(Unit):
         else:
             raise ConsistencyException('Unknown TimeUnit type "{}"'.format(self.type))
         
-        return time_unit_s
+        return float(time_unit_s)
 
     # Get start/end/center
     def _get_start(self, end=None, center=None):

@@ -399,24 +399,24 @@ class Forecaster(TimeSeriesParametricModel):
 
                 if isinstance(timeseries[0], Slot):
                     forecast.append(DataTimeSlot(start = last_item.end,
-                                                 unit  = timeseries._resolution,
+                                                 unit  = timeseries.resolution,
                                                  data_loss = None,
                                                  #tz = timeseries.tz,
                                                  data  = data))
                 else:
-                    forecast.append(DataTimePoint(t = last_item.t + timeseries._resolution.value,
+                    forecast.append(DataTimePoint(t = last_item.t + timeseries.resolution,
                                                   tz = timeseries.tz,
                                                   data  = data))
                 last_item = forecast[-1]
         else:
             if isinstance(timeseries[0], Slot):
                 forecast = DataTimeSlot(start = forecast_start_item.end,
-                                        unit  = timeseries._resolution,
+                                        unit  = timeseries.resolution,
                                         data_loss = None,
                                         #tz = timeseries.tz,
                                         data  = predicted_data)
             else:
-                forecast = DataTimePoint(t = forecast_start_item.t + timeseries._resolution.value,
+                forecast = DataTimePoint(t = forecast_start_item.t + timeseries.resolution,
                                          tz = timeseries.tz,
                                          data  = predicted_data)
             
@@ -450,13 +450,7 @@ class PeriodicAverageForecaster(Forecaster):
         # Set or detect periodicity
         if periodicity is None:        
             periodicity =  get_periodicity(timeseries)
-            try:
-                if isinstance(timeseries._resolution, TimeUnit):
-                    logger.info('Detected periodicity: %sx %s', periodicity, timeseries._resolution)
-                else:
-                    logger.info('Detected periodicity: %sx %ss', periodicity, timeseries._resolution)
-            except AttributeError:
-                logger.info('Detected periodicity: %sx %ss', periodicity, timeseries._resolution)
+            logger.info('Detected periodicity: %sx %s', periodicity, timeseries.resolution)
                 
         self.data['periodicity']  = periodicity
         self.data['dst_affected'] = dst_affected
@@ -482,7 +476,7 @@ class PeriodicAverageForecaster(Forecaster):
                     break
                 
                 # Process
-                periodicity_index = get_periodicity_index(item, timeseries._resolution, periodicity, dst_affected)
+                periodicity_index = get_periodicity_index(item, timeseries.resolution, periodicity, dst_affected)
                 if not periodicity_index in sums:
                     sums[periodicity_index] = item.data[key]
                     totals[periodicity_index] = 1
@@ -520,7 +514,7 @@ class PeriodicAverageForecaster(Forecaster):
         for j in range(self.data['window']):
             serie_index = forecast_start - self.data['window'] + j
             real_value = timeseries[serie_index].data[key]
-            forecast_value = self.data['averages'][get_periodicity_index(timeseries[serie_index], timeseries._resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])]
+            forecast_value = self.data['averages'][get_periodicity_index(timeseries[serie_index], timeseries.resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])]
             diffs += (real_value - forecast_value)            
 
         # Sum the avg diff between the real and the forecast on the window to the forecast (the offset)
@@ -533,21 +527,17 @@ class PeriodicAverageForecaster(Forecaster):
             # Set forecast timestamp
             if isinstance(timeseries[0], Slot):
                 try:
-                    if isinstance(timeseries._resolution, Unit):
-                        forecast_timestamp = forecast_timestamps[-1] + timeseries._resolution
-                    else:
-                        forecast_timestamp = TimePoint(forecast_timestamps[-1].t + timeseries._resolution)
-                        
+                    forecast_timestamp = forecast_timestamps[-1] + timeseries.resolution
                     forecast_timestamps.append(forecast_timestamp)
                 except IndexError:
                     forecast_timestamp = forecast_start_item.end
                     forecast_timestamps.append(forecast_timestamp)
 
             else:
-                forecast_timestamp = TimePoint(t = forecast_start_item.t + (timeseries._resolution*step), tz = forecast_start_item.tz )
+                forecast_timestamp = TimePoint(t = forecast_start_item.t + (timeseries.resolution.as_seconds()*step), tz = forecast_start_item.tz )
     
             # Compute the real forecast data
-            periodicity_index = get_periodicity_index(forecast_timestamp, timeseries._resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])        
+            periodicity_index = get_periodicity_index(forecast_timestamp, timeseries.resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])        
             forecast_data.append({key: self.data['averages'][periodicity_index] + (offset*1.0)})
         
         # Return
@@ -557,7 +547,7 @@ class PeriodicAverageForecaster(Forecaster):
     def _plot_averages(self, timeseries, **kwargs):      
         averages_timeseries = copy.deepcopy(timeseries)
         for item in averages_timeseries:
-            value = self.data['averages'][get_periodicity_index(item, averages_timeseries._resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])]
+            value = self.data['averages'][get_periodicity_index(item, averages_timeseries.resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])]
             if not value:
                 value = 0
             item.data['average'] =value 
@@ -611,15 +601,10 @@ Prophet is robust to missing data and shifts in the trend, and typically handles
         data_to_forecast = []
         
         for _ in range(steps):
-            if isinstance (timeseries._resolution, TimeUnit):
-                new_item_dt = last_item_dt + timeseries._resolution
-                data_to_forecast.append(self.remove_timezone(new_item_dt))
-                last_item_dt = new_item_dt
-            else:
-                new_item_t = last_item_t + timeseries._resolution
-                new_item_dt = dt_from_s(new_item_t, tz=timeseries.tz)
-                data_to_forecast.append(self.remove_timezone(new_item_dt))
-                last_item_t = new_item_t  
+            new_item_dt = last_item_dt + timeseries.resolution
+            data_to_forecast.append(self.remove_timezone(new_item_dt))
+            last_item_dt = new_item_dt
+
         dataframe_to_forecast = DataFrame(data_to_forecast, columns = ['ds'])
                     
         # Call Prophet predict 

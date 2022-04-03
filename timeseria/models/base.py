@@ -194,7 +194,7 @@ class TimeSeriesParametricModel(ParametricModel):
         if self.fitted:
         
             # Save original data resolution (Unit or TimeUnit Object)
-            or_resolution = self.data['resolution']
+            orresolution = self.data['resolution']
     
             # Temporarily change the model resolution unit as string representation
             self.data['resolution'] = str(self.data['resolution'])
@@ -203,7 +203,7 @@ class TimeSeriesParametricModel(ParametricModel):
         save_output  = super(TimeSeriesParametricModel, self).save(*args, **kwargs)
         
         # Set back original data resolution
-        self.data['resolution'] = or_resolution
+        self.data['resolution'] = orresolution
         
         # Return output
         return save_output

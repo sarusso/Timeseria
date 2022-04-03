@@ -335,7 +335,7 @@ def check_timeseries(timeseries, resolution=None):
     # Import here or you will end up with cyclic imports
     from .datastructures import DataTimePointSeries, DataTimeSlotSeries 
     if isinstance(timeseries, DataTimePointSeries):
-        if timeseries._resolution == 'variable':
+        if timeseries.resolution.is_variable():
             raise ValueError('Variable resolutions are not supported. Resample or slot the time series first.')
     elif isinstance(timeseries, DataTimeSlotSeries):
         pass
@@ -352,17 +352,17 @@ def check_resolution(timeseries, resolution):
         if resolution == timeseries.resolution:
             return True
         try:
-            if resolution.value == timeseries.resolution.duration_s():
+            if resolution.value == timeseries.resolution.as_seconds():
                 return True
         except:
             pass
         try:
-            if resolution.duration_s() == timeseries.resolution.value:
+            if resolution.as_seconds() == timeseries.resolution.value:
                 return True
         except:
             pass
         try:
-            if resolution.duration_s() == timeseries.resolution:
+            if resolution.as_seconds() == timeseries.resolution:
                 return True
         except:
             pass
@@ -474,7 +474,7 @@ def get_periodicity_index(item, resolution, periodicity, dst_affected=False):
     from .units import Unit, TimeUnit
     # Handle specific cases
     if isinstance(resolution, TimeUnit):  
-        resolution_s = resolution.duration_s(item.dt)
+        resolution_s = resolution.as_seconds(item.dt)
     elif isinstance(resolution, Unit):  
         if isinstance(resolution.value, list):
             raise NotImplementedError('Sorry, periodocity in multi-dimensional spaces are not defined')
