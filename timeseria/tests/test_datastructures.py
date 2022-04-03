@@ -7,7 +7,7 @@ from ..datastructures import Point, TimePoint, DataPoint, DataTimePoint
 from ..datastructures import Slot, TimeSlot, DataSlot, DataTimeSlot
 from ..datastructures import Series, SlotSeries, TimePointSeries, TimeSlotSeries, DataSlotSeries
 from ..datastructures import DataTimePointSeries, DataTimeSlotSeries 
-from ..datastructures import SeriesSlice, SeriesDenseSlice 
+from ..datastructures import SeriesSlice 
 from ..time import UTC, dt
 from ..units import Unit, TimeUnit
 
@@ -360,7 +360,7 @@ class TestPointSeries(unittest.TestCase):
 
         # Test resolution: variable, threee points       
         time_point_series = TimePointSeries(TimePoint(t=60),TimePoint(t=120),TimePoint(t=130))
-        self.assertEqual(time_point_series.resolution, 'variable')
+        self.assertEqual(time_point_series.resolution, '~1m')
         
         # Test resolution: defined, threee points               
         time_point_series = TimePointSeries(TimePoint(t=60),TimePoint(t=120),TimePoint(t=180))
@@ -449,14 +449,14 @@ class TestPointSeries(unittest.TestCase):
                                                      DataTimePoint(dt=dt(2015,10,25,0,0,0, tzinfo='Europe/Rome'), data=24.1),
                                                      DataTimePoint(dt=dt(2015,10,26,0,0,0, tzinfo='Europe/Rome'), data=23.1))
         
-        self.assertEqual(data_time_point_series.resolution, 'variable') # DST occurred
+        self.assertEqual(data_time_point_series.resolution, '~86400s') # DST occurred
         
         data_time_point_series = DataTimePointSeries(DataTimePoint(dt=dt(2015,10,27,0,0,0, tzinfo='Europe/Rome'), data={'a':23.8}),
                                                      DataTimePoint(dt=dt(2015,10,28,0,0,0, tzinfo='Europe/Rome'), data={'a':24.1}),
                                                      DataTimePoint(dt=dt(2015,10,29,0,0,0, tzinfo='Europe/Rome'), data={'a':23.1}))
         
         self.assertEqual(data_time_point_series.resolution, 86400) # No DST occured
-
+        self.assertEqual(data_time_point_series.resolution, '86400s') # No DST occured
 
         # Test get item by string key (filter on data labels). More testing is done in the operation tests
         data_time_point_series =  DataTimePointSeries(DataTimePoint(t=60, data={'a':1, 'b':2}))
@@ -673,7 +673,7 @@ class TestSlotSeries(unittest.TestCase):
         slot_series.append(Slot(start=Point(10), end=Point(20)))
         
         # The unit is more used as a type..
-        slot_series =  SlotSeries(Slot(start=Point(0), end=Point(10), unit='10-ish'))
+        slot_series = SlotSeries(Slot(start=Point(0), end=Point(10), unit='10-ish'))
         slot_series.append(Slot(start=Point(10), end=Point(21), unit='10-ish'))
 
 
@@ -702,10 +702,10 @@ class TestSlotSeries(unittest.TestCase):
         time_slot_series.append(TimeSlot(start=TimePoint(t=60, tz='Europe/Rome'), end=TimePoint(t=120, tz='Europe/Rome')))
 
         # Test slot unit
-        self.assertEqual(time_slot_series._resolution, Unit(60.0))
+        self.assertEqual(time_slot_series.resolution, Unit(60.0))
 
         # Test resolution 
-        self.assertEqual(time_slot_series._resolution, Unit(60))
+        self.assertEqual(time_slot_series.resolution, Unit(60))
         
 
     def test_DataSlotSeries(self):
@@ -761,8 +761,8 @@ class TestSlotSeries(unittest.TestCase):
             data_time_slot_series.append(DataTimeSlot(start=TimePoint(t=120), end=TimePoint(t=180), data={'a':56, 'c':67}))            
 
         # Test with units
-        self.assertEqual(data_time_slot_series._resolution, Unit(60.0))
-        self.assertEqual(DataTimeSlotSeries(DataTimeSlot(start=TimePoint(t=60), end=TimePoint(t=120), data=23.8, unit=TimeUnit('60s')))._resolution, TimeUnit('60s'))
+        self.assertEqual(data_time_slot_series.resolution, Unit(60.0))
+        self.assertEqual(DataTimeSlotSeries(DataTimeSlot(start=TimePoint(t=60), end=TimePoint(t=120), data=23.8, unit=TimeUnit('60s'))).resolution, TimeUnit('60s'))
         
         data_time_slot_series = DataTimeSlotSeries()
         prev_t    = 1595862221
@@ -909,7 +909,7 @@ class TestSeriesSlices(unittest.TestCase):
             point.valid_from=validity_regions[point.t][0]
             point.valid_to=validity_regions[point.t][1]
         
-        series_slice = SeriesDenseSlice(series, 2, 8)
+        series_slice = SeriesSlice(series, 2, 8, dense=True)
         
         self.assertEqual(len(series_slice), 7)
         

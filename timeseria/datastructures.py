@@ -723,11 +723,32 @@ class TimePointSeries(PointSeries):
                     raise ValueError('Time t="{}" is a duplicate'.format(item.t))
                 
                 if self._resolution is None:
-                    self._resolution = TimeUnit(to_time_unit_string(item.t - self.prev_t, friendlier=True))
+                    self.resolution_as_seconds = item.t - self.prev_t # For a bit of performance
                     
-                elif self._resolution != 'variable':
-                    if self._resolution != item.t - self.prev_t:
-                        self._resolution = 'variable'
+                    class TimeResolution(TimeUnit):
+    
+                        def __init__(self, *args, **kwargs):
+                            variable = kwargs.pop('variable', False)
+                            self.variable = variable
+                            super(TimeResolution, self).__init__(*args, **kwargs)
+                    
+                        def __repr__(self):
+                            if self.variable:
+                                return "~{}".format(super(TimeResolution, self).__repr__())
+                            else:
+                                return "{}".format(super(TimeResolution, self).__repr__())
+                        
+                        def is_variable(self):
+                            return self.variable
+
+                    self._resolution = TimeResolution(to_time_unit_string(item.t - self.prev_t, friendlier=True)) 
+                    #self._resolution = TimeUnit(to_time_unit_string(item.t - self.prev_t, friendlier=True))
+                    
+                elif not self._resolution.variable:
+                    if self.resolution_as_seconds != item.t - self.prev_t:
+                        # TODO: here you should set a flag and remove the resolution.
+                        # Then when this is requested, set it using the autodetected sampling rate
+                        self._resolution.variable = True
 
             self.prev_t = item.t
                 
@@ -771,9 +792,12 @@ class TimePointSeries(PointSeries):
     @property
     def resolution(self):
         """The (temporal) resolution of the time series."""
-        return self._resolution
+        try:
+            return self._resolution
+        except AttributeError:
+            return None
 
-   
+
 class DataPointSeries(PointSeries):
     """A series of data points, where each item is guaranteed to be ordered and to carry the same data type.
 
@@ -1006,6 +1030,8 @@ class DataTimePointSeries(DataPointSeries, TimePointSeries):
             autodetected_sampling_interval_as_str = str(self.autodetected_sampling_interval)
             if autodetected_sampling_interval_as_str.endswith('.0'):
                 # TODO: use a friendlier resolution here as well, as above?
+                # TODO: do something like this when setting the variable resolution, roght now the .resolution
+                # and ._resolution_string might return different values as they are computed differently  
                 autodetected_sampling_interval_as_str = autodetected_sampling_interval_as_str[:-2] 
             _resolution_string = 'variable resolution (~{}s)'.format(autodetected_sampling_interval_as_str)
         return _resolution_string
@@ -1350,18 +1376,18 @@ class SlotSeries(Series):
         # Slots can belong to the same series if they are in succession (tested with the __succedes__ method)
         # and if they have the same unit, which we test here instead as the __succedes__ is more general.
         try:
-            if self._resolution != item.unit:
-                # Try for floatign point precision errors
+            if self._reference_unit != item.unit:
+                # Try for floating point precision errors
                 abort = False
                 try:
-                    if not  is_close(self._resolution, item.unit):
+                    if not is_close(self._reference_unit.value, item.unit.value):
                         abort = True
                 except (TypeError, ValueError):
                     abort = True
                 if abort:
-                    raise ValueError('Cannot add items with different units (I have "{}" and you tried to add "{}")'.format(self._resolution, item.unit))
+                    raise ValueError('Cannot add items with different units (I have "{}" and you tried to add "{}")'.format(self._reference_unit, item.unit))
         except AttributeError:
-            self._resolution = item.unit
+            self._reference_unit = item.unit
 
         # Call parent append
         super(SlotSeries, self).append(item)
@@ -1412,7 +1438,31 @@ class TimeSlotSeries(SlotSeries):
     @property
     def resolution(self):
         """The (temporal) resolution of the time series."""
-        return self._resolution
+        try:
+            return self._resolution
+        except AttributeError:
+            try:
+                
+                class TimeResolution(TimeUnit):
+    
+                    def __init__(self, *args, **kwargs):
+                        variable = kwargs.pop('variable', False)
+                        self.variable = variable
+                        super(TimeResolution, self).__init__(*args, **kwargs)
+                
+                    def __repr__(self):
+                        if self.variable:
+                            return "~{}".format(super(TimeResolution, self).__repr__())
+                        else:
+                            return "{}".format(super(TimeResolution, self).__repr__())
+                    
+                    def is_variable(self):
+                        return self.variable
+                
+                self._resolution = TimeResolution(self._reference_unit.value)
+                return self._resolution
+            except AttributeError:
+                return None
 
 
 class DataSlotSeries(SlotSeries):
@@ -1655,7 +1705,7 @@ class DataTimeSlotSeries(DataSlotSeries, TimeSlotSeries):
     def __repr__(self):
         if len(self):
             # TODO: "slots of unit" ?
-            return 'Time series of #{} slots of {}, from slot starting @ {} ({}) to slot starting @ {} ({})'.format(len(self), self._resolution, self[0].start.t, self[0].start.dt, self[-1].start.t, self[-1].start.dt)            
+            return 'Time series of #{} slots of {}, from slot starting @ {} ({}) to slot starting @ {} ({})'.format(len(self), self.resolution, self[0].start.t, self[0].start.dt, self[-1].start.t, self[-1].start.dt)            
         else:
             return 'Time series of #0 slots'
 
@@ -1669,13 +1719,12 @@ class DataTimeSlotSeries(DataSlotSeries, TimeSlotSeries):
 
 
 #==============================
-#  Series Slices
+#  Series slice
 #==============================
+
 class SeriesSlice(Series):
-    
-    dense = False
-    
-    def __init__(self, series, from_i, to_i, from_t=None, to_t=None, interpolation_method='linear'):
+        
+    def __init__(self, series, from_i, to_i, from_t=None, to_t=None, interpolation_method='linear', dense=False):
         # TODO: move to "fill_strategy" instead of "interpolation_mode"?
         self.series = series
         self.from_i = from_i
@@ -1685,6 +1734,7 @@ class SeriesSlice(Series):
         self.new_points = {}
         self.from_t = from_t
         self.to_t=to_t
+        self.dense=dense
     
     def __getitem__(self, i):
         if self.dense:
@@ -1809,20 +1859,7 @@ class SeriesSlice(Series):
 
     def data_labels(self):
         return self.series.data_labels()
-    
-    # Generic attributes
-    #def __getattribute__(self, name):
-    #    try:
-    #        return object.__getattribute__(self, name)
-    #    except AttributeError:
-    #        try:
-    #            return object.__getattribute__(self.series, name)
-    #        except Exception as e:
-    #            raise e from None
 
-class SeriesDenseSlice(SeriesSlice):    
-
-    dense = True
 
 
 

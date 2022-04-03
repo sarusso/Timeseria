@@ -335,7 +335,7 @@ def check_timeseries(timeseries, resolution=None):
     # Import here or you will end up with cyclic imports
     from .datastructures import DataTimePointSeries, DataTimeSlotSeries 
     if isinstance(timeseries, DataTimePointSeries):
-        if timeseries._resolution == 'variable':
+        if timeseries.resolution.is_variable():
             raise ValueError('Variable resolutions are not supported. Resample or slot the time series first.')
     elif isinstance(timeseries, DataTimeSlotSeries):
         pass
