@@ -99,7 +99,7 @@ def _to_dg_time(dt):
         return 'new Date(Date.UTC({}, {}, {}, {}, {}, {}))'.format(dt.year, dt.month-1, dt.day, dt.hour, dt.minute, dt.second)
 
 
-def _to_dg_data(serie, data_labels_to_plot, data_indexes_to_plot, aggregate_by=0):
+def _to_dg_data(serie, data_labels_to_plot, data_indexes_to_plot, full_precision, aggregate_by=0):
     '''{% for timestamp,value in metric_data.items %}{{timestamp}},{{value}}\n{%endfor%}}'''
     
     dg_data=''
@@ -208,15 +208,19 @@ def _to_dg_data(serie, data_labels_to_plot, data_indexes_to_plot, aggregate_by=0
                 # Data
                 for i, label in enumerate(labels):
                     avg = data_sums[i]/aggregate_by
-                    #if i  in index_metrics_positions:
-                    #    data_part+='[{},{},{}],'.format( 0, avg, avg)
-                    #else:
-                    data_part+='[{},{},{}],'.format( data_mins[i], avg, data_maxs[i])
-
+                    if full_precision:
+                        data_part+='[{},{},{}],'.format(data_mins[i], avg, data_maxs[i])
+                    else:
+                        data_part+='[{:.2f},{:.2f},{:.2f}],'.format(data_mins[i], avg, data_maxs[i])
+                        
                 # data_indexes
                 for i, index in enumerate(data_indexes_to_plot):
                     if index_sums[i] is not None:
-                        data_part+='[0,{0},{0}],'.format(index_sums[i]/aggregate_by)
+                        aggregated_index_value = index_sums[i]/aggregate_by
+                        if full_precision:
+                            data_part+='[0,{},{}],'.format(aggregated_index_value,aggregated_index_value)
+                        else:
+                            data_part+='[0,{:.4f},{:.4f}],'.format(aggregated_index_value,aggregated_index_value)                            
                     else:
                         data_part+='[null,null,null],'
 
@@ -255,8 +259,11 @@ def _to_dg_data(serie, data_labels_to_plot, data_indexes_to_plot, aggregate_by=0
                 else:
                     data = item.data[label]
 
-                data_part += '{},'.format(data)   #item.data
-                
+                if full_precision:
+                    data_part += '{},'.format(data)
+                else:
+                    data_part += '{:.2f},'.format(data)
+                                    
                 # Global min
                 if global_min is None:
                     global_min = data
@@ -276,7 +283,10 @@ def _to_dg_data(serie, data_labels_to_plot, data_indexes_to_plot, aggregate_by=0
                 try:
                     index_value = item.data_indexes[index]
                     if index_value is not None:
-                        data_part+='{},'.format(index_value)
+                        if full_precision:
+                            data_part+='{},'.format(index_value)
+                        else:
+                            data_part+='{:.4f},'.format(index_value)                       
                     else:
                         data_part+='null,'
                 except KeyError:
@@ -307,8 +317,8 @@ def _to_dg_data(serie, data_labels_to_plot, data_indexes_to_plot, aggregate_by=0
 #  Dygraphs plot
 #=================
 
-def dygraphs_plot(timeseries, data_labels='all', data_indexes='all', aggregate=None, aggregate_by=None, color=None, 
-                  height=None, image=DEFAULT_PLOT_AS_IMAGE, image_resolution='1280x380', html=False, save_to=None):
+def dygraphs_plot(timeseries, data_labels='all', data_indexes='all', aggregate=None, aggregate_by=None, full_precision=False,
+                  color=None, height=None, image=DEFAULT_PLOT_AS_IMAGE, image_resolution='1280x380', html=False, save_to=None):
     """Plot a time series using Dygraphs interactive plots.
     
        Args:
@@ -321,6 +331,7 @@ def dygraphs_plot(timeseries, data_labels='all', data_indexes='all', aggregate=N
                             By default, above 10000 data points the time series starts to
                             get aggregated by a factor of ten for each order of magnitude. 
            aggregate_by(int): a custom aggregation factor.
+           full_precision(bool): if to use (nearly) full precision using 6 significant figures. Defaulted to false.
            color(str): the color of the time series in the plot. Only supported for univariate time series.
            height(int): force a plot height, in the time series data units.
            image(bool): if to generate an image rendering of the plot instead of the default interactive one.
@@ -572,7 +583,7 @@ function legendFormatter(data) {
                 html += "<span style='margin-left:15px'>indexes:</span>"
                 first_data_index=false
             }*/
-            html += "<span" + decoration + "> <span style='background: " + series.color + ";'>&nbsp" + series.labelHTML + "&nbsp</span>:&#160;" + series.yHTML*100 + "%</span>, ";
+            html += "<span" + decoration + "> <span style='background: " + series.color + ";'>&nbsp" + series.labelHTML + "&nbsp</span>:&#160;" + """+ ('series.yHTML*100' if full_precision else '(Math.round(series.yHTML *100 * 100) / 100)')  +""" + "%</span>, ";
         
         }
         else {
@@ -626,7 +637,7 @@ function legendFormatter(data) {
     labels_list = ['Timestamp'] + labels.split(',')
 
     # Get series data in Dygraphs format (and aggregate if too much data and find global min and max)
-    global_min, global_max, dg_data = _to_dg_data(timeseries, data_labels_to_plot, data_indexes_to_plot, aggregate_by)
+    global_min, global_max, dg_data = _to_dg_data(timeseries, data_labels_to_plot, data_indexes_to_plot, full_precision, aggregate_by)
     if height:
         global_max = height
     if global_max != global_min:
@@ -658,6 +669,8 @@ showRangeSelector: """+('true' if not image else 'false')+""",
 hideOverlayOnMouseOut: true,
 interactionModel: Dygraph.defaultInteractionModel,
 includeZero: false,
+digitsAfterDecimal:2,
+sigFigs: """ + ('6' if full_precision else 'null') + """,  
 showRoller: false,
 legend: 'always',
 labelsUTC: true,
