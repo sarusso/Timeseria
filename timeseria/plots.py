@@ -39,6 +39,24 @@ else:
 #   Utilities
 #=================
 
+# Tab 10 colormap (https://matplotlib.org/stable/tutorials/colors/colormaps.html)
+# https://github.com/matplotlib/matplotlib/blob/f6e0ee49c598f59c6e6cf4eefe473e4dc634a58a/lib/matplotlib/_cm.py
+_tab10_colormap_norm = (
+    (0.12156862745098039, 0.4666666666666667,  0.7058823529411765  ),  # 1f77b4
+    #(1.0,                 0.4980392156862745,  0.054901960784313725),  # ff7f0e
+    (0.17254901960784313, 0.6274509803921569,  0.17254901960784313 ),  # 2ca02c
+    (0.8392156862745098,  0.15294117647058825, 0.1568627450980392  ),  # d62728
+    (0.5803921568627451,  0.403921568627451,   0.7411764705882353  ),  # 9467bd
+    (0.5490196078431373,  0.33725490196078434, 0.29411764705882354 ),  # 8c564b
+    #(0.8901960784313725,  0.4666666666666667,  0.7607843137254902  ),  # e377c2
+    (0.4980392156862745,  0.4980392156862745,  0.4980392156862745  ),  # 7f7f7f
+    (0.7372549019607844,  0.7411764705882353,  0.13333333333333333 ),  # bcbd22
+    (0.09019607843137255, 0.7450980392156863,  0.8117647058823529),    # 17becf
+)
+
+def to_rgba_str_from_norm_rgb(rgb, a):
+    return 'rgba({},{},{},{})'.format(rgb[0]*255,rgb[1]*255,rgb[2]*255,a)
+
 def _utc_fake_s_from_dt(dt):
     dt_str = dt_to_str(dt)
     if '+' in dt_str:
@@ -295,6 +313,7 @@ def dygraphs_plot(timeseries, data_labels='all', data_indexes='all', aggregate=N
     
        Args:
            timeseries(DataTimePointSeries/DataTimeSlotSeries): the time series to plot.
+           data_indexes(list): a list of data_labels to plot. By default set to all the data labels of the series.
            data_indexes(list): a list of data_indexes as the ``data_loss``, ``data_reconstructed`` etc.
                                to plot. By default set to all the data indexes of the series. To disable
                                plotting data indexes entirely, use None or an empty list.
@@ -669,90 +688,66 @@ axes: {
 },
 animatedZooms: true,"""
 
-    # Define colors in case of an aggregated plot and not. Has to be
-    # differentiated due different transparency policies in Dygraphs
+    # Variable fill alpha in case of aggregated plot or not (for the area)
+    # They have to be differentiated due different transparency policies in Dygraphs
     if aggregate_by:        
-        rgba_value_red    = 'rgba(255,128,128,0.4)'   # Alpha is for the legend
-        rgba_value_gray   = 'rgba(240,240,240,0.5)'   # Alpha is for the legend
-        rgba_value_orange = 'rgba(235, 156, 56,1.0)'  # Alpha is for the legend
-        fill_alpha_value  = 0.31                      # Alpha for the area 
+        fill_alpha_value  = 0.31
     else:
-        rgba_value_red    = 'rgba(255,128,128,0.4)'   # Alpha is for the legend
-        rgba_value_gray   = 'rgba(240,240,240,0.5)'   # Alpha is for the legend
-        rgba_value_orange = 'rgba(245, 193, 130,0.8)' # Alpha is for the legend
-        fill_alpha_value  = 0.5                       # Alpha for the area
+        fill_alpha_value  = 0.5
 
-    # Fixed fill alpha value
+    # Fixed fill alpha value, used for some colors
     fill_alpha_value_fixed = 0.6
 
-    # Fixed colors
-    rgba_alpha_violet = 'rgba(227, 168, 237, 0.5)'   #  235, 179, 245 | 227, 156, 240
+    # Fixed colors (alpha is for the lgend)
+    rgba_value_red    = 'rgba(255,128,128,0.4)'
+    rgba_alpha_violet = 'rgba(227, 168, 237, 0.5)' 
     rgba_value_yellow = 'rgba(255, 255, 102, 0.6)'
     rgba_value_darkorange = 'rgba(255, 140, 0, 0.7)'
     
-    # Special series start
+    # Data indexes series start
     dygraphs_javascript += """
      series: {"""
     
-    # Data reconstructed index series
-    if 'data_reconstructed' in data_indexes_to_plot:
-        dygraphs_javascript += """
-       'data_reconstructed': {
-         //customBars: false, // Does not work?
-         axis: 'y2',
-         drawPoints: false,
-         strokeWidth: 0,
-         highlightCircleSize:0,
-         fillGraph: true,
-         fillAlpha: """+str(fill_alpha_value_fixed)+""",   // This alpha is used for the area
-         color: '"""+rgba_alpha_violet+"""'                // Alpha here is used for the legend 
-       },"""
+    colormap_count = 0
+    for i, data_index_to_plot in enumerate(data_indexes_to_plot):
     
-    # Data loss index series
-    if 'data_loss' in data_indexes_to_plot:
-        # Add data loss special timeseries
-        dygraphs_javascript += """
-       'data_loss': {
-         //customBars: false, // Does not work?
-         axis: 'y2',
-         //stepPlot: true,
-         drawPoints: false,
-         strokeWidth: 0,
-         highlightCircleSize:0,
-         fillGraph: true,
-         fillAlpha: """+str(fill_alpha_value)+""",  // This alpha is used for the area 
-         color: '"""+rgba_value_red+"""'            // Alpha here is used for the legend 
-       },"""
+        # Special data indexes
+        if data_index_to_plot == 'data_reconstructed':
+            data_index_fillalpha = fill_alpha_value_fixed
+            data_index_color = rgba_alpha_violet
 
-    # Data forecast index series
-    if 'forecast' in data_indexes_to_plot:
-        dygraphs_javascript += """
-       'forecast': {
-         //customBars: false, // Does not work?
-         axis: 'y2',
-         //stepPlot: true,
-         drawPoints: false,
-         strokeWidth: 0,
-         highlightCircleSize:0,
-         fillGraph: true,
-         fillAlpha: """+str(fill_alpha_value)+""",  // This alpha is used for the area 
-         color: '"""+rgba_value_yellow+"""'         // Alpha here is used for the legend 
-       },"""
+        elif data_index_to_plot == 'data_loss':
+            data_index_fillalpha = fill_alpha_value
+            data_index_color = rgba_value_red
 
-    # Add anomaly index series
-    if 'anomaly' in data_indexes_to_plot:
+        elif data_index_to_plot == 'forecast':
+            data_index_fillalpha = fill_alpha_value
+            data_index_color = rgba_value_yellow
+
+        elif data_index_to_plot ==  'anomaly':
+            data_index_fillalpha = fill_alpha_value_fixed
+            data_index_color = rgba_value_darkorange
+        
+        # Standard data indexes
+        else:
+            data_index_fillalpha = fill_alpha_value-0.1
+            data_index_color = to_rgba_str_from_norm_rgb(_tab10_colormap_norm[colormap_count%len(_tab10_colormap_norm)], fill_alpha_value+0.1 if aggregate_by else fill_alpha_value-0.1)
+            colormap_count += 1
+           
+        # Now create the entry for this data index               
         dygraphs_javascript += """
-        'anomaly': {
+        '"""+data_index_to_plot+"""': {
          //customBars: false, // Does not work?
          axis: 'y2',
          drawPoints: false,
          strokeWidth: 0,
          highlightCircleSize:0,
          fillGraph: true,
-         fillAlpha: """+str(fill_alpha_value_fixed)+""",  // This alpha is used for the area
-         color: '"""+rgba_value_darkorange+"""'           // Alpha here is used for the legend 
-       },"""
-   
+         fillAlpha: """+str(data_index_fillalpha)+""", // This alpha is used for the area
+         color: '"""+data_index_color+"""'             // Alpha here is used for the legend 
+       },"""    
+
+
     # Add data mark index series
     dygraphs_javascript += """
        'data_mark': {
