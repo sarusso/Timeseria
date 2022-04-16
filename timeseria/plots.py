@@ -50,7 +50,7 @@ def _utc_fake_s_from_dt(dt):
 
 
 
-def _get_keys_and_check_data_for_plot(data):
+def _check_data_for_plot(data):
     if is_numerical(data):
         keys = []
     elif isinstance(data, list):
@@ -81,7 +81,7 @@ def _to_dg_time(dt):
         return 'new Date(Date.UTC({}, {}, {}, {}, {}, {}))'.format(dt.year, dt.month-1, dt.day, dt.hour, dt.minute, dt.second)
 
 
-def _to_dg_data(serie,  data_indexes_to_plot, aggregate_by=0):
+def _to_dg_data(serie, data_labels_to_plot, data_indexes_to_plot, aggregate_by=0):
     '''{% for timestamp,value in metric_data.items %}{{timestamp}},{{value}}\n{%endfor%}}'''
     
     dg_data=''
@@ -102,15 +102,15 @@ def _to_dg_data(serie,  data_indexes_to_plot, aggregate_by=0):
                 
         # Prepare a dict for every piece of data
         try:
-            keys
+            labels
         except UnboundLocalError:
-            # Set keys and support vars
-            keys = _get_keys_and_check_data_for_plot(item.data)
-            if not keys:
-                keys = [None]
-            data_sums = [0 for key in keys]
-            data_mins = [None for key in keys]
-            data_maxs = [None for key in keys]
+            # Set labels and support vars
+            labels = data_labels_to_plot
+            if not labels:
+                labels = [None]
+            data_sums = [0 for label in labels]
+            data_mins = [None for label in labels]
+            data_maxs = [None for label in labels]
             index_sums = [0 for index in data_indexes_to_plot]
             
 
@@ -124,18 +124,18 @@ def _to_dg_data(serie,  data_indexes_to_plot, aggregate_by=0):
                 first_t = item.t
                   
             # Define data
-            if keys:
+            if labels:
                 datas=[]      
-                for j, key in enumerate(keys):
-                    if key is None:
+                for j, label in enumerate(labels):
+                    if label is None:
                         datas.append(item.data)
                     else:
-                        datas.append(item.data[key])
+                        datas.append(item.data[label])
             else:
                 datas = [item.data]
             
             
-            # Loop over data keys, including the "None" key if we have no keys (float data), and add data
+            # Loop over data labels, including the "None" label if we have no labels (float data), and add data
             for j, data in enumerate(datas):
                 
                 # Sum
@@ -188,7 +188,7 @@ def _to_dg_data(serie,  data_indexes_to_plot, aggregate_by=0):
                 data_part=''
                 
                 # Data
-                for i, key in enumerate(keys):
+                for i, label in enumerate(labels):
                     avg = data_sums[i]/aggregate_by
                     #if i  in index_metrics_positions:
                     #    data_part+='[{},{},{}],'.format( 0, avg, avg)
@@ -218,9 +218,9 @@ def _to_dg_data(serie,  data_indexes_to_plot, aggregate_by=0):
                 dg_data += '[{},{}],'.format(_to_dg_time(dt_from_s(aggregation_t, tz=item.tz)), data_part)
                 
                 # Reset averages
-                data_sums = [0 for key in keys]
-                data_mins = [None for key in keys]
-                data_maxs = [None for key in keys]
+                data_sums = [0 for label in labels]
+                data_mins = [None for label in labels]
+                data_maxs = [None for label in labels]
                 index_sums = [0 for index in data_indexes_to_plot]
                 first_t = None
 
@@ -229,13 +229,13 @@ def _to_dg_data(serie,  data_indexes_to_plot, aggregate_by=0):
         #====================
         else:
                     
-            # Loop over data keys, including the "None" key if we have no keys (float data), and add data
+            # Loop over data labels, including the "None" label if we have no labels (float data), and add data
             data_part=''
-            for key in keys:
-                if key is None:
+            for label in labels:
+                if label is None:
                     data = item.data
                 else:
-                    data = item.data[key]
+                    data = item.data[label]
 
                 data_part += '{},'.format(data)   #item.data
                 
@@ -289,8 +289,8 @@ def _to_dg_data(serie,  data_indexes_to_plot, aggregate_by=0):
 #  Dygraphs plot
 #=================
 
-def dygraphs_plot(timeseries, data_indexes='all', aggregate=None, aggregate_by=None, color=None, height=None, 
-                  image=DEFAULT_PLOT_AS_IMAGE, image_resolution='1280x380', html=False, save_to=None):
+def dygraphs_plot(timeseries, data_labels='all', data_indexes='all', aggregate=None, aggregate_by=None, color=None, 
+                  height=None, image=DEFAULT_PLOT_AS_IMAGE, image_resolution='1280x380', html=False, save_to=None):
     """Plot a time series using Dygraphs interactive plots.
     
        Args:
@@ -350,6 +350,24 @@ def dygraphs_plot(timeseries, data_indexes='all', aggregate=None, aggregate_by=N
 
     #if show_data_reconstructed:
     #    show_data_loss=False
+
+    # Handle series data_lables
+    if data_labels == 'all':
+        # Plot all the series data_labels
+        data_labels_to_plot = timeseries.data_labels()
+    elif data_labels is None:
+        data_labels_to_plot = []
+    else:
+        # Check that the data_labels are of the right type and that are present in the series data_labels
+        data_labels_to_plot = []
+        if not isinstance(data_labels, list):
+            raise TypeError('The "data_labels" argument must be a list or the magic word "all" (got type "{}")'.format(data_labels.__class__.__name__))
+        for label in data_labels:
+            if not isinstance(label, str):
+                raise TypeError('The "data_labels" list items must be string (got type "{}")'.format(label.__class__.__name__))
+            if not label in timeseries.data_labels():
+                raise ValueError('The data label "{}" is not present in the series data labeles ({})'.format(label, timeseries._all_data_labels()))
+            data_labels_to_plot.append(label)
 
     # Handle series data_indexes
     if data_indexes == 'all':
@@ -558,18 +576,20 @@ function legendFormatter(data) {
     dygraphs_javascript += 'new Dygraph('
     dygraphs_javascript += 'document.getElementById("{}"),'.format(graph_div_id)
 
+    # Check data for plot.
+    _check_data_for_plot(timeseries[0].data)
+
     # Loop over all the keys
     labels=''
-    keys = _get_keys_and_check_data_for_plot(timeseries[0].data)
-    if keys:
-        for key in keys:
-            if isinstance(key, int):
-                if len(keys) == 1:
+    if data_labels_to_plot:
+        for data_label_to_plot in data_labels_to_plot:
+            if isinstance(data_label_to_plot, int):
+                if len(data_labels_to_plot) == 1:
                     labels='value,'
                 else:    
-                    labels += 'value {},'.format(key+1)
+                    labels += 'value {},'.format(data_label_to_plot+1)
             else:
-                labels += '{},'.format(key)
+                labels += '{},'.format(data_label_to_plot)
         # Remove last comma
         labels = labels[0:-1]
     else:
@@ -587,7 +607,7 @@ function legendFormatter(data) {
     labels_list = ['Timestamp'] + labels.split(',')
 
     # Get series data in Dygraphs format (and aggregate if too much data and find global min and max)
-    global_min, global_max, dg_data = _to_dg_data(timeseries, data_indexes_to_plot, aggregate_by)
+    global_min, global_max, dg_data = _to_dg_data(timeseries, data_labels_to_plot, data_indexes_to_plot, aggregate_by)
     if height:
         global_max = height
     if global_max != global_min:
@@ -747,7 +767,7 @@ animatedZooms: true,"""
        },"""
 
     # Add all non-index series to be included in the miniplot
-    for label in timeseries.data_labels():
+    for label in data_labels_to_plot:
         dygraphs_javascript += """
            '"""+str(label)+"""': {
              showInRangeSelector:true
@@ -758,7 +778,7 @@ animatedZooms: true,"""
      },"""
 
     # Force "original" Dygraph color if only one data series, or use custom color:          
-    if len(timeseries.data_labels()) <=1:
+    if len(data_labels_to_plot) <=1:
         if color:
             dygraphs_javascript += """colors: ['"""+color+"""'],"""         
         else:
