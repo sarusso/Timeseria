@@ -194,7 +194,7 @@ def compute_coverage(series, from_t, to_t, sampling_interval=None):
         float: the interval coverage.
     """
 
-    logger.debug('Called compute_coverage from {} to {}'.format(from_t, to_t))
+    logger.debug('Called compute_coverage() from {} to {}'.format(from_t, to_t))
 
     # Check from_t/to_t
     if from_t >= to_t:
@@ -260,6 +260,9 @@ def compute_data_loss(series, from_t, to_t, force=False, sampling_interval=None)
         float: the interval data loss.
     """
 
+    logger.debug('Called compute_data_loss() from {} to {}'.format(from_t, to_t))
+
+
     # Get the series sampling interval unless it is forced to a specific value
     if not sampling_interval:
         sampling_interval = series.autodetected_sampling_interval
@@ -272,7 +275,8 @@ def compute_data_loss(series, from_t, to_t, force=False, sampling_interval=None)
     # i.e. at first and last items since on the borders there still may be  data losses. 
     data_loss_from_missing_coverage = 1 - compute_coverage(series, from_t, to_t, sampling_interval=sampling_interval)
 
-
+    logger.debug('Data loss from missing coverage: %s', data_loss_from_missing_coverage)
+    
     #========================================
     #  Data loss from previous data losses.
     #========================================
@@ -280,27 +284,44 @@ def compute_data_loss(series, from_t, to_t, force=False, sampling_interval=None)
     # Computed only if the resolutions is constant, as they can be defined only if the series was already 
     # made uniform (i.e. by a resampling process), or if forced for testing or other potential reasons.
     data_loss_from_previously_computed = 0.0
-    if series.resolution != 'variable' or force:
-        
+
+    if (series.resolution is not None and not series.resolution.is_variable()) or force:
+
         for point in series:
+            
             if point.data_loss:
-    
-                # Skip points not to be taken dinto account
-                if point.t + (sampling_interval/2) < from_t:
+
+                # Set validity
+                point_valid_from_t = point.t - (sampling_interval/2)
+                point_valid_to_t = point.t + (sampling_interval/2)
+                
+                # Skip points which have not to be taken into account
+                if point_valid_to_t < from_t:
                     continue
-                if point.t - (sampling_interval/2) >= to_t:
+                if point_valid_from_t >= to_t:
                     continue
                 
-                # Compute the contribution of this point data loss.
-                if (point.t < from_t)  and point.t + (sampling_interval/2) >= from_t:
-                    this_validity = (point.t + (sampling_interval/2)) - from_t
-                elif (point.t > to_t)  and point.t + (sampling_interval/2) < to_t:
-                    this_validity = to_t - (point.t + (sampling_interval/2))
+                # Compute the contribution of this point data loss: overlapping
+                # first point, overlapping last point, or all included?
+                if point_valid_from_t < from_t:
+                    point_contribution = abs(from_t - point_valid_to_t)
+                elif point_valid_to_t >= to_t:
+                    point_contribution = abs(to_t - point_valid_from_t)
                 else:
-                    this_validity = sampling_interval
+                    point_contribution = sampling_interval
                 
-                # Now rescale the data loss with respect to the validity and from/to and sum it up
-                data_loss_from_previously_computed += point.data_loss * (this_validity/( to_t - from_t))
+                #logger.debug('----------------')
+                #count+=1
+                #logger.debug('count: %s', count)
+                #logger.debug('point_valid_from_t: %s', point_valid_from_t)
+                #logger.debug('point.t: %s', point.t)
+                #logger.debug('point_valid_to_t: %s', point_valid_to_t)
+                #logger.debug('point_contribution: %s', point_contribution)                
+
+                # Now rescale the data loss with respect to the contribution and from/to and sum it up
+                data_loss_from_previously_computed += point.data_loss * (point_contribution/( to_t - from_t))
+           
+    logger.debug('Data loss from previously computed: %s', data_loss_from_previously_computed)
 
     # Compute total data loss    
     data_loss = data_loss_from_missing_coverage + data_loss_from_previously_computed

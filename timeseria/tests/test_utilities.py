@@ -286,39 +286,39 @@ class TestComputeCoverageAndDataLoss(unittest.TestCase):
         series.append(DataTimePoint(t = 60, data = {'temperature': 23}))
         series.append(DataTimePoint(t = 70, data = {'temperature': 23}))
         attach_validity_regions(series)
- 
+  
         # Test basic
         self.assertAlmostEqual(compute_data_loss(series, from_t = 45, to_t = 55, sampling_interval=10), 1.0)
         self.assertAlmostEqual(compute_data_loss(series, from_t = 50, to_t = 60, sampling_interval=10), 0.5)
         self.assertAlmostEqual(compute_data_loss(series, from_t = 65, to_t = 75, sampling_interval=10), 0.0)
- 
+  
         # Test out of boundaries
         data_loss = compute_data_loss(series, from_t = 100, to_t = 120, sampling_interval=10) 
         self.assertEqual(data_loss, 1)    
- 
+  
         # Test for 1-element series
         single_element_series = DataTimePointSeries()
         single_element_series.append(DataTimePoint(t = 40, data = {'temperature': 23}))
         attach_validity_regions(single_element_series, sampling_interval=10)
-
+ 
         # TODO: the following is quite messy.
-
+ 
         # The series has only one element and no sampling_interval is provided, no idea how to compute validity        
         #with self.assertRaises(ValueError):
         #    compute_data_loss(single_element_series, from_t = 30, to_t = 60) 
- 
+  
         # Only 10 seconds out of 30 (point has validity regions 35-45, interval is from 30 to 60)
         data_loss = compute_data_loss(single_element_series, from_t = 30, to_t = 60, sampling_interval=10) 
         self.assertAlmostEqual(data_loss, (2.0/3.0))
-
+ 
         # Test two elements, some border condition for sull fata losses may arise
         series_two_elements = DataTimePointSeries()
         series_two_elements.append(DataTimePoint(t = 40, data = {'temperature': 23}))
         series_two_elements.append(DataTimePoint(t = 60, data = {'temperature': 23}))
         attach_validity_regions(series_two_elements, sampling_interval=10)
-        
+         
         self.assertEqual(compute_data_loss(series_two_elements, from_t = 45, to_t = 55, sampling_interval=10), 1)
- 
+  
         # Series with pre-existent data losses, which have to be taken into account as well
         series_with_data_losses = DataTimePointSeries()
         series_with_data_losses.append(DataTimePoint(t = 20, data = {'temperature': 23}, data_loss=0))
@@ -327,23 +327,38 @@ class TestComputeCoverageAndDataLoss(unittest.TestCase):
         series_with_data_losses.append(DataTimePoint(t = 60, data = {'temperature': 23}, data_loss=0))
         series_with_data_losses.append(DataTimePoint(t = 70, data = {'temperature': 23}, data_loss=0))
         attach_validity_regions(series_with_data_losses)
-
+ 
         # Test missing + already ( 0 + 0.5 + 1 + 0 = 1.5 / 3 = 0.5)
         data_loss = compute_data_loss(series_with_data_losses, from_t = 30, to_t = 60, sampling_interval=10, force=True) 
         self.assertAlmostEqual(data_loss, 0.5)
- 
+  
         # Test also on actually resampled series
         resampled_series = series.resample(10)
         attach_validity_regions(resampled_series)
-
+ 
         data_loss = compute_data_loss(resampled_series, from_t = 30, to_t = 60)
         self.assertAlmostEqual(data_loss, 1.0/3.0)
-
+ 
         resampled_series_5 = self.data_time_point_series_5.resample(60)  
         attach_validity_regions(resampled_series_5)
-      
+       
         data_loss = compute_data_loss(resampled_series_5, from_t = 1436022300, to_t = 1436022600) 
-        self.assertAlmostEqual(data_loss, 0.4)    
+        self.assertAlmostEqual(data_loss, 0.3)
+         
+        # TODO: This test come after a bug, needs to be better unrolled. the bug was
+        # raising when there were overlapping points at the start or end of the slot.
+    
+        from timeseria import  storages
+        DATASET_PATH = '/'.join(storages.__file__.split('/')[0:-1]) + '/tests/test_data/csv/'
+        csv_storage = storages.CSVFileStorage(DATASET_PATH + 'humitemp_long.csv')
+        timeseries = csv_storage.get(limit=400)
+        timeseries = timeseries[200:300]
+        resampled_series = timeseries.resample(600)
+        
+        attach_validity_regions(resampled_series)
+        
+        data_loss = compute_data_loss(resampled_series, from_t = 1546700400, to_t = 1546711200) 
+        self.assertAlmostEqual(data_loss, 1.0)
 
 
 class TestGetPeriodicity(unittest.TestCase):

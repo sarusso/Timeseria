@@ -348,14 +348,14 @@ class TestResampler(unittest.TestCase):
         self.assertAlmostEqual(resampled_series[0].data_indexes['data_reconstructed'], 0.4)
         self.assertAlmostEqual(resampled_series[0].data_indexes['anomaly'], 0.275)
         self.assertAlmostEqual(resampled_series[0].data_indexes['forecast'], 0)
-        # TODO: data loss is computed by compute_data_loss and not exact. expected 0.46
-        self.assertAlmostEqual(resampled_series[0].data_loss, 0.47)
+        # TODO: data loss is computed by compute_data_loss and not exact. expected 0.46 --> now corrected!
+        self.assertAlmostEqual(resampled_series[0].data_loss, 0.46)
         
         self.assertAlmostEqual(resampled_series[1].data_indexes['data_reconstructed'], 0)
         self.assertAlmostEqual(resampled_series[1].data_indexes['anomaly'], 0.7)
         self.assertAlmostEqual(resampled_series[1].data_indexes['forecast'], 0.65)
         # TODO: data loss is computed by compute_data_loss. Data losses not present are treated as zero. Are we sure? 
-        self.assertAlmostEqual(resampled_series[1].data_loss, 0.04)
+        self.assertAlmostEqual(resampled_series[1].data_loss, 0.035)
  
         # Now resample at the same sampling interval and check data_indexes are still there
         same_resampled_series = series[0:5].resample(60)
