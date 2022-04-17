@@ -350,7 +350,7 @@ class TestComputeCoverageAndDataLoss(unittest.TestCase):
     
         from timeseria import  storages
         DATASET_PATH = '/'.join(storages.__file__.split('/')[0:-1]) + '/tests/test_data/csv/'
-        csv_storage = storages.CSVFileStorage(DATASET_PATH + 'humitemp_long.csv')
+        csv_storage = storages.CSVFileStorage(DATASET_PATH + 'temperature.csv')
         timeseries = csv_storage.get(limit=400)
         timeseries = timeseries[200:300]
         resampled_series = timeseries.resample(600)
