@@ -57,6 +57,9 @@ class TestBaseModelClasses(unittest.TestCase):
         # Instantiate a parametric model
         parametric_model = ParametricModelMock()
         parametric_model_id = parametric_model.id
+
+        # Set model save path
+        model_path = TEMP_MODELS_DIR+'/test_TSP_model'
         
         # Cannot apply model before fitting
         with self.assertRaises(NotFittedError):
@@ -64,7 +67,7 @@ class TestBaseModelClasses(unittest.TestCase):
 
         # Cannot save model before fitting
         with self.assertRaises(NotFittedError):
-            parametric_model.save(TEMP_MODELS_DIR)  
+            parametric_model.save(model_path)  
         
         # Call the mock train
         with self.assertRaises(TypeError):
@@ -84,11 +87,11 @@ class TestBaseModelClasses(unittest.TestCase):
                          
         parametric_model.apply(data_time_slot_series)
         
-        # And save
-        model_dir = parametric_model.save(TEMP_MODELS_DIR)
+        # And save        
+        parametric_model.save(model_path)
         
         # Now re-load
-        loaded_parametric_model = ParametricModelMock(model_dir)
+        loaded_parametric_model = ParametricModelMock(model_path)
         self.assertEqual(loaded_parametric_model.id, parametric_model_id)
 
 
@@ -113,7 +116,7 @@ class TestBaseModelClasses(unittest.TestCase):
 
 
         # Test window generation functions
-        window_matrix = KerasModelMock.to_window_datapoints_matrix(data_time_point_series, window=2, steps=1, encoder=None)
+        window_matrix = KerasModelMock._to_window_datapoints_matrix(data_time_point_series, window=2, steps=1, encoder=None)
         
         # What to expect (using the timestamp to represent a datapoint):
         # 1,2
@@ -135,7 +138,7 @@ class TestBaseModelClasses(unittest.TestCase):
         self.assertEqual(window_matrix[-1][0].t, 4)
         self.assertEqual(window_matrix[-1][1].t, 5)
         
-        target_vector = KerasModelMock.to_target_values_vector(data_time_point_series, window=2, steps=1)
+        target_vector = KerasModelMock._to_target_values_vector(data_time_point_series, window=2, steps=1)
 
         # What to expect (using the data value to represent a datapoint):
         # [0.3], [0.4], [0.5], [0.6] Note that they are lists in order to support multi-step forecast
@@ -342,9 +345,11 @@ class TestForecasters(unittest.TestCase):
         
         forecaster.fit(self.sine_series_minute, periodicity=63)
         
-        model_dir = forecaster.save(TEMP_MODELS_DIR)
+        model_path = TEMP_MODELS_DIR + '/test_PA_model'
         
-        loaded_forecaster = PeriodicAverageForecaster(model_dir)
+        forecaster.save(model_path)
+        
+        loaded_forecaster = PeriodicAverageForecaster(model_path)
         
         self.assertEqual(forecaster.data['averages'], loaded_forecaster.data['averages'])
 
@@ -535,7 +540,7 @@ class TestForecasters(unittest.TestCase):
 
 
     def test_LSTMForecaster_save_load(self):
-        
+
         try:
             import tensorflow
         except ImportError:
@@ -550,11 +555,14 @@ class TestForecasters(unittest.TestCase):
         forecaster = LSTMForecaster()
         forecaster.fit(sine_series_minute)
         
-        # Save
-        model_dir = forecaster.save(TEMP_MODELS_DIR)
+        # Set model path
+        model_path = TEMP_MODELS_DIR+ '/test_LSTM_model'
+        
+        # Save        
+        forecaster.save(model_path)
 
         # Load
-        loaded_forecaster = LSTMForecaster(path=model_dir)
+        loaded_forecaster = LSTMForecaster(model_path)
         
         # Predict from the loaded model 
         predicted_data = loaded_forecaster.predict(sine_series_minute)
@@ -615,10 +623,13 @@ class TestAnomalyDetectors(unittest.TestCase):
         anomaly_detector = PeriodicAverageAnomalyDetector()
         
         anomaly_detector.fit(self.sine_series_minute, periodicity=63)
+       
+        # Set model save path
+        model_path = TEMP_MODELS_DIR+'/test_anomaly_model'
         
-        model_dir = anomaly_detector.save(TEMP_MODELS_DIR)
+        anomaly_detector.save(model_path)
         
-        loaded_anomaly_detector = PeriodicAverageAnomalyDetector(model_dir)
+        loaded_anomaly_detector = PeriodicAverageAnomalyDetector(model_path)
         
         self.assertEqual(anomaly_detector.data['AE_threshold'], loaded_anomaly_detector.data['AE_threshold'])
         self.assertEqual(anomaly_detector.forecaster.data['averages'], loaded_anomaly_detector.forecaster.data['averages'])

@@ -42,11 +42,23 @@ except ImportError:
 #======================
 
 class Forecaster(TimeSeriesParametricModel):
+    """A generic forecasting model. Besides the ``predict()`` and  ``apply()`` methods, also provides a ``forecast()``
+    method which allows to get the forecasted n steps-ahead full data points or slots.
+    
+    Args:
+        path (str): a path from which to load a saved model. Will override all other init settings.
+    """
 
-    def predict(self, timeseries, *args, **kwargs):
+    def fit(self, timeseries, *args, **kwargs):
+        "Fit the forecaster on a time series"
+        return super(Forecaster, self).fit(timeseries, *args, **kwargs)
+
+
+    def predict(self, timeseries, steps=1, *args, **kwargs):
+        "Predict n steps-ahead forecast values, and return key-value data where the keys are the data labels."
  
         # Check if the input timeseries is shorter than the window, if any.
-        # However, nearly all forecasters use windows, at least of one point.
+        # Note that nearly all forecasters use windows, at least of one point.
         try:
             if len(timeseries) < self.data['window']:
                 raise ValueError('The timeseries length ({}) is shorter than the model window ({}), it must be at least equal.'.format(len(timeseries), self.data['window']))
@@ -54,8 +66,133 @@ class Forecaster(TimeSeriesParametricModel):
             pass
         
         # Call parent predict
-        return super(Forecaster, self).predict(timeseries, *args, **kwargs)
+        return super(Forecaster, self).predict(timeseries, steps, *args, **kwargs)
 
+
+    def forecast(self, timeseries, steps=1, forecast_start=None):
+        """Forecast n steps-ahead full data points or slots"""
+
+        # Set forecast starting item
+        if forecast_start is not None:
+            forecast_start_item = timeseries[forecast_start]
+        else:
+            forecast_start_item = timeseries[-1]
+            
+        # Handle forecast start
+        if forecast_start is not None:
+            try:
+                predicted_data = self.predict(timeseries=timeseries, steps=steps, forecast_start=forecast_start)
+            except TypeError as e:
+                if 'unexpected keyword argument' and  'forecast_start' in str(e):
+                    raise NotImplementedError('The model does not support the "forecast_start" parameter, cannot proceed')           
+                else:
+                    raise
+        else:
+            predicted_data = self.predict(timeseries=timeseries, steps=steps)
+                
+        # List of predictions or single prediction?
+        if isinstance(predicted_data,list):
+            forecast = []
+            last_item = forecast_start_item
+            for data in predicted_data:
+
+                if isinstance(timeseries[0], Slot):
+                    forecast.append(DataTimeSlot(start = last_item.end,
+                                                 unit  = timeseries.resolution,
+                                                 data_loss = None,
+                                                 #tz = timeseries.tz,
+                                                 data  = data))
+                else:
+                    forecast.append(DataTimePoint(t = last_item.t + timeseries.resolution,
+                                                  tz = timeseries.tz,
+                                                  data  = data))
+                last_item = forecast[-1]
+        else:
+            if isinstance(timeseries[0], Slot):
+                forecast = DataTimeSlot(start = forecast_start_item.end,
+                                        unit  = timeseries.resolution,
+                                        data_loss = None,
+                                        #tz = timeseries.tz,
+                                        data  = predicted_data)
+            else:
+                forecast = DataTimePoint(t = forecast_start_item.t + timeseries.resolution,
+                                         tz = timeseries.tz,
+                                         data  = predicted_data)
+  
+        return forecast
+
+
+    def apply(self, timeseries, steps=1, *args, **kwargs):
+        """Apply the forecast on a time series for n steps-ahead"""
+        return super(Forecaster, self).apply(timeseries, steps, *args, **kwargs)
+
+    def _apply(self, timeseries, steps=1, inplace=False):
+
+        input_timeseries_len = len(timeseries)
+ 
+        if inplace:
+            forecast_timeseries = timeseries
+        else:
+            forecast_timeseries = timeseries.duplicate()
+        
+        # Add the forecast index
+        for item in forecast_timeseries:
+            item.data_indexes['forecast'] = 0
+        
+        # Call model forecasting logic
+        try:
+            forecast_model_results = self.forecast(timeseries = forecast_timeseries, steps=steps)
+            if not isinstance(forecast_model_results, list):
+                forecast_timeseries.append(forecast_model_results)
+            else:
+                for item in forecast_model_results:
+                    item.data_indexes['forecast'] = 1
+                    forecast_timeseries.append(item)
+
+        except NotImplementedError:
+            
+            for _ in range(steps):
+    
+                # Call the forecast only on the last point
+                forecast_model_results = self.forecast(timeseries = forecast_timeseries, steps=1)
+
+                # Add forecasted index
+                forecast_model_results.data_indexes['forecast'] = 1
+
+                # Add the forecast to the forecasts time series
+                forecast_timeseries.append(forecast_model_results)
+    
+        # Do we have missing forecasts?
+        if input_timeseries_len + steps != len(forecast_timeseries):
+            raise ValueError('There are missing forecasts. If your model does not support multi-step forecasting, raise a NotImplementedError if steps>1 and Timeseria will handle it for you.')
+ 
+        if not inplace:
+            return forecast_timeseries
+        else:
+            return None
+
+    def evaluate(self, timeseries, steps='auto', limit=None, plots=False, plot=False, metrics=['RMSE', 'MAE'], details=False, from_t=None, to_t=None, from_dt=None, to_dt=None, evaluation_timeseries=False):
+        """Evaluate the forecaster on a time series.
+
+        Args:
+            steps (list): The list of steps-ahead to use for the evaluation. Default to automatic detection based on the model.
+            limit(int): set a limit for the time series elements to use for the evaluation.
+            plots(bool): if to produce evaluation plots, defaulted to False. Beware that setting this option to True will cause to generate 
+                         a plot for each evaluation point or slot of the time series: use with caution and only on small time series.
+            plot(bool): if to produce an overall evaluation plot, defaulted to False.
+            metrics(list): the error metrics to use for the evaluation.
+                Supported values are:
+                ``RMSE`` (Root Mean Square Error), 
+                ``MAE``  (Mean Absolute Error), and 
+                ``MAPE``  (Mean Absolute percentage Error).
+            details(bool): if to add intermediate steps details to the evaluation results.
+            from_t(float): evaluation starting epoch timestamp.
+            to_t(float): evaluation ending epoch timestamp
+            from_dt(datetime): evaluation starting datetime.
+            to_dt(datetime) : evaluation ending datetime.
+            evaluation_timeseries(bool): if to produce an evaluation timeseirs containing the eror metrics. Defaulted to false.
+        """
+        return super(Forecaster, self).evaluate(timeseries, steps, limit, plots, plot, metrics, details, from_t, to_t, from_dt, to_dt, evaluation_timeseries)
 
     def _evaluate(self, timeseries, steps='auto', limit=None, plots=False, plot=False, metrics=['RMSE', 'MAE'], details=False, from_t=None, to_t=None, from_dt=None, to_dt=None, evaluation_timeseries=False):
 
@@ -324,123 +461,50 @@ class Forecaster(TimeSeriesParametricModel):
             return results
 
 
-    def _apply(self, timeseries, steps=1, inplace=False):
-
-
-        input_timeseries_len = len(timeseries)
- 
-        if inplace:
-            forecast_timeseries = timeseries
-        else:
-            forecast_timeseries = timeseries.duplicate()
-        
-        # Add the forecast index
-        for item in forecast_timeseries:
-            item.data_indexes['forecast'] = 0
-        
-        # Call model forecasting logic
-        try:
-            forecast_model_results = self.forecast(timeseries = forecast_timeseries, steps=steps)
-            if not isinstance(forecast_model_results, list):
-                forecast_timeseries.append(forecast_model_results)
-            else:
-                for item in forecast_model_results:
-                    item.data_indexes['forecast'] = 1
-                    forecast_timeseries.append(item)
-
-        except NotImplementedError:
-            
-            for _ in range(steps):
-    
-                # Call the forecast only on the last point
-                forecast_model_results = self.forecast(timeseries = forecast_timeseries, steps=1)
-
-                # Add forecasted index
-                forecast_model_results.data_indexes['forecast'] = 1
-
-                # Add the forecast to the forecasts time series
-                forecast_timeseries.append(forecast_model_results)
-    
-        # Do we have missing forecasts?
-        if input_timeseries_len + steps != len(forecast_timeseries):
-            raise ValueError('There are missing forecasts. If your model does not support multi-step forecasting, raise a NotImplementedError if steps>1 and Timeseria will handle it for you.')
- 
-        if not inplace:
-            return forecast_timeseries
-        else:
-            return None
-
-
-    def forecast(self, timeseries, steps=1, forecast_start=None):
-
-        # Set forecast starting item
-        if forecast_start is not None:
-            forecast_start_item = timeseries[forecast_start]
-        else:
-            forecast_start_item = timeseries[-1]
-            
-        # Handle forecast start
-        if forecast_start is not None:
-            try:
-                predicted_data = self.predict(timeseries=timeseries, steps=steps, forecast_start=forecast_start)
-            except TypeError as e:
-                if 'unexpected keyword argument' and  'forecast_start' in str(e):
-                    raise NotImplementedError('The model does not support the "forecast_start" parameter, cannot proceed')           
-                else:
-                    raise
-        else:
-            predicted_data = self.predict(timeseries=timeseries, steps=steps)
-                
-        # List of predictions or single prediction?
-        if isinstance(predicted_data,list):
-            forecast = []
-            last_item = forecast_start_item
-            for data in predicted_data:
-
-                if isinstance(timeseries[0], Slot):
-                    forecast.append(DataTimeSlot(start = last_item.end,
-                                                 unit  = timeseries.resolution,
-                                                 data_loss = None,
-                                                 #tz = timeseries.tz,
-                                                 data  = data))
-                else:
-                    forecast.append(DataTimePoint(t = last_item.t + timeseries.resolution,
-                                                  tz = timeseries.tz,
-                                                  data  = data))
-                last_item = forecast[-1]
-        else:
-            if isinstance(timeseries[0], Slot):
-                forecast = DataTimeSlot(start = forecast_start_item.end,
-                                        unit  = timeseries.resolution,
-                                        data_loss = None,
-                                        #tz = timeseries.tz,
-                                        data  = predicted_data)
-            else:
-                forecast = DataTimePoint(t = forecast_start_item.t + timeseries.resolution,
-                                         tz = timeseries.tz,
-                                         data  = predicted_data)
-            
-         
-        return forecast
-
-
-
 #=========================
 #  P. Average Forecaster
 #=========================
 
 class PeriodicAverageForecaster(Forecaster):
+    """A forecaster based on periodic averages.
+    
+    Args:
+        path (str): a path from which to load a saved model. Will override all other init settings.
+        window (int): the window length. If set to ``auto``, then it will be automatically handled based on the time series periodicity.
+    """
 
-    def __init__(self, path=None, id=None):
-        
-        super(PeriodicAverageForecaster, self).__init__(path=path, id=id)
+    def __init__(self, path=None, window='auto'):
+
+        # Set window
+        if window != 'auto':
+            try:
+                int(window)
+            except:
+                raise ValueError('Got a non-integer window ({})'.format(window)) 
+        self.window = window
+
+        # Call parent init        
+        super(PeriodicAverageForecaster, self).__init__(path=path)
 
         # If loaded (fitted), convert the average dict keys back to integers
         if self.fitted:
             self.data['averages'] = {int(key):value for key, value in self.data['averages'].items()}
-
         
-    def _fit(self, timeseries, window=None, periodicity=None, dst_affected=False, from_t=None, to_t=None, from_dt=None, to_dt=None):
+
+    def fit(self, timeseries, periodicity='auto', dst_affected=False, from_t=None, to_t=None, from_dt=None, to_dt=None):
+        """Fit the forecaster on a time series.
+
+        Args:
+            periodicity(int): the periodicty of the time series. If set to ``auto`` then it will be automatically detected using a FFT.
+            dst_affected(bool): if the model should take into account DST effects.
+            from_t(float): fit starting epoch timestamp.
+            to_t(float): fit ending epoch timestamp
+            from_dt(datetime): fit starting datetime.
+            to_dt(datetime) : fit ending datetime.
+        """
+        return super(PeriodicAverageForecaster, self).fit(timeseries, periodicity, dst_affected, from_t, to_t, from_dt, to_dt)
+        
+    def _fit(self, timeseries, periodicity='auto', dst_affected=False, from_t=None, to_t=None, from_dt=None, to_dt=None):
 
         if len(timeseries.data_labels()) > 1:
             raise NotImplementedError('Multivariate time series are not yet supported')
@@ -448,16 +512,16 @@ class PeriodicAverageForecaster(Forecaster):
         from_t, to_t = set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
 
         # Set or detect periodicity
-        if periodicity is None:        
+        if periodicity == 'auto':        
             periodicity =  get_periodicity(timeseries)
             logger.info('Detected periodicity: %sx %s', periodicity, timeseries.resolution)
                 
         self.data['periodicity']  = periodicity
         self.data['dst_affected'] = dst_affected
 
-        # Set or detect window
-        if window:
-            self.data['window'] = window
+        # Set window
+        if self.window != 'auto':
+            self.data['window'] = self.window
         else:
             logger.info('Using a window of "{}"'.format(periodicity))
             self.data['window'] = periodicity
@@ -494,6 +558,8 @@ class PeriodicAverageForecaster(Forecaster):
 
 
     def _predict(self, timeseries, steps=1, forecast_start=None):
+        
+        # TODO: remove the forecast_start or move it in the parent(s).
       
         # Univariate is enforced by the fit
         key = self.data['data_labels'][0]
@@ -550,7 +616,7 @@ class PeriodicAverageForecaster(Forecaster):
             value = self.data['averages'][get_periodicity_index(item, averages_timeseries.resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])]
             if not value:
                 value = 0
-            item.data['average'] =value 
+            item.data['periodic_average'] =value 
         averages_timeseries.plot(**kwargs)
 
 
@@ -560,12 +626,24 @@ class PeriodicAverageForecaster(Forecaster):
 #=========================
 
 class ProphetForecaster(Forecaster, ProphetModel):
-    '''Prophet (from Facebook) implements a procedure for forecasting time series data based on an additive 
-model where non-linear trends are fit with yearly, weekly, and daily seasonality, plus holiday effects.
-It works best with time series that have strong seasonal effects and several seasons of historical data.
-Prophet is robust to missing data and shifts in the trend, and typically handles outliers well. 
-'''
+    """A forecaster based on Prophet. Prophet (from Facebook) implements a procedure for forecasting time series data based
+    on an additive model where non-linear trends are fit with yearly, weekly, and daily seasonality, plus holiday effects. 
+    
+    Args:
+        path (str): a path from which to load a saved model. Will override all other init settings.
+    """
 
+    def fit(self, timeseries, from_t=None, to_t=None, from_dt=None, to_dt=None):
+        """Fit the forecaster on a time series.
+     
+            Args:
+                from_t(float): fit starting epoch timestamp.
+                to_t(float): fit ending epoch timestamp
+                from_dt(datetime): fit starting datetime.
+                to_dt(datetime) : fit ending datetime.
+        """
+        return super(ProphetForecaster, self).fit(timeseries, from_t, to_t, from_dt, to_dt)
+ 
     def _fit(self, timeseries, from_t=None, to_t=None, from_dt=None, to_dt=None):
 
         if len(timeseries.data_labels()) > 1:
@@ -575,7 +653,7 @@ Prophet is robust to missing data and shifts in the trend, and typically handles
 
         from_t, to_t = set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
 
-        data = self.from_timeseria_to_prophet(timeseries, from_t=from_t, to_t=to_t)
+        data = self._from_timeseria_to_prophet(timeseries, from_t=from_t, to_t=to_t)
 
         # Instantiate the Prophet model
         self.prophet_model = Prophet()
@@ -602,7 +680,7 @@ Prophet is robust to missing data and shifts in the trend, and typically handles
         
         for _ in range(steps):
             new_item_dt = last_item_dt + timeseries.resolution
-            data_to_forecast.append(self.remove_timezone(new_item_dt))
+            data_to_forecast.append(self._remove_timezone(new_item_dt))
             last_item_dt = new_item_dt
 
         dataframe_to_forecast = DataFrame(data_to_forecast, columns = ['ds'])
@@ -626,15 +704,26 @@ Prophet is robust to missing data and shifts in the trend, and typically handles
 #=========================
 
 class ARIMAForecaster(Forecaster, ARIMAModel):
+    """A forecaster based on ARIMA. AutoRegressive Integrated Moving Average models are a generalization of an 
+    AutoRegessive Moving Average (ARMA) model, whoch provide a description of a (weakly) stationary stochastic
+    process in terms of two polynomials, one for the autoregression (AR) and the second for the moving average (MA).
+    The I indicates that the data values have been replaced with the difference between their values and the previous values.
+    
+    Args:
+        path (str): a path from which to load a saved model. Will override all other init settings.
+        p(int): the order of the AR term.
+        d(int): the number of differencing required to make the time series stationary.
+        q(int): the order of the MA term.
+    """
 
-    def __init__(self, p=1,d=1,q=0): #p=5,d=2,q=5
+    def __init__(self, path=None, p=1,d=1,q=0): #p=5,d=2,q=5
         if (p,d,q) == (1,1,0):
             logger.info('You are using ARIMA\'s defaults of p=1, d=1, q=0. You might want to set them to more suitable values when initializing the model.')
         self.p = p
         self.d = d
         self.q = q
         # TODO: save the above in data[]?
-        super(ARIMAForecaster, self).__init__()
+        super(ARIMAForecaster, self).__init__(path)
 
 
     def _fit(self, timeseries):
@@ -676,7 +765,12 @@ class ARIMAForecaster(Forecaster, ARIMAModel):
 #=========================
 
 class AARIMAForecaster(Forecaster):
-
+    """A forecaster based on Auto-ARIMA. Auto-ARIMA mdoels set automatically the best values for the
+    p, d and q parameters, trying different values and checking which ones perform better.
+    
+    Args:
+        path (str): a path from which to load a saved model. Will override all other init settings.
+    """
     def _fit(self, timeseries, **kwargs):
         
         import pmdarima as pm
@@ -729,26 +823,40 @@ class AARIMAForecaster(Forecaster):
 #=========================
 
 class LSTMForecaster(KerasModel, Forecaster):
+    """A LSTM-based forecaster. LSTMs are artificial neutral networks particulary well suited for time series forecasting tasks.
 
-    def __init__(self, path=None, id=None, window=None, features=None, neurons=128, keras_model=None):
+    Args:
+        path(str): a path from which to load a saved model. Will override all other init settings.
+        window (int): the window length.
+        features(list): which features to use. Supported values are:
+            ``values`` (use the data values), 
+            ``diffs``  (use the diffs between the values), and 
+            ``hours``  (use the hours of the timestamp). 
+        neurons(int): how many neaurons to use for the LSTM neural nework hidden layer.
+        keras_model(keras.Model) : an optional external Keras Model architecture. Will cause the ``neurons`` argument to be discarded.
+    """
+        
+    def __init__(self, path=None, window=3, features=['values'], neurons=128, keras_model=None):
 
-        super(LSTMForecaster, self).__init__(path=path, id=id)
+        super(LSTMForecaster, self).__init__(path=path)
         
         # Did the init load a model?
         try:
             if self.fitted:
-                # If so, no need to proceed
+                
+                # Load the kears model as well
+                self._load_keras_model(path)
+        
+                # No need to proceed further 
                 return
         except AttributeError:
             pass
         
-        if not window:
+        if not window ==3:
             logger.info('Using default window size of 3')
-            window = 3
        
-        if not features:
+        if features == ['values']:
             logger.info('Using default features: values')
-            features = ['values']
         
         # Set window, neurons, features
         self.data['window'] = window
@@ -758,6 +866,13 @@ class LSTMForecaster(KerasModel, Forecaster):
         # Set external model architecture if any
         self.keras_model = keras_model
 
+    def save(self, path):
+
+        # Call parent save
+        super(LSTMForecaster, self).save(path)
+
+        # Now save the Keras model itself
+        self._save_keras_model(path)
 
     def _fit(self, timeseries, from_t=None, to_t=None, from_dt=None, to_dt=None, verbose=False, epochs=30, normalize=True):
 
@@ -801,17 +916,17 @@ class LSTMForecaster(KerasModel, Forecaster):
 
         # Move to "matrix" of windows plus "vector" of targets data representation. Or, in other words:
         # window_datapoints is a list of lists (matrix) where each nested list (row) is a list of window datapoints.
-        window_datapoints_matrix = self.to_window_datapoints_matrix(timeseries_normalized, window=self.data['window'], steps=1)
-        target_values_vector = self.to_target_values_vector(timeseries_normalized, window=self.data['window'], steps=1)
+        window_datapoints_matrix = self._to_window_datapoints_matrix(timeseries_normalized, window=self.data['window'], steps=1)
+        target_values_vector = self._to_target_values_vector(timeseries_normalized, window=self.data['window'], steps=1)
 
         # Compute window features
         window_features = []
         for window_datapoints in window_datapoints_matrix:
-            window_features.append(self.compute_window_features(window_datapoints,
+            window_features.append(self._compute_window_features(window_datapoints,
                                                                 data_labels = data_labels,
                                                                 features=self.data['features']))
 
-        # Obtain the number of features based on compute_window_features() output
+        # Obtain the number of features based on _compute_window_features() output
         features_per_window_item = len(window_features[0][0])
         output_dimension = len(target_values_vector[0])
         
@@ -858,7 +973,7 @@ class LSTMForecaster(KerasModel, Forecaster):
                     datapoint.data[data_label] = (datapoint.data[data_label] - self.data['min_values'][data_label]) / (self.data['max_values'][data_label] - self.data['min_values'][data_label])
 
         # Compute window features
-        window_features = self.compute_window_features(window_timeseries, data_labels=self.data['data_labels'], features=self.data['features'])
+        window_features = self._compute_window_features(window_timeseries, data_labels=self.data['data_labels'], features=self.data['features'])
 
         # Perform the predict and set prediction data
         yhat = self.keras_model.predict(array([window_features]), verbose=verbose)

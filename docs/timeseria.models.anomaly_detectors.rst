@@ -18,7 +18,7 @@
    .. autosummary::
    
       AnomalyDetector
-      ForecasterAnomalyDetector
+      ForecastBasedAnomalyDetector
       PeriodicAverageAnomalyDetector
    
    

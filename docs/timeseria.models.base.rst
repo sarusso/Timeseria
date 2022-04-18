@@ -21,9 +21,12 @@
       ParametricModel
       TimeSeriesParametricModel
 
-      ARIMAModel
-      KerasModel
-      ProphetModel
+..
+  This is a comment, and these are disabled.
+  Add them back under the autosumamry to re-enable them.
+  ARIMAModel
+  KerasModel
+  ProphetModel
    
    
 
