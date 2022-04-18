@@ -30,6 +30,16 @@ from .base import TimeSeriesParametricModel, ProphetModel
 #=========================
 
 class Reconstructor(TimeSeriesParametricModel):
+    """A generic reconstruction model.
+    
+    Args:
+        path (str): a path from which to load a saved model. Will override all other init settings.
+    """
+
+    def predict(self, timeseries, *args, **kwargs):
+        """Disabled. Reconstructors can be used only with the ``apply()`` method."""
+        raise NotImplementedError('Anomaly detectors can be used only with the apply() method') from None
+        
 
     def _predict(self, *args, **kwargs):
         raise NotImplementedError('Reconstructors can be used only from the apply() method.') from None
@@ -96,6 +106,25 @@ class Reconstructor(TimeSeriesParametricModel):
         else:
             return None
 
+    def evaluate(self, timeseries, steps='auto', limit=None, data_loss_threshold=1, metrics=['RMSE', 'MAE'], details=False, from_t=None, to_t=None, from_dt=None, to_dt=None):
+        """Evaluate the reconstructor on a time series.
+
+        Args:
+            steps (list): The list of steps-ahead to use for the evaluation. Default to automatic detection based on the model.
+            limit(int): set a limit for the time series elements to use for the evaluation.
+            data_loss_threshold(float): the data loss threshold required for the reconstructir to kick-in.
+            metrics(list): the error metrics to use for the evaluation.
+                Supported values are:
+                ``RMSE`` (Root Mean Square Error), 
+                ``MAE``  (Mean Absolute Error), and 
+                ``MAPE``  (Mean Absolute percentage Error).
+            details(bool): if to add intermediate steps details to the evaluation results.
+            from_t(float): evaluation starting epoch timestamp.
+            to_t(float): evaluation ending epoch timestamp
+            from_dt(datetime): evaluation starting datetime.
+            to_dt(datetime) : evaluation ending datetime.
+        """
+        return super(Reconstructor, self).evaluate(timeseries, steps, limit, data_loss_threshold, metrics, details, from_t, to_t, from_dt, to_dt)
 
     def _evaluate(self, timeseries, steps='auto', limit=None, data_loss_threshold=1, metrics=['RMSE', 'MAE'], details=False, from_t=None, to_t=None, from_dt=None, to_dt=None):
 
@@ -272,26 +301,34 @@ class Reconstructor(TimeSeriesParametricModel):
 #=========================
 
 class PeriodicAverageReconstructor(Reconstructor):
+    """A reconstuction model based on periodic averages.
     
-    def fit(self, timeseries, data_loss_threshold=0.5, periodicity=None, dst_affected=False, from_t=None, to_t=None, from_dt=None, to_dt=None, offset_method='average'):
+    Args:
+        path (str): a path from which to load a saved model. Will override all other init settings.
+    """
+    
+    def fit(self, timeseries, data_loss_threshold=0.5, periodicity='auto', dst_affected=False,  offset_method='average', from_t=None, to_t=None, from_dt=None, to_dt=None):
         # This is a fit wrapper only to allow correct documentation
         """
-        Fit the model. On top of the basic reconstructor parameters, also accepts:
+        Fit the reconstructor on a time series.
  
         Args:
-            timeseries (:obj:`timeseria.datastructures.DataTimePointSeries` or :obj:`timeseria.datastructures.DataTimeSlotSeries`): The timeseries on which to perform the reconstruction.
-            data_loss_threshold (float): The threshold of the data loss to use to fit the model.
-            periodicity (float, optional): used to force a specific periodicity.
-         
+            data_loss_threshold(float): the threshold of the data loss to discard an element from the fit.
+            periodicity(int): the periodicty of the time series. If set to ``auto`` then it will be automatically detected using a FFT.
+            dst_affected(bool): if the model should take into account DST effects.
+            offset_method(str): how to offset the reconstructed data in order to align it to the missing data gaps. Valuse are ``avergae``
+                                to use the average gap value, or ``extrmes`` to use its extremes.
+            from_t(float): fit starting epoch timestamp.
+            to_t(float): fit ending epoch timestamp
+            from_dt(datetime): fit starting datetime.
+            to_dt(datetime) : fit ending datetime.
         """
-        return super(PeriodicAverageReconstructor, self).fit(timeseries, data_loss_threshold, periodicity, dst_affected, from_t, to_t, from_dt, to_dt, offset_method)
+        return super(PeriodicAverageReconstructor, self).fit(timeseries, data_loss_threshold, periodicity, dst_affected, offset_method, from_t, to_t, from_dt, to_dt)
 
-        
-    
-    def _fit(self, timeseries, data_loss_threshold=0.5, periodicity=None, dst_affected=False, from_t=None, to_t=None, from_dt=None, to_dt=None, offset_method='average'):
+    def _fit(self, timeseries, data_loss_threshold=0.5, periodicity='auto', dst_affected=False, offset_method='average', from_t=None, to_t=None, from_dt=None, to_dt=None):
 
         if not offset_method in ['average', 'extremes']:
-            raise Exception('Unknown offset method "{}"'.format(self.offset_method))
+            raise Exception('Unknown offset method "{}"'.format(offset_method))
         self.offset_method = offset_method
     
         if len(timeseries.data_labels()) > 1:
@@ -300,7 +337,7 @@ class PeriodicAverageReconstructor(Reconstructor):
         from_t, to_t = set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
         
         # Set or detect periodicity
-        if periodicity is None:
+        if periodicity == 'auto':
             periodicity =  get_periodicity(timeseries)
             try:
                 if isinstance(timeseries.resolution, TimeUnit):
@@ -387,7 +424,7 @@ class PeriodicAverageReconstructor(Reconstructor):
             value = self.data['averages'][get_periodicity_index(item, averages_timeseries.resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])]
             if not value:
                 value = 0
-            item.data['average'] =value 
+            item.data['periodic_average'] = value 
         averages_timeseries.plot(**kwargs)
 
 
@@ -396,7 +433,13 @@ class PeriodicAverageReconstructor(Reconstructor):
 #=========================
 
 class ProphetReconstructor(Reconstructor, ProphetModel):
+    """A forecaster based on Prophet. Prophet (from Facebook) implements a procedure for forecasting time series data based
+    on an additive model where non-linear trends are fit with yearly, weekly, and daily seasonality, plus holiday effects. 
     
+    Args:
+        path (str): a path from which to load a saved model. Will override all other init settings.
+    """
+        
     def _fit(self, timeseries, from_t=None, to_t=None, from_dt=None, to_dt=None):
 
         from fbprophet import Prophet
@@ -406,7 +449,7 @@ class ProphetReconstructor(Reconstructor, ProphetModel):
         if len(timeseries.data_labels()) > 1:
             raise NotImplementedError('Multivariate time series are not yet supported')
 
-        data = self.from_timeseria_to_prophet(timeseries, from_t, to_t)
+        data = self._from_timeseria_to_prophet(timeseries, from_t, to_t)
 
         # Instantiate the Prophet model
         self.prophet_model = Prophet()
@@ -422,7 +465,7 @@ class ProphetReconstructor(Reconstructor, ProphetModel):
         items_to_reconstruct = []
         for j in range(from_index, to_index):
             items_to_reconstruct.append(timeseries[j])
-        data_to_reconstruct = [self.remove_timezone(dt_from_s(item.t)) for item in items_to_reconstruct]
+        data_to_reconstruct = [self._remove_timezone(dt_from_s(item.t)) for item in items_to_reconstruct]
         dataframe_to_reconstruct = DataFrame(data_to_reconstruct, columns = ['ds'])
 
         # Apply Prophet fit

@@ -19,7 +19,7 @@
 
       Transformation   
       Resampler
-      Slotter
+      Aggregator
    
    
 

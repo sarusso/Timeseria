@@ -28,15 +28,15 @@ except (ImportError,AttributeError):
 #======================
 
 class Model(object):
-    '''A stateless model, or a white-box model. Exposes only predict(), apply() and evaluate() methods,
-    since it is assumed that all the information is coded and nothing is learnt from the data.'''
+    """A stateless model, or a white-box model. Exposes only ``predict()``, ``apply()`` and ``evaluate()``
+     methods, since it is assumed that all the information is coded and nothing is learnt from the data."""
     
     def __init__(self):
         pass
 
-    
+
     def predict(self, data, *args, **kwargs):
-        """Call te model predict logic"""
+        """Call the model predict logic on some data"""
         try:
             self._predict
         except AttributeError:
@@ -46,6 +46,7 @@ class Model(object):
 
 
     def apply(self, data, *args, **kwargs):
+        """Apply the model on some data"""
         try:
             self._apply
         except AttributeError:
@@ -55,6 +56,7 @@ class Model(object):
 
 
     def evaluate(self, data, *args, **kwargs):
+        """Evaluate the model on some data"""
         try:
             self._evaluate
         except AttributeError:
@@ -69,12 +71,17 @@ class Model(object):
 #=========================
 
 class ParametricModel(Model):
-    """A stateful model with parameters, or a (partly) black-box model. Parameters can be set manually
-    or learnt (fitted) from data. On top of the predict(), apply() and evaluate() methods it provides
-    a save() method to store the parameters of the model, and optionally a fit() method if the parameters
-    are to be learnt form data."""
+    """A stateful model with parameters, or a (partly) black-box model. Parameters can be set manually or
+    learnt (fitted) from data. On top of the ``predict()``, ``apply()`` and ``evaluate()`` methods it provides
+    a ``save()`` method to store the parameters of the model, and optionally a ``fit()`` method if the parameters
+    are to be learnt form data.
     
-    def __init__(self, path=None, id=None):
+    Args:
+        path (str): a path from which to load a saved model. Will override all other init settings.
+ 
+    """
+    
+    def __init__(self, path=None):
         
         if path:
             with open(path+'/data.json', 'r') as f:
@@ -82,29 +89,35 @@ class ParametricModel(Model):
             self.fitted = True
             
         else:
-            if not id:
-                id = str(uuid.uuid4())
+            id = str(uuid.uuid4())
             self.fitted = False
             self.data = {'id': id}
 
         super(ParametricModel, self).__init__()
 
 
-    def save(self, path):
+    @property
+    def id(self):
+        """A unique identifier for the model"""
+        return self.data['id']
 
-        if not self.fitted:
-            raise NotFittedError()
 
-        # Prepare model dir and dump data as json
-        model_dir = '{}/{}'.format(path, self.data['id'])
-        os.makedirs(model_dir)
-        model_data_file = '{}/data.json'.format(model_dir)
-        with open(model_data_file, 'w') as f:
-            f.write(json.dumps(self.data))
-        logger.info('Saved model with id "%s" in "%s"', self.data['id'], model_dir)
-        return model_dir
+    def fit(self, data, *args, **kwargs):
+        """Fit the model on some data"""
 
-    
+        try:
+            self._fit
+        except AttributeError:
+            raise NotImplementedError('Fitting this model is not implemented')
+        
+        fit_output = self._fit(data, *args, **kwargs)
+
+        self.data['fitted_at'] = now_s()
+        self.fitted = True
+
+        return fit_output
+
+
     def predict(self, data, *args, **kwargs):
 
         try:
@@ -139,78 +152,65 @@ class ParametricModel(Model):
             raise NotImplementedError('Evaluating this model is not implemented')
 
         if not self.fitted:
-            raise NotFittedError()
+            raise NotFittedError('This model is not fitted, cannot evaluate')
                 
         return self._evaluate(data, *args, **kwargs)
 
 
-    def fit(self, *args, **kwargs):
-
-        try:
-            self._fit
-        except AttributeError:
-            raise NotImplementedError('Fitting this model is not implemented')
-        
-        fit_output = self._fit(*args, **kwargs)
-
-        self.data['fitted_at'] = now_s()
-        self.fitted = True
-
-        return fit_output
-
-
-    def cross_validate(self, *args, **kwargs):
+    def cross_validate(self, data, *args, **kwargs):
+        """Cross validate the model on some data"""
 
         try:
             self._cross_validate
         except AttributeError:
             raise NotImplementedError('Cross-validating this model is not implemented')
 
-        return self._cross_validate(*args, **kwargs)
+        return self._cross_validate(data, *args, **kwargs)
 
 
-    @property
-    def id(self):
-        return self.data['id']
+    def save(self, path):
+        """Save the model in the given path. The model is saved in "directory format", 
+         meaning that a new directory will be created containing the data for the model."""
+
+        if not self.fitted:
+            raise NotFittedError()
+
+        if not path:
+            raise ValueError('Got empty path, cannot save')
+
+        if os.path.exists(path):
+            raise ValueError('The path "{}" already exists'.format(path)) 
+
+        # Prepare model dir and dump data as json
+        os.makedirs(path)
+        model_data_file = '{}/data.json'.format(path)
+        with open(model_data_file, 'w') as f:
+            f.write(json.dumps(self.data))
+        logger.info('Saved model with id "%s" in "%s"', self.data['id'], path)
 
 
 
 class TimeSeriesParametricModel(ParametricModel):
     """A parametric model specifically designed to work with time series data. In particular,
-    it ensures resolution and data keys consistency between methods and save/load operations.""" 
+    it ensures resolution and data labels consistency between methods and save/load operations.
+
+    Args:
+        path (str): a path from which to load a saved model. Will override all other init settings.
+    """ 
     
-    def __init__(self, path=None, id=None):
+    def __init__(self, path=None):
 
         # Call parent init
-        super(TimeSeriesParametricModel, self).__init__(path, id)
+        super(TimeSeriesParametricModel, self).__init__(path)
 
         # If the model has been loaded, convert resolution as TimeUnit
         if self.fitted:
             self.data['resolution'] = TimeUnit(self.data['resolution'])
 
-    def save(self, *args, **kwargs):
-
-        # If fitted, handle resolution. If not fitted, the parent save will raise.
-        if self.fitted:
-        
-            # Save original data resolution (Unit or TimeUnit Object)
-            orresolution = self.data['resolution']
-    
-            # Temporarily change the model resolution unit as string representation
-            self.data['resolution'] = str(self.data['resolution'])
-            
-        # Call parent save
-        save_output  = super(TimeSeriesParametricModel, self).save(*args, **kwargs)
-        
-        # Set back original data resolution
-        self.data['resolution'] = orresolution
-        
-        # Return output
-        return save_output
-
 
     def fit(self, timeseries, *args, **kwargs):
-        
+        """Fit the model on a time series"""
+  
         # Check timeseries
         check_timeseries(timeseries)
         
@@ -228,6 +228,7 @@ class TimeSeriesParametricModel(ParametricModel):
 
 
     def predict(self, timeseries, *args, **kwargs):
+        """Call the model predict logic on a time series"""
         
         # Check timeseries and its resolution
         check_timeseries(timeseries)
@@ -240,21 +241,9 @@ class TimeSeriesParametricModel(ParametricModel):
         # Call parent predict and return output
         return super(TimeSeriesParametricModel, self).predict(timeseries, *args, **kwargs)
 
-
-    def evaluate(self, timeseries, *args, **kwargs):
-        
-        # Check timeseries and its resolution
-        check_timeseries(timeseries)
-        
-        # If fitted, check resolution. If not fitted, the parent init will raise.
-        if self.fitted:
-            check_resolution(timeseries, self.data['resolution'])
-                
-        # Call parent evaluate and return output
-        return super(TimeSeriesParametricModel, self).evaluate(timeseries, *args, **kwargs)
-
-
+    
     def apply(self, timeseries, *args, **kwargs):
+        """Apply the model on a time series"""
         
         # Check timeseries
         check_timeseries(timeseries)
@@ -267,7 +256,33 @@ class TimeSeriesParametricModel(ParametricModel):
         return super(TimeSeriesParametricModel, self).apply(timeseries, *args, **kwargs)
 
 
-    def _cross_validate(self, data, *args, **kwargs):
+    def evaluate(self, timeseries, *args, **kwargs):
+        """Evaluate the model on a time series"""
+        
+        # Check timeseries and its resolution
+        check_timeseries(timeseries)
+        
+        # If fitted, check resolution. If not fitted, the parent init will raise.
+        if self.fitted:
+            check_resolution(timeseries, self.data['resolution'])
+                
+        # Call parent evaluate and return output
+        return super(TimeSeriesParametricModel, self).evaluate(timeseries, *args, **kwargs)
+
+
+    def cross_validate(self, timeseries, rounds=10, **kwargs):
+        """Cross validate the model on a time series.
+        
+        All the parameters starting with the ``fit_`` prefix are forwareded to the model ``fit()`` method (without the prefix), and
+        all the parameters starting with the ``evaluate_`` prefix are forwarded to the model ``evaluate()`` method (without the prefix).
+        
+        Args:
+            rounds(int): how many rounds of cross validation to run.
+        """
+        return super(TimeSeriesParametricModel, self).cross_validate(timeseries, rounds, **kwargs)
+
+
+    def _cross_validate(self, timeseries, rounds=10, **kwargs):
 
         try:
             self._evaluate
@@ -275,11 +290,11 @@ class TimeSeriesParametricModel(ParametricModel):
             raise NotImplementedError('Evaluating this model is not implemented, cannot cross-validate')
 
         # Check timeseries
-        check_timeseries(data)
+        check_timeseries(timeseries)
         
         # If fitted, check resolution. If not fitted, the parent init will raise.
         if self.fitted:
-            check_resolution(data, self.data['resolution'])
+            check_resolution(timeseries, self.data['resolution'])
         
         # Decouple fit from validate args
         fit_kwargs = {}
@@ -294,12 +309,6 @@ class TimeSeriesParametricModel(ParametricModel):
                 evaluate_kwargs[kwarg.replace('evaluate_', '')] = kwargs[kwarg]
         for consumed_kwarg in consumed_kwargs:
             kwargs.pop(consumed_kwarg)
-
-        # For readability
-        timeseries = data
-        
-        # How many rounds
-        rounds = kwargs.pop('rounds', 10)
 
         # Do we still have some kwargs?
         if kwargs:
@@ -324,13 +333,13 @@ class TimeSeriesParametricModel(ParametricModel):
             # Fit
             if i == 0:            
                 logger.debug('Fitting from {} ({})'.format(to_t, to_dt))
-                self.fit(data, from_t=to_t, **fit_kwargs)
+                self.fit(timeseries, from_t=to_t, **fit_kwargs)
             else:
                 logger.debug('Fitting until {} ({}) and then from {} ({}).'.format(to_t, to_dt, from_t, from_dt))
-                self.fit(data, from_t=to_t, to_t=from_t, **fit_kwargs)                
+                self.fit(timeseries, from_t=to_t, to_t=from_t, **fit_kwargs)                
             
             # Evaluate & append
-            evaluations.append(self.evaluate(data, from_t=from_t, to_t=to_t, **evaluate_kwargs))
+            evaluations.append(self.evaluate(timeseries, from_t=from_t, to_t=to_t, **evaluate_kwargs))
         
         # Regroup evaluations
         evaluation_metrics = list(evaluations[0].keys())
@@ -353,21 +362,38 @@ class TimeSeriesParametricModel(ParametricModel):
         return results
 
 
+    def save(self, path):
+
+        # If fitted, handle resolution. If not fitted, the parent save will raise.
+        if self.fitted:
+        
+            # Save original data resolution (Unit or TimeUnit Object)
+            orresolution = self.data['resolution']
+    
+            # Temporarily change the model resolution unit as string representation
+            self.data['resolution'] = str(self.data['resolution'])
+            
+        # Call parent save
+        super(TimeSeriesParametricModel, self).save(path)
+        
+        # Set back original data resolution
+        self.data['resolution'] = orresolution
+
+
 
 #=========================
 #  Base Prophet model
 #=========================
 
-class ProphetModel(TimeSeriesParametricModel):
-    '''Class to wrap some common logic for Prophet-based models.'''
-
+class ProphetModel():
+    '''Class to wrap some internal common logic for Prophet-based models.'''
 
     @classmethod
-    def remove_timezone(cls, dt):
+    def _remove_timezone(cls, dt):
         return dt.replace(tzinfo=None)
 
     @classmethod
-    def from_timeseria_to_prophet(cls, timeseries, from_t=None, to_t=None):
+    def _from_timeseria_to_prophet(cls, timeseries, from_t=None, to_t=None):
 
         # Create Python lists with data
         try:
@@ -388,9 +414,9 @@ class ProphetModel(TimeSeriesParametricModel):
                 break                
 
             if data_labels_are_indexes:     
-                data_as_list.append([cls.remove_timezone(item.dt), item.data[0]])
+                data_as_list.append([cls._remove_timezone(item.dt), item.data[0]])
             else:
-                data_as_list.append([cls.remove_timezone(item.dt), item.data[list(item.data.keys())[0]]])
+                data_as_list.append([cls._remove_timezone(item.dt), item.data[list(item.data.keys())[0]]])
 
         # Create the pandas DataFrames
         data = DataFrame(data_as_list, columns = ['ds', 'y'])
@@ -404,9 +430,9 @@ class ProphetModel(TimeSeriesParametricModel):
 #=========================
 
 class ARIMAModel():
-    '''Class to wrap some common logic for ARIMA-based models.'''
+    """Class to wrap some internal common logic for ARIMA-based models."""
     
-    def get_start_end_indexes(self, timeseries, n):
+    def _get_start_end_indexes(self, timeseries, n):
 
         # Do the math to get the right indexes for the prediction, both out-of-sample and in-sample
         # Not used at the moment as there seems to be bugs in the statsmodel package.
@@ -453,48 +479,31 @@ class ARIMAModel():
 #  Base Keras model
 #=========================
 
-class KerasModel(ParametricModel):
-    '''Class to wrap some common logic for Keras-based models.'''
+class KerasModel():
+    """Class to wrap some internal common logic for Keras-based models."""
 
-
-    def __init__(self, path=None, id=None):
+    def _load_keras_model(self, path):
         
-        super(KerasModel, self).__init__(path=path, id=id)
-
-        # If loaded, load the Keras model as well
+        # Load the Keras model
         if path:
             from keras.models import load_model as load_keras_model
             self.keras_model = load_keras_model('{}/keras_model'.format(path))
 
+    def _save_keras_model(self, path):
 
-    def save(self, path):
-
-        # Save the parameters (the "data") property
-        model_dir = super(KerasModel, self).save(path)
-
-        # Now save the Keras model itself
+        # Save the Keras model
         try:
-            self.keras_model.save('{}/keras_model'.format(model_dir))
+            self.keras_model.save('{}/keras_model'.format(path))
         except Exception as e:
-            shutil.rmtree(model_dir)
+            shutil.rmtree(path)
             raise e
-        return model_dir
-
     
-    # TODO: this following stuff should not go here. Maybe only if extending a TimeSeriesParametricModel, and still it is probably wrong.
+    # TODO: since we are extenting a generic ParametricModel, the following methods should not be here.
+    # Maybe only if extending a TimeSeriesParametricModel, and still it is probably the wrong place, as for the
+    # ARIMA and Prophet above also. Consider moving them in a "utility" package or directly in the models.
     
-    #@staticmethod
-    #def to_windows(timeseries):
-    #    '''Compute window data values from a time series.'''
-    #    key = timeseries.data_labels()[0]
-    #    window_data_values = []
-    #    for item in timeseries:
-    #        window_data_values.append(item.data[key])
-    #    return window_data_values
-
-        
     @staticmethod
-    def to_window_datapoints_matrix(timeseries, window, steps, encoder=None):
+    def _to_window_datapoints_matrix(timeseries, window, steps, encoder=None):
         '''Compute window datapoints matrix from a time series.'''
         # steps to be intended as steps ahead (for the forecaster)
         window_datapoints = []
@@ -512,9 +521,8 @@ class KerasModel(ParametricModel):
                 
         return window_datapoints
 
-    
     @staticmethod
-    def to_target_values_vector(timeseries, window, steps):
+    def _to_target_values_vector(timeseries, window, steps):
         '''Compute target values vector from a time series.'''
         # steps to be intended as steps ahead (for the forecaster)
     
@@ -536,9 +544,8 @@ class KerasModel(ParametricModel):
 
         return targets
 
-
     @staticmethod
-    def compute_window_features(window_datapoints, data_labels, features):
+    def _compute_window_features(window_datapoints, data_labels, features):
         """Compute features from a list of window data points (or slots).
         
         Args:
