@@ -110,7 +110,8 @@ class Reconstructor(TimeSeriesParametricModel):
         """Evaluate the reconstructor on a time series.
 
         Args:
-            steps (list): The list of steps-ahead to use for the evaluation. Default to automatic detection based on the model.
+            steps (int, list): a single value or a list of values for how many steps (intended as missing data points or slots) 
+                               to reconstruct in the evaluation. Default to automatic detection based on the model.
             limit(int): set a limit for the time series elements to use for the evaluation.
             data_loss_threshold(float): the data loss threshold required for the reconstructir to kick-in.
             metrics(list): the error metrics to use for the evaluation.

@@ -175,7 +175,7 @@ class Forecaster(TimeSeriesParametricModel):
         """Evaluate the forecaster on a time series.
 
         Args:
-            steps (list): The list of steps-ahead to use for the evaluation. Default to automatic detection based on the model.
+            steps (int,list): a single value or a list of values for how many steps-ahead to forecast in the evaluation. Default to automatic detection based on the model.
             limit(int): set a limit for the time series elements to use for the evaluation.
             plots(bool): if to produce evaluation plots, defaulted to False. Beware that setting this option to True will cause to generate 
                          a plot for each evaluation point or slot of the time series: use with caution and only on small time series.
