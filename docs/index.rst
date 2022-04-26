@@ -4,13 +4,14 @@ Welcome to Timeseria reference documentation!
 
 Timeseria is an object-oriented time series processing library which aims at making it easy to manipulate time series data and to build statistical and machine learning models on top of it.
 
-It provides a built-in set of common operations (resampling, aggregation, differencing etc.) as well as 
-models (reconstruction, forecasting and anomaly detection), and both custom operations and models can be easily plugged in.
+Unlike common numerical and data analysis frameworks, Timeseira does not make use of low level structures as arrays and matrices for representing data. Instead, it builds up from well defined and reusable logical units (objects) which can be easily composed together, ensuring a high level of consistency.
 
-Timeseria also tries to address by design all those annoying things which are often left as an implementation detail but that actually cause wasting massive amounts of time - as handling data losses, non-uniform sampling rates, differences between time-slotted data and punctual observations, variable time units, timezones, DST changes and so on.
+Because of this approach, Timeseria addresses by design all those annoying things which are often left as an implementation detail but that actually cause wasting massive amounts of time - as handling data losses, non-uniform sampling rates, differences between aggregated data and punctual observations, timezones, DST changes, and so on.
+
+Timeseria  comes with a built-in set of common operations (resampling, aggregation, differencing etc.) and models (reconstruction, forecasting and anomaly detection) which can be easily extended with custom ones, and integrates a powerful plotting engine based on Dygraphs capable of plotting even millions of data points.
 
 This is the refeerence documentations, and it is quite essential. To get started more gently, you can have a look at the
-`quickstart <https://sarusso.github.io/Timeseria/Quickstart.html>`_ or at the `welcome <https://sarusso.github.io/Timeseria/Welcome.html>`_ notebooks.
+`quickstart <https://github.com/sarusso/Timeseria-notebooks/blob/master/notebooks/Quickstart.ipynb>`_ or at the `welcome <https://github.com/sarusso/Timeseria-notebooks/blob/master/notebooks/Welcome.ipynb>`_ notebooks.
 
 Examples are provided in the `Timeseria-notebooks <https://github.com/sarusso/Timeseria-notebooks>`_ repository, and a Docker image ready to be played with is available on `Docker Hub <https://hub.docker.com/r/sarusso/timeseria>`_.
 

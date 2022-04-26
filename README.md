@@ -3,9 +3,11 @@
 
 Timeseria is an object-oriented time series processing library which aims at making it easy to manipulate time series data and to build statistical and machine learning models on top of it.
 
-It comes with a built-in set of common operations (resampling, aggregation, differencing etc.) and models (reconstruction, forecasting and anomaly detection) which can cover a variety of simple use-cases. Moreover, both custom operations and models can be easily plugged in.
+Unlike common numerical and data analysis frameworks, Timeseira does not make use of low level structures as arrays and matrices for representing data. Instead, it builds up from well defined and reusable logical units (objects) which can be easily composed together, ensuring a high level of consistency.
 
-Timeseria also addresses by design all those annoying things which are often left as an implementation detail but that actually cause wasting massive amounts of time - as handling data losses, non-uniform sampling rates, differences between time-slotted (aggregated) data and punctual observations, variable time units, timezones, DST changes and so on.
+Because of this approach, Timeseria addresses by design all those annoying things which are often left as an implementation detail but that actually cause wasting massive amounts of time - as handling data losses, non-uniform sampling rates, differences between aggregated data and punctual observations, timezones, DST changes, and so on.
+
+Timeseria  comes with a built-in set of common operations (resampling, aggregation, differencing etc.) and models (reconstruction, forecasting and anomaly detection) which can be easily extended with custom ones, and integrates a powerful plotting engine based on Dygraphs capable of plotting even millions of data points.
 
 You can get started by reading the [quickstart](https://github.com/sarusso/Timeseria-notebooks/blob/master/notebooks/Quickstart.ipynb) or the [welcome](https://github.com/sarusso/Timeseria-notebooks/blob/master/notebooks/Welcome.ipynb) notebooks. Also the [reference documentation](https://timeseria.readthedocs.io) might be useful.
 
