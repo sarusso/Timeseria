@@ -3,7 +3,7 @@
 from setuptools import setup, find_packages
 
 setup(name='timeseria',
-      version='0.1.6',
+      version='1.0.0',
       description='A time series processing library',
       url="https://github.com/sarusso/timeseria",
       author='Stefano Alberto Russo',

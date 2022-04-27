@@ -19,11 +19,11 @@ sys.path.insert(0, os.path.abspath('..'))
 # -- Project information -----------------------------------------------------
 
 project = 'Timeseria'
-copyright = '2021, Stefano Alberto Russo'
+copyright = '2022, Stefano Alberto Russo'
 author = 'Stefano Alberto Russo'
 
 # The full version, including alpha/beta/rc tags
-release = 'v0.1.0-pre'
+release = 'v1.0.0'
 
 
 # -- General configuration ---------------------------------------------------
