@@ -137,7 +137,7 @@ def compute_validity_regions(series, from_t=None, to_t=None, sampling_interval=N
 
     # Get the series sampling interval unless it is forced to a specific value
     if not sampling_interval:
-        sampling_interval = series.autodetected_sampling_interval
+        sampling_interval = series._autodetected_sampling_interval
 
     # Segments dict
     validity_segments = {}
@@ -265,7 +265,7 @@ def compute_data_loss(series, from_t, to_t, force=False, sampling_interval=None)
 
     # Get the series sampling interval unless it is forced to a specific value
     if not sampling_interval:
-        sampling_interval = series.autodetected_sampling_interval
+        sampling_interval = series._autodetected_sampling_interval
        
     #========================================
     #  Data loss from missing coverage.
@@ -285,7 +285,7 @@ def compute_data_loss(series, from_t, to_t, force=False, sampling_interval=None)
     # made uniform (i.e. by a resampling process), or if forced for testing or other potential reasons.
     data_loss_from_previously_computed = 0.0
 
-    if (series.resolution is not None and not series.resolution.is_variable()) or force:
+    if (series.resolution is not None) or force:
 
         for point in series:
             
@@ -355,16 +355,17 @@ def is_almost_equal(one, two):
 def check_timeseries(timeseries, resolution=None):
     # Import here or you will end up with cyclic imports
     from .datastructures import DataTimePointSeries, DataTimeSlotSeries 
+    
+    if not timeseries:
+        raise ValueError('A non-empty time series is required')
+        
     if isinstance(timeseries, DataTimePointSeries):
-        if timeseries.resolution.is_variable():
-            raise ValueError('Variable resolutions are not supported. Resample or slot the time series first.')
+        if timeseries.resolution is None:
+            raise ValueError('Time series with undefined (variable) resolutions are not supported. Resample or slot the time series first.')
     elif isinstance(timeseries, DataTimeSlotSeries):
         pass
     else:
         raise TypeError('Either a DataTimePointSeries or a DataTimeSlotSeries is required (got "{}")'.format(timeseries.__class__.__name__))
-
-    if not timeseries:
-        raise ValueError('A non-empty time series is required')
 
 def check_resolution(timeseries, resolution):
     

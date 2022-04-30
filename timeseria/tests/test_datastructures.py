@@ -358,9 +358,9 @@ class TestPointSeries(unittest.TestCase):
         self.assertTrue(isinstance(time_point_series.resolution.value, str))
         self.assertEqual(time_point_series.resolution.value, '61s')
 
-        # Test resolution: variable, threee points       
+        # Test resolution: variable (thus not defined), threee points       
         time_point_series = TimePointSeries(TimePoint(t=60),TimePoint(t=120),TimePoint(t=130))
-        self.assertEqual(time_point_series.resolution, '~1m')
+        self.assertEqual(time_point_series.resolution, None)
         
         # Test resolution: defined, threee points               
         time_point_series = TimePointSeries(TimePoint(t=60),TimePoint(t=120),TimePoint(t=180))
@@ -449,7 +449,7 @@ class TestPointSeries(unittest.TestCase):
                                                      DataTimePoint(dt=dt(2015,10,25,0,0,0, tzinfo='Europe/Rome'), data=24.1),
                                                      DataTimePoint(dt=dt(2015,10,26,0,0,0, tzinfo='Europe/Rome'), data=23.1))
         
-        self.assertEqual(data_time_point_series.resolution, '~86400s') # DST occurred
+        self.assertEqual(data_time_point_series.resolution, None) # DST occurred, resolution marked as undefined
         
         data_time_point_series = DataTimePointSeries(DataTimePoint(dt=dt(2015,10,27,0,0,0, tzinfo='Europe/Rome'), data={'a':23.8}),
                                                      DataTimePoint(dt=dt(2015,10,28,0,0,0, tzinfo='Europe/Rome'), data={'a':24.1}),
