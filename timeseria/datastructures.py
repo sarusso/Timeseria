@@ -977,10 +977,11 @@ class DataTimePointSeries(DataPointSeries, TimePointSeries):
         """The time series as a Pandas DataFrame object."""
         data_labels = self.data_labels()
         
-        if self[0].data_loss is not None:
-            dump_data_loss = True
-        else:
-            dump_data_loss = False
+        dump_data_loss = False
+        for item in self:
+            if item.data_loss is not None:
+                dump_data_loss = True
+                break
         
         if dump_data_loss:
             columns = ['Timestamp'] + data_labels + ['data_loss']
@@ -995,8 +996,9 @@ class DataTimePointSeries(DataPointSeries, TimePointSeries):
             else:
                 df = df.append(DataFrame([[item.dt]+values], columns=columns))                
         df = df.set_index('Timestamp')
-        return df
         
+        return df
+      
     def plot(self, engine='dg', *args, **kwargs):
         """Plot the time series. The default plotting engine is Dygraphs (``engine=\'dg\'``),
            limited support for Matplotplib (``engine=\'mp\'``) is also available.
@@ -1667,10 +1669,11 @@ class DataTimeSlotSeries(DataSlotSeries, TimeSlotSeries):
         """The time series as a Pandas DataFrame object."""
         data_labels = self.data_labels()
         
-        if self[0].data_loss is not None:
-            dump_data_loss = True
-        else:
-            dump_data_loss = False
+        dump_data_loss = False
+        for item in self:
+            if item.data_loss is not None:
+                dump_data_loss = True
+                break
         
         if dump_data_loss:
             columns = ['Timestamp'] + data_labels + ['data_loss']
@@ -1685,6 +1688,7 @@ class DataTimeSlotSeries(DataSlotSeries, TimeSlotSeries):
             else:
                 df = df.append(DataFrame([[item.dt]+values], columns=columns))                
         df = df.set_index('Timestamp')
+        
         return df
 
     def plot(self, engine='dg', *args, **kwargs):
