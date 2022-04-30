@@ -1,5 +1,13 @@
 name: Tests
-on: [push, pull_request]
+on:
+  push:
+    branches-ignore:
+      - master
+      - "test/*"
+  pull_request:
+    branches:
+      - master
+      - develop
 jobs:
   test:
     runs-on: ubuntu-20.04
@@ -17,4 +25,4 @@ jobs:
           pip install statsmodels==0.12.1
           pip install pmdarima==1.8
       - name: Run tests with unittest
-        run: python3 -m unittest discover       
+        run: python3 -m unittest discover
