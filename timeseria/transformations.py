@@ -331,7 +331,7 @@ class SlottedTransformation(Transformation):
 
         # Automatically detect validity if not set
         if validity is None:
-            validity = series.autodetected_sampling_interval
+            validity = series._autodetected_sampling_interval
             logger.info('Using auto-detected sampling interval: %ss', validity)
 
         # Check if upsamplimg (with some tolearance):

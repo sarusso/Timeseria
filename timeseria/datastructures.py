@@ -238,8 +238,6 @@ class Series(list):
         
         super(Series, self).remove(x)
 
-
-
     def pop(self, i=None):
         """
         Remove the item at the given position in the list, and return it. If no index is
@@ -703,15 +701,16 @@ class TimePointSeries(PointSeries):
         if tz:
             self._tz = timezonize(tz)
         
-        self._resolution = None
-
         super(TimePointSeries, self).__init__(*args, **kwargs)
         
 
     # Check time ordering and resolution
     def append(self, item):
         try:
-            
+            self.prev_t
+        except AttributeError:
+            pass
+        else:
             # This is to support the deepcopy, otherwise the original prev_t will be used
             if len(self)>0:
                 
@@ -722,39 +721,26 @@ class TimePointSeries(PointSeries):
                 if item.t == self.prev_t:
                     raise ValueError('Time t="{}" is a duplicate'.format(item.t))
                 
-                if self._resolution is None:
-                    self.resolution_as_seconds = item.t - self.prev_t # For a bit of performance
-                    
-                    class TimeResolution(TimeUnit):
-    
-                        def __init__(self, *args, **kwargs):
-                            variable = kwargs.pop('variable', False)
-                            self.variable = variable
-                            super(TimeResolution, self).__init__(*args, **kwargs)
-                    
-                        def __repr__(self):
-                            if self.variable:
-                                return "~{}".format(super(TimeResolution, self).__repr__())
-                            else:
-                                return "{}".format(super(TimeResolution, self).__repr__())
-                        
-                        def is_variable(self):
-                            return self.variable
-
-                    self._resolution = TimeResolution(to_time_unit_string(item.t - self.prev_t, friendlier=True)) 
-                    #self._resolution = TimeUnit(to_time_unit_string(item.t - self.prev_t, friendlier=True))
-                    
-                elif not self._resolution.variable:
-                    if self.resolution_as_seconds != item.t - self.prev_t:
-                        # TODO: here you should set a flag and remove the resolution.
-                        # Then when this is requested, set it using the autodetected sampling rate
-                        self._resolution.variable = True
-
-            self.prev_t = item.t
+                try:
+                    self._resolution 
                 
-        except AttributeError:
+                except AttributeError:
+                    
+                    # Set the resolution as seconds for a bit of performance
+                    self._resolution_as_seconds = item.t - self.prev_t 
+                    
+                    # Set the resolution
+                    self._resolution = TimeUnit(to_time_unit_string(item.t - self.prev_t, friendlier=True))
+                                    
+                else:
+                    if self._resolution != None:
+                        # Check that the resolution is constant, otherwise make it undefined
+                        if self._resolution_as_seconds != (item.t - self.prev_t):
+                            del self._resolution_as_seconds
+                            self._resolution = None
+        finally:
             self.prev_t = item.t
-       
+            
         super(TimePointSeries, self).append(item)
 
     @property
@@ -790,12 +776,48 @@ class TimePointSeries(PointSeries):
         return new_series
 
     @property
+    def _autodetected_sampling_interval(self):
+        try:
+            return self.__autodetected_sampling_interval
+        except AttributeError:
+            from .utilities import detect_sampling_interval
+            self.__autodetected_sampling_interval = detect_sampling_interval(self)
+            return self.__autodetected_sampling_interval
+    
+    @property
     def resolution(self):
         """The (temporal) resolution of the time series."""
         try:
             return self._resolution
         except AttributeError:
+            # Case of an empty series
             return None
+    
+    def guess_resolution(self):
+        if not self:
+            raise ValueError('Cannot guess the resolution for an empty time series')
+        if len(self) == 1:
+            raise ValueError('Cannot guess the resolution for a time series with only one point')
+        if self.resolution is not None:
+            raise ValueError('The time series has a well defined resolution ({}), guessing it does not make sense'.format(self.resolution))
+        else:
+            try:
+                self._guessed_resolution
+            except AttributeError:
+                self._guessed_resolution = TimeUnit(to_time_unit_string(self._autodetected_sampling_interval, friendlier=True))
+            finally:
+                return self._guessed_resolution 
+
+    @property
+    def _resolution_string(self):
+        if isinstance(self.resolution, Unit):
+            # Includes TimeUnits
+            _resolution_string = '{} resolution'.format(self.resolution)
+        else:
+            _autodetected_sampling_interval_as_str = TimeUnit(to_time_unit_string(self._autodetected_sampling_interval, friendlier=True))
+            _resolution_string = 'variable resolution (~{})'.format(_autodetected_sampling_interval_as_str)
+        return _resolution_string
+
 
 
 class DataPointSeries(PointSeries):
@@ -1013,30 +1035,6 @@ class DataTimePointSeries(DataPointSeries, TimePointSeries):
             if out: return out
         else:
             raise ValueError('Unknown plotting engine "{}'.format(engine))
-        
-    @property
-    def autodetected_sampling_interval(self):
-        try:
-            return self._autodetected_sampling_interval
-        except AttributeError:
-            from .utilities import detect_sampling_interval
-            self._autodetected_sampling_interval = detect_sampling_interval(self)
-            return self._autodetected_sampling_interval
-    
-    @property
-    def _resolution_string(self):
-        if isinstance(self.resolution, Unit):
-            # Includes TimeUnits
-            _resolution_string = '{} resolution'.format(self.resolution)
-        else:
-            autodetected_sampling_interval_as_str = str(self.autodetected_sampling_interval)
-            if autodetected_sampling_interval_as_str.endswith('.0'):
-                # TODO: use a friendlier resolution here as well, as above?
-                # TODO: do something like this when setting the variable resolution, roght now the .resolution
-                # and ._resolution_string might return different values as they are computed differently  
-                autodetected_sampling_interval_as_str = autodetected_sampling_interval_as_str[:-2] 
-            _resolution_string = 'variable resolution (~{}s)'.format(autodetected_sampling_interval_as_str)
-        return _resolution_string
 
     def __repr__(self):
         if len(self):
@@ -1378,18 +1376,18 @@ class SlotSeries(Series):
         # Slots can belong to the same series if they are in succession (tested with the __succedes__ method)
         # and if they have the same unit, which we test here instead as the __succedes__ is more general.
         try:
-            if self._reference_unit != item.unit:
+            if self._resolution != item.unit:
                 # Try for floating point precision errors
                 abort = False
                 try:
-                    if not is_close(self._reference_unit.value, item.unit.value):
+                    if not is_close(self._resolution.value, item.unit.value):
                         abort = True
                 except (TypeError, ValueError):
                     abort = True
                 if abort:
-                    raise ValueError('Cannot add items with different units (I have "{}" and you tried to add "{}")'.format(self._reference_unit, item.unit))
+                    raise ValueError('Cannot add slots with a different unit than the series resolution (I have "{}" and you tried to add "{}")'.format(self._resolution, item.unit))
         except AttributeError:
-            self._reference_unit = item.unit
+            self._resolution = item.unit
 
         # Call parent append
         super(SlotSeries, self).append(item)
@@ -1443,28 +1441,8 @@ class TimeSlotSeries(SlotSeries):
         try:
             return self._resolution
         except AttributeError:
-            try:
-                
-                class TimeResolution(TimeUnit):
-    
-                    def __init__(self, *args, **kwargs):
-                        variable = kwargs.pop('variable', False)
-                        self.variable = variable
-                        super(TimeResolution, self).__init__(*args, **kwargs)
-                
-                    def __repr__(self):
-                        if self.variable:
-                            return "~{}".format(super(TimeResolution, self).__repr__())
-                        else:
-                            return "{}".format(super(TimeResolution, self).__repr__())
-                    
-                    def is_variable(self):
-                        return self.variable
-                
-                self._resolution = TimeResolution(self._reference_unit.value)
-                return self._resolution
-            except AttributeError:
-                return None
+            # Case of an empty series
+            return None
 
 
 class DataSlotSeries(SlotSeries):

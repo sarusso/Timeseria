@@ -347,21 +347,33 @@ class TestPointSeries(unittest.TestCase):
         # Test resolution: not defined as just one point
         time_point_series = TimePointSeries(TimePoint(t=60))
         self.assertEqual(time_point_series.resolution, None)
-
-        # Test resolution: defined, two points       
-        time_point_series = TimePointSeries(TimePoint(t=60),TimePoint(t=121))
         
+        # Cannot guess resolution if only one point
+        with self.assertRaises(ValueError):
+            time_point_series.guess_resolution()
+
+        # Test resolution: defined, two points61 seconds
+        time_point_series = TimePointSeries(TimePoint(t=60),TimePoint(t=121)) 
         self.assertTrue(isinstance(time_point_series.resolution,TimeUnit))
         self.assertEqual(str(time_point_series.resolution), '61s')
         self.assertEqual(time_point_series.resolution, 61) # TimeUnits support math
-
-        self.assertTrue(isinstance(time_point_series.resolution.value, str))
         self.assertEqual(time_point_series.resolution.value, '61s')
-
-        # Test resolution: variable, threee points       
-        time_point_series = TimePointSeries(TimePoint(t=60),TimePoint(t=120),TimePoint(t=130))
-        self.assertEqual(time_point_series.resolution, '~1m')
+        self.assertEqual(time_point_series.resolution.as_seconds(), 61)
         
+        # Test resolution: defined, two points, 1 minute 
+        time_point_series = TimePointSeries(TimePoint(t=60),TimePoint(t=120))
+        self.assertEqual(str(time_point_series.resolution), '1m')
+        self.assertEqual(time_point_series.resolution, 60) # TimeUnits support math
+        self.assertEqual(time_point_series.resolution.value, '1m')
+        self.assertEqual(time_point_series.resolution.as_seconds(), 60)
+
+        # Test resolution: variable (thus not defined), threee points       
+        time_point_series = TimePointSeries(TimePoint(t=60),TimePoint(t=120),TimePoint(t=130))
+        self.assertEqual(time_point_series.resolution, None)
+        self.assertEqual(time_point_series.guess_resolution(), 60)
+        self.assertEqual(str(time_point_series.guess_resolution()), '1m')
+        self.assertEqual(time_point_series.guess_resolution().as_seconds(), 60)
+
         # Test resolution: defined, threee points               
         time_point_series = TimePointSeries(TimePoint(t=60),TimePoint(t=120),TimePoint(t=180))
         self.assertEqual(time_point_series.duplicate().resolution, 60)
@@ -449,8 +461,9 @@ class TestPointSeries(unittest.TestCase):
                                                      DataTimePoint(dt=dt(2015,10,25,0,0,0, tzinfo='Europe/Rome'), data=24.1),
                                                      DataTimePoint(dt=dt(2015,10,26,0,0,0, tzinfo='Europe/Rome'), data=23.1))
         
-        self.assertEqual(data_time_point_series.resolution, '~86400s') # DST occurred
-        
+        self.assertEqual(data_time_point_series.resolution, None) # DST occurred, resolution marked as undefined
+        self.assertEqual(data_time_point_series.guess_resolution(), 86400)
+
         data_time_point_series = DataTimePointSeries(DataTimePoint(dt=dt(2015,10,27,0,0,0, tzinfo='Europe/Rome'), data={'a':23.8}),
                                                      DataTimePoint(dt=dt(2015,10,28,0,0,0, tzinfo='Europe/Rome'), data={'a':24.1}),
                                                      DataTimePoint(dt=dt(2015,10,29,0,0,0, tzinfo='Europe/Rome'), data={'a':23.1}))

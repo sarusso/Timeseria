@@ -117,7 +117,7 @@ def check_dt_consistency(date_dt):
 
 
 def correct_dt_dst(datetime_obj):
-    """Check that the dst is correct and if not, change it"""
+    """Check that the DST is correct and if not, change it."""
 
     # https://en.wikipedia.org/wiki/Tz_database
     # https://www.iana.org/time-zones
