@@ -544,22 +544,23 @@ def get_periodicity_index(item, resolution, periodicity, dst_affected=False):
 # Detetc sampling interval
 #==============================
 
-def detect_sampling_interval(data_time_point_series):
+def detect_sampling_interval(time_series):
+    """Autodetect (guess) the sampling interval of a time series"""
 
     diffs={}
-    prev_data_time_point=None
-    for data_time_point in data_time_point_series:
-        if prev_data_time_point is not None:
-            diff = data_time_point.t - prev_data_time_point.t
+    prev_point=None
+    for point in time_series:
+        if prev_point is not None:
+            diff = point.t - prev_point.t
             if diff not in diffs:
                 diffs[diff] = 1
             else:
                 diffs[diff] +=1
-        prev_data_time_point = data_time_point
+        prev_point = point
     
     # Iterate until the diffs are not too spread, then pick the maximum.
     i=0
-    while is_almost_equal(len(diffs), len(data_time_point_series)):
+    while is_almost_equal(len(diffs), len(time_series)):
         or_diffs=diffs
         diffs={}
         for diff in or_diffs:
@@ -570,7 +571,7 @@ def detect_sampling_interval(data_time_point_series):
                 diffs[diff] +=1            
         
         if i > 10:
-            raise Exception('Cannot automatically detect original resolution')
+            raise Exception('Cannot automatically detect the ampling interval')
     
     most_common_diff_total = 0
     most_common_diff = None
@@ -620,14 +621,17 @@ def to_float(string,no_data_placeholders=[],label=None):
 
 
 def to_time_unit_string(seconds, friendlier=True):
-    """Converts seconds to a (friendlier) time unit string, as 1h, 10m etc.)"""    
+    """Converts seconds to a (friendlier) time unit string, as 1s, 1h, 10m etc.)"""    
     seconds_str = str(seconds).replace('.0', '')
-    if seconds_str == '60':
-        seconds_str = '1m'
-    elif seconds_str == '600':
-        seconds_str = '10m'
-    elif seconds_str == '3600':
-        seconds_str = '1h'
+    if friendlier:
+        if seconds_str == '60':
+            seconds_str = '1m'
+        elif seconds_str == '600':
+            seconds_str = '10m'
+        elif seconds_str == '3600':
+            seconds_str = '1h'
+        else:
+            seconds_str = seconds_str+'s'
     else:
         seconds_str = seconds_str+'s'
     return seconds_str

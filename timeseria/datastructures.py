@@ -776,6 +776,15 @@ class TimePointSeries(PointSeries):
         return new_series
 
     @property
+    def _autodetected_sampling_interval(self):
+        try:
+            return self.__autodetected_sampling_interval
+        except AttributeError:
+            from .utilities import detect_sampling_interval
+            self.__autodetected_sampling_interval = detect_sampling_interval(self)
+            return self.__autodetected_sampling_interval
+    
+    @property
     def resolution(self):
         """The (temporal) resolution of the time series."""
         try:
@@ -783,6 +792,32 @@ class TimePointSeries(PointSeries):
         except AttributeError:
             # Case of an empty series
             return None
+    
+    def guess_resolution(self):
+        if not self:
+            raise ValueError('Cannot guess the resolution for an empty time series')
+        if len(self) == 1:
+            raise ValueError('Cannot guess the resolution for a time series with only one point')
+        if self.resolution is not None:
+            raise ValueError('The time series has a well defined resolution ({}), guessing it does not make sense'.format(self.resolution))
+        else:
+            try:
+                self._guessed_resolution
+            except AttributeError:
+                self._guessed_resolution = TimeUnit(to_time_unit_string(self._autodetected_sampling_interval, friendlier=True))
+            finally:
+                return self._guessed_resolution 
+
+    @property
+    def _resolution_string(self):
+        if isinstance(self.resolution, Unit):
+            # Includes TimeUnits
+            _resolution_string = '{} resolution'.format(self.resolution)
+        else:
+            _autodetected_sampling_interval_as_str = TimeUnit(to_time_unit_string(self._autodetected_sampling_interval, friendlier=True))
+            _resolution_string = 'variable resolution (~{})'.format(_autodetected_sampling_interval_as_str)
+        return _resolution_string
+
 
 
 class DataPointSeries(PointSeries):
@@ -1000,30 +1035,6 @@ class DataTimePointSeries(DataPointSeries, TimePointSeries):
             if out: return out
         else:
             raise ValueError('Unknown plotting engine "{}'.format(engine))
-        
-    @property
-    def _autodetected_sampling_interval(self):
-        try:
-            return self.___autodetected_sampling_interval
-        except AttributeError:
-            from .utilities import detect_sampling_interval
-            self.__autodetected_sampling_interval = detect_sampling_interval(self)
-            return self.__autodetected_sampling_interval
-    
-    @property
-    def _resolution_string(self):
-        if isinstance(self.resolution, Unit):
-            # Includes TimeUnits
-            _resolution_string = '{} resolution'.format(self.resolution)
-        else:
-            _autodetected_sampling_interval_as_str = str(self._autodetected_sampling_interval)
-            if _autodetected_sampling_interval_as_str.endswith('.0'):
-                # TODO: use a friendlier resolution here as well, as above?
-                # TODO: do something like this when setting the variable resolution, roght now the .resolution
-                # and ._resolution_string might return different values as they are computed differently  
-                _autodetected_sampling_interval_as_str = _autodetected_sampling_interval_as_str[:-2] 
-            _resolution_string = 'variable resolution (~{}s)'.format(_autodetected_sampling_interval_as_str)
-        return _resolution_string
 
     def __repr__(self):
         if len(self):
