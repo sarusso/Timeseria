@@ -786,7 +786,15 @@ class TimePointSeries(PointSeries):
     
     @property
     def resolution(self):
-        """The (temporal) resolution of the time series."""
+        """The (temporal) resolution of the time series.
+        
+        Returns a :obj:`timeseria.units.TimeUnit` object. Not defined (returns :obj:`None`) if:
+        
+            * the time series in empty,
+            * the time series has only one point, or
+            * the sampling rate is variable, either because of data losses or uneven observations.
+        
+        """
         try:
             return self._resolution
         except AttributeError:
@@ -1437,7 +1445,11 @@ class TimeSlotSeries(SlotSeries):
 
     @property
     def resolution(self):
-        """The (temporal) resolution of the time series."""
+        """The (temporal) resolution of the time series.
+        
+        Returns a :obj:`timeseria.units.TimeUnit` object, which corresponds to the slots unit.
+        Not defined (returns :obj:`None`) if the time series is empty.
+        """
         try:
             return self._resolution
         except AttributeError:
