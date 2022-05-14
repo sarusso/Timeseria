@@ -216,7 +216,7 @@ class Forecaster(TimeSeriesParametricModel):
                 if not self.data['window']:
                     steps = [1]
                 else:
-                    steps = [1, 2, 3]
+                    steps = [1, self.data['window']]
         elif isinstance(steps, list):
             if not self.data['window']:
                 if steps != [1]:
