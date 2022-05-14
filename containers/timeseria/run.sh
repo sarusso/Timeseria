@@ -11,10 +11,10 @@ echo -e  "===============================\n"
 
 if [[ "x$LIVE" == "xFalse" ]]; then
     echo "Running without live code changes."
-    docker run -p8888:8888 -it timeseria
+    docker run -p8888:8888 -eDEFAULT_PLOT_TYPE=$DEFAULT_PLOT_TYPE -it timeseria
 else
     echo "Running with live code changes. Use LIVE=False to disable."
     #-v your_notebooks_dir:/notebooks 
-    docker run -p8888:8888 -v $PWD:/opt/Timeseria -it timeseria
+    docker run -p8888:8888 -eDEFAULT_PLOT_TYPE=$DEFAULT_PLOT_TYPE -v $PWD:/opt/Timeseria -it timeseria
 fi
 

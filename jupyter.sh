@@ -15,3 +15,5 @@ fi
             
 # Run
 ./run.sh
+
+# To enable image-based plots by defualt, use DEFAULT_PLOT_TYPE=image ./jupyter.sh
