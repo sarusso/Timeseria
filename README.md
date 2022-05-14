@@ -1,5 +1,8 @@
 # Timeseria
 
+
+[![Tests status](https://github.com/sarusso/timeseria/actions/workflows/ci.yml/badge.svg)](https://github.com/sarusso/Timeseria/actions) [![Licence Apache 2](https://img.shields.io/github/license/sarusso/Timeseria)](https://github.com/sarusso/Timeseria/blob/master/LICENSE) [![Semver 2.0.0](https://camo.githubusercontent.com/76f12a58798ac587a2f5147b3e3917f09fd083a23ffa5febbe91ad18d2537ea9/68747470733a2f2f696d672e736869656c64732e696f2f62616467652f73656d7665722d322e302e302d626c7565)](https://semver.org/spec/v2.0.0.html) 
+
 Timeseria is an object-oriented time series processing library which aims at making it easy to manipulate time series data and to build statistical and machine learning models on top of it.
 
 Unlike common numerical and data analysis frameworks, Timeseria does not make use of low level structures as arrays and matrices for representing data. Instead, it builds up from well defined and reusable logical units (objects) which can be easily composed together, ensuring a high level of consistency.
@@ -100,9 +103,9 @@ To instead set a specific log level when testing (default is CRITICAL):
     TIMESERIA_LOGLEVEL=DEBUG ./test.sh
 
 
-## Testing [![Tests status](https://github.com/sarusso/timeseria/actions/workflows/ci.yml/badge.svg)](https://github.com/sarusso/Timeseria/actions)
+## Testing
 
-Every commit on the Timeseria codebase is automatically tested with GitHub Actions. [Check all branch statuses](https://github.com/sarusso/Timeseria/actions).
+How to run the unit tests for development is covered in the previus paragraph. Moreover, every push on the Timeseria codebase as well as the pull requests are automatically tested with GitHub Actions: [check all branch statuses](https://github.com/sarusso/Timeseria/actions).
 
 
 ## Licensing
