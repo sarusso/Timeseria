@@ -650,10 +650,10 @@ class CSVFileStorage(Storage):
                         data_indexes = {}
                         for key in item[1]:
                             if key.startswith('__'):
-                                data_indexes[key] = item[1][key]
+                                data_indexes[key[2:]] = item[1][key]
                         # Remove data_indexes from item data 
                         for index in data_indexes:       
-                            item[1].pop(index)
+                            item[1].pop('__'+index)
                                 
                     # Create DataTimePoint, set data and data_indexes
                     data_time_point = DataTimePoint(t=item[0], data=item[1], data_indexes=data_indexes, tz=tz)
@@ -679,10 +679,10 @@ class CSVFileStorage(Storage):
                         data_indexes = {}
                         for key in item[1]:
                             if key.startswith('__'):
-                                data_indexes[key] = item[1][key]
+                                data_indexes[key[2:]] = item[1][key]
                         # Remove data_indexes from item data 
                         for index in data_indexes:       
-                            item[1].pop(index)
+                            item[1].pop('__'+index)
                     
                     if DEFAULT_SLOT_DATA_LOSS is not None and 'data_loss' not in data_indexes:
                         data_indexes['data_loss'] = DEFAULT_SLOT_DATA_LOSS
