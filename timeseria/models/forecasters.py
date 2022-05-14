@@ -864,7 +864,7 @@ class LSTMForecaster(KerasModel, Forecaster):
         except AttributeError:
             pass
         
-        if not window ==3:
+        if window == 3:
             logger.info('Using default window size of 3')
        
         if features == ['values']:
