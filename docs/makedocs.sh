@@ -2,7 +2,7 @@
 set -e
 
 # Move to container dir
-cd ../containers/Ubuntu_20.04
+cd ../containers/timeseria
 
 if [[ "x$BUILD" != "xFalse" ]]; then
     # Build

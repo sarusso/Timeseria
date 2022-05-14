@@ -17,10 +17,6 @@ RUN apt-get install -y xdg-utils wget libxrandr2 libxkbcommon0 libxfixes3 libxex
 # Install Jupyter and Sphinx for docs (force Jinja2 3.0.3 to prevent an incpompatibility in newer versions) 
 RUN pip3 install notebook==5.7.10 Sphinx==3.5.2 sphinx-rtd-theme==0.5.1 Jinja2==3.0.3
 
-# Add the entrypoint
-COPY containers/Ubuntu_20.04/entrypoint.sh /
-RUN chmod 755 /entrypoint.sh
-
 # Add timeseria group. We chose GID 1000 as default.
 RUN groupadd -g 1000 timeseria
 
@@ -34,7 +30,7 @@ RUN apt-get install sudo -y
 RUN adduser timeseria sudo
 
 # No pass sudo (for everyone, actually)
-COPY containers/Ubuntu_20.04/sudoers /etc/sudoers
+COPY containers/timeseria-base/sudoers /etc/sudoers
 
 # Initialize headless Chromium (sytem-level or pyppeteer)
 RUN if [ "$(uname -i)" = "aarch64" ] ; then \
@@ -44,17 +40,3 @@ RUN if [ "$(uname -i)" = "aarch64" ] ; then \
     sudo -i -u timeseria python3 -c "from pyppeteer.chromium_downloader import download_chromium; download_chromium()"; \
     fi
 
-# Create a directory for the notebook
-RUN mkdir /notebooks && chown timeseria:timeseria /notebooks
-
-# Add demo notebooks
-RUN cd /tmp && git clone https://github.com/sarusso/Timeseria-notebooks && cd Timeseria-notebooks && git checkout 145a9a8
-RUN mv /tmp/Timeseria-notebooks/notebooks/* /notebooks/ && rm -rf /tmp/Timeseria-notebooks
-RUN chown -R timeseria:timeseria /notebooks/*
-
-# Add code
-COPY ./ /opt/Timeseria
-
-# Set user and entrypoint
-USER timeseria
-ENTRYPOINT ["/entrypoint.sh"]

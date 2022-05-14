@@ -14,6 +14,7 @@ if [[ "x$LIVE" == "xFalse" ]]; then
     docker run -p8888:8888 -it timeseria
 else
     echo "Running with live code changes. Use LIVE=False to disable."
-    docker run -p8888:8888 -v $PWD:/opt/Timeseria -v $PWD/notebooks:/notebooks -it timeseria
+    #-v your_notebooks_dir:/notebooks 
+    docker run -p8888:8888 -v $PWD:/opt/Timeseria -it timeseria
 fi
 

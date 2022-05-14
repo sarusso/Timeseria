@@ -11,9 +11,9 @@ echo -e  "===============================\n"
 
 if [[ "x$CACHE" == "xFalse" ]]; then
     echo "Building without cache."
-    docker build --no-cache -f containers/Ubuntu_20.04/Dockerfile ./ -t timeseria
+    docker build --no-cache -f containers/timeseria-base/Dockerfile ./ -t timeseria-base
 else
     echo "Building with cache. Use CACHE=False to disable it."
-    docker build -f containers/Ubuntu_20.04/Dockerfile ./ -t timeseria
+    docker build -f containers/timeseria-base/Dockerfile ./ -t timeseria-base
 
 fi

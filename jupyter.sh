@@ -4,7 +4,7 @@ set -e
 # This script will build and run the Timeseria container for the arch in use (with Jupyter into it).
 
 # Move to container dir
-cd containers/Ubuntu_20.04
+cd containers/timeseria
 
 if [[ "x$BUILD" != "xFalse" ]]; then
     # Build
