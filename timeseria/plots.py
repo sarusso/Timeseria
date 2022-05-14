@@ -331,7 +331,8 @@ def dygraphs_plot(timeseries, data_labels='all', data_indexes='all', aggregate=N
                             By default, above 10000 data points the time series starts to
                             get aggregated by a factor of ten for each order of magnitude. 
            aggregate_by(int): a custom aggregation factor.
-           full_precision(bool): if to use (nearly) full precision using 6 significant figures. Defaulted to false.
+           full_precision(bool): if to use (nearly) full precision using 6 significant figures instead of the
+                                 automatic rounding. Defaulted to false.
            color(str): the color of the time series in the plot. Only supported for univariate time series.
            height(int): force a plot height, in the time series data units.
            image(bool): if to generate an image rendering of the plot instead of the default interactive one.

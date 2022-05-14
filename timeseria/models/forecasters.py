@@ -171,15 +171,18 @@ class Forecaster(TimeSeriesParametricModel):
         else:
             return None
 
-    def evaluate(self, timeseries, steps='auto', limit=None, plots=False, plot=False, metrics=['RMSE', 'MAE'], details=False, from_t=None, to_t=None, from_dt=None, to_dt=None, evaluation_timeseries=False):
+    def evaluate(self, timeseries, steps='auto', limit=None, plot=False, plots=False, metrics=['RMSE', 'MAE'], details=False, from_t=None, to_t=None, from_dt=None, to_dt=None, evaluation_timeseries=False):
         """Evaluate the forecaster on a time series.
 
         Args:
             steps (int,list): a single value or a list of values for how many steps-ahead to forecast in the evaluation. Default to automatic detection based on the model.
             limit(int): set a limit for the time series elements to use for the evaluation.
+            plot(bool): if to produce an overall evaluation plot, defaulted to False. If set to True, the evaluation results are not retuned.
+                        To get both the evaluation results and the overall evaluation plot, set the `evaluation_timeseries` switch to True in
+                        order to add it to the evaluation results and plot it afterwards.
             plots(bool): if to produce evaluation plots, defaulted to False. Beware that setting this option to True will cause to generate 
-                         a plot for each evaluation point or slot of the time series: use with caution and only on small time series.
-            plot(bool): if to produce an overall evaluation plot, defaulted to False.
+                         a plot for each evaluation point or slot of the time series: use with caution and only on small time series. Not
+                         supported with image-based plots.
             metrics(list): the error metrics to use for the evaluation.
                 Supported values are:
                 ``RMSE`` (Root Mean Square Error), 
@@ -190,7 +193,7 @@ class Forecaster(TimeSeriesParametricModel):
             to_t(float): evaluation ending epoch timestamp
             from_dt(datetime): evaluation starting datetime.
             to_dt(datetime) : evaluation ending datetime.
-            evaluation_timeseries(bool): if to produce an evaluation timeseirs containing the eror metrics. Defaulted to false.
+            evaluation_timeseries(bool): if to add to the results an evaluation timeseirs containing the eror metrics. Defaulted to false.
         """
         return super(Forecaster, self).evaluate(timeseries, steps, limit, plots, plot, metrics, details, from_t, to_t, from_dt, to_dt, evaluation_timeseries)
 
@@ -199,6 +202,11 @@ class Forecaster(TimeSeriesParametricModel):
         # Set empty list if metrics were None
         if metrics is None:
             metrics = []
+
+        # Check supported metrics
+        for metric in metrics:
+            if metric not in ['RMSE', 'MAE', 'MAPE']:
+                raise ValueError('The metric "{}" is not supported'.format(metric))
 
         # Set evaluation steps if we have to
         if steps == 'auto':
@@ -449,12 +457,16 @@ class Forecaster(TimeSeriesParametricModel):
             if 'MAPE' in metrics:
                 simple_results['MAPE'] = results['MAPE']
             results = simple_results
+        
+        # Do we have to plot the evaluation timeseries?
+        if plot:
+            if results:
+                logger.info('Plotting the evaluation time series, not returning evaluation results (which are: {})'.format(results))
+            return evaluation_timeseries.plot()
 
         # Handle evaluation timeseries if required
         if return_evaluation_timeseries:
             results['evaluation_timeseries'] = evaluation_timeseries 
-        if plot:
-            evaluation_timeseries.plot()   
 
         # Return evaluation results if any
         if results:
