@@ -396,7 +396,7 @@ def dygraphs_plot(timeseries, data_labels='all', data_indexes='all', aggregate=N
             if not isinstance(label, str):
                 raise TypeError('The "data_labels" list items must be string (got type "{}")'.format(label.__class__.__name__))
             if not label in timeseries.data_labels():
-                raise ValueError('The data label "{}" is not present in the series data labeles ({})'.format(label, timeseries._all_data_labels()))
+                raise ValueError('The data label "{}" is not present in the series data labeles (choices are: {})'.format(label, timeseries.data_labels()))
             data_labels_to_plot.append(label)
 
     # Handle series data_indexes
@@ -414,7 +414,7 @@ def dygraphs_plot(timeseries, data_labels='all', data_indexes='all', aggregate=N
             if not isinstance(index, str):
                 raise TypeError('The "data_indexes" list items must be string (got type "{}")'.format(index.__class__.__name__))
             if not index in timeseries._all_data_indexes():
-                raise ValueError('The data index "{}" is not present in the series data indexes ({})'.format(index, timeseries._all_data_indexes()))
+                raise ValueError('The data index "{}" is not present in the series data indexes (choices are: {})'.format(index, timeseries._all_data_indexes()))
             data_indexes_to_plot.append(index)
 
     # Checks
