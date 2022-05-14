@@ -27,8 +27,25 @@ class TestMathOperations(unittest.TestCase):
     def test_diff_csum(self):
   
         # TODO: duplicate the test for points/slots? At the moment points are tested at the end
+
+        # Test on empty, single point or variable resolution time serie
+        with self.assertRaises(ValueError):
+            series = DataTimePointSeries()
+            diff(series)
+
+        with self.assertRaises(ValueError):
+            series = DataTimePointSeries()
+            series.append(DataTimePoint(t=0, data={'value':10}))
+            diff(series)
+        
+        with self.assertRaises(ValueError):
+            series = DataTimePointSeries()
+            series.append(DataTimePoint(t=0, data={'value':10}))
+            series.append(DataTimePoint(t=1, data={'value':11}))
+            series.append(DataTimePoint(t=8, data={'value':12}))
+            diff(series)
   
-        # Test data        
+        # Test data for the next tests        
         series = DataTimeSlotSeries()
         series.append(DataTimeSlot(start=TimePoint(0), end=TimePoint(60), data={'value':10}, data_loss=0.1))
         series.append(DataTimeSlot(start=TimePoint(60), end=TimePoint(120), data={'value':12}, data_loss=0.2))
@@ -97,6 +114,16 @@ class TestMathOperations(unittest.TestCase):
 
 
     def test_derivative_integral(self):
+
+        # Test on empty, single point or variable resolution time serie
+        with self.assertRaises(ValueError):
+            series = DataTimePointSeries()
+            derivative(series)
+
+        with self.assertRaises(ValueError):
+            series = DataTimePointSeries()
+            series.append(DataTimePoint(t=0, data={'value':10}))
+            derivative(series)
         
         # Test data        
         series = DataTimeSlotSeries()

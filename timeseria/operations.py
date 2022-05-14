@@ -201,12 +201,24 @@ class Sum(ScalarOperation):
 #=======================
 
 class Derivative(SeriesOperation):
-    """Derivative operation (callable object). Must operate on a fixed resolution time series"""
+    """Derivative operation (callable object)."""
     
     def __call__(self, series, inplace=False, normalize=True, diffs=False):
         
+        if len(series) == 0:
+            if diffs:
+                raise ValueError('The differences cannot be computed on an empty series.')
+            else:
+                raise ValueError('The derivative cannot be computed on an empty series')
+
+        if len(series) == 1:
+            if diffs:
+                raise ValueError('The differences cannot be computed on a series with only one item')
+            else:
+                raise ValueError('The derivative cannot be computed on a series with only one item')
+        
         if diffs and inplace:
-            raise NotImplementedError('Computing diffs in-place is not supported as it would change the series length')
+            raise NotImplementedError('Computing differences in-place is not supported as it would change the series length')
         
         if normalize:
             if series.resolution is None:
@@ -259,7 +271,7 @@ class Derivative(SeriesOperation):
                         # Both left and right increment for the items in the middle
                         diff_left = series[i].data[key] - series[i-1].data[key]
                         diff_right = series[i+1].data[key] - series[i].data[key]
-
+                
                 # Combine and normalize (if required) the increments to get the actual derivative
                 if normalize:
                     if diff is not None:
@@ -310,7 +322,7 @@ class Derivative(SeriesOperation):
 
 
 class Integral(SeriesOperation):
-    """Integral operation (callable object). Must operate on a fixed resolution time series."""
+    """Integral operation (callable object)."""
     
     def __call__(self, series, inplace=False, normalize=True, c=0, offset=0):
         
@@ -341,7 +353,7 @@ class Integral(SeriesOperation):
             # Do we have to create the previous point based on an offset?
             if i==0 and offset:
                 if inplace:
-                    raise ValueError('Cannot use prev_data in in.place mode, would require to add a ppint to the series')
+                    raise ValueError('Cannot use prev_data in in-place mode, would require to add a ppint to the series')
                 
                 if isinstance(offset,dict):
                     data = {'{}_{}'.format(data_label,postfix): offset[data_label] for data_label in series.data_labels()} 
@@ -433,12 +445,16 @@ class Integral(SeriesOperation):
 class Diff(Derivative):
     """Incremental differences operation (callable object). Reduces the series leght by one (the firts element), same as Pandas."""
     def __call__(self, series, inplace=False):
+        if series.resolution is None:
+            raise ValueError('The differences cannot be computed on variable resolution time series, resample it or use the derivative operation.')
         return super(Diff, self).__call__(series, inplace=inplace, normalize=False, diffs=True)
 
 
 class CSum(Integral):
     """Cumulative sum operation (callable object)."""
     def __call__(self, series, inplace=False, offset=None):
+        if series.resolution is None:
+            raise ValueError('The cumulative sums cannot be computed on variable resolution time series, resample it or use the integral operation.')
         return super(CSum, self).__call__(series, inplace=inplace, normalize=False, offset=offset)
 
 
