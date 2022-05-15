@@ -6,7 +6,7 @@ MAINTAINER Stefano Alberto Russo <stefano.russo@gmail.com>
 RUN mkdir /notebooks && chown timeseria:timeseria /notebooks
 
 # Add demo notebooks
-RUN cd /tmp && git clone https://github.com/sarusso/Timeseria-notebooks && cd Timeseria-notebooks && git checkout 57fc3fe
+RUN cd /tmp && git clone https://github.com/sarusso/Timeseria-notebooks && cd Timeseria-notebooks && git checkout 60a5b1b
 RUN mv /tmp/Timeseria-notebooks/notebooks/* /notebooks/ && rm -rf /tmp/Timeseria-notebooks
 RUN chown -R timeseria:timeseria /notebooks/*
 
