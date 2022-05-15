@@ -199,6 +199,9 @@ class Forecaster(TimeSeriesParametricModel):
 
     def _evaluate(self, timeseries, steps='auto', limit=None, plots=False, plot=False, metrics=['RMSE', 'MAE'], details=False, from_t=None, to_t=None, from_dt=None, to_dt=None, evaluation_timeseries=False):
 
+        if len(timeseries.data_labels()) > 1:
+            raise NotImplementedError('Sorry, evaluating models built for multivariate time series is not supported yet')
+
         # Set empty list if metrics were None
         if metrics is None:
             metrics = []
