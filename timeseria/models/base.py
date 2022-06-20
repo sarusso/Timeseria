@@ -235,7 +235,8 @@ class TimeSeriesParametricModel(ParametricModel):
         
         # If fitted, check resolution and keys. If not fitted, the parent init will raise.
         if self.fitted:
-            check_resolution(timeseries, self.data['resolution'])
+            if len(timeseries) > 1:
+                check_resolution(timeseries, self.data['resolution'])
             check_data_labels(timeseries, self.data['data_labels'])
                 
         # Call parent predict and return output

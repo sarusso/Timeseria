@@ -115,7 +115,7 @@ class Forecaster(TimeSeriesParametricModel):
                                         #tz = timeseries.tz,
                                         data  = predicted_data)
             else:
-                forecast = DataTimePoint(t = forecast_start_item.t + timeseries.resolution,
+                forecast = DataTimePoint(t = forecast_start_item.t + self.data['resolution'],
                                          tz = timeseries.tz,
                                          data  = predicted_data)
   
@@ -216,10 +216,13 @@ class Forecaster(TimeSeriesParametricModel):
             try:
                 steps = [1, self.data['periodicity']]
             except KeyError:
-                if not self.data['window']:
+                try:
+                    if not self.data['window']:
+                        steps = [1]
+                    else:
+                        steps = [1, self.data['window']]
+                except (KeyError, AttributeError):
                     steps = [1]
-                else:
-                    steps = [1, self.data['window']]
         elif isinstance(steps, list):
             if not self.data['window']:
                 if steps != [1]:
@@ -261,7 +264,16 @@ class Forecaster(TimeSeriesParametricModel):
             for key in timeseries.data_labels():
                 
                 # If the model has no window, evaluate on the entire time series
-                if not self.data['window']:
+                
+                try:
+                    if not self.data['window']:
+                        has_window = False
+                    else:
+                        has_window = True
+                except (KeyError, AttributeError):
+                    has_window = False
+                
+                if not has_window:
 
                     # Note: steps_round is always equal to the entire test time series length in window-less model evaluation
      
