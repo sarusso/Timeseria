@@ -10,14 +10,10 @@ fi
 
 if [[ "x$@" == "x" ]] ; then
 
-    # Start Jupyter as default entrypoint
-    echo -e  "Running Jupyter"
-
     # Reduce verbosity and disable Python buffering
     export PYTHONWARNINGS=ignore
     export TF_CPP_MIN_LOG_LEVEL=3
     export PYTHONUNBUFFERED=on
-    export EXTENDED_TESTING=False
     export PYTHONPATH=\$PYTHONPATH:/opt/Timeseria
     
     # Set base port
@@ -32,6 +28,16 @@ if [[ "x$@" == "x" ]] ; then
         BASE_DIR="'$BASE_DIR'"
     fi
 
+    # If base dir is empty, clone
+    if [ "x$(ls -A $BASE_DIR)" == "x" ]; then
+        echo "Notebooks directory is empty, downloading demo notebooks..."
+        cd /tmp && git clone https://github.com/sarusso/Timeseria-notebooks
+        mv Timeseria-notebooks/notebooks/* $BASE_DIR/
+    fi
+
+    # Start Jupyter as default entrypoint
+    echo "Running Jupyter..."
+    echo ""
     cd /opt/Timeseria && jupyter notebook --ip=0.0.0.0 --port=$BASE_PORT --NotebookApp.token='' --NotebookApp.notebook_dir=$BASE_DIR
 
 else

@@ -1,30 +1,31 @@
 #!/bin/bash
 set -e
 
-# This script will build the Timeseria container for the arch in use and run the tests into it.
+# This script will build the Timeseria container and then run the tests into it.
 
-# Move to container dir
-cd containers/timeseria
-
+# Build
 if [[ "x$BUILD" != "xFalse" ]]; then
-    # Build
-    echo ""
+
+    echo -e  "\n===================================="
+    echo -e  "|  Building the Docker container   |"
+    echo -e  "====================================\n"
+
+    cd containers/timeseria
     echo "Building Timeseria Docker container. Use BUILD=False to skip."
     ./build.sh
+    cd ../../
+
 fi
             
-        
-# Start testing
-cd ../../
+# Run the tests
+echo -e  "\n===================================="
+echo -e  "|  Running tests in the container  |"
+echo -e  "====================================\n"
 
-echo -e  "\n==============================="
-echo -e  "|   Running tests             |"
-echo -e  "===============================\n"
+# Reduce verbosity, disable Python buffering and set the log level
+ENV_VARS="PYTHONWARNINGS=ignore TF_CPP_MIN_LOG_LEVEL=3 PYTHONUNBUFFERED=on TIMESERIA_LOGLEVEL=$TIMESERIA_LOGLEVEL"
 
-# Reduce verbosity and disable Python buffering
-ENV_VARS="PYTHONWARNINGS=ignore TF_CPP_MIN_LOG_LEVEL=3 PYTHONUNBUFFERED=on EXTENDED_TESTING=False TIMESERIA_LOGLEVEL=$TIMESERIA_LOGLEVEL"
-
-# The "cd" as first command does not work, hence the "date".
+# Note: "cd" as first command does not work, hence the "date".
 if [ $# -eq 0 ]; then
     docker run -v $PWD:/opt/Timeseria -it timeseria "date && cd /opt/Timeseria && $ENV_VARS python3 -m unittest discover"
 else

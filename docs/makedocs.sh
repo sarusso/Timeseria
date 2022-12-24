@@ -1,29 +1,30 @@
 #!/bin/bash
 set -e
 
-# Move to container dir
-cd ../containers/timeseria
+# This script will build the Timeseria container and then use it to build the docs.
 
+# Build
 if [[ "x$BUILD" != "xFalse" ]]; then
-    # Build
-    echo ""
+
+    echo -e  "\n===================================="
+    echo -e  "|  Building the Docker container   |"
+    echo -e  "====================================\n"
+
+    cd containers/timeseria
     echo "Building Timeseria Docker container. Use BUILD=False to skip."
     ./build.sh
-fi
-            
-        
-# Start building the docs
-cd ../../
+    cd ../../
 
-echo -e  "\n==============================="
-echo -e  "|     Building docs           |"
-echo -e  "===============================\n"
+fi
+                 
+# Build the docs
+echo -e  "\n===================================="
+echo -e  "|  Building docs in the container  |"
+echo -e  "====================================\n"
 
 # Reduce verbosity and disable Python buffering
-ENV_VARS="PYTHONWARNINGS=ignore TF_CPP_MIN_LOG_LEVEL=3 PYTHONUNBUFFERED=on EXTENDED_TESTING=False LOGLEVEL=$LOGLEVEL "
+ENV_VARS="PYTHONWARNINGS=ignore TF_CPP_MIN_LOG_LEVEL=3 PYTHONUNBUFFERED=one"
 
+# Start the build
+cd ../../
 docker run -v $PWD:/opt/Timeseria -it timeseria "cd /opt/Timeseria/docs && $ENV_VARS make clean && make html"
-
-
-
-

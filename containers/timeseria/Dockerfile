@@ -5,10 +5,8 @@ MAINTAINER Stefano Alberto Russo <stefano.russo@gmail.com>
 # Create a directory for the notebook
 RUN mkdir /notebooks && chown timeseria:timeseria /notebooks
 
-# Add demo notebooks
-RUN cd /tmp && git clone https://github.com/sarusso/Timeseria-notebooks && cd Timeseria-notebooks && git checkout 60a5b1b
-RUN mv /tmp/Timeseria-notebooks/notebooks/* /notebooks/ && rm -rf /tmp/Timeseria-notebooks
-RUN chown -R timeseria:timeseria /notebooks/*
+# Add extra requirements
+RUN pip install plotly==5.11.0
 
 # Add code
 COPY ./ /opt/Timeseria
@@ -20,3 +18,5 @@ RUN chmod 755 /entrypoint.sh
 # Set user and entrypoint
 USER timeseria
 ENTRYPOINT ["/entrypoint.sh"]
+
+
