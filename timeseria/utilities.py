@@ -360,7 +360,7 @@ def check_timeseries(timeseries, resolution=None):
         raise ValueError('A non-empty time series is required')
         
     if isinstance(timeseries, DataTimePointSeries):
-        if timeseries.resolution is None and len(timeseries) > 1:
+        if timeseries.resolution == 'variable':
             raise ValueError('Time series with undefined (variable) resolutions are not supported. Resample or slot the time series first.')
     elif isinstance(timeseries, DataTimeSlotSeries):
         pass

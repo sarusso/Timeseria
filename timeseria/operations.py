@@ -221,7 +221,7 @@ class Derivative(SeriesOperation):
             raise NotImplementedError('Computing differences in-place is not supported as it would change the series length')
         
         if normalize:
-            if series.resolution is None:
+            if series.resolution == 'variable':
                 variable_resolution = True
                 sampling_interval = series._autodetected_sampling_interval
             else:
@@ -327,7 +327,7 @@ class Integral(SeriesOperation):
     def __call__(self, series, inplace=False, normalize=True, c=0, offset=0):
         
         if normalize:
-            if series.resolution is None:
+            if series.resolution == 'variable':
                 variable_resolution = True
                 sampling_interval = series._autodetected_sampling_interval
             else:
@@ -445,7 +445,7 @@ class Integral(SeriesOperation):
 class Diff(Derivative):
     """Incremental differences operation (callable object). Reduces the series leght by one (the firts element), same as Pandas."""
     def __call__(self, series, inplace=False):
-        if series.resolution is None:
+        if series.resolution == 'variable':
             raise ValueError('The differences cannot be computed on variable resolution time series, resample it or use the derivative operation.')
         return super(Diff, self).__call__(series, inplace=inplace, normalize=False, diffs=True)
 
@@ -453,7 +453,7 @@ class Diff(Derivative):
 class CSum(Integral):
     """Cumulative sum operation (callable object)."""
     def __call__(self, series, inplace=False, offset=None):
-        if series.resolution is None:
+        if series.resolution == 'variable':
             raise ValueError('The cumulative sums cannot be computed on variable resolution time series, resample it or use the integral operation.')
         return super(CSum, self).__call__(series, inplace=inplace, normalize=False, offset=offset)
 

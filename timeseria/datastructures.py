@@ -711,7 +711,10 @@ class TimePointSeries(PointSeries):
         except AttributeError:
             pass
         else:
-            # This is to support the deepcopy, otherwise the original prev_t will be used
+            # Check time ordering and handle the resolution.
+
+            # The following if is to support the deepcopy, otherwise the original prev_t will be used
+            # TODO: maybe move the above to a "hasattr" plus an "and" instead of this logic?
             if len(self)>0:
                 
                 # logger.debug('Checking time ordering for t="%s" (prev_t="%s")', item.t, self.prev_t)
@@ -733,12 +736,19 @@ class TimePointSeries(PointSeries):
                     self._resolution = TimeUnit(to_time_unit_string(item.t - self.prev_t, friendlier=True))
                                     
                 else:
-                    if self._resolution != None:
-                        # Check that the resolution is constant, otherwise make it undefined
+                    # If the resolution is constant (not variable), check that it still is
+                    if self._resolution != 'variable':
                         if self._resolution_as_seconds != (item.t - self.prev_t):
+                            # ...otherwise, mark it as variable
                             del self._resolution_as_seconds
-                            self._resolution = None
+                            self._resolution = 'variable'
         finally:
+            # Delete the autodetected sampling interval cache if present
+            try:
+                del self._autodetected_sampling_interval
+            except:
+                pass
+            # And set the prev
             self.prev_t = item.t
             
         super(TimePointSeries, self).append(item)
@@ -746,13 +756,13 @@ class TimePointSeries(PointSeries):
     @property
     def tz(self):
         """The timezone of the series."""
-        # Note: we compute the tz on the fly beacuse for point time series we assume to use the tz
+        # Note: we compute the tz on the fly because for point time series we assume to use the tz
         # attribute way lass than the slot time series, where the tz is instead computed at append-time.
         try:
             return self._tz
         except AttributeError:
             # Detect timezone on the fly
-            # TODO: this ensure each ppint is on the same timezone. Do we want this?
+            # TODO: this ensures that each point is on the same timezone. Do we want this?
             detected_tz = None
             for item in self:
                 if not detected_tz:
@@ -788,17 +798,18 @@ class TimePointSeries(PointSeries):
     def resolution(self):
         """The (temporal) resolution of the time series.
         
-        Returns a :obj:`timeseria.units.TimeUnit` object. Not defined (returns :obj:`None`) if:
+        Returns a :obj:`timeseria.units.TimeUnit` object, unless:
         
-            * the time series in empty,
-            * the time series has only one point, or
-            * the sampling rate is variable, either because of data losses or uneven observations.
+            * the resolution is not defined (returns :obj:`None`), either because the time series is empty or because it has only one point; or
+            * the resolution is variable (returns the string ``variable``), because the data points are not equally spaced, for example due to
+              data losses or uneven observations.
         
+        If the time series has a variable resolution, the `guess_resolution()` method can provide an estimate.
         """
         try:
             return self._resolution
         except AttributeError:
-            # Case of an empty series
+            # Case of an empty or 1-point series
             return None
     
     def guess_resolution(self):
@@ -806,7 +817,7 @@ class TimePointSeries(PointSeries):
             raise ValueError('Cannot guess the resolution for an empty time series')
         if len(self) == 1:
             raise ValueError('Cannot guess the resolution for a time series with only one point')
-        if self.resolution is not None:
+        if self.resolution != 'variable':
             raise ValueError('The time series has a well defined resolution ({}), guessing it does not make sense'.format(self.resolution))
         else:
             try:
@@ -818,14 +829,15 @@ class TimePointSeries(PointSeries):
 
     @property
     def _resolution_string(self):
-        if isinstance(self.resolution, Unit):
-            # Includes TimeUnits
-            _resolution_string = '{} resolution'.format(self.resolution)
+        if self.resolution is None:
+            resolution_string = 'undefined resolution'
         else:
-            _autodetected_sampling_interval_as_str = TimeUnit(to_time_unit_string(self._autodetected_sampling_interval, friendlier=True))
-            _resolution_string = 'variable resolution (~{})'.format(_autodetected_sampling_interval_as_str)
-        return _resolution_string
-
+            if self.resolution == 'variable':
+                autodetected_sampling_interval_as_str = TimeUnit(to_time_unit_string(self._autodetected_sampling_interval, friendlier=True))
+                resolution_string = 'variable resolution (~{})'.format(autodetected_sampling_interval_as_str)
+            else:
+                resolution_string = '{} resolution'.format(self.resolution)
+        return resolution_string
 
 
 class DataPointSeries(PointSeries):

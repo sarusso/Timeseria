@@ -343,6 +343,10 @@ class TestPointSeries(unittest.TestCase):
         time_point_series.change_timezone('Europe/Rome')
         self.assertEqual(str(time_point_series.tz), 'Europe/Rome')
         self.assertEqual(str(type(time_point_series.tz)), "<class 'pytz.tzfile.Europe/Rome'>")  
+
+        # Test resolution: not defined as empty
+        time_point_series = TimePointSeries()
+        self.assertEqual(time_point_series.resolution, None)
         
         # Test resolution: not defined as just one point
         time_point_series = TimePointSeries(TimePoint(t=60))
@@ -352,7 +356,7 @@ class TestPointSeries(unittest.TestCase):
         with self.assertRaises(ValueError):
             time_point_series.guess_resolution()
 
-        # Test resolution: defined, two points61 seconds
+        # Test resolution: defined, two points, 61 seconds
         time_point_series = TimePointSeries(TimePoint(t=60),TimePoint(t=121)) 
         self.assertTrue(isinstance(time_point_series.resolution,TimeUnit))
         self.assertEqual(str(time_point_series.resolution), '61s')
@@ -367,9 +371,9 @@ class TestPointSeries(unittest.TestCase):
         self.assertEqual(time_point_series.resolution.value, '1m')
         self.assertEqual(time_point_series.resolution.as_seconds(), 60)
 
-        # Test resolution: variable (thus not defined), threee points       
+        # Test resolution: variable, threee points       
         time_point_series = TimePointSeries(TimePoint(t=60),TimePoint(t=120),TimePoint(t=130))
-        self.assertEqual(time_point_series.resolution, None)
+        self.assertEqual(time_point_series.resolution, 'variable')
         self.assertEqual(time_point_series.guess_resolution(), 60)
         self.assertEqual(str(time_point_series.guess_resolution()), '1m')
         self.assertEqual(time_point_series.guess_resolution().as_seconds(), 60)
@@ -461,7 +465,7 @@ class TestPointSeries(unittest.TestCase):
                                                      DataTimePoint(dt=dt(2015,10,25,0,0,0, tzinfo='Europe/Rome'), data=24.1),
                                                      DataTimePoint(dt=dt(2015,10,26,0,0,0, tzinfo='Europe/Rome'), data=23.1))
         
-        self.assertEqual(data_time_point_series.resolution, None) # DST occurred, resolution marked as undefined
+        self.assertEqual(data_time_point_series.resolution, 'variable') # DST occurred, resolution marked as undefined
         self.assertEqual(data_time_point_series.guess_resolution(), 86400)
 
         data_time_point_series = DataTimePointSeries(DataTimePoint(dt=dt(2015,10,27,0,0,0, tzinfo='Europe/Rome'), data={'a':23.8}),

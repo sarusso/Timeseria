@@ -430,7 +430,7 @@ class TestForecasters(unittest.TestCase):
         # Test on Points as well
         data_time_point_series = CSVFileStorage(TEST_DATA_PATH + '/csv/temperature.csv').get(limit=200)
         forecaster = ARIMAForecaster()
-        with self.assertRaises(Exception):
+        with self.assertRaises(ValueError):
             forecaster.fit(data_time_point_series)
            
         data_time_point_series = Resampler(600).process(data_time_point_series)
@@ -479,7 +479,7 @@ class TestForecasters(unittest.TestCase):
         # Test on Points as well
         data_time_point_series = CSVFileStorage(TEST_DATA_PATH + '/csv/temperature.csv').get(limit=200)
         forecaster = AARIMAForecaster()
-        with self.assertRaises(Exception):
+        with self.assertRaises(ValueError):
             forecaster.fit(data_time_point_series)
            
         data_time_point_series = Resampler(600).process(data_time_point_series)
@@ -604,11 +604,10 @@ class TestAnomalyDetectors(unittest.TestCase):
                 anomalies_count += 1
         self.assertEqual(anomalies_count, 9)
 
-
         # Test on Points as well
         data_time_point_series = CSVFileStorage(TEST_DATA_PATH + '/csv/temperature.csv').get(limit=200)
         anomaly_detector = PeriodicAverageAnomalyDetector()
-        with self.assertRaises(Exception):
+        with self.assertRaises(ValueError):
             anomaly_detector.fit(data_time_point_series)
           
         data_time_point_series = Resampler(600).process(data_time_point_series)

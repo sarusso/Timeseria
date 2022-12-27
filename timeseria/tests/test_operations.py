@@ -29,20 +29,20 @@ class TestMathOperations(unittest.TestCase):
         # TODO: duplicate the test for points/slots? At the moment points are tested at the end
 
         # Test on empty, single point or variable resolution time serie
+        series = DataTimePointSeries()
         with self.assertRaises(ValueError):
-            series = DataTimePointSeries()
             diff(series)
 
+        series = DataTimePointSeries()
+        series.append(DataTimePoint(t=0, data={'value':10}))
         with self.assertRaises(ValueError):
-            series = DataTimePointSeries()
-            series.append(DataTimePoint(t=0, data={'value':10}))
             diff(series)
-        
+
+        series = DataTimePointSeries()
+        series.append(DataTimePoint(t=0, data={'value':10}))
+        series.append(DataTimePoint(t=1, data={'value':11}))
+        series.append(DataTimePoint(t=8, data={'value':12})) 
         with self.assertRaises(ValueError):
-            series = DataTimePointSeries()
-            series.append(DataTimePoint(t=0, data={'value':10}))
-            series.append(DataTimePoint(t=1, data={'value':11}))
-            series.append(DataTimePoint(t=8, data={'value':12}))
             diff(series)
   
         # Test data for the next tests        
