@@ -596,7 +596,7 @@ class TimeUnit(Unit):
                 try:
                     time_shifted_dt = time_shifted_dt.replace(month=new_month)
                 except ValueError as e:
-                    raise ValueError('{} for {}'.format(e, time_shifted_dt))
+                    raise ValueError('Error: {} for {} plus {} month(s)'.format(e, time_shifted_dt, self.months))
             
             # Check DST offset consistency and fix if not respected
             if not check_dt_consistency(time_shifted_dt):
