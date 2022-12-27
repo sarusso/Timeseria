@@ -377,6 +377,17 @@ class TestPointSeries(unittest.TestCase):
         self.assertEqual(time_point_series.guess_resolution(), 60)
         self.assertEqual(str(time_point_series.guess_resolution()), '1m')
         self.assertEqual(time_point_series.guess_resolution().as_seconds(), 60)
+        self.assertEqual(time_point_series.guess_resolution(confidence=True)['value'],60)
+        self.assertEqual(time_point_series.guess_resolution(confidence=True)['confidence'],0)
+
+        # Test resolution: variable, four points       
+        time_point_series = TimePointSeries(TimePoint(t=60),TimePoint(t=120),TimePoint(t=180),TimePoint(t=190))
+        self.assertEqual(time_point_series.resolution, 'variable')
+        self.assertEqual(time_point_series.guess_resolution(), 60)
+        self.assertEqual(str(time_point_series.guess_resolution()), '1m')
+        self.assertEqual(time_point_series.guess_resolution().as_seconds(), 60)
+        self.assertEqual(time_point_series.guess_resolution(confidence=True)['value'],60)
+        self.assertEqual(time_point_series.guess_resolution(confidence=True)['confidence'],0.5)
 
         # Test resolution: defined, threee points               
         time_point_series = TimePointSeries(TimePoint(t=60),TimePoint(t=120),TimePoint(t=180))

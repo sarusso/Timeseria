@@ -544,7 +544,7 @@ def get_periodicity_index(item, resolution, periodicity, dst_affected=False):
 # Detetc sampling interval
 #==============================
 
-def detect_sampling_interval(time_series):
+def detect_sampling_interval(time_series, confidence=False):
     """Autodetect (guess) the sampling interval of a time series"""
 
     diffs={}
@@ -579,8 +579,25 @@ def detect_sampling_interval(time_series):
         if diffs[diff] > most_common_diff_total:
             most_common_diff_total = diffs[diff]
             most_common_diff = diff
-    return(most_common_diff)
 
+    second_most_common_diff_total = 0
+    second_most_common_diff = None
+    for diff in diffs:
+        if diff == most_common_diff:
+            continue
+        if diffs[diff] > second_most_common_diff_total:
+            second_most_common_diff_total = diffs[diff]
+            second_most_common_diff = diff
+
+    if confidence:
+        if len(diffs) == 1:
+            confidence_value = 1.0
+        else:
+            # TODO: this is a totally arbitrary confidence metric, check me.
+            confidence_value = 1 - (second_most_common_diff_total / most_common_diff_total)
+        return most_common_diff, confidence_value
+    else:
+        return most_common_diff
 
 
 #==============================

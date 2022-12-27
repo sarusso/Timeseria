@@ -746,6 +746,7 @@ class TimePointSeries(PointSeries):
             # Delete the autodetected sampling interval cache if present
             try:
                 del self._autodetected_sampling_interval
+                del self._autodetected_sampling_interval_confidence
             except:
                 pass
             # And set the prev
@@ -791,8 +792,17 @@ class TimePointSeries(PointSeries):
             return self.__autodetected_sampling_interval
         except AttributeError:
             from .utilities import detect_sampling_interval
-            self.__autodetected_sampling_interval = detect_sampling_interval(self)
+            self.__autodetected_sampling_interval, self.__autodetected_sampling_interval_confidence = detect_sampling_interval(self, confidence=True)           
             return self.__autodetected_sampling_interval
+    
+    @property
+    def _autodetected_sampling_interval_confidence(self):
+        try:
+            return self.__autodetected_sampling_interval_confidence
+        except AttributeError:
+            from .utilities import detect_sampling_interval
+            self.__autodetected_sampling_interval, self.__autodetected_sampling_interval_confidence = detect_sampling_interval(self, confidence=True)           
+            return self.__autodetected_sampling_interval_confidence
     
     @property
     def resolution(self):
@@ -812,7 +822,7 @@ class TimePointSeries(PointSeries):
             # Case of an empty or 1-point series
             return None
     
-    def guess_resolution(self):
+    def guess_resolution(self, confidence=False):
         if not self:
             raise ValueError('Cannot guess the resolution for an empty time series')
         if len(self) == 1:
@@ -825,7 +835,10 @@ class TimePointSeries(PointSeries):
             except AttributeError:
                 self._guessed_resolution = TimeUnit(to_time_unit_string(self._autodetected_sampling_interval, friendlier=True))
             finally:
-                return self._guessed_resolution 
+                if confidence:
+                    return {'value': self._guessed_resolution, 'confidence': self._autodetected_sampling_interval_confidence}
+                else:
+                    return self._guessed_resolution 
 
     @property
     def _resolution_string(self):
