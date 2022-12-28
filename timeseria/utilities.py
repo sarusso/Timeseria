@@ -571,7 +571,7 @@ def detect_sampling_interval(time_series, confidence=False):
                 diffs[diff] +=1            
         
         if i > 10:
-            raise Exception('Cannot automatically detect the ampling interval')
+            raise Exception('Cannot automatically detect the sampling interval')
     
     most_common_diff_total = 0
     most_common_diff = None
@@ -726,8 +726,6 @@ def os_shell(command, capture=False, verbose=False, interactive=False, silent=Fa
             return True
         else:
             return True
-
-
 
 
 

@@ -364,14 +364,14 @@ class TestPointSeries(unittest.TestCase):
         self.assertEqual(time_point_series.resolution.value, '61s')
         self.assertEqual(time_point_series.resolution.as_seconds(), 61)
         
-        # Test resolution: defined, two points, 1 minute 
+        # Test resolution: defined, two points, 1 minute
         time_point_series = TimePointSeries(TimePoint(t=60),TimePoint(t=120))
         self.assertEqual(str(time_point_series.resolution), '1m')
         self.assertEqual(time_point_series.resolution, 60) # TimeUnits support math
         self.assertEqual(time_point_series.resolution.value, '1m')
         self.assertEqual(time_point_series.resolution.as_seconds(), 60)
 
-        # Test resolution: variable, threee points       
+        # Test resolution: variable, three points
         time_point_series = TimePointSeries(TimePoint(t=60),TimePoint(t=120),TimePoint(t=130))
         self.assertEqual(time_point_series.resolution, 'variable')
         self.assertEqual(time_point_series.guess_resolution(), 60)
@@ -380,7 +380,7 @@ class TestPointSeries(unittest.TestCase):
         self.assertEqual(time_point_series.guess_resolution(confidence=True)['value'],60)
         self.assertEqual(time_point_series.guess_resolution(confidence=True)['confidence'],0)
 
-        # Test resolution: variable, four points       
+        # Test resolution: variable, four points
         time_point_series = TimePointSeries(TimePoint(t=60),TimePoint(t=120),TimePoint(t=180),TimePoint(t=190))
         self.assertEqual(time_point_series.resolution, 'variable')
         self.assertEqual(time_point_series.guess_resolution(), 60)
@@ -389,7 +389,7 @@ class TestPointSeries(unittest.TestCase):
         self.assertEqual(time_point_series.guess_resolution(confidence=True)['value'],60)
         self.assertEqual(time_point_series.guess_resolution(confidence=True)['confidence'],0.5)
 
-        # Test resolution: defined, threee points               
+        # Test resolution: defined, three points
         time_point_series = TimePointSeries(TimePoint(t=60),TimePoint(t=120),TimePoint(t=180))
         self.assertEqual(time_point_series.duplicate().resolution, 60)
         self.assertEqual(time_point_series[0:2].resolution, 60)

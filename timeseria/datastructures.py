@@ -423,7 +423,7 @@ class Series(list):
         """
         
         return list(self[-n:])
-
+ 
 
 #======================
 #  Points
@@ -456,10 +456,10 @@ class Point():
         if len(self.coordinates)==1:
             return str(self.coordinates[0])
         else:
-            return str(self.coordinates)
+            return str(self.coordinates).replace(' ', '')
 
     def __repr__(self):
-        return '{} @ {}'.format(self.__class__.__name__, self.__coordinates_repr__)
+        return 'Point @ {}'.format(self.__coordinates_repr__)
 
     def __str__(self):
         return self.__repr__()
@@ -562,8 +562,7 @@ class TimePoint(Point):
         return dt_from_s(self.t, tz=self.tz)
 
     def __repr__(self):
-        return '{} @ {} ({})'.format(self.__class__.__name__, self.t, self.dt)
-        # return '{} @ t={} ({})'.format(self.__class__.__name__, self.t, self.dt)
+        return 'Time point @ {} ({})'.format(self.t, self.dt)
     
 
 class DataPoint(Point):
@@ -614,9 +613,9 @@ class DataPoint(Point):
 
     def __repr__(self):
         if self.data_loss is not None:
-            return '{} with data "{}" and data_loss="{}"'.format(super(DataPoint, self).__repr__(), self.data, self.data_loss)            
+            return 'Point @ {} with data "{}" and data_loss="{}"'.format(self.__coordinates_repr__, self.data, self.data_loss)
         else:
-            return '{} with data "{}"'.format(super(DataPoint, self).__repr__(), self.data)
+            return 'Point @ {} with data "{}"'.format(self.__coordinates_repr__, self.data)
     
     def __eq__(self, other):
         if self._data != other._data:
@@ -668,9 +667,12 @@ class DataTimePoint(DataPoint, TimePoint):
            data_indexes(dict): data indexes.
            data_loss(float): the data loss index, if any.
     """
-    pass
 
-    # NOTE: the __repr__ used is from the DataPoint above, which in turn uses the TimePoint one.
+    def __repr__(self):
+        if self.data_loss is not None:
+            return 'Time point @ {} ({}) with data "{}" and data_loss="{}"'.format(self.t, self.dt, self.data, self.data_loss)
+        else:
+            return 'Time point @ {} ({}) with data "{}"'.format(self.t, self.dt, self.data)
 
 
 #======================
@@ -1135,7 +1137,7 @@ class Slot():
             self._unit = unit
 
     def __repr__(self):
-        return '{} @ [{},{}]'.format(self.__class__.__name__, self.start.__coordinates_repr__, self.end.__coordinates_repr__)
+        return 'Slot @ [{},{}]'.format(self.start.__coordinates_repr__, self.end.__coordinates_repr__)
     
     def __str__(self):
         return self.__repr__()
@@ -1207,7 +1209,7 @@ class TimeSlot(Slot):
             start=TimePoint(dt=dt, tz=tz)
         
         if not isinstance(start, self.__POINT_TYPE__):
-            raise TypeError('Slot start must be a Point object (got "{}")'.format(start.__class__.__name__))
+            raise TypeError('Slot start must be a {} object (got "{}")'.format(self.__POINT_TYPE__.__name__, start.__class__.__name__))
 
         try:
             if start.tz != end.tz:
@@ -1269,6 +1271,9 @@ class TimeSlot(Slot):
         """The slot datetime timestamp, intended as the starting point one."""
         return self.start.dt
 
+    def __repr__(self):
+        return 'Time slot @ [{},{}] ([{},{}])'.format(self.start.t, self.end.t, self.start.dt, self.end.dt)
+    
 
 class DataSlot(Slot):
     """A slot that carries some data. Can be initialized with start and end
@@ -1283,7 +1288,7 @@ class DataSlot(Slot):
            data_loss(float): the data loss index, if any.
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self, *args, **kwargs):
         
         # Data
         try:
@@ -1317,10 +1322,13 @@ class DataSlot(Slot):
         self._data_indexes = data_indexes
 
         # Call parent init
-        super(DataSlot, self).__init__(**kwargs)
+        super(DataSlot, self).__init__(*args, **kwargs)
 
     def __repr__(self):
-        return '{} with start="{}" and end="{}"'.format(self.__class__.__name__, self.start, self.end)
+        if self.data_loss is not None:
+            return 'Slot @ [{},{}] with data "{}" and data_loss="{}"'.format(self.start.__coordinates_repr__, self.end.__coordinates_repr__, self.data, self.data_loss)
+        else:
+            return 'Slot @ [{},{}] with data "{}"'.format(self.start.__coordinates_repr__, self.end.__coordinates_repr__, self.data)
 
     def __eq__(self, other):
         if self._data != other._data:
@@ -1377,18 +1385,11 @@ class DataTimeSlot(DataSlot, TimeSlot):
            data_loss(float): the data loss index, if any.
     """
 
-
     def __repr__(self):
-        #if self.data_loss is not None:
-        #    return '{} @ t=[{},{}] ([{},{}]) with data={} and data_loss={}'.format(self.__class__.__name__, self.start.t, self.end.t, self.start.dt, self.end.dt, self.data, self.data_loss)
-        #else:
-        #    return '{} @ t=[{},{}] ([{},{}]) with data={}'.format(self.__class__.__name__, self.start.t, self.end.t, self.start.dt, self.end.dt, self.data)
-
         if self.data_loss is not None:
-            return '{} @ [{},{}] ([{},{}]) with data={} and data_loss={}'.format(self.__class__.__name__, self.start.t, self.end.t, self.start.dt, self.end.dt, self.data, self.data_loss)
+            return 'Time slot @ [{},{}] ([{},{}]) with data={} and data_loss={}'.format(self.start.t, self.end.t, self.start.dt, self.end.dt, self.data, self.data_loss)
         else:
-            return '{} @ [{},{}] ([{},{}]) with data={}'.format(self.__class__.__name__, self.start.t, self.end.t, self.start.dt, self.end.dt, self.data)
-        
+            return 'Time slot @ [{},{}] ([{},{}]) with data={}'.format(self.start.t, self.end.t, self.start.dt, self.end.dt, self.data)
 
 
 #======================
