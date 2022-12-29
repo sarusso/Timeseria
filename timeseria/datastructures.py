@@ -892,55 +892,9 @@ class Series(list):
         return select_operation(self, *args, **kwargs)
     
     # Inspection utilities
-    def inspect(self, limit=10):
-        """Print a summary of the series and its elements, limited to 10 items by default.
-        
-            Args:
-                limit: the limit of elements to print, by default 10.
-        """
-        print(str(self)+':\n')
-        print('[', end='')
-        
-        if not limit or limit > len(self):
-        
-            for i, item in enumerate(self):
-                if limit and i >= limit:
-                    break
-                else:
-                    if i==0:
-                        print(str(item)+',')
-                    elif i==len(self)-1:
-                        print(' '+str(item), end='')                        
-                    else:
-                        print(' '+str(item)+',')
-        else:
-            
-            head_n = int(limit/2)+1
-            tail_n = int(limit/2)
 
-            for i, item in enumerate(self.head(head_n)):
-                if i==0:
-                    print(str(item)+',')                       
-                else:
-                    print(' '+str(item)+',')
+    def _summary(self, limit=10):
 
-            print(' ...')
-
-            for i, item in enumerate(self.tail(tail_n)):
-                if i==tail_n-1:
-                    print(' '+str(item), end='')                        
-                else:
-                    print(' '+str(item)+',')
-
-        print(']')
-
-    def inspect_as_str(self, limit=10):
-        """Return a summary of the series and its elements, limited to 10 items by default.
-        
-            Args:
-                limit: the limit of elements to print, by default 10.
-        """
-        
         string = str(self)+':\n\n'
         string+='['
         
@@ -957,30 +911,56 @@ class Series(list):
                     else:
                         string+=' '+str(item)+',\n'
         else:
-            
-            head_n = int(limit/2)+1
-            tail_n = int(limit/2)
+            if limit==1:
+                head_n=1
+                tail_n=0
+            else:
+                if limit % 2 == 0:
+                    head_n = int(limit/2)
+                else:
+                    head_n = int(limit/2)+1
+                tail_n = int(limit/2)
 
             for i, item in enumerate(self.head(head_n)):
                 if i==0:
                     string+=str(item)+',\n'                       
                 else:
                     string+=' '+str(item)+',\n'
-
-            string+=' ...\n'
-
-            for i, item in enumerate(self.tail(tail_n)):
-                if i==tail_n-1:
-                    string+=' '+str(item)                        
-                else:
-                    string+=' '+str(item)+',\n'
+            if limit < len(self): 
+                string+=' ...\n'
+            if tail_n != 0:
+                for i, item in enumerate(self.tail(tail_n)):
+                    if i==tail_n-1:
+                        string+=' '+str(item)                        
+                    else:
+                        string+=' '+str(item)+',\n'
 
         string+=']'
         return string
 
+    def summary(self, limit=10, newlines=False):
+        """Return a string summary of the series and its elements, limited to 10 items by default.
+        
+            Args:
+                limit: the limit of elements to print, by default 10.
+                newlines: if to include the newline characters or not.
+        """
+        if newlines:
+            return self._summary(limit=limit)
+        else:
+            return self._summary(limit=limit).replace('\n', ' ').replace('...', '...,')
+
+    def inspect(self, limit=10):
+        """Print a summary of the series and its elements, limited to 10 items by default.
+        
+            Args:
+                limit: the limit of elements to print, by default 10.
+        """
+        print(self._summary(limit=limit))
+
     def contents(self):
-        """Get al the items of the series (as a list)."""   
-        return list(self)     
+        """Get all the items of the series as a list."""   
+        return list(self)  
 
     def head(self, n=5):
         """Get the first n items of the series as a list, 5 by default.
@@ -988,7 +968,6 @@ class Series(list):
             Args:
                 n: the number of first elements to return .
         """
-        
         return list(self[0:n])
 
     def tail(self, n=5):
@@ -997,7 +976,6 @@ class Series(list):
             Args:
                 n: the number of last elements to return .
         """
-        
         return list(self[-n:])
  
 
