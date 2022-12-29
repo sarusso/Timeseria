@@ -354,18 +354,17 @@ def is_almost_equal(one, two):
 
 def check_timeseries(timeseries, resolution=None):
     # Import here or you will end up with cyclic imports
-    from .datastructures import DataTimePointSeries, DataTimeSlotSeries 
+    from .datastructures import TimeSeries 
     
+    if not isinstance(timeseries, TimeSeries):
+        raise TypeError('A TimeSeries object is required (got "{}")'.format(timeseries.__class__.__name__))
+
     if not timeseries:
         raise ValueError('A non-empty time series is required')
         
-    if isinstance(timeseries, DataTimePointSeries):
-        if timeseries.resolution == 'variable':
-            raise ValueError('Time series with undefined (variable) resolutions are not supported. Resample or slot the time series first.')
-    elif isinstance(timeseries, DataTimeSlotSeries):
-        pass
-    else:
-        raise TypeError('Either a DataTimePointSeries or a DataTimeSlotSeries is required (got "{}")'.format(timeseries.__class__.__name__))
+    if timeseries.resolution == 'variable':
+        raise ValueError('Time series with undefined (variable) resolutions are not supported. Resample or slot the time series first.')
+
 
 def check_resolution(timeseries, resolution):
     

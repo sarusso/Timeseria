@@ -2,7 +2,7 @@
 """Series transformations as resampling and aggregation."""
 
 from .time import dt_from_s, s_from_dt, as_timezone
-from .datastructures import DataTimeSlot, DataTimeSlotSeries, TimePoint, DataTimePointSeries, DataTimePoint, SeriesSlice
+from .datastructures import DataTimeSlot, TimePoint, DataTimePoint, TimeSeries, SeriesSlice
 from .utilities import compute_data_loss, compute_validity_regions
 from .operations import avg
 from .units import TimeUnit
@@ -101,7 +101,7 @@ def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_poi
                     for data_label in data_labels:
                         point.data[data_label] += point.data[data_label] * point.weight
                 new_point_t = (to_t - from_t) /2
-                series_dense_slice = DataTimePointSeries(DataTimePoint(t=new_point_t, data=new_point_data, tz=series.tz))
+                series_dense_slice = TimeSeries(DataTimePoint(t=new_point_t, data=new_point_data, tz=series.tz))
 
         else:
             # Slice the original series to provide only the datapoints belonging to the slot 
@@ -252,7 +252,7 @@ class SlottedTransformation(Transformation):
         # Checks
         if include_extremes:
             raise NotImplementedError('Including the extremes is not yet implemented')        
-        if not isinstance(series, DataTimePointSeries):
+        if not isinstance(series[0], DataTimePoint):
             raise TypeError('Can process only DataTimePointSeries, got "{}"'.format(series.__class__.__name__))
         if not series:
             raise ValueError('Cannot process empty series')
@@ -351,7 +351,7 @@ class SlottedTransformation(Transformation):
         slot_end_dt = None
         process_ended = False
         slot_prev_point_i = None 
-        new_series = DataTimePointSeries() if target=='points' else DataTimeSlotSeries()
+        new_series = TimeSeries()
 
         # Set timezone
         timezone  = series.tz
@@ -522,10 +522,10 @@ class SlottedTransformation(Transformation):
         if target == 'points':
             logger.info('Resampled %s DataTimePoints in %s DataTimePoints', count, len(new_series))
         else:
-            if isinstance(series, DataTimePointSeries):
-                logger.info('Aggregated %s DataTimePoints in %s DataTimeSlots', count, len(new_series))
+            if isinstance(series[0], DataTimePoint):
+                logger.info('Aggregated %s points in %s slots', count, len(new_series))
             else:
-                logger.info('Aggregated %s DataTimeSlots in %s DataTimeSlots', count, len(new_series))
+                logger.info('Aggregated %s slots in %s slots', count, len(new_series))
                 
         return new_series
 

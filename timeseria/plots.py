@@ -5,8 +5,8 @@
 import os
 import uuid
 import datetime
+from .datastructures import DataTimePoint, DataTimeSlot
 from .time import dt_from_s, dt_to_str, dt_from_str
-from .datastructures import DataTimePointSeries, DataTimeSlotSeries
 from .units import TimeUnit
 from .utilities import is_numerical, os_shell
 try:
@@ -198,9 +198,9 @@ def _to_dg_data(serie, data_labels_to_plot, data_indexes_to_plot, full_precision
 
             # Dump aggregated data?
             if (i!=0)  and ((i % aggregate_by)==0):
-                if isinstance(serie, DataTimePointSeries):
+                if issubclass(serie.items_type, DataTimePoint):
                     last_t = item.t
-                elif isinstance(serie, DataTimeSlotSeries):
+                elif issubclass(serie.items_type,DataTimeSlot):
                     last_t = item.end.t
                 aggregation_t = first_t + ((last_t-first_t) /2)
                 data_part=''
@@ -419,14 +419,14 @@ def dygraphs_plot(timeseries, data_labels='all', data_indexes='all', aggregate=N
             data_indexes_to_plot.append(index)
 
     # Checks
-    if isinstance(timeseries, DataTimePointSeries):
+    if issubclass(timeseries.items_type, DataTimePoint): 
         stepPlot_value   = 'false'
         drawPoints_value = 'true'
         if aggregate_by:
             legend_pre = 'Point (aggregated by {}) at '.format(aggregate_by)
         else:
             legend_pre = 'Point at '
-    elif isinstance(timeseries, DataTimeSlotSeries):
+    elif issubclass(timeseries.items_type, DataTimeSlot):
         if isinstance(timeseries.resolution, TimeUnit):
             serie_unit_string = str(timeseries.resolution)
         else:
@@ -448,13 +448,13 @@ def dygraphs_plot(timeseries, data_labels='all', data_indexes='all', aggregate=N
     if timeseries.title:
         title = timeseries.title
     else:
-        if isinstance(timeseries, DataTimePointSeries):
+        if issubclass(timeseries.items_type, DataTimePoint):
             if aggregate_by:
                 title = 'Time series of #{} points at {}, aggregated by {}'.format(len(timeseries), timeseries._resolution_string, aggregate_by)
             else:
                 title = 'Time series of #{} points at {}'.format(len(timeseries), timeseries._resolution_string)
              
-        elif isinstance(timeseries, DataTimeSlotSeries):
+        elif issubclass(timeseries.items_type, DataTimeSlot):
             if aggregate_by:
                 # TODO: "slots of unit" ?
                 title = 'Time series of #{} slots of {}, aggregated by {}'.format(len(timeseries), serie_unit_string, aggregate_by)
@@ -913,7 +913,7 @@ define('"""+graph_id+"""', ['dgenv'], function (Dygraph) {
                 pyppeteer_logger.setLevel(logging.CRITICAL)
                 
                 # Check we have Chromium,. if not, download
-                if not chromium_executable().exists():
+                if False:#not chromium_executable().exists():
                     logger.info('Downloading Chromium for rendering image-based plots...')
                     download_chromium()
                     logger.info('Done. Will not be required anymore on this system.')

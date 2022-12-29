@@ -15,417 +15,6 @@ logger = logging.getLogger(__name__)
 
 
 #======================
-#  Generic Series
-#======================
-
-class Series(list):
-    """A list of items coming one after another, where every item
-       is guaranteed to be of the same type and in an order or
-       succession.
-       
-       Args:
-           *args (list): the series items.    
-    """
-
-    # 1,2,3 are in order. 1,3,8 are in order. 1,8,3 re not in order.
-    # 5,6,7 are integer succession. 5.3, 5.4, 5.5 are too in a succesisons. 5,6,8 are not in a succession. 
-    # a group or a number of related or similar things, events, etc., arranged or occurring in temporal, spatial, or other order or succession; sequence.
-
-    # By default the type is not defined
-    __TYPE__ = None
-    
-    def __init__(self, *args, **kwargs):
-
-        for arg in args:
-            self.append(arg)
-            
-        self._title = None
-
-    def append(self, item):
-        """Append an item to the series."""
-        
-        # TODO: move to use the insert
-        
-        # logger.debug('Checking %s', item)
-        
-        # Set type if not already done
-        if not self.__TYPE__:
-            self.__TYPE__ = type(item)
-
-        # Check type
-        if not isinstance(item, self.__TYPE__):
-            raise TypeError('Got incompatible type "{}", can only accept "{}"'.format(item.__class__.__name__, self.__TYPE__.__name__))
-        
-        # Check order or succession
-        try:
-            try:
-                if not item.__succedes__(self[-1]):
-                    raise ValueError('Not in succession ("{}" does not succeeds "{}")'.format(item,self[-1])) from None                    
-            except IndexError:
-                raise
-            except AttributeError:
-                try:
-                    if not item > self[-1]:
-                        raise ValueError('Not in order ("{}" does not follow "{}")'.format(item,self[-1])) from None
-                except TypeError:
-                    raise TypeError('Object of class "{}" does not implement a "__gt__" or a "__succedes__" method, cannot append it to a Series (which is ordered)'.format(item.__class__.__name__)) from None
-        except IndexError:
-            pass
-        
-        # Append
-        super(Series, self).append(item)
-    
-    def __sum__(self, other):
-        raise NotImplementedError
-
-    def __hash__(self):
-        return id(self)
-
-    @property
-    def title(self):
-        """A title for the series, to be used for plotting etc.""" 
-        if self._title:
-            return self._title
-        else:
-            return None
-
-    @title.setter
-    def title(self, title):
-        self._title=title
-
-    def __repr__(self):
-        return '{} of #{} elements'.format(self.__class__.__name__, len(self))
-    
-    def __str__(self):
-        return self.__repr__()
-        
-    # Python slice (i.e [0:35])
-    def __getitem__(self, key):
-        if isinstance(key, slice):   
-            # TODO: improve and implement shallow copies please.         
-            indices = range(*key.indices(len(self)))
-            series = self.__class__()
-            for i in indices:
-                series.append(super(Series, self).__getitem__(i))
-            try:
-                series.mark = self.mark
-            except:
-                pass
-            return series
-        elif isinstance(key, str):   
-            # Try filtering on this data key only
-            return self.filter(key)
-        else:
-            return super(Series, self).__getitem__(key)
-
-    def _all_data_indexes(self):
-        """Return all the data_indexes of the series, to be intended as custom
-        defined indicators (i.e. data_loss, anomaly_index, etc.)."""
-        
-        # TODO: move this to the Data*Series...?
-        data_index_names = []
-        for item in self:
-            for index_name in item.data_indexes:
-                if index_name not in data_index_names:
-                    data_index_names.append(index_name)
-        
-        # Reorder according to legacy indexes behaviour
-        ordered_data_index_names = []
-        legacy_indexes = ['data_reconstructed', 'data_loss', 'anomaly', 'forecast']
-        for legacy_index in legacy_indexes:
-            if legacy_index in data_index_names:
-                ordered_data_index_names.append(legacy_index)
-                data_index_names.remove(legacy_index)
-        
-        # Merge and sort
-        ordered_data_index_names += sorted(data_index_names)
-            
-        return ordered_data_index_names
-
-    @property
-    def mark(self):
-        """A mark for the series, useful for highlighting a portion of a plot.
-           Required to be formatted as a list or tuple with two elements, the
-           first from where the mark has to start and the second where it has
-           to end.
-        """
-        try:
-            return self._mark
-        except AttributeError:
-            return None
-
-    @mark.setter
-    def mark(self, value):
-        if not value:
-            del self._mark
-        else:
-            # Check valid mark
-            if not isinstance(value, (list, tuple)):
-                raise TypeError('Series mark must be a list or tuple')
-            if not len(value) == 2:
-                raise ValueError('Series mark must be a list or tuple of two elements')    
-            self._mark = value
-
-    @property
-    def mark_title(self):
-        """A tile for the mark, to be displayed in the plot legend."""
-        try:
-            return self._mark_title
-        except AttributeError:
-            return None
-
-    @mark_title.setter
-    def mark_title(self, value):
-        if not value:
-            del self._mark_title
-        else: 
-            self._mark_title = value
-
-    # Inherited methods to be edited
-    def insert(self, i, x):
-        """Insert an item at a given position. The first argument is the index of the element 
-        before which to insert, so series.insert(0, x) inserts at the front of the series, and 
-        series.insert(len(series), x) is equivalent to append(x). Order or succession are enforced."""
-        
-        if len(self) > 0:
-            
-            # Check valid type
-            if not isinstance(x, self.__TYPE__):
-                raise TypeError('Got incompatible type "{}", can only accept "{}"'.format(x.__class__.__name__, self.__TYPE__.__name__))
-        
-            # Check ordering/succession
-            if i == 0:
-                try:
-                    if not self[0].__succedes__(x):
-                        raise ValueError('Cannot insert element "{}" in position "{}" as it would break the succession'.format(x,i))
-                except AttributeError:
-                    if not self[0] > x:
-                        raise ValueError('Cannot insert element "{}" in position "{}" as not in order'.format(x,i)) from None  
-            
-            elif i == len(self):
-                try:
-                    if not x.__succedes__(self[-1]):
-                        raise ValueError('Cannot insert element "{}" in position "{}" as it would break the succession'.format(x,i))
-                except AttributeError:
-                    if not x > self[-1]:
-                        raise ValueError('Cannot insert element "{}" in position "{}" as not in order'.format(x,i)) from None 
-                            
-            else:
-                try:
-                    self[0].__succedes__
-                except AttributeError:
-                    if not x > self[i-1]:
-                        raise ValueError('Cannot insert element "{}" in position "{}" with element "{}" as not in order'.format(x,i, self[i])) from None
-                else:
-                    raise IndexError('Cannot insert an item in the middle of a series whose items follow a succession'.format(i)) 
-            
-            super(Series, self).insert(i,x)
-
-        else:
-            self.append(x) 
-                 
-    def remove(self, x):
-        """Remove the first item from the list whose value is equal to x. It raises a `ValueError` if there is no such item
-        and a `NotImplementedError` is the series items are in a succession as it would breake it.
-        """
-        try:
-            self[0].__succedes__
-            raise NotImplementedError('Remove is not implemented for series whose items are in a succession') 
-        except IndexError:
-            pass
-        except AttributeError:
-            pass
-        
-        super(Series, self).remove(x)
-
-    def pop(self, i=None):
-        """
-        Remove the item at the given position in the list, and return it. If no index is
-        specified, removes and returns the last item in the series. If items are in a
-        succession and the index is set, a `NotImplementerError` is raised.
-        """
-        if len(self) == 0:
-            raise IndexError('Cannot pop from an empty series')
-        if i is not None:
-            if i not in [0, len(self)]:
-                try:
-                    self[0].__succedes__
-                except AttributeError:
-                    pass
-                else:
-                    raise IndexError('Cannot pop an item in the middle of a series whose items follow a succession')                    
-            return super(Series, self).pop(i)
-        else:
-            return super(Series, self).pop()
-            
-    def clear(self):
-        """Remove all items from the series."""
-        super(Series, self).clear()
-
-    def index(self, x, start=None, end=None):
-        """
-        Return zero-based index in the series of the item whose value is equal to x.
-        Raises a ValueError if there is no such item.
-
-        The optional arguments start and end are interpreted as in the slice notation and are
-        used to limit the search to a particular subsequence of the list. The returned index is
-        computed relative to the beginning of the full sequence rather than the start argument.
-        """
-        super(Series, self).index(x, start, end)
-
-    def copy(self):
-        """Return a shallow copy of the series."""
-        return super(Series, self).copy()
-
-    # Inherited methods to be disabled
-    def extend(self):
-        """Disabled (use the `merge` instead)."""
-        raise NotImplementedError('Use the "merge()" instead')
-
-    def count(self, x):
-        """Disabled (there is only one item instance by design)."""
-        raise NotImplementedError('There is only one item by design')
-
-    def sort(self, key=None, reverse=False):
-        """Disabled (sorting is already guaranteed)."""
-        raise NotImplementedError('Sorting is already guaranteed')
-
-    def reverse(self):
-        """Disabled (reversing is not compatible with an ordering)."""
-        raise NotImplementedError('Reversing is not compatible with an ordering')
-
-    # Operations
-    def duplicate(self):
-        """ Return a deep copy of the series."""
-        return deepcopy(self)
-
-    def merge(self, *args, **kwargs):
-        """Merge the series with one or more other series."""
-        from .operations import merge as merge_operation
-        return merge_operation(self, *args, **kwargs)
-
-    def filter(self, *args, **kwargs):
-        # TODO: refactor this to allow generic item properties? Maybe merge witht he following select?
-        """Filter a series given one or more properties of its elemnents. Example filtering arguments: ``data_label``, ``from_t``, ``to_t``, ``from_dt``, ``to_dt``."""
-        from .operations import filter as filter_operation
-        return filter_operation(self, *args, **kwargs) 
-
-    def select(self, *args, **kwargs):
-        """Select one or more items of the series given an SQL-like query."""
-        from .operations import select as select_operation
-        return select_operation(self, *args, **kwargs)
-    
-    # Inspection utilities
-    def inspect(self, limit=10):
-        """Prints a summary of the series and its elements, limited to 10 items by default.
-        
-            Args:
-                limit: the limit of elements to print, by default 10.
-        """
-        print(str(self)+':\n')
-        print('[', end='')
-        
-        if not limit or limit > len(self):
-        
-            for i, item in enumerate(self):
-                if limit and i >= limit:
-                    break
-                else:
-                    if i==0:
-                        print(str(item)+',')
-                    elif i==len(self)-1:
-                        print(' '+str(item), end='')                        
-                    else:
-                        print(' '+str(item)+',')
-        else:
-            
-            head_n = int(limit/2)+1
-            tail_n = int(limit/2)
-
-            for i, item in enumerate(self.head(head_n)):
-                if i==0:
-                    print(str(item)+',')                       
-                else:
-                    print(' '+str(item)+',')
-
-            print(' ...')
-
-            for i, item in enumerate(self.tail(tail_n)):
-                if i==tail_n-1:
-                    print(' '+str(item), end='')                        
-                else:
-                    print(' '+str(item)+',')
-
-        print(']')
-
-    def inspect_as_str(self, limit=10):
-        """Return a summary of the series and its elements, limited to 10 items by default.
-        
-            Args:
-                limit: the limit of elements to print, by default 10.
-        """
-        
-        string = str(self)+':\n\n'
-        string+='['
-        
-        if not limit or limit > len(self):
-        
-            for i, item in enumerate(self):
-                if limit and i >= limit:
-                    break
-                else:
-                    if i==0:
-                        string+=str(item)+',\n'
-                    elif i==len(self)-1:
-                        string+=' '+str(item)                        
-                    else:
-                        string+=' '+str(item)+',\n'
-        else:
-            
-            head_n = int(limit/2)+1
-            tail_n = int(limit/2)
-
-            for i, item in enumerate(self.head(head_n)):
-                if i==0:
-                    string+=str(item)+',\n'                       
-                else:
-                    string+=' '+str(item)+',\n'
-
-            string+=' ...\n'
-
-            for i, item in enumerate(self.tail(tail_n)):
-                if i==tail_n-1:
-                    string+=' '+str(item)                        
-                else:
-                    string+=' '+str(item)+',\n'
-
-        string+=']'
-        return string
-
-    def contents(self):
-        """Get al the items of the series as a list."""   
-        return list(self)     
-
-    def head(self, n=5):
-        """Get the first n items of the series as a list, 5 by default.
-        
-            Args:
-                n: the number of first elements to return .
-        """
-        
-        return list(self[0:n])
-
-    def tail(self, n=5):
-        """Get the last n items of the series as a list, 5 by default.
-        
-            Args:
-                n: the number of last elements to return .
-        """
-        
-        return list(self[-n:])
- 
-
-#======================
 #  Points
 #======================
 
@@ -675,420 +264,7 @@ class DataTimePoint(DataPoint, TimePoint):
             return 'Time point @ {} ({}) with data "{}"'.format(self.t, self.dt, self.data)
 
 
-#======================
-#  Point Series
-#======================
 
-class PointSeries(Series):
-    """A series of points, where each item is guaranteed to be ordered.
-
-       Args:
-           *args (list): the series points.    
-    """
-    __TYPE__ = Point
-
-
-class TimePointSeries(PointSeries):
-    """A series of points in time, where each item is guaranteed to be ordered.
-
-       Args:
-           *args (list): the series of time points.    
-    """
-
-    __TYPE__ = TimePoint
-
-    def __init__(self, *args, **kwargs):
-
-        tz = kwargs.pop('tz', None)
-        if tz:
-            self._tz = timezonize(tz)
-        
-        super(TimePointSeries, self).__init__(*args, **kwargs)
-        
-
-    # Check time ordering and resolution
-    def append(self, item):
-        try:
-            self.prev_t
-        except AttributeError:
-            pass
-        else:
-            # Check time ordering and handle the resolution.
-
-            # The following if is to support the deepcopy, otherwise the original prev_t will be used
-            # TODO: maybe move the above to a "hasattr" plus an "and" instead of this logic?
-            if len(self)>0:
-                
-                # logger.debug('Checking time ordering for t="%s" (prev_t="%s")', item.t, self.prev_t)
-                if item.t < self.prev_t:
-                    raise ValueError('Time t="{}" is out of order (prev t="{}")'.format(item.t, self.prev_t))
-                
-                if item.t == self.prev_t:
-                    raise ValueError('Time t="{}" is a duplicate'.format(item.t))
-                
-                try:
-                    self._resolution 
-                
-                except AttributeError:
-                    
-                    # Set the resolution as seconds for a bit of performance
-                    self._resolution_as_seconds = item.t - self.prev_t 
-                    
-                    # Set the resolution
-                    self._resolution = TimeUnit(to_time_unit_string(item.t - self.prev_t, friendlier=True))
-                                    
-                else:
-                    # If the resolution is constant (not variable), check that it still is
-                    if self._resolution != 'variable':
-                        if self._resolution_as_seconds != (item.t - self.prev_t):
-                            # ...otherwise, mark it as variable
-                            del self._resolution_as_seconds
-                            self._resolution = 'variable'
-        finally:
-            # Delete the autodetected sampling interval cache if present
-            try:
-                del self._autodetected_sampling_interval
-                del self._autodetected_sampling_interval_confidence
-            except:
-                pass
-            # And set the prev
-            self.prev_t = item.t
-            
-        super(TimePointSeries, self).append(item)
-
-    @property
-    def tz(self):
-        """The timezone of the series."""
-        # Note: we compute the tz on the fly because for point time series we assume to use the tz
-        # attribute way lass than the slot time series, where the tz is instead computed at append-time.
-        try:
-            return self._tz
-        except AttributeError:
-            # Detect timezone on the fly
-            # TODO: this ensures that each point is on the same timezone. Do we want this?
-            detected_tz = None
-            for item in self:
-                if not detected_tz:
-                    detected_tz = item.tz
-                else:
-                    # Terrible but seems like no other way to compare pytz.tzfile.* classes
-                    if str(item.tz) != str(detected_tz): 
-                        return UTC
-            return detected_tz
-    
-    def change_timezone(self, tz):
-        """Change the timezone of the series, in-place."""
-        for time_point in self:
-            time_point.change_timezone(tz)
-        self._tz = time_point.tz
-
-    def as_timezone(self, tz):
-        """Get a copy of the series on a new timezone.""" 
-        new_series = self.duplicate() 
-        new_series.change_timezone(tz)
-        return new_series
-
-    @property
-    def _autodetected_sampling_interval(self):
-        try:
-            return self.__autodetected_sampling_interval
-        except AttributeError:
-            from .utilities import detect_sampling_interval
-            self.__autodetected_sampling_interval, self.__autodetected_sampling_interval_confidence = detect_sampling_interval(self, confidence=True)           
-            return self.__autodetected_sampling_interval
-    
-    @property
-    def _autodetected_sampling_interval_confidence(self):
-        try:
-            return self.__autodetected_sampling_interval_confidence
-        except AttributeError:
-            from .utilities import detect_sampling_interval
-            self.__autodetected_sampling_interval, self.__autodetected_sampling_interval_confidence = detect_sampling_interval(self, confidence=True)           
-            return self.__autodetected_sampling_interval_confidence
-    
-    @property
-    def resolution(self):
-        """The (temporal) resolution of the time series.
-        
-        Returns a :obj:`timeseria.units.TimeUnit` object, unless:
-        
-            * the resolution is not defined (returns :obj:`None`), either because the time series is empty or because it has only one point; or
-            * the resolution is variable (returns the string ``variable``), because the data points are not equally spaced, for example due to
-              data losses or uneven observations.
-        
-        If the time series has a variable resolution, the `guess_resolution()` method can provide an estimate.
-        """
-        try:
-            return self._resolution
-        except AttributeError:
-            # Case of an empty or 1-point series
-            return None
-    
-    def guess_resolution(self, confidence=False):
-        if not self:
-            raise ValueError('Cannot guess the resolution for an empty time series')
-        if len(self) == 1:
-            raise ValueError('Cannot guess the resolution for a time series with only one point')
-        if self.resolution != 'variable':
-            raise ValueError('The time series has a well defined resolution ({}), guessing it does not make sense'.format(self.resolution))
-        else:
-            try:
-                self._guessed_resolution
-            except AttributeError:
-                self._guessed_resolution = TimeUnit(to_time_unit_string(self._autodetected_sampling_interval, friendlier=True))
-            finally:
-                if confidence:
-                    return {'value': self._guessed_resolution, 'confidence': self._autodetected_sampling_interval_confidence}
-                else:
-                    return self._guessed_resolution 
-
-    @property
-    def _resolution_string(self):
-        if self.resolution is None:
-            resolution_string = 'undefined resolution'
-        else:
-            if self.resolution == 'variable':
-                autodetected_sampling_interval_as_str = TimeUnit(to_time_unit_string(self._autodetected_sampling_interval, friendlier=True))
-                resolution_string = 'variable resolution (~{})'.format(autodetected_sampling_interval_as_str)
-            else:
-                resolution_string = '{} resolution'.format(self.resolution)
-        return resolution_string
-
-
-class DataPointSeries(PointSeries):
-    """A series of data points, where each item is guaranteed to be ordered and to carry the same data type.
-
-       Args:
-           *args (list): the series of data points.    
-    """
-
-    __TYPE__ = DataPoint
-
-    # Check data compatibility
-    def append(self, item):
-        
-        try:
-            if not type(self._item_data_reference) == type(item.data):
-                raise TypeError('Got different data: {} vs {}'.format(self._item_data_reference.__class__.__name__, item.data.__class__.__name__))
-            if isinstance(self._item_data_reference, list):
-                if len(self._item_data_reference) != len(item.data):
-                    raise ValueError('Got different data lengths: {} vs {}'.format(len(self._item_data_reference), len(item.data)))
-            if isinstance(self._item_data_reference, dict):
-                if set(self._item_data_reference.keys()) != set(item.data.keys()):
-                    raise ValueError('Got different data keys: {} vs {}'.format(self._item_data_reference.keys(), item.data.keys()))
-            
-        except AttributeError:
-            # logger.debug('Setting data reference: %s', item.data)
-            self._item_data_reference = item.data
-            
-        super(DataPointSeries, self).append(item)
-
-    def data_labels(self):
-        """Return the labels of the data carried by the DataPoints.
-        If data is a dictionary, then these are the dictionary keys,
-        if data is a list, then these are the list indexes. Other
-        data formats are not supported."""
-          
-        if len(self) == 0:
-            return None
-        else:
-            # TODO: can we optimize here? Computing them once and then serving them does not work if someone changes data keys...
-            try:
-                return sorted(list(self[0].data.keys()))
-            except AttributeError:
-                return list(range(len(self[0].data)))
-
-    def rename_data_label(self, old_key, new_key):
-        """Rename a data key, in-place."""
-        for item in self:
-            # TODO: move to the DataPoint/DataSlot?
-            item.data[new_key] = item.data.pop(old_key)
-
-    def remove_data_loss(self):
-        """Remove the ``data_loss`` index, in-place."""
-        for item in self:
-            item.data_indexes.pop('data_loss', None)
-
-    def remove_data_index(self, data_index):
-        """Remove a data index, in-place."""
-        for item in self:
-            item.data_indexes.pop(data_index, None)        
-
-    # Operations
-    def min(self, *args, **kwargs):
-        """Get the minimum data value(s) of a series. Supports an optional ``data_label`` argument."""
-        from .operations import min as min_operation
-        return min_operation(self, *args, **kwargs)
-
-    def max(self, *args, **kwargs):
-        """Get the maximum data value(s) of a series. Supports an optional ``data_label`` argument."""
-        from .operations import max as max_operation
-        return max_operation(self, *args, **kwargs)    
-
-    def avg(self, *args, **kwargs):
-        """Get the average data value(s) of a series. Supports an optional ``data_label`` argument."""
-        from .operations import avg as avg_operation
-        return avg_operation(self, *args, **kwargs)   
-
-    def sum(self, *args, **kwargs):
-        """Sum every data value(s) of a series. Supports an optional ``data_label`` argument."""
-        from .operations import sum as sum_operation
-        return sum_operation(self, *args, **kwargs)  
-
-    def derivative(self, *args, **kwargs):
-        """Compute the derivative of the series. Extra parameters: ``inplace`` (defaulted to false),
-        ``normalize`` (defaulted to true), ``diffs`` (defaulted to false) to compute differences
-        instead of the derivative."""
-        from .operations import derivative as derivative_operation
-        return derivative_operation(self, *args, **kwargs)   
-
-    def integral(self, *args, **kwargs):
-        """Compute the integral of the series. Extra parameters: ``inplace`` (defaulted to false),
-        ``normalize`` (defaulted to true), ``c`` (defaulted to zero) for the integration constant."""
-        from .operations import integral as integral_operation
-        return integral_operation(self, *args, **kwargs)   
-
-    def diff(self, *args, **kwargs):
-        """Compute the incremental differences. Extra parameters: ``inplace`` (defaulted to false)."""
-        from .operations import diff as diff_operation
-        return diff_operation(self, *args, **kwargs)   
-
-    def csum(self, *args, **kwargs):
-        """Compute the incremental sum. Extra parameters: ``inplace`` (defaulted to false),
-        ``offset`` (defaulted to zero) to set the starting value where to apply the sums on."""
-        from .operations import csum as csum_operation
-        return csum_operation(self, *args, **kwargs)
-
-    def normalize(self, *args, **kwargs):
-        """Normalize the time series data values. Extra parameters: ``inplace`` (defaulted to false)."""
-        from .operations import normalize as normalize_operation
-        return normalize_operation(self, *args, **kwargs)   
-
-    def rescale(self, *args, **kwargs):
-        """Rescale the time series data values. Extra parameters: ``inplace`` (defaulted to false)."""
-        from .operations import rescale as rescale_operation
-        return rescale_operation(self, *args, **kwargs)
-
-    def offset(self, *args, **kwargs):
-        """Offset the time series data values. Extra parameters: ``inplace`` (defaulted to false)."""
-        from .operations import offset as offset_operation
-        return offset_operation(self, *args, **kwargs)  
-
-    def mavg(self, *args, **kwargs):
-        """Compute the moving average. Extra parameters: ``inplace`` (defaulted to false)
-        and ``window``, a required parameter, for the length of the moving average window."""
-        from .operations import mavg as mavg_operation
-        return mavg_operation(self, *args, **kwargs)
-
-
-class DataTimePointSeries(DataPointSeries, TimePointSeries):
-    """A series of data points in time, where each item is guaranteed to be ordered and to carry the same data type.
-    
-        Args:
-           *args (list): the series of data time points.    
-    """
-
-    __TYPE__ = DataTimePoint
-
-    def __init__(self, *args, **kwargs):
-
-        # Handle df kwarg
-        df = kwargs.pop('df', None)
-        
-        # Handle first argument as dataframe
-        if args and (isinstance(args[0], DataFrame)):
-            df = args[0]
-
-        # Do we have to initialize the time series from a dataframe?        
-        if df is not None:
-
-            # Create data time points list
-            data_time_points = []
-            
-            # Get data frame labels
-            labels = list(df.columns) 
-            
-            for row in df.iterrows():
-                
-                # Set the timestamp
-                if not isinstance(row[0], datetime):
-                    raise TypeError('A DataFrame with a DateTime index column is required')
-                dt = row[0]
-                
-                # Prepare data
-                data = {}
-                for i,label in enumerate(labels):
-                    data[label] = row[1][i]
-                
-                data_time_points.append(DataTimePoint(dt=dt, data=data))
-            
-            # Set the list of data time points
-            super(DataTimePointSeries, self).__init__(*data_time_points, **kwargs)
-            return None
-        
-        # Original init
-        super(DataTimePointSeries, self).__init__(*args, **kwargs)
-
-    @property
-    def df(self):
-        """The time series as a Pandas DataFrame object."""
-        data_labels = self.data_labels()
-        
-        dump_data_loss = False
-        for item in self:
-            if item.data_loss is not None:
-                dump_data_loss = True
-                break
-        
-        if dump_data_loss:
-            columns = ['Timestamp'] + data_labels + ['data_loss']
-        else:
-            columns = ['Timestamp'] + data_labels
-            
-        df = DataFrame(columns=columns)
-        for item in self:
-            values = [item.data[key] for key in data_labels]
-            if dump_data_loss:
-                df = df.append(DataFrame([[item.dt]+values+[item.data_loss]], columns=columns))
-            else:
-                df = df.append(DataFrame([[item.dt]+values], columns=columns))                
-        df = df.set_index('Timestamp')
-        
-        return df
-      
-    def plot(self, engine='dg', *args, **kwargs):
-        """Plot the time series. The default plotting engine is Dygraphs (``engine=\'dg\'``),
-           limited support for Matplotplib (``engine=\'mp\'``) is also available.
-           For plotting options for Dygraphs, see :func:`~.plots.dygraphs_plot`, while for
-           plotting options for Matplotlib, see :func:`~.plots.matplotlib_plot`.""" 
-        if engine=='mp':
-            from .plots import matplotlib_plot
-            matplotlib_plot(self, *args, **kwargs)
-        elif engine=='dg':
-            from .plots import dygraphs_plot
-            out = dygraphs_plot(self, *args, **kwargs)
-            if out: return out
-        else:
-            raise ValueError('Unknown plotting engine "{}'.format(engine))
-
-    def __repr__(self):
-        if len(self):
-            return 'Time series of #{} points at {}, from point @ {} ({}) to point @ {} ({})'.format(len(self), self._resolution_string, self[0].t, self[0].dt, self[-1].t, self[-1].dt)
-        else:
-            return 'Time series of #0 points'
-
-    # Transformations
-    def aggregate(self, unit, *args, **kwargs):
-        """Aggregate the series in slots of a length set by the ``unit`` parameter."""
-        from .transformations import Aggregator
-        aggregator = Aggregator(unit, *args, **kwargs)
-        return aggregator.process(self)  
-
-    def resample(self, unit, *args, **kwargs):
-        """Resample the series using a sampling interval of a length set by the ``unit`` parameter."""
-        from .transformations import Resampler
-        resampler = Resampler(unit, *args, **kwargs)
-        return resampler.process(self)  
 
 
 #======================
@@ -1377,7 +553,7 @@ class DataTimeSlot(DataSlot, TimeSlot):
        use and should not be relied upon.
     
        Args:
-           start(TimePoint): the slot starting time point.
+           start(:obj:`TimePoint`): the slot starting time point.
            end(TimePoint): the slot ending time point.
            unit(TimeUnit): the slot time unit.
            data: the data.
@@ -1392,130 +568,810 @@ class DataTimeSlot(DataSlot, TimeSlot):
             return 'Time slot @ [{},{}] ([{},{}]) with data={}'.format(self.start.t, self.end.t, self.start.dt, self.end.dt, self.data)
 
 
-#======================
-#  Slot Series
-#======================
+#==============================
+#  Series
+#==============================
 
-class SlotSeries(Series):
-    """A series of generic slots, where each item is guaranteed to be in succession.
-    
+class Series(list):
+    """A list of items coming one after another, where every item
+       is guaranteed to be of the same type and in order or succession.
+       
        Args:
-           *args (list): the series of slots.    
-    """
-    
-    __TYPE__ = Slot
-
-    def append(self, item):
-        
-        # Slots can belong to the same series if they are in succession (tested with the __succedes__ method)
-        # and if they have the same unit, which we test here instead as the __succedes__ is more general.
-        try:
-            if self._resolution != item.unit:
-                # Try for floating point precision errors
-                abort = False
-                try:
-                    if not is_close(self._resolution.value, item.unit.value):
-                        abort = True
-                except (TypeError, ValueError):
-                    abort = True
-                if abort:
-                    raise ValueError('Cannot add slots with a different unit than the series resolution (I have "{}" and you tried to add "{}")'.format(self._resolution, item.unit))
-        except AttributeError:
-            self._resolution = item.unit
-
-        # Call parent append
-        super(SlotSeries, self).append(item)
-
-
-class TimeSlotSeries(SlotSeries):
-    """A series of slots in time, where each item is guaranteed to be in succession.
-    
-       Args:
-           *args (list): the series of time slots.    
+           *args: the series items.    
     """
 
-    __TYPE__ = TimeSlot
+    # 1,2,3 are in order. 1,3,8 are in order. 1,8,3 re not in order.
+    # 5,6,7 are integer succession. 5.3, 5.4, 5.5 are too in a succesisons. 5,6,8 are not in a succession. 
+    # a group or a number of related or similar things, events, etc., arranged or occurring in temporal, spatial, or other order or succession; sequence.
 
-    def append(self, item):
-        
-        if not self.tz:
-            # If no timezone set, use the item one's
-            self._tz = item.tz
+    # By default the type is not defined
+    __TYPE__ = None
+    
+    def __init__(self, *args, **kwargs):
+
+        if kwargs:
+            raise ValueError('Got an unknown argument "{}"'.format(list(kwargs.keys())[0]))
+
+        for arg in args:
+            self.append(arg)
             
-        else:
-            # Else, check for the same timezone
-            if self._tz != item.tz:
-                raise ValueError('Cannot add items on different timezones (I have "{}" and you tried to add "{}")'.format(self.tz, item.start.tz))
+        self._title = None
 
-        super(TimeSlotSeries, self).append(item)
+    def append(self, item):
+        """Append an item to the series. Accepts only items of the same
+        type of the items already present in the series (unless empty)"""
+        
+        # TODO: move to use the insert
+        
+        # logger.debug('Checking %s', item)
+        
+        # Set type if not already done
+        if not self.__TYPE__:
+            self.__TYPE__ = type(item)
+
+        # Check type
+        if not isinstance(item, self.__TYPE__):
+            raise TypeError('Got incompatible type "{}", can only accept "{}"'.format(item.__class__.__name__, self.__TYPE__.__name__))
+        
+        # Check order or succession
+        try:
+            try:
+                if not item.__succedes__(self[-1]):
+                    raise ValueError('Not in succession ("{}" does not succeeds "{}")'.format(item,self[-1])) from None                    
+            except IndexError:
+                raise
+            except AttributeError:
+                try:
+                    if not item > self[-1]:
+                        raise ValueError('Not in order ("{}" does not follow "{}")'.format(item,self[-1])) from None
+                except TypeError:
+                    raise TypeError('Object of class "{}" does not implement a "__gt__" or a "__succedes__" method, cannot append it to a Series (which is ordered)'.format(item.__class__.__name__)) from None
+        except IndexError:
+            pass
+
+        # Check data type if any
+        try:
+            if self._item_data_reference:
+                
+                if not type(self._item_data_reference) == type(item.data):
+                    raise TypeError('Got different data: {} vs {}'.format(self._item_data_reference.__class__.__name__, item.data.__class__.__name__))
+                if isinstance(self._item_data_reference, list):
+                    if len(self._item_data_reference) != len(item.data):
+                        raise ValueError('Got different data lengths: {} vs {}'.format(len(self._item_data_reference), len(item.data)))
+                if isinstance(self._item_data_reference, dict):
+                    if set(self._item_data_reference.keys()) != set(item.data.keys()):
+                        raise ValueError('Got different data keys: {} vs {}'.format(self._item_data_reference.keys(), item.data.keys()))
+        except AttributeError:
+            # logger.debug('Setting data reference: %s', item.data)
+            try:
+                self._item_data_reference = item.data
+            except AttributeError:
+                self._item_data_reference = None
+        
+        # Append
+        super(Series, self).append(item)
+    
+    def __sum__(self, other):
+        raise NotImplementedError
+
+    def __hash__(self):
+        return id(self)
+
+    @property
+    def title(self):
+        """A title for the series, to be used for plotting etc.""" 
+        if self._title:
+            return self._title
+        else:
+            return None
+
+    @title.setter
+    def title(self, title):
+        self._title=title
+
+    def __repr__(self):
+        return '{} of #{} elements'.format(self.__class__.__name__, len(self))
+    
+    def __str__(self):
+        return self.__repr__()
+        
+    # Python slice (i.e [0:35])
+    def __getitem__(self, key):
+        if isinstance(key, slice):   
+            # TODO: improve and implement shallow copies please.         
+            indices = range(*key.indices(len(self)))
+            series = self.__class__()
+            for i in indices:
+                series.append(super(Series, self).__getitem__(i))
+            try:
+                series.mark = self.mark
+            except:
+                pass
+            return series
+        elif isinstance(key, str):   
+            # Try filtering on this data key only
+            return self.filter(key)
+        else:
+            return super(Series, self).__getitem__(key)
+
+    def _all_data_indexes(self):
+        """Return all the data_indexes of the series, to be intended as custom
+        defined indicators (i.e. data_loss, anomaly_index, etc.)."""
+        
+        # TODO: move this to the Data*Series...?
+        data_index_names = []
+        for item in self:
+            for index_name in item.data_indexes:
+                if index_name not in data_index_names:
+                    data_index_names.append(index_name)
+        
+        # Reorder according to legacy indexes behaviour
+        ordered_data_index_names = []
+        legacy_indexes = ['data_reconstructed', 'data_loss', 'anomaly', 'forecast']
+        for legacy_index in legacy_indexes:
+            if legacy_index in data_index_names:
+                ordered_data_index_names.append(legacy_index)
+                data_index_names.remove(legacy_index)
+        
+        # Merge and sort
+        ordered_data_index_names += sorted(data_index_names)
+            
+        return ordered_data_index_names
+
+    @property
+    def mark(self):
+        """A mark for the series, useful for highlighting a portion of a plot.
+           Required to be formatted as a list or tuple with two elements, the
+           first from where the mark has to start and the second where it has
+           to end.
+        """
+        try:
+            return self._mark
+        except AttributeError:
+            return None
+
+    @mark.setter
+    def mark(self, value):
+        if not value:
+            del self._mark
+        else:
+            # Check valid mark
+            if not isinstance(value, (list, tuple)):
+                raise TypeError('Series mark must be a list or tuple')
+            if not len(value) == 2:
+                raise ValueError('Series mark must be a list or tuple of two elements')    
+            self._mark = value
+
+    @property
+    def mark_title(self):
+        """A tile for the mark, to be displayed in the plot legend."""
+        try:
+            return self._mark_title
+        except AttributeError:
+            return None
+
+    @mark_title.setter
+    def mark_title(self, value):
+        if not value:
+            del self._mark_title
+        else: 
+            self._mark_title = value
+
+    # Inherited methods to be edited
+    def insert(self, i, x):
+        """Insert an item at a given position. The first argument is the index of the element 
+        before which to insert, so series.insert(0, x) inserts at the front of the series, and 
+        series.insert(len(series), x) is equivalent to append(x). Order or succession are enforced."""
+        
+        if len(self) > 0:
+            
+            # Check valid type
+            if not isinstance(x, self.__TYPE__):
+                raise TypeError('Got incompatible type "{}", can only accept "{}"'.format(x.__class__.__name__, self.__TYPE__.__name__))
+        
+            # Check ordering/succession
+            if i == 0:
+                try:
+                    if not self[0].__succedes__(x):
+                        raise ValueError('Cannot insert element "{}" in position "{}" as it would break the succession'.format(x,i))
+                except AttributeError:
+                    if not self[0] > x:
+                        raise ValueError('Cannot insert element "{}" in position "{}" as not in order'.format(x,i)) from None  
+            
+            elif i == len(self):
+                try:
+                    if not x.__succedes__(self[-1]):
+                        raise ValueError('Cannot insert element "{}" in position "{}" as it would break the succession'.format(x,i))
+                except AttributeError:
+                    if not x > self[-1]:
+                        raise ValueError('Cannot insert element "{}" in position "{}" as not in order'.format(x,i)) from None 
+                            
+            else:
+                try:
+                    self[0].__succedes__
+                except AttributeError:
+                    if not x > self[i-1]:
+                        raise ValueError('Cannot insert element "{}" in position "{}" with element "{}" as not in order'.format(x,i, self[i])) from None
+                else:
+                    raise IndexError('Cannot insert an item in the middle of a series whose items follow a succession'.format(i)) 
+            
+            super(Series, self).insert(i,x)
+
+        else:
+            self.append(x) 
+                 
+    def remove(self, x):
+        """Remove the first item from the list whose value is equal to x. It raises a `ValueError` if there is no such item
+        and a `NotImplementedError` is the series items are in a succession as it would breake it.
+        """
+        try:
+            self[0].__succedes__
+            raise NotImplementedError('Remove is not implemented for series whose items are in a succession') 
+        except IndexError:
+            pass
+        except AttributeError:
+            pass
+        
+        super(Series, self).remove(x)
+
+    def pop(self, i=None):
+        """
+        Remove the item at the given position in the list, and return it. If no index is
+        specified, removes and returns the last item in the series. If items are in a
+        succession and the index is set, a `NotImplementerError` is raised.
+        """
+        if len(self) == 0:
+            raise IndexError('Cannot pop from an empty series')
+        if i is not None:
+            if i not in [0, len(self)]:
+                try:
+                    self[0].__succedes__
+                except AttributeError:
+                    pass
+                else:
+                    raise IndexError('Cannot pop an item in the middle of a series whose items follow a succession')                    
+            return super(Series, self).pop(i)
+        else:
+            return super(Series, self).pop()
+            
+    def clear(self):
+        """Remove all items from the series."""
+        super(Series, self).clear()
+
+    def index(self, x, start=None, end=None):
+        """
+        Return zero-based index in the series of the item whose value is equal to x.
+        Raises a ValueError if there is no such item.
+
+        The optional arguments start and end are interpreted as in the slice notation and are
+        used to limit the search to a particular subsequence of the list. The returned index is
+        computed relative to the beginning of the full sequence rather than the start argument.
+        """
+        super(Series, self).index(x, start, end)
+
+    def copy(self):
+        """Return a shallow copy of the series."""
+        return super(Series, self).copy()
+
+    # Inherited methods to be disabled
+    def extend(self):
+        """Disabled (use the `merge` instead)."""
+        raise NotImplementedError('Use the "merge()" instead')
+
+    def count(self, x):
+        """Disabled (there is only one item instance by design)."""
+        raise NotImplementedError('There is only one item by design')
+
+    def sort(self, key=None, reverse=False):
+        """Disabled (sorting is already guaranteed)."""
+        raise NotImplementedError('Sorting is already guaranteed')
+
+    def reverse(self):
+        """Disabled (reversing is not compatible with an ordering)."""
+        raise NotImplementedError('Reversing is not compatible with an ordering')
+
+    # Operations
+    def duplicate(self):
+        """ Return a deep copy of the series."""
+        return deepcopy(self)
+
+    def merge(self, *args, **kwargs):
+        """Merge the series with one or more other series."""
+        from .operations import merge as merge_operation
+        return merge_operation(self, *args, **kwargs)
+
+    def filter(self, *args, **kwargs):
+        # TODO: refactor this to allow generic item properties? Maybe merge with the select operation? cfr same op in the time series below
+        """Filter a time series given one or more properties of its elements, e.g. by ``data_label``."""
+        from .operations import filter as filter_operation
+        return filter_operation(self, *args, **kwargs) 
+
+    def select(self, *args, **kwargs):
+        """Select one or more items of the time series given an SQL-like query."""
+        from .operations import select as select_operation
+        return select_operation(self, *args, **kwargs)
+    
+    # Inspection utilities
+    def inspect(self, limit=10):
+        """Print a summary of the series and its elements, limited to 10 items by default.
+        
+            Args:
+                limit: the limit of elements to print, by default 10.
+        """
+        print(str(self)+':\n')
+        print('[', end='')
+        
+        if not limit or limit > len(self):
+        
+            for i, item in enumerate(self):
+                if limit and i >= limit:
+                    break
+                else:
+                    if i==0:
+                        print(str(item)+',')
+                    elif i==len(self)-1:
+                        print(' '+str(item), end='')                        
+                    else:
+                        print(' '+str(item)+',')
+        else:
+            
+            head_n = int(limit/2)+1
+            tail_n = int(limit/2)
+
+            for i, item in enumerate(self.head(head_n)):
+                if i==0:
+                    print(str(item)+',')                       
+                else:
+                    print(' '+str(item)+',')
+
+            print(' ...')
+
+            for i, item in enumerate(self.tail(tail_n)):
+                if i==tail_n-1:
+                    print(' '+str(item), end='')                        
+                else:
+                    print(' '+str(item)+',')
+
+        print(']')
+
+    def inspect_as_str(self, limit=10):
+        """Return a summary of the series and its elements, limited to 10 items by default.
+        
+            Args:
+                limit: the limit of elements to print, by default 10.
+        """
+        
+        string = str(self)+':\n\n'
+        string+='['
+        
+        if not limit or limit > len(self):
+        
+            for i, item in enumerate(self):
+                if limit and i >= limit:
+                    break
+                else:
+                    if i==0:
+                        string+=str(item)+',\n'
+                    elif i==len(self)-1:
+                        string+=' '+str(item)                        
+                    else:
+                        string+=' '+str(item)+',\n'
+        else:
+            
+            head_n = int(limit/2)+1
+            tail_n = int(limit/2)
+
+            for i, item in enumerate(self.head(head_n)):
+                if i==0:
+                    string+=str(item)+',\n'                       
+                else:
+                    string+=' '+str(item)+',\n'
+
+            string+=' ...\n'
+
+            for i, item in enumerate(self.tail(tail_n)):
+                if i==tail_n-1:
+                    string+=' '+str(item)                        
+                else:
+                    string+=' '+str(item)+',\n'
+
+        string+=']'
+        return string
+
+    def contents(self):
+        """Get al the items of the series (as a list)."""   
+        return list(self)     
+
+    def head(self, n=5):
+        """Get the first n items of the series as a list, 5 by default.
+        
+            Args:
+                n: the number of first elements to return .
+        """
+        
+        return list(self[0:n])
+
+    def tail(self, n=5):
+        """Get the last n items of the series as a list, 5 by default.
+        
+            Args:
+                n: the number of last elements to return .
+        """
+        
+        return list(self[-n:])
  
+
+
+#==============================
+#  Time Series 
+#==============================
+class TimeSeries(Series):
+    """A list of items coming one after another over time, where every item
+       is guaranteed to be of the same type and in order or succession.
+       
+       Time series accept only items of type :obj:`DataTimePoint` and :obj:`DataTimeSlot`
+       (or :obj:`TimePoint` and :obj:`TimeSlot`, which are useful in some particular circumstances).
+       
+       Time series can also be created providing a Pandas data frame with a time-based index as first argument or using the keyword argument ``df``.
+     
+       Args:
+           *args: the time series items.
+           df (:obj:`DataFrame`, optional, also as first arg): a Pandas data frame with a time-based index.
+    """
+
+    def __repr__(self):
+        if not self:
+            return 'Empty time series'
+        else:
+            if issubclass(self.items_type, TimePoint):
+                return 'Time series of #{} points at {}, from point @ {} ({}) to point @ {} ({})'.format(len(self), self._resolution_string, self[0].t, self[0].dt, self[-1].t, self[-1].dt)
+            elif issubclass(self.items_type, TimeSlot):
+                return 'Time series of #{} slots of {}, from slot starting @ {} ({}) to slot starting @ {} ({})'.format(len(self), self.resolution, self[0].start.t, self[0].start.dt, self[-1].start.t, self[-1].start.dt)            
+            else:
+                raise Exception('Got no TimePoints nor TimeSlots in a Time Series, this is a consistency error (got {})'.format(self.items_type.__name__))
+    
+    @property
+    def items_type(self):
+        """The type of the items of the time series."""
+        return self[0].__class__
+
+    #=========================
+    #  Init
+    #=========================
+    
+    def __init__(self, *args, **kwargs):
+
+        # Handle df kwarg
+        df = kwargs.pop('df', None)
+        items_type = kwargs.pop('items_type', None)
+        
+        # Handle first argument as dataframe
+        if args and (isinstance(args[0], DataFrame)):
+            df = args[0]
+
+        # Do we have to initialize the time series from a dataframe?        
+        if df is not None:
+            
+            # Infer if we have to create points or slots and their unit
+            unit_str_pd=df.index.inferred_freq
+    
+            if not unit_str_pd:
+                if not items_type:
+                    logger.info('Cannot infer the freqency of the dataframe, will just create points')
+                    items_type = DataTimePoint
+                
+            else:
+                
+                # Calendar
+                unit_str_pd=unit_str_pd.replace('A', 'Y')    # Year (end) ?
+                unit_str_pd=unit_str_pd.replace('Y', 'Y')    # Year (end) )
+                unit_str_pd=unit_str_pd.replace('AS', 'Y')   # Year (start)
+                unit_str_pd=unit_str_pd.replace('YS', 'Y')   # Year (start)
+                unit_str_pd=unit_str_pd.replace('MS', 'M')   # Month (start)
+                unit_str_pd=unit_str_pd.replace('M', 'M')    # Month (end) 
+                unit_str_pd=unit_str_pd.replace('D', 'D')    # Day
+    
+                # Physical
+                unit_str_pd=unit_str_pd.replace('H', 'h')    # Hour
+                unit_str_pd=unit_str_pd.replace('T', 'm')    # Minute
+                unit_str_pd=unit_str_pd.replace('min', 'm')  # Minute
+                unit_str_pd=unit_str_pd.replace('S', 's')    # Second
+    
+                if len(unit_str_pd) == 1:
+                    unit_str = '1'+unit_str_pd
+                else:
+                    unit_str = unit_str_pd
+                
+                unit=TimeUnit(unit_str)
+                
+                if unit.is_calendar():
+                    logger.info('Assuming a slot time unit of "{}"'.format(unit_str))
+                    if not items_type:
+                        items_type = DataTimeSlot
+                    else:
+                        if items_type==DataTimePoint:
+                            raise ValueError('Creating points with calendar time units is not supported.')
+                else:
+                    if not items_type:
+                        items_type = DataTimePoint
+            
+            # Now create the points or the slots      
+            if items_type==DataTimeSlot:
+            
+                # Create data time points list
+                data_time_slots = []
+    
+                # Get data frame labels
+                labels = list(df.columns) 
+    
+                for row in df.iterrows():
+    
+                    # Set the timestamp
+                    if not isinstance(row[0], datetime):
+                        raise TypeError('A DataFrame with a DateTime index column is required')
+                    dt = row[0]
+    
+                    # Prepare data
+                    data = {}
+                    for i,label in enumerate(labels):
+                        data[label] = row[1][i]
+                    data_time_slots.append(DataTimeSlot(dt=dt, unit=TimeUnit(unit_str), data=data))
+    
+                # Set the list of data time points
+                super(TimeSeries, self).__init__(*data_time_slots, **kwargs)
+            
+            else:
+                # Create data time points list
+                data_time_points = []
+                
+                # Get data frame labels
+                labels = list(df.columns) 
+                
+                for row in df.iterrows():
+                    
+                    # Set the timestamp
+                    if not isinstance(row[0], datetime):
+                        raise TypeError('A DataFrame with a DateTime index column is required')
+                    dt = row[0]
+                    
+                    # Prepare data
+                    data = {}
+                    for i,label in enumerate(labels):
+                        data[label] = row[1][i]
+                    
+                    data_time_points.append(DataTimePoint(dt=dt, data=data))
+                
+                # Set the list of data time points
+                super(TimeSeries, self).__init__(*data_time_points, **kwargs)
+        
+        else:
+               
+            # Handle timezone
+            tz = kwargs.pop('tz', None)
+            if tz:
+                self._tz = timezonize(tz)
+            
+            # Call parent init
+            super(TimeSeries, self).__init__(*args, **kwargs)
+    
+    #=========================
+    #  Append
+    #=========================
+    def append(self, item):
+        """Append an item to the time series. Accepts only items of type :obj:`DataTimePoint` and :obj:`DataTimeSlot`
+        (or :obj:`TimePoint` and :obj:`TimeSlot`, which are useful in some particular circumstances) and in any case 
+        of the same type of the items already present in the time series, unless empty."""
+        
+        if isinstance(item, TimePoint):
+        
+            try:
+                self.prev_t
+            except AttributeError:
+                pass
+            else:
+                # Check time ordering and handle the resolution.
+    
+                # The following if is to support the deepcopy, otherwise the original prev_t will be used
+                # TODO: maybe move the above to a "hasattr" plus an "and" instead of this logic?
+                if len(self)>0:
+    
+                    # logger.debug('Checking time ordering for t="%s" (prev_t="%s")', item.t, self.prev_t)
+                    if item.t < self.prev_t:
+                        raise ValueError('Time t="{}" is out of order (prev t="{}")'.format(item.t, self.prev_t))
+                    
+                    if item.t == self.prev_t:
+                        raise ValueError('Time t="{}" is a duplicate'.format(item.t))
+                    
+                    try:
+                        self._resolution 
+                    
+                    except AttributeError:
+                        
+                        # Set the resolution as seconds for a bit of performance
+                        self._resolution_as_seconds = item.t - self.prev_t 
+                        
+                        # Set the resolution
+                        self._resolution = TimeUnit(to_time_unit_string(item.t - self.prev_t, friendlier=True))
+                                        
+                    else:
+                        # If the resolution is constant (not variable), check that it still is
+                        if self._resolution != 'variable':
+                            if self._resolution_as_seconds != (item.t - self.prev_t):
+                                # ...otherwise, mark it as variable
+                                del self._resolution_as_seconds
+                                self._resolution = 'variable'
+            finally:
+                # Delete the autodetected sampling interval cache if present
+                try:
+                    del self._autodetected_sampling_interval
+                    del self._autodetected_sampling_interval_confidence
+                except:
+                    pass
+                # And set the prev
+                self.prev_t = item.t
+        
+        elif isinstance(item, TimeSlot):
+            
+            # Slots can belong to the same series if they are in succession (tested with the __succedes__ method)
+            # and if they have the same unit, which we test here instead as the __succedes__ is more general.
+
+            # Check the timezone (only for slots, points are not affected by timezones)
+            if not self.tz:
+                # If no timezone set, use the item one's
+                self._tz = item.tz
+    
+            else:
+                # Else, check for the same timezone
+                if self._tz != item.tz:
+                    raise ValueError('Cannot append slots on different timezones (I have "{}" and you tried to add "{}")'.format(self.tz, item.start.tz))
+
+            try:
+                if self._resolution != item.unit:
+                    # Try for floating point precision errors
+                    abort = False
+                    try:
+                        if not is_close(self._resolution.value, item.unit.value):
+                            abort = True
+                    except (TypeError, ValueError):
+                        abort = True
+                    if abort:
+                        raise ValueError('Cannot add slots with a different unit than the series resolution (I have "{}" and you tried to add "{}")'.format(self._resolution, item.unit))
+            except AttributeError:
+                self._resolution = item.unit
+    
+        else:
+            raise TypeError('Adding data to a time series only accepts TimePoints o TimeSlots (got "{}")'.format(item.__class__.__name__))
+
+        # Lastly, call the series append
+        super(TimeSeries, self).append(item)
+
+
+    #=========================
+    #  Timezone-related
+    #=========================
+
     @property
     def tz(self):
         """The timezone of the time series."""
+        # Note: we compute the tz on the fly because for point time series we assume to use the tz
+        # attribute way lass than the slot time series, where the tz is instead computed at append-time.
         try:
             return self._tz
         except AttributeError:
-            return None
-        
+            # Detect timezone on the fly
+            # TODO: this ensures that each point is on the same timezone. Do we want this?
+            detected_tz = None
+            for item in self:
+                if not detected_tz:
+                    detected_tz = item.tz
+                else:
+                    # Terrible but seems like no other way to compare pytz.tzfile.* classes
+                    if str(item.tz) != str(detected_tz): 
+                        return UTC
+            return detected_tz
+    
     def change_timezone(self, tz):
-        """Change the timezone of the series, in-place."""
-        for time_slot in self:
-            time_slot.change_timezone(tz)
-        self._tz = time_slot.tz
+        """Change the timezone of the timeseries, in-place."""
+        for time_point in self:
+            time_point.change_timezone(tz)
+        self._tz = time_point.tz
 
     def as_timezone(self, tz):
-        """Get a copy of the series on a new timezone.""" 
+        """Get a copy of the time series on a new timezone.""" 
         new_series = self.duplicate() 
         new_series.change_timezone(tz)
         return new_series
 
+
+    #=========================
+    #  Resolution-related
+    #=========================
+
+    @property
+    def _autodetected_sampling_interval(self):
+        if not issubclass(self.items_type, TimePoint):
+            raise NotImplementedError('Auto-detecting the sampling rate (and its confidence) is implemented only for point series')
+        try:
+            return self.__autodetected_sampling_interval
+        except AttributeError:
+            from .utilities import detect_sampling_interval
+            self.__autodetected_sampling_interval, self.__autodetected_sampling_interval_confidence = detect_sampling_interval(self, confidence=True)           
+            return self.__autodetected_sampling_interval
+    
+    @property
+    def _autodetected_sampling_interval_confidence(self):
+        if not issubclass(self.items_type, TimePoint):
+            raise NotImplementedError('Auto-detecting the sampling rate (and its confidence) is implemented only for point series')
+        try:
+            return self.__autodetected_sampling_interval_confidence
+        except AttributeError:
+            from .utilities import detect_sampling_interval
+            self.__autodetected_sampling_interval, self.__autodetected_sampling_interval_confidence = detect_sampling_interval(self, confidence=True)           
+            return self.__autodetected_sampling_interval_confidence
+    
     @property
     def resolution(self):
         """The (temporal) resolution of the time series.
         
-        Returns a :obj:`timeseria.units.TimeUnit` object, which corresponds to the slots unit.
-        Not defined (returns :obj:`None`) if the time series is empty.
+        Returns a :obj:`timeseria.units.TimeUnit` object, unless:
+        
+            * the resolution is not defined (returns :obj:`None`), either because the time series is empty or because it is a point time series and has only one point; or
+            * the resolution is variable (returns the string ``variable``), only possible for point time series, if its points are not equally spaced for example because of
+              data losses or uneven observations.
+        
+        If the time series has a variable resolution, the `guess_resolution()` method can provide an estimate. If the time series is a slot time series, then the resolutions is just
+        the unit of its slots.
         """
         try:
             return self._resolution
         except AttributeError:
-            # Case of an empty series
+            # Case of an empty or 1-point series
             return None
-
-
-class DataSlotSeries(SlotSeries):
-    """A series of data slots, where each item is guaranteed to be in succession and to carry the same data type.
     
-       Args:
-           *args (list): the series of data slots.    
-    """
+    def guess_resolution(self, confidence=False):
+        if not issubclass(self.items_type, TimePoint):
+            raise NotImplementedError('Guessing the resolution is implemented only for point series')
+        if not self:
+            raise ValueError('Cannot guess the resolution for an empty time series')
+        if len(self) == 1:
+            raise ValueError('Cannot guess the resolution for a time series with only one point')
+        if self.resolution != 'variable':
+            raise ValueError('The time series has a well defined resolution ({}), guessing it does not make sense'.format(self.resolution))
+        else:
+            try:
+                self._guessed_resolution
+            except AttributeError:
+                self._guessed_resolution = TimeUnit(to_time_unit_string(self._autodetected_sampling_interval, friendlier=True))
+            finally:
+                if confidence:
+                    return {'value': self._guessed_resolution, 'confidence': self._autodetected_sampling_interval_confidence}
+                else:
+                    return self._guessed_resolution 
 
-    __TYPE__ = DataSlot
+    @property
+    def _resolution_string(self):
+        if self.resolution is None:
+            resolution_string = 'undefined resolution'
+        else:
+            if self.resolution == 'variable':
+                autodetected_sampling_interval_as_str = TimeUnit(to_time_unit_string(self._autodetected_sampling_interval, friendlier=True))
+                resolution_string = 'variable resolution (~{})'.format(autodetected_sampling_interval_as_str)
+            else:
+                resolution_string = '{} resolution'.format(self.resolution)
+        return resolution_string
 
-    # Check data compatibility
-    def append(self, item):
-        
-        try:
-            if not type(self._item_data_reference) == type(item.data):
-                raise TypeError('Got different data: {} vs {}'.format(self._item_data_reference.__class__.__name__, item.data.__class__.__name__))
-            if isinstance(self._item_data_reference, list):
-                if len(self._item_data_reference) != len(item.data):
-                    raise ValueError('Got different data lengths: {} vs {}'.format(len(self._item_data_reference), len(item.data)))
-            if isinstance(self._item_data_reference, dict):
-                if set(self._item_data_reference.keys()) != set(item.data.keys()):
-                    raise ValueError('Got different data keys: {} vs {}'.format(self._item_data_reference.keys(), item.data.keys()))
 
-        except AttributeError:
-            # TODO: uniform self.tz, self._resolution, self._item_data_reference
-            self._item_data_reference = item.data
-        
-        super(DataSlotSeries, self).append(item)
-    
+    #=========================
+    #  Data-related
+    #=========================
+
     def data_labels(self):
-        """Return the labels of the data carried by the DataSlots.
+        """Returns the labels of the data carried by the points or slots.
         If data is a dictionary, then these are the dictionary keys,
         if data is a list, then these are the list indexes. Other
         data formats are not supported."""
+        if len(self) > 0 and not self._item_data_reference:
+            raise TypeError('Time series items have no data, cannot get data labels')
         if len(self) == 0:
             return None
         else:
@@ -1527,38 +1383,56 @@ class DataSlotSeries(SlotSeries):
 
     def rename_data_label(self, old_key, new_key):
         """Rename a data key, in-place."""
+        if len(self) > 0 and not self._item_data_reference:
+            raise TypeError('Time series items have no data, cannot rename a label')
         for item in self:
             # TODO: move to the DataPoint/DataSlot?
             item.data[new_key] = item.data.pop(old_key)
 
     def remove_data_loss(self):
         """Remove the ``data_loss`` index, in-place."""
+        if len(self) > 0 and not self._item_data_reference:
+            raise TypeError('Time series items have no data, cannot remove the data loss')
         for item in self:
             item.data_indexes.pop('data_loss', None)
-    
+
     def remove_data_index(self, data_index):
         """Remove a data index, in-place."""
+        if len(self) > 0 and not self._item_data_reference:
+            raise TypeError('Time series items have no data, cannot rename data indexes')
         for item in self:
             item.data_indexes.pop(data_index, None)        
 
-    # Operations
+
+    #=========================
+    #  Operations
+    #=========================
+
     def min(self, *args, **kwargs):
         """Get the minimum data value(s) of a series. Supports an optional ``data_label`` argument."""
+        if len(self) > 0 and not self._item_data_reference:
+            raise TypeError('Time series items have no data, cannot compute any operation')
         from .operations import min as min_operation
         return min_operation(self, *args, **kwargs)
 
     def max(self, *args, **kwargs):
         """Get the maximum data value(s) of a series. Supports an optional ``data_label`` argument."""
+        if len(self) > 0 and not self._item_data_reference:
+            raise TypeError('Time series items have no data, cannot compute any operation')
         from .operations import max as max_operation
         return max_operation(self, *args, **kwargs)    
 
     def avg(self, *args, **kwargs):
         """Get the average data value(s) of a series. Supports an optional ``data_label`` argument."""
+        if len(self) > 0 and not self._item_data_reference:
+            raise TypeError('Time series items have no data, cannot compute any operation')
         from .operations import avg as avg_operation
         return avg_operation(self, *args, **kwargs)   
 
     def sum(self, *args, **kwargs):
         """Sum every data value(s) of a series. Supports an optional ``data_label`` argument."""
+        if len(self) > 0 and not self._item_data_reference:
+            raise TypeError('Time series items have no data, cannot compute any operation')
         from .operations import sum as sum_operation
         return sum_operation(self, *args, **kwargs)  
 
@@ -1566,123 +1440,76 @@ class DataSlotSeries(SlotSeries):
         """Compute the derivative of the series. Extra parameters: ``inplace`` (defaulted to false),
         ``normalize`` (defaulted to true), ``diffs`` (defaulted to false) to compute differences
         instead of the derivative."""
+        if len(self) > 0 and not self._item_data_reference:
+            raise TypeError('Time series items have no data, cannot compute any operation')
         from .operations import derivative as derivative_operation
         return derivative_operation(self, *args, **kwargs)   
 
     def integral(self, *args, **kwargs):
         """Compute the integral of the series. Extra parameters: ``inplace`` (defaulted to false),
         ``normalize`` (defaulted to true), ``c`` (defaulted to zero) for the integration constant."""
+        if len(self) > 0 and not self._item_data_reference:
+            raise TypeError('Time series items have no data, cannot compute any operation')
         from .operations import integral as integral_operation
         return integral_operation(self, *args, **kwargs)   
 
     def diff(self, *args, **kwargs):
         """Compute the incremental differences. Extra parameters: ``inplace`` (defaulted to false)."""
+        if len(self) > 0 and not self._item_data_reference:
+            raise TypeError('Time series items have no data, cannot compute any operation')
         from .operations import diff as diff_operation
         return diff_operation(self, *args, **kwargs)   
 
     def csum(self, *args, **kwargs):
         """Compute the incremental sum. Extra parameters: ``inplace`` (defaulted to false),
         ``offset`` (defaulted to zero) to set the starting value where to apply the sums on."""
+        if len(self) > 0 and not self._item_data_reference:
+            raise TypeError('Time series items have no data, cannot compute any operation')
         from .operations import csum as csum_operation
         return csum_operation(self, *args, **kwargs)
 
     def normalize(self, *args, **kwargs):
         """Normalize the time series data values. Extra parameters: ``inplace`` (defaulted to false)."""
+        if len(self) > 0 and not self._item_data_reference:
+            raise TypeError('Time series items have no data, cannot compute any operation')
         from .operations import normalize as normalize_operation
         return normalize_operation(self, *args, **kwargs)   
 
     def rescale(self, *args, **kwargs):
         """Rescale the time series data values. Extra parameters: ``inplace`` (defaulted to false)."""
+        if len(self) > 0 and not self._item_data_reference:
+            raise TypeError('Time series items have no data, cannot compute any operation')
         from .operations import rescale as rescale_operation
         return rescale_operation(self, *args, **kwargs)
 
     def offset(self, *args, **kwargs):
         """Offset the time series data values. Extra parameters: ``inplace`` (defaulted to false)."""
+        if len(self) > 0 and not self._item_data_reference:
+            raise TypeError('Time series items have no data, cannot compute any operation')
         from .operations import offset as offset_operation
         return offset_operation(self, *args, **kwargs)  
-  
+
     def mavg(self, *args, **kwargs):
         """Compute the moving average. Extra parameters: ``inplace`` (defaulted to false)
         and ``window``, a required parameter, for the length of the moving average window."""
+        if len(self) > 0 and not self._item_data_reference:
+            raise TypeError('Time series items have no data, cannot compute any operation')
         from .operations import mavg as mavg_operation
         return mavg_operation(self, *args, **kwargs)
+    
+    def filter(self, *args, **kwargs):
+        # TODO: refactor this to allow generic item properties? Maybe merge with the select operation? cfr same op in the series above
+        """Filter a time series given one or more properties of its elements. Example filtering arguments: ``data_label``, ``from_t``, ``to_t``, ``from_dt``, ``to_dt``."""
+        from .operations import filter as filter_operation
+        return filter_operation(self, *args, **kwargs) 
 
-
-class DataTimeSlotSeries(DataSlotSeries, TimeSlotSeries):
-    """A series of data slots in time, where each item is guaranteed to be in succession and to carry the same data type.
-       
-       Args:
-           *args (list): the series of data time slots.    
-    """
-
-    __TYPE__ = DataTimeSlot
-
-    def __init__(self, *args, **kwargs):
-
-        # Handle df kwarg
-        df = kwargs.pop('df', None)
-        
-        # Handle first argument as dataframe
-        if args and (isinstance(args[0], DataFrame)):
-            df = args[0]
-
-        # Do we have to initialize the time series from a dataframe?        
-        if df is not None:
-
-            # Create data time points list
-            data_time_slots = []
-            
-            # Get data frame labels
-            labels = list(df.columns) 
-
-            # Get TimeUnit directly using and converting the inferred frequncy on the Pandas Data Frame
-            unit_str=df.index.inferred_freq
-            
-            if not unit_str:
-                raise Exception('Cannot infer the time unit for the slots')
-            
-            # Calendar
-            unit_str=unit_str.replace('A', 'Y')    # Year (end) ?
-            unit_str=unit_str.replace('Y', 'Y')    # Year (end) )
-            unit_str=unit_str.replace('AS', 'Y')    # Year (start)
-            unit_str=unit_str.replace('YS', 'Y')    # Year (start)
-            unit_str=unit_str.replace('MS', 'M')    # Month (start)
-            unit_str=unit_str.replace('M', 'M')    # Month (end) 
-            unit_str=unit_str.replace('D', 'D')    # Day
-            
-            # Physical
-            unit_str=unit_str.replace('H', 'h')    # Hour
-            unit_str=unit_str.replace('T', 'm')    # Minute
-            unit_str=unit_str.replace('min', 'm')  # Minute
-            unit_str=unit_str.replace('S', 's')    # Second
-            
-            if len(unit_str) == 1:
-                unit_str = '1'+unit_str
-            logger.info('Assuming a slot time unit of "{}"'.format(unit_str))
-            
-            for row in df.iterrows():
-                
-                # Set the timestamp
-                if not isinstance(row[0], datetime):
-                    raise TypeError('A DataFrame with a DateTime index column is required')
-                dt = row[0]
-                
-                # Prepare data
-                data = {}
-                for i,label in enumerate(labels):
-                    data[label] = row[1][i]
-                data_time_slots.append(DataTimeSlot(dt=dt, unit=TimeUnit(unit_str), data=data))
-            
-            # Set the list of data time points
-            super(DataTimeSlotSeries, self).__init__(*data_time_slots, **kwargs)
-            return None
-        
-        # Original init
-        super(DataTimeSlotSeries, self).__init__(*args, **kwargs)
+    #=========================
+    #  Conversion-related
+    #=========================
 
     @property
     def df(self):
-        """The time series as a Pandas DataFrame object."""
+        """The time series as a Pandas data frame object."""
         data_labels = self.data_labels()
         
         dump_data_loss = False
@@ -1707,8 +1534,12 @@ class DataTimeSlotSeries(DataSlotSeries, TimeSlotSeries):
         
         return df
 
+    #=========================
+    #  Plot-related
+    #=========================
+      
     def plot(self, engine='dg', *args, **kwargs):
-        """Plot the time series. The default plotting engine is Dygraphs (``engine=\'dg\'``ƒ),
+        """Plot the time series. The default plotting engine is Dygraphs (``engine=\'dg\'``),
            limited support for Matplotplib (``engine=\'mp\'``) is also available.
            For plotting options for Dygraphs, see :func:`~.plots.dygraphs_plot`, while for
            plotting options for Matplotlib, see :func:`~.plots.matplotlib_plot`.""" 
@@ -1720,22 +1551,28 @@ class DataTimeSlotSeries(DataSlotSeries, TimeSlotSeries):
             out = dygraphs_plot(self, *args, **kwargs)
             if out: return out
         else:
-            raise Exception('Unknown plotting engine "{}'.format(engine))
+            raise ValueError('Unknown plotting engine "{}'.format(engine))
 
-    def __repr__(self):
-        if len(self):
-            # TODO: "slots of unit" ?
-            return 'Time series of #{} slots of {}, from slot starting @ {} ({}) to slot starting @ {} ({})'.format(len(self), self.resolution, self[0].start.t, self[0].start.dt, self[-1].start.t, self[-1].start.dt)            
-        else:
-            return 'Time series of #0 slots'
 
-    # Transformations
-    def slot(self, unit, *args, **kwargs):
-        """Re-agregate the series in slots of a length set by the ``unit`` parameter."""
+    #=========================
+    #  Transformations
+    #=========================
+    def aggregate(self, unit, *args, **kwargs):
+        """Aggregate the time series in slots of a length set by the ``unit`` parameter."""
+        if len(self) > 0 and not self._item_data_reference:
+            raise TypeError('Time series items have no data, cannot compute any transformation')
         from .transformations import Aggregator
         aggregator = Aggregator(unit, *args, **kwargs)
         return aggregator.process(self)  
 
+    def resample(self, unit, *args, **kwargs):
+        """Resample the time series using a sampling interval of a length set by the ``unit`` parameter."""
+        if len(self) > 0 and not self._item_data_reference:
+            raise TypeError('Time series items have no data, cannot compute any transformation')
+        from .transformations import Resampler
+        resampler = Resampler(unit, *args, **kwargs)
+        return resampler.process(self) 
+   
 
 
 #==============================
@@ -1882,5 +1719,42 @@ class SeriesSlice(Series):
 
 
 
+#=========================
+# For back-compatibility
+#=========================
 
+class DataPointSeries(Series): 
+    '''This class is deprecated in favour of the TimeSeries class.'''
+    def __init__(self, *args, **kwargs):
+        logger.warning('The DataPointSeries class is deprecated, please replace it with the new TimeSeries class.')
+        super(DataPointSeries, self).__init__(*args, **kwargs)
 
+class DataSlotSeries(Series):
+    '''This class is deprecated in favour of the TimeSeries class.'''
+    def __init__(self, *args, **kwargs):
+        logger.warning('The DataSlotSeries class is deprecated, please replace it with the new TimeSeries class.')
+        super(DataSlotSeries, self).__init__(*args, **kwargs)
+
+class TimePointSeries(TimeSeries):
+    '''This class is deprecated in favour of the TimeSeries class.'''
+    def __init__(self, *args, **kwargs):
+        logger.warning('The DataPointSeries class is deprecated, please replace it with the new TimeSeries class.')
+        super(TimePointSeries, self).__init__(*args, **kwargs)
+
+class DataTimePointSeries(TimeSeries):
+    '''This class is deprecated in favour of the TimeSeries class.'''
+    def __init__(self, *args, **kwargs):
+        logger.warning('The DataTimePointSeries class is deprecated, please replace it with the new TimeSeries class.')
+        super(DataTimePointSeries, self).__init__(*args, **kwargs)
+
+class TimeSlotSeries(TimeSeries):
+    '''This class is deprecated in favour of the TimeSeries class.'''
+    def __init__(self, *args, **kwargs):
+        logger.warning('The TimeSlotSeries class is deprecated, please replace it with the new TimeSeries class.')
+        super(TimeSlotSeries, self).__init__(*args, **kwargs)
+
+class DataTimeSlotSeries(TimeSeries):
+    '''This class is deprecated in favour of the TimeSeries class.'''
+    def __init__(self, *args, **kwargs):
+        logger.warning('The DataTimeSlotSeries class is deprecated, please replace it with the new TimeSeries class.')
+        super(DataTimeSlotSeries, self).__init__(*args, **kwargs)

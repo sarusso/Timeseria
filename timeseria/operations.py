@@ -3,7 +3,7 @@
 
 from copy import copy, deepcopy
 from .time import s_from_dt
-from .datastructures import Series, Slot, Point, DataTimePointSeries, DataTimeSlotSeries
+from .datastructures import Series, Slot, Point
 from .utilities import is_close
 from .units import TimeUnit, Unit
 from .exceptions import ConsistencyException 
@@ -748,12 +748,10 @@ class Filter(SeriesOperation):
         
         # Re-set reference data as well
         try:
-            filtered_series._item_data_reference
+            filtered_series._item_data_reference = filtered_series[0].data
         except AttributeError:
             pass
-        else:
-            filtered_series._item_data_reference = filtered_series[0].data
-
+        
         return filtered_series 
 
 
@@ -816,7 +814,7 @@ class Merge(SeriesOperation):
                 reference_series = series
 
         # Create the (empty) result time series 
-        result_series = seriess[0].__class__(unit=resolution)
+        result_series = seriess[0].__class__()
         
         # Scroll the time series to get the offsets
         offsets = {}
