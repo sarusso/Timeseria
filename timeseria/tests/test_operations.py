@@ -1,7 +1,5 @@
 import unittest
-import os
-from ..datastructures import TimePoint, DataTimePoint, DataTimeSlotSeries, DataTimeSlot
-from ..datastructures import TimePointSeries, DataTimePointSeries
+from ..datastructures import TimePoint, DataTimePoint , DataTimeSlot, TimeSeries
 from ..operations import derivative, integral, diff, csum, min, max, avg, filter, select, mavg, normalize, merge, offset, rescale
 from ..operations import Operation
 
@@ -29,16 +27,16 @@ class TestMathOperations(unittest.TestCase):
         # TODO: duplicate the test for points/slots? At the moment points are tested at the end
 
         # Test on empty, single point or variable resolution time serie
-        series = DataTimePointSeries()
+        series = TimeSeries()
         with self.assertRaises(ValueError):
             diff(series)
 
-        series = DataTimePointSeries()
+        series = TimeSeries()
         series.append(DataTimePoint(t=0, data={'value':10}))
         with self.assertRaises(ValueError):
             diff(series)
 
-        series = DataTimePointSeries()
+        series = TimeSeries()
         series.append(DataTimePoint(t=0, data={'value':10}))
         series.append(DataTimePoint(t=1, data={'value':11}))
         series.append(DataTimePoint(t=8, data={'value':12})) 
@@ -46,7 +44,7 @@ class TestMathOperations(unittest.TestCase):
             diff(series)
   
         # Test data for the next tests        
-        series = DataTimeSlotSeries()
+        series = TimeSeries()
         series.append(DataTimeSlot(start=TimePoint(0), end=TimePoint(60), data={'value':10}, data_loss=0.1))
         series.append(DataTimeSlot(start=TimePoint(60), end=TimePoint(120), data={'value':12}, data_loss=0.2))
         series.append(DataTimeSlot(start=TimePoint(120), end=TimePoint(180), data={'value':15}, data_loss=0.3))
@@ -94,7 +92,7 @@ class TestMathOperations(unittest.TestCase):
         #self.assertEqual(series[3].data['value_diff'],1)
 
         # Multi-key Test data (on points)
-        series = DataTimePointSeries()
+        series = TimeSeries()
         series.append(DataTimePoint(t=0, data={'value':10, 'another_value': 75}))
         series.append(DataTimePoint(t=60, data={'value':12, 'another_value': 65}))
         series.append(DataTimePoint(t=120, data={'value':6, 'another_value': 32}))
@@ -117,16 +115,16 @@ class TestMathOperations(unittest.TestCase):
 
         # Test on empty, single point or variable resolution time serie
         with self.assertRaises(ValueError):
-            series = DataTimePointSeries()
+            series = TimeSeries()
             derivative(series)
 
         with self.assertRaises(ValueError):
-            series = DataTimePointSeries()
+            series = TimeSeries()
             series.append(DataTimePoint(t=0, data={'value':10}))
             derivative(series)
         
         # Test data        
-        series = DataTimeSlotSeries()
+        series = TimeSeries()
         series.append(DataTimeSlot(start=TimePoint(0), end=TimePoint(1), data={'value':10}, data_loss=0.1))
         series.append(DataTimeSlot(start=TimePoint(1), end=TimePoint(2), data={'value':12}, data_loss=0.2))
         series.append(DataTimeSlot(start=TimePoint(2), end=TimePoint(3), data={'value':15}, data_loss=0.3))
@@ -160,7 +158,7 @@ class TestMathOperations(unittest.TestCase):
         self.assertEqual(derivative_integral_series[3].data_loss, 0.4)
 
         # Test data        
-        series = DataTimeSlotSeries()
+        series = TimeSeries()
         series.append(DataTimeSlot(start=TimePoint(0), end=TimePoint(10), data={'value':10}))
         series.append(DataTimeSlot(start=TimePoint(10), end=TimePoint(20), data={'value':12}))
         series.append(DataTimeSlot(start=TimePoint(20), end=TimePoint(30), data={'value':15}))
@@ -175,7 +173,7 @@ class TestMathOperations(unittest.TestCase):
         self.assertAlmostEqual(derivative_series[3].data['value_derivative'],0.1)        
 
         # Multi-key Test data
-        series = DataTimePointSeries()
+        series = TimeSeries()
         series.append(DataTimePoint(t=0, data={'value':10, 'another_value': 75}))
         series.append(DataTimePoint(t=10, data={'value':12, 'another_value': 65}))
         series.append(DataTimePoint(t=20, data={'value':6, 'another_value': 32}))
@@ -187,7 +185,7 @@ class TestMathOperations(unittest.TestCase):
         self.assertAlmostEqual(derivative_series[1].data['another_value_derivative'],-2.15)
 
         # Test derivative-integral identity with the data     
-        series = DataTimeSlotSeries()
+        series = TimeSeries()
         series.append(DataTimeSlot(start=TimePoint(0), end=TimePoint(1), data={'value':0}))
         series.append(DataTimeSlot(start=TimePoint(1), end=TimePoint(2), data={'value':6}))
         series.append(DataTimeSlot(start=TimePoint(2), end=TimePoint(3), data={'value':14}))
@@ -204,7 +202,7 @@ class TestMathOperations(unittest.TestCase):
         self.assertAlmostEqual(derivative_integral_series[4].data['value_derivative_integral'],20)
 
         # Variable sampling rate
-        series = DataTimePointSeries()
+        series = TimeSeries()
         series.append(DataTimePoint(t=0,  data={'value':0}))
         series.append(DataTimePoint(t=1,  data={'value':0.5}))
         series.append(DataTimePoint(t=2,  data={'value':1}))
@@ -228,9 +226,9 @@ class TestMathOperations(unittest.TestCase):
         self.assertAlmostEqual(derivative_integral_series[4].data['value_derivative_integral'],3.5)
 
     def test_normalize(self):
-        series =  DataTimePointSeries(DataTimePoint(t=60, data={'a':2, 'b':6}, data_loss=0.1),
-                                      DataTimePoint(t=120, data={'a':4, 'b':9}, data_loss=0.2),
-                                      DataTimePoint(t=180, data={'a':8, 'b':3}, data_loss=0.3))
+        series =  TimeSeries(DataTimePoint(t=60, data={'a':2, 'b':6}, data_loss=0.1),
+                             DataTimePoint(t=120, data={'a':4, 'b':9}, data_loss=0.2),
+                             DataTimePoint(t=180, data={'a':8, 'b':3}, data_loss=0.3))
 
         normalized_series = normalize(series)
 
@@ -255,9 +253,9 @@ class TestMathOperations(unittest.TestCase):
 
 
     def test_rescale(self):
-        series = DataTimePointSeries(DataTimePoint(t=60, data={'a':2, 'b':6}, data_loss=0.1),
-                                     DataTimePoint(t=120, data={'a':4, 'b':9}, data_loss=0.2),
-                                     DataTimePoint(t=180, data={'a':8, 'b':3}, data_loss=0.3))
+        series = TimeSeries(DataTimePoint(t=60, data={'a':2, 'b':6}, data_loss=0.1),
+                            DataTimePoint(t=120, data={'a':4, 'b':9}, data_loss=0.2),
+                            DataTimePoint(t=180, data={'a':8, 'b':3}, data_loss=0.3))
         
         # Rescale with single value
         rescaled_series = rescale(series, 2)
@@ -286,9 +284,9 @@ class TestMathOperations(unittest.TestCase):
 
 
     def test_offset(self):
-        series = DataTimePointSeries(DataTimePoint(t=60, data={'a':2, 'b':6}, data_loss=0.1),
-                                     DataTimePoint(t=120, data={'a':4, 'b':9}, data_loss=0.2),
-                                     DataTimePoint(t=180, data={'a':8, 'b':3}, data_loss=0.3))
+        series = TimeSeries(DataTimePoint(t=60, data={'a':2, 'b':6}, data_loss=0.1),
+                            DataTimePoint(t=120, data={'a':4, 'b':9}, data_loss=0.2),
+                            DataTimePoint(t=180, data={'a':8, 'b':3}, data_loss=0.3))
         
         # Offset with single value
         offsetted_series = offset(series, 10)
@@ -318,7 +316,7 @@ class TestMathOperations(unittest.TestCase):
 
     def test_mavg(self):
 
-        series = DataTimeSlotSeries()
+        series = TimeSeries()
         series.append(DataTimeSlot(start=TimePoint(0), end=TimePoint(1), data={'value':2}, data_loss=0.1))
         series.append(DataTimeSlot(start=TimePoint(1), end=TimePoint(2), data={'value':4}, data_loss=0.2))
         series.append(DataTimeSlot(start=TimePoint(2), end=TimePoint(3), data={'value':8}, data_loss=0.3))
@@ -352,7 +350,7 @@ class TestMathOperations(unittest.TestCase):
         self.assertEqual(max([1,2,3]),3)
         
         # Test data
-        series = DataTimeSlotSeries()
+        series = TimeSeries()
         series.append(DataTimeSlot(start=TimePoint(0), end=TimePoint(60), data={'value':10}))
         series.append(DataTimeSlot(start=TimePoint(60), end=TimePoint(120), data={'value':12}))
         series.append(DataTimeSlot(start=TimePoint(120), end=TimePoint(180), data={'value':6}))
@@ -369,7 +367,7 @@ class TestMathOperations(unittest.TestCase):
         self.assertEqual(series.avg(), 11)
 
         # Multi-key Test data
-        series = DataTimePointSeries()
+        series = TimeSeries()
         series.append(DataTimePoint(t=0, data={'value':10, 'another_value': 75}))
         series.append(DataTimePoint(t=60, data={'value':12, 'another_value': 65}))
         series.append(DataTimePoint(t=120, data={'value':6, 'another_value': 32}))
@@ -390,8 +388,8 @@ class TestMathOperations(unittest.TestCase):
 
     def test_avg_weighted(self):
    
-        series1 = DataTimePointSeries()
-        series2 = DataTimePointSeries()
+        series1 = TimeSeries()
+        series2 = TimeSeries()
   
         point = DataTimePoint(t=-3, data={'value':3})
         point.weight=0
@@ -437,7 +435,7 @@ class TestSeriesOperations(unittest.TestCase):
     
     def test_filter(self):
 
-        test_time_point_series = TimePointSeries(TimePoint(t=60),TimePoint(t=120),TimePoint(t=130))
+        test_time_point_series = TimeSeries(TimePoint(t=60),TimePoint(t=120),TimePoint(t=130))
 
         # Test from/to filtering
         self.assertEqual(len(filter(test_time_point_series, from_t=1, to_t=140)),3)
@@ -449,9 +447,9 @@ class TestSeriesOperations(unittest.TestCase):
         self.assertEqual(len(test_time_point_series.filter(to_t=61)),1)
 
         # Test  data
-        series =  DataTimePointSeries(DataTimePoint(t=60, data={'a':1, 'b':2}),
-                                      DataTimePoint(t=120, data={'a':2, 'b':4}),
-                                      DataTimePoint(t=180, data={'a':3, 'b':8}))
+        series =  TimeSeries(DataTimePoint(t=60, data={'a':1, 'b':2}),
+                             DataTimePoint(t=120, data={'a':2, 'b':4}),
+                             DataTimePoint(t=180, data={'a':3, 'b':8}))
 
         # Test get item by string key (filtering on data labels)
         self.assertEqual(filter(series, 'b')[0].data, {'b': 2})
@@ -470,7 +468,7 @@ class TestSeriesOperations(unittest.TestCase):
     def test_select(self):
     
         # Test data
-        series = DataTimePointSeries()
+        series = TimeSeries()
         series.append(DataTimePoint(t=0, data={'value':10, 'another_value': 75}))
         series.append(DataTimePoint(t=60, data={'value':12, 'another_value': 65}))
         series.append(DataTimePoint(t=120, data={'value':6, 'another_value': 32}))
@@ -484,14 +482,14 @@ class TestSeriesOperations(unittest.TestCase):
     def test_merge(self):
     
         # Test data
-        series1 = DataTimePointSeries()
+        series1 = TimeSeries()
         series1.append(DataTimePoint(t=0, data={'value':10}, data_loss=0.1))
         series1.append(DataTimePoint(t=60, data={'value':12}, data_loss=0.2))
         series1.append(DataTimePoint(t=120, data={'value':6}, data_loss=0.3))
         series1.append(DataTimePoint(t=180, data={'value':16}, data_loss=0.4))
         series1.append(DataTimePoint(t=240, data={'value':20}, data_loss=0.5))
 
-        series2 = DataTimePointSeries()
+        series2 = TimeSeries()
         series2.append(DataTimePoint(t=0, data={'another_value': 75}, data_loss=0.01))
         series2.append(DataTimePoint(t=60, data={'another_value': 65}, data_loss=0.02))
         series2.append(DataTimePoint(t=120, data={'another_value': 32}, data_loss=0.03))

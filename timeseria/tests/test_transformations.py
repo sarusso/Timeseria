@@ -1,6 +1,6 @@
 import unittest
 import os
-from ..datastructures import DataTimePoint, DataTimePointSeries
+from ..datastructures import DataTimePoint, TimeSeries
 from ..transformations import Resampler, Aggregator 
 from ..time import dt, s_from_dt, dt_from_str
 from ..units import TimeUnit
@@ -18,7 +18,7 @@ class TestResampler(unittest.TestCase):
     def test_resample_minimal(self):
         
         # Test series
-        series = DataTimePointSeries()
+        series = TimeSeries()
         series.append(DataTimePoint(t=-4,  data={'value':4}))
         series.append(DataTimePoint(t=-3,  data={'value':3}))
         series.append(DataTimePoint(t=-2,  data={'value':2}))
@@ -59,7 +59,7 @@ class TestResampler(unittest.TestCase):
     def test_resample_basic(self):
         
         # Test series
-        series = DataTimePointSeries()
+        series = TimeSeries()
         series.append(DataTimePoint(t=-3,  data={'value':3}))
         series.append(DataTimePoint(t=-2,  data={'value':2}))
         series.append(DataTimePoint(t=-1,  data={'value':1}))
@@ -157,7 +157,7 @@ class TestResampler(unittest.TestCase):
     def test_upsample(self):
         
         # Test series
-        series = DataTimePointSeries()
+        series = TimeSeries()
         series.append(DataTimePoint(t=-3,  data={'value':3}))
         series.append(DataTimePoint(t=-2,  data={'value':2}))
         series.append(DataTimePoint(t=-1,  data={'value':1}))
@@ -194,7 +194,7 @@ class TestResampler(unittest.TestCase):
     def test_resample_edge_1(self):
         
         # Create 5-minute test data with 
-        series = DataTimePointSeries()
+        series = TimeSeries()
         series.append(DataTimePoint(t = (60*20), data = {'value': 1.55}))
         series.append(DataTimePoint(t = (60*25), data = {'value': 1.58}))
         series.append(DataTimePoint(t = (60*30), data = {'value': 1.61}))
@@ -242,7 +242,7 @@ class TestResampler(unittest.TestCase):
     def test_resample_edge_2(self):
 
         # Create 5-minute test data  with ten secs ofset
-        series = DataTimePointSeries()
+        series = TimeSeries()
         series.append(DataTimePoint(t = (60*20)+10, data = {'value': 1.55}))
         series.append(DataTimePoint(t = (60*25)+10, data = {'value': 1.58}))
         series.append(DataTimePoint(t = (60*30)+10, data = {'value': 1.61}))
@@ -293,7 +293,7 @@ class TestResampler(unittest.TestCase):
     def test_resampler_data_indexes(self):
         
         # Time series from 16:58:00 to 17:32:00 (Europe/Rome)
-        series = DataTimePointSeries()
+        series = TimeSeries()
         start_t = 1436022000 - 120
         for i in range(35):
             if i > 10 and i < 15:
@@ -368,7 +368,7 @@ class TestAggregator(unittest.TestCase):
     def setUp(self):       
                 
         # Time series at 1m resolution from 14:58:00 to 15:32:00 (UTC)
-        self.series_1 = DataTimePointSeries()
+        self.series_1 = TimeSeries()
         start_t = 1436022000 - 120
         for i in range(35):
             point = DataTimePoint(t = start_t + (i*60),
@@ -376,7 +376,7 @@ class TestAggregator(unittest.TestCase):
             self.series_1.append(point)
         
         # Time series at 1m resolution  from 14:00:00 to 15:30:00 (UTC)
-        self.series_2 = DataTimePointSeries()
+        self.series_2 = TimeSeries()
         start_t = 1436022000
         for i in range(34):
             point = DataTimePoint(t = start_t + (i*60),
@@ -384,7 +384,7 @@ class TestAggregator(unittest.TestCase):
             self.series_2.append(point)
 
         # Time series at 1m resolution from 14:00:00 to 13:20:00 (UTC)
-        self.series_3 = DataTimePointSeries()
+        self.series_3 = TimeSeries()
         start_t = 1436022000 - 120
         for i in range(23):
             point = DataTimePoint(t = start_t + (i*60),
@@ -392,7 +392,7 @@ class TestAggregator(unittest.TestCase):
             self.series_3.append(point) 
         
         # Time series at 1m resolution from 14:10:00 to 15:30:00 (UTC)
-        self.series_4 = DataTimePointSeries()
+        self.series_4 = TimeSeries()
         start_t = 1436022000 + 600
         for i in range(21):
             point = DataTimePoint(t = start_t + (i*60),
@@ -400,7 +400,7 @@ class TestAggregator(unittest.TestCase):
             self.series_4.append(point)
 
         # Time series at 1m resolution from 14:58:00 to 15:32:00 (UTC)
-        self.series_5 = DataTimePointSeries()
+        self.series_5 = TimeSeries()
         start_t = 1436022000 - 120
         for i in range(35):
             if i > 10 and i <21:
@@ -413,7 +413,7 @@ class TestAggregator(unittest.TestCase):
         from_dt  = dt(2019,10,1,1,0,0, tzinfo='Europe/Rome')
         to_dt    = dt(2019,10,1,6,0,0, tzinfo='Europe/Rome')
         time_unit = TimeUnit('15m') 
-        self.series_6 = DataTimePointSeries()
+        self.series_6 = TimeSeries()
         slider_dt = from_dt
         count = 0
         while slider_dt < to_dt:
@@ -429,7 +429,7 @@ class TestAggregator(unittest.TestCase):
         from_dt   = dt(2019,10,24,0,0,0, tzinfo='Europe/Rome')
         to_dt     = dt(2019,10,31,0,0,0, tzinfo='Europe/Rome')
         time_unit = TimeUnit('1h') 
-        self.series_7 = DataTimePointSeries()
+        self.series_7 = TimeSeries()
         slider_dt = from_dt
         count = 0
         while slider_dt < to_dt:
@@ -525,7 +525,7 @@ class TestAggregator(unittest.TestCase):
 
     def test_upslot(self):
 
-        series = DataTimePointSeries()
+        series = TimeSeries()
         series.append(DataTimePoint(t = 0, data = {'value': 0}))
         series.append(DataTimePoint(t = 3600, data = {'value': 3600}))
         series.append(DataTimePoint(t = 7200, data = {'value': 7200}))
@@ -563,7 +563,7 @@ class TestAggregator(unittest.TestCase):
         from ..operations import min, max, avg, sum
  
         # Time series from 16:58:00 to 17:32:00 (Europe/Rome)
-        series = DataTimePointSeries()
+        series = TimeSeries()
         start_t = 1436022000 - 120
         for i in range(35):
             point = DataTimePoint(t = start_t + (i*60),
@@ -601,7 +601,7 @@ class TestAggregator(unittest.TestCase):
 
 
         # Time series from 16:58:00 to 17:32:00 (Europe/Rome) with a full short (single-slot) gap to be interpolated
-        series = DataTimePointSeries()
+        series = TimeSeries()
         start_t = 1436022000 - 120
         for i in range(35):
             if i < 12 or i > 22:
@@ -628,7 +628,7 @@ class TestAggregator(unittest.TestCase):
 
             
         # Time series from 16:58:00 to 17:32:00 (Europe/Rome) with a full long (multi-slot) gap to be interpolated
-        series = DataTimePointSeries()
+        series = TimeSeries()
         start_t = 1436022000 - 120
         for i in range(60):
             if i < 10 or i >48:
@@ -662,7 +662,7 @@ class TestAggregator(unittest.TestCase):
     def test_slot_data_indexes(self):
         
         # Time series from 16:58:00 to 17:32:00 (Europe/Rome)
-        series = DataTimePointSeries()
+        series = TimeSeries()
         start_t = 1436022000 - 120
         for i in range(35):
             if i > 10 and i < 15:

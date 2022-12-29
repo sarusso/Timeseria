@@ -395,8 +395,9 @@ class TimeUnit(Unit):
         try:
             if self.as_seconds() == other:
                 return True
-        except TypeError:
-            # Raised if this or the other other TimeUnit is of calendar type
+        except (TypeError, ValueError):
+            # Raised if this or the other other TimeUnit is of calendar type, e.g.
+            # ValueError: You can ask to get a calendar TimeUnit as seconds only if you provide the unit starting point
             pass            
 
         # If everything fails, return false:

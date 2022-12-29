@@ -1,6 +1,6 @@
 import unittest
 import os
-from ..datastructures import DataTimePoint, DataTimeSlot, DataTimePointSeries, DataTimeSlotSeries
+from ..datastructures import DataTimePoint, DataTimeSlot, TimeSeries
 from ..storages import CSVFileStorage
 from ..units import TimeUnit
 
@@ -263,10 +263,10 @@ class TestCSVFileStorage(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             
             # Test on points
-            data_time_point_series = DataTimePointSeries(DataTimePoint(t=60, data=[23.8,3], data_loss=0.1),
-                                                         DataTimePoint(t=120, data=[24.1,4], data_loss=0.2),
-                                                         DataTimePoint(t=240, data=[23.1,5], data_loss=0.3),
-                                                         DataTimePoint(t=300, data=[22.7,6], data_loss=0.4))
+            data_time_point_series = TimeSeries(DataTimePoint(t=60, data=[23.8,3], data_loss=0.1),
+                                                DataTimePoint(t=120, data=[24.1,4], data_loss=0.2),
+                                                DataTimePoint(t=240, data=[23.1,5], data_loss=0.3),
+                                                DataTimePoint(t=300, data=[22.7,6], data_loss=0.4))
             data_time_point_series.change_timezone('Europe/Rome')
        
             storage = CSVFileStorage('/{}/file_1.csv'.format(temp_dir))
@@ -280,7 +280,7 @@ class TestCSVFileStorage(unittest.TestCase):
             # Test getting back the series from the storage
             series = storage.get()
             self.assertEqual(len(series),4)
-            self.assertTrue(isinstance(series, DataTimePointSeries))
+            self.assertTrue(isinstance(series[0], DataTimePoint))
             
             # Test indexes correctly se by the get
             self.assertEqual(len(series[0].data_indexes),1)
@@ -288,10 +288,10 @@ class TestCSVFileStorage(unittest.TestCase):
             self.assertEqual(series[3].data_indexes['data_loss'], 0.4)
             
             # Now tes on slots
-            data_time_point_series = DataTimeSlotSeries(DataTimeSlot(t=60, unit=TimeUnit('1m'), data=[23.8,3], data_loss=0.1),
-                                                        DataTimeSlot(t=120, unit=TimeUnit('1m'), data=[24.1,4], data_loss=0.2),
-                                                        DataTimeSlot(t=180, unit=TimeUnit('1m'), data=[23.1,5], data_loss=0.3),
-                                                        DataTimeSlot(t=240, unit=TimeUnit('1m'), data=[22.7,6], data_loss=0.4))
+            data_time_point_series = TimeSeries(DataTimeSlot(t=60, unit=TimeUnit('1m'), data=[23.8,3], data_loss=0.1),
+                                                DataTimeSlot(t=120, unit=TimeUnit('1m'), data=[24.1,4], data_loss=0.2),
+                                                DataTimeSlot(t=180, unit=TimeUnit('1m'), data=[23.1,5], data_loss=0.3),
+                                                DataTimeSlot(t=240, unit=TimeUnit('1m'), data=[22.7,6], data_loss=0.4))
             data_time_point_series.change_timezone('Europe/Rome')
             
             storage = CSVFileStorage('/{}/file_2.csv'.format(temp_dir))
@@ -305,7 +305,7 @@ class TestCSVFileStorage(unittest.TestCase):
             # Test getting back the series from the storage
             series = storage.get(as_slots=True)
             self.assertEqual(len(series),4)
-            self.assertTrue(isinstance(series, DataTimeSlotSeries))
+            self.assertTrue(isinstance(series[0], DataTimeSlot))
 
             # Test indexes correctly se by the get
             self.assertEqual(len(series[0].data_indexes),1)

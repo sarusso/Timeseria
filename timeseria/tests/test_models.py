@@ -2,7 +2,7 @@ import unittest
 import os
 import tempfile
 from math import sin, cos
-from ..datastructures import DataTimeSlotSeries, DataTimeSlot, TimePoint, DataTimePoint, DataTimePointSeries
+from ..datastructures import TimePoint, DataTimeSlot, DataTimePoint, TimeSeries
 from ..models import Model, ParametricModel, TimeSeriesParametricModel, KerasModel
 from ..models import PeriodicAverageReconstructor, PeriodicAverageForecaster, PeriodicAverageAnomalyDetector
 from ..models import ProphetForecaster, ProphetReconstructor
@@ -50,9 +50,9 @@ class TestBaseModelClasses(unittest.TestCase):
                 pass 
 
         # Define test time series
-        empty_data_time_slot_series = DataTimeSlotSeries()
-        data_time_slot_series = DataTimeSlotSeries(DataTimeSlot(start=TimePoint(t=1), end=TimePoint(t=2), data={'metric1': 56}),
-                                                   DataTimeSlot(start=TimePoint(t=2), end=TimePoint(t=3), data={'metric1': 56}))
+        empty_series = TimeSeries()
+        data_time_slot_series = TimeSeries(DataTimeSlot(start=TimePoint(t=1), end=TimePoint(t=2), data={'metric1': 56}),
+                                           DataTimeSlot(start=TimePoint(t=2), end=TimePoint(t=3), data={'metric1': 56}))
 
         # Instantiate a parametric model
         parametric_model = ParametricModelMock()
@@ -74,7 +74,7 @@ class TestBaseModelClasses(unittest.TestCase):
             parametric_model.fit('hello')
 
         with self.assertRaises(ValueError):
-            parametric_model.fit(empty_data_time_slot_series)
+            parametric_model.fit(empty_series)
                          
         parametric_model.fit(data_time_slot_series)
         
@@ -83,7 +83,7 @@ class TestBaseModelClasses(unittest.TestCase):
             parametric_model.apply('hello')
 
         with self.assertRaises(ValueError):
-            parametric_model.apply(empty_data_time_slot_series)
+            parametric_model.apply(empty_series)
                          
         parametric_model.apply(data_time_slot_series)
         
@@ -107,12 +107,12 @@ class TestBaseModelClasses(unittest.TestCase):
                 pass 
 
         # Define test time series
-        data_time_point_series = DataTimePointSeries(DataTimePoint(t=1, data={'metric1': 0.1}),
-                                                     DataTimePoint(t=2, data={'metric1': 0.2}),
-                                                     DataTimePoint(t=3, data={'metric1': 0.3}),
-                                                     DataTimePoint(t=4, data={'metric1': 0.4}),
-                                                     DataTimePoint(t=5, data={'metric1': 0.5}),
-                                                     DataTimePoint(t=6, data={'metric1': 0.6}),)
+        data_time_point_series = TimeSeries(DataTimePoint(t=1, data={'metric1': 0.1}),
+                                            DataTimePoint(t=2, data={'metric1': 0.2}),
+                                            DataTimePoint(t=3, data={'metric1': 0.3}),
+                                            DataTimePoint(t=4, data={'metric1': 0.4}),
+                                            DataTimePoint(t=5, data={'metric1': 0.5}),
+                                            DataTimePoint(t=6, data={'metric1': 0.6}),)
 
 
         # Test window generation functions
@@ -160,7 +160,7 @@ class TestReconstructors(unittest.TestCase):
         with open(TEST_DATA_PATH + '/csv/temp_slots_1h.csv') as f:
             data=f.read()
         
-        data_time_slot_series = DataTimeSlotSeries()
+        data_time_slot_series = TimeSeries()
         for line in data.split('\n'):
             if line:
                 start_t = float(line.split(',')[0])
@@ -272,12 +272,12 @@ class TestForecasters(unittest.TestCase):
     def setUp(self):
         
         # Create a minute-resolution test DataTimeSlotSeries
-        self.sine_series_minute = DataTimeSlotSeries()
+        self.sine_series_minute = TimeSeries()
         for i in range(1000):
             self.sine_series_minute.append(DataTimeSlot(start=TimePoint(i*60), end=TimePoint((i+1)*60), data={'value':sin(i/10.0)}))
 
         # Create a day-resolution test DataTimeSlotSeries
-        self.sine_series_day = DataTimeSlotSeries()
+        self.sine_series_day = TimeSeries()
         for i in range(1000):
             step = 60 * 60 * 24
             self.sine_series_day.append(DataTimeSlot(start=TimePoint(i*step), end=TimePoint((i+1)*step), data={'value':sin(i/10.0)}))
@@ -498,7 +498,7 @@ class TestForecasters(unittest.TestCase):
             return
 
         # Create a minute-resolution test DataTimeSlotSeries
-        sine_series_minute = DataTimeSlotSeries()
+        sine_series_minute = TimeSeries()
         for i in range(10):
             sine_series_minute.append(DataTimeSlot(start=TimePoint(i*60), end=TimePoint((i+1)*60), data={'value':sin(i/10.0)}))
 
@@ -527,7 +527,7 @@ class TestForecasters(unittest.TestCase):
             return
         
         # Create a minute-resolution test DataTimeSlotSeries
-        sine_series_minute = DataTimeSlotSeries()
+        sine_series_minute = TimeSeries()
         for i in range(10):
             sine_series_minute.append(DataTimeSlot(start=TimePoint(i*60), end=TimePoint((i+1)*60), data={'sin':sin(i/10.0), 'cos':cos(i/10.0)}))
 
@@ -548,7 +548,7 @@ class TestForecasters(unittest.TestCase):
             return
         
         # Create a minute-resolution test DataTimeSlotSeries
-        sine_series_minute = DataTimeSlotSeries()
+        sine_series_minute = TimeSeries()
         for i in range(10):
             sine_series_minute.append(DataTimeSlot(start=TimePoint(i*60), end=TimePoint((i+1)*60), data={'sin':sin(i/10.0), 'cos':cos(i/10.0)}))
 
@@ -577,7 +577,7 @@ class TestAnomalyDetectors(unittest.TestCase):
     def setUp(self):
         
         # Create a minute-resolution test DataTimeSlotSeries
-        self.sine_series_minute = DataTimeSlotSeries()
+        self.sine_series_minute = TimeSeries()
         for i in range(1000):
             if i % 100 == 0:
                 value = 2
