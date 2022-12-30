@@ -738,7 +738,7 @@ class CSVFileStorage(Storage):
                 csv_file.write('# Extra parameters: {{"type": "slots", "tz": "{}", "resolution": "{}"}}\n'.format(timeseries.tz, timeseries.resolution))
 
             else:
-                raise TypeError('Can store only DataTimePointSeries or DataTimeSlotSeries')
+                raise TypeError('Can store only time series of DataTimePoints or DataTimeSlots')
 
 
             # 1) Dump headers

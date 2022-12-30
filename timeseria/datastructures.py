@@ -553,7 +553,7 @@ class DataTimeSlot(DataSlot, TimeSlot):
        use and should not be relied upon.
     
        Args:
-           start(:obj:`TimePoint`): the slot starting time point.
+           start(TimePoint): the slot starting time point.
            end(TimePoint): the slot ending time point.
            unit(TimeUnit): the slot time unit.
            data: the data.
@@ -994,7 +994,7 @@ class TimeSeries(Series):
      
        Args:
            *args: the time series items.
-           df (:obj:`DataFrame`, optional, also as first arg): a Pandas data frame with a time-based index.
+           df (DataFrame, optional, also as first arg): a Pandas data frame with a time-based index.
     """
 
     def __repr__(self):
@@ -1006,7 +1006,7 @@ class TimeSeries(Series):
             elif issubclass(self.items_type, TimeSlot):
                 return 'Time series of #{} slots of {}, from slot starting @ {} ({}) to slot starting @ {} ({})'.format(len(self), self.resolution, self[0].start.t, self[0].start.dt, self[-1].start.t, self[-1].start.dt)            
             else:
-                raise Exception('Got no TimePoints nor TimeSlots in a Time Series, this is a consistency error (got {})'.format(self.items_type.__name__))
+                raise ConsistencyException('Got no TimePoints nor TimeSlots in a Time Series, this is a consistency error (got {})'.format(self.items_type.__name__))
     
     @property
     def items_type(self):
@@ -1702,37 +1702,55 @@ class SeriesSlice(Series):
 #=========================
 
 class DataPointSeries(Series): 
-    '''This class is deprecated in favour of the TimeSeries class.'''
+    """This class is deprecated in favour of the TimeSeries class.
+    
+    :meta private:
+    """
     def __init__(self, *args, **kwargs):
         logger.warning('The DataPointSeries class is deprecated, please replace it with the new TimeSeries class.')
         super(DataPointSeries, self).__init__(*args, **kwargs)
 
 class DataSlotSeries(Series):
-    '''This class is deprecated in favour of the TimeSeries class.'''
+    """This class is deprecated in favour of the TimeSeries class.
+    
+    :meta private:
+    """
     def __init__(self, *args, **kwargs):
         logger.warning('The DataSlotSeries class is deprecated, please replace it with the new TimeSeries class.')
         super(DataSlotSeries, self).__init__(*args, **kwargs)
 
 class TimePointSeries(TimeSeries):
-    '''This class is deprecated in favour of the TimeSeries class.'''
+    """This class is deprecated in favour of the TimeSeries class.
+    
+    :meta private:
+    """
     def __init__(self, *args, **kwargs):
         logger.warning('The DataPointSeries class is deprecated, please replace it with the new TimeSeries class.')
         super(TimePointSeries, self).__init__(*args, **kwargs)
 
 class DataTimePointSeries(TimeSeries):
-    '''This class is deprecated in favour of the TimeSeries class.'''
+    """This class is deprecated in favour of the TimeSeries class.
+    
+    :meta private:
+    """
     def __init__(self, *args, **kwargs):
         logger.warning('The DataTimePointSeries class is deprecated, please replace it with the new TimeSeries class.')
         super(DataTimePointSeries, self).__init__(*args, **kwargs)
 
 class TimeSlotSeries(TimeSeries):
-    '''This class is deprecated in favour of the TimeSeries class.'''
+    """This class is deprecated in favour of the TimeSeries class.
+    
+    :meta private:
+    """
     def __init__(self, *args, **kwargs):
         logger.warning('The TimeSlotSeries class is deprecated, please replace it with the new TimeSeries class.')
         super(TimeSlotSeries, self).__init__(*args, **kwargs)
 
 class DataTimeSlotSeries(TimeSeries):
-    '''This class is deprecated in favour of the TimeSeries class.'''
+    """This class is deprecated in favour of the TimeSeries class.
+    
+    :meta private:
+    """
     def __init__(self, *args, **kwargs):
         logger.warning('The DataTimeSlotSeries class is deprecated, please replace it with the new TimeSeries class.')
         super(DataTimeSlotSeries, self).__init__(*args, **kwargs)

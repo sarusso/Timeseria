@@ -252,8 +252,8 @@ class SlottedTransformation(Transformation):
         # Checks
         if include_extremes:
             raise NotImplementedError('Including the extremes is not yet implemented')        
-        if not isinstance(series[0], DataTimePoint):
-            raise TypeError('Can process only DataTimePointSeries, got "{}"'.format(series.__class__.__name__))
+        if not issubclass(series.items_type, DataTimePoint):
+            raise TypeError('Can process only time series of DataTimePoints, got time series of items type "{}"'.format(series.items_type.__name__))
         if not series:
             raise ValueError('Cannot process empty series')
         if target not in ['points', 'slots']:

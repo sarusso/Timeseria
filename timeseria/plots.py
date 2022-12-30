@@ -322,7 +322,7 @@ def dygraphs_plot(timeseries, data_labels='all', data_indexes='all', aggregate=N
     """Plot a time series using Dygraphs interactive plots.
     
        Args:
-           timeseries(DataTimePointSeries/DataTimeSlotSeries): the time series to plot.
+           timeseries(TimeSeries): the time series to plot.
            data_indexes(list): a list of data_labels to plot. By default set to all the data labels of the series.
            data_indexes(list): a list of data_indexes as the ``data_loss``, ``data_reconstructed`` etc.
                                to plot. By default set to all the data indexes of the series. To disable
