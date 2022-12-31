@@ -10,11 +10,12 @@ if [[ "x$BUILD" != "xFalse" ]]; then
     echo -e  "|  Building the Docker container   |"
     echo -e  "====================================\n"
 
-    cd containers/timeseria
+    cd ../containers/timeseria
     echo "Building Timeseria Docker container. Use BUILD=False to skip."
     ./build.sh
     cd ../../
-
+else
+    cd ..
 fi
                  
 # Build the docs
@@ -26,5 +27,4 @@ echo -e  "====================================\n"
 ENV_VARS="PYTHONWARNINGS=ignore TF_CPP_MIN_LOG_LEVEL=3 PYTHONUNBUFFERED=one"
 
 # Start the build
-cd ../../
 docker run -v $PWD:/opt/Timeseria -it timeseria "cd /opt/Timeseria/docs && $ENV_VARS make clean && make html"
