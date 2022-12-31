@@ -24,5 +24,7 @@ jobs:
           pip install tensorflow==2.7.0
           pip install statsmodels==0.12.1
           pip install pmdarima==1.8
+          pip install pystan==2.19.1.1
+          pip install prophet==1.1.1
       - name: Run tests with unittest
         run: python3 -m unittest discover

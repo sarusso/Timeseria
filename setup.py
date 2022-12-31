@@ -39,7 +39,7 @@ setup(name='timeseria',
                         'tensorflow-gpu': ['tensorflow-gpu >=1.15.2, <3.0.0'],
                         'tensorflow-macos': ['tensorflow-macos >=1.15.2, <3.0.0'],
                         'tensorflow-aarch64': ['tensorflow-aarch64 >=1.15.2, <3.0.0'],
-                        'prophet':['fbprophet==0.6'],
+                        'prophet':['prophet >=1.1.1, <2.0.0'],
                         'arima': ['pmdarima >=1.8, <2.0.0', 'statsmodels >=0.12.1, <1.0.0']
                        },
       license='Apache License 2.0',

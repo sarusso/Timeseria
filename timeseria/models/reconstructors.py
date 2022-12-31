@@ -443,7 +443,7 @@ class ProphetReconstructor(Reconstructor, ProphetModel):
         
     def _fit(self, timeseries, from_t=None, to_t=None, from_dt=None, to_dt=None):
 
-        from fbprophet import Prophet
+        from prophet import Prophet
 
         from_t, to_t = set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
 

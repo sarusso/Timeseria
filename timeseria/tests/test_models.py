@@ -239,9 +239,9 @@ class TestReconstructors(unittest.TestCase):
 
     def test_ProphetReconstructor(self):
         try:
-            import fbprophet
+            import prophet
         except ImportError:
-            print('Skipping Prophet tests as no fbprophet module installed')
+            print('Skipping Prophet tests as no prophet module installed')
             return
             
         # Get test data        
@@ -359,9 +359,9 @@ class TestForecasters(unittest.TestCase):
     def test_ProphetForecaster(self):
 
         try:
-            import fbprophet
+            import prophet
         except ImportError:
-            print('Skipping Prophet tests as no fbprophet module installed')
+            print('Skipping Prophet tests as no prophet module installed')
             return
          
         forecaster = ProphetForecaster()
@@ -374,12 +374,12 @@ class TestForecasters(unittest.TestCase):
 
         # Test the evaluate
         evalation_results = forecaster.evaluate(self.sine_series_day, limit=10)
-        self.assertAlmostEqual(evalation_results['RMSE'], 0.8211270888684844)
-        self.assertAlmostEqual(evalation_results['MAE'], 0.809400693526047)
+        self.assertAlmostEqual(evalation_results['RMSE'], 0.82, places=2)
+        self.assertAlmostEqual(evalation_results['MAE'], 0.81, places=2)
 
         evalation_results = forecaster.evaluate(self.sine_series_day, limit=1)
-        self.assertAlmostEqual(evalation_results['RMSE'], 0.5390915558518541) # For one sample they must be the same
-        self.assertAlmostEqual(evalation_results['MAE'], 0.5390915558518541) # For one sample they must be the same
+        self.assertAlmostEqual(evalation_results['RMSE'], 0.54, places=2) # For one sample they must be the same
+        self.assertAlmostEqual(evalation_results['MAE'], 0.54, places=2) # For one sample they must be the same
         
         # Test on Points as well
         data_time_point_series = CSVFileStorage(TEST_DATA_PATH + '/csv/temperature.csv').get(limit=200)
