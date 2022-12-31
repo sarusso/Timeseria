@@ -38,7 +38,11 @@ if [[ "x$@" == "x" ]] ; then
     # Start Jupyter as default entrypoint
     echo "Running Jupyter..."
     echo ""
-    cd /opt/Timeseria && jupyter notebook --ip=0.0.0.0 --port=$BASE_PORT --NotebookApp.token='' --NotebookApp.notebook_dir=$BASE_DIR
+    
+    cd /opt/Timeseria
+    jupyter nbextension enable --py widgetsnbextension &> /dev/null
+    jupyter trust $BASE_DIR/*
+    jupyter notebook --ip=0.0.0.0 --port=$BASE_PORT --NotebookApp.token='' --NotebookApp.notebook_dir=$BASE_DIR
 
 else
     ENTRYPOINT_COMMAND=$@
