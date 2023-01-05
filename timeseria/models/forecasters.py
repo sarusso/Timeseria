@@ -15,7 +15,7 @@ from math import sqrt
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 
 # Base models and utilities
-from .base import TimeSeriesParametricModel, ProphetModel, ARIMAModel, KerasModel
+from .base import TimeSeriesModel, ProphetModel, ARIMAModel, KerasModel
 
 # Setup logging
 import logging
@@ -41,7 +41,7 @@ except ImportError:
 #  Generic Forecaster
 #======================
 
-class Forecaster(TimeSeriesParametricModel):
+class Forecaster(TimeSeriesModel):
     """A generic forecasting model. Besides the ``predict()`` and  ``apply()`` methods, also provides a ``forecast()``
     method which allows to get the forecasted n steps-ahead full data points or slots.
     
@@ -865,6 +865,7 @@ class LSTMForecaster(KerasModel, Forecaster):
         
     def __init__(self, path=None, window=3, features=['values'], neurons=128, keras_model=None):
 
+        # TODO: move this at the end of the init.
         super(LSTMForecaster, self).__init__(path=path)
         
         # Did the init load a model?

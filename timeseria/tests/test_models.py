@@ -3,7 +3,7 @@ import os
 import tempfile
 from math import sin, cos
 from ..datastructures import TimePoint, DataTimeSlot, DataTimePoint, TimeSeries
-from ..models import Model, ParametricModel, TimeSeriesParametricModel, KerasModel
+from ..models import Model, TimeSeriesModel, KerasModel
 from ..models import PeriodicAverageReconstructor, PeriodicAverageForecaster, PeriodicAverageAnomalyDetector
 from ..models import ProphetForecaster, ProphetReconstructor
 from ..models import ARIMAForecaster, AARIMAForecaster
@@ -30,18 +30,72 @@ np.random.seed(0)
 class TestBaseModelClasses(unittest.TestCase):
 
     def test_Model(self):
+                
+        # Test non-parametric
         model = Model()
+        self.assertFalse(model.is_parametric())
+        self.assertEqual(model._type, 'non-parametric')
+        with self.assertRaises(TypeError):
+            model.save(TEMP_MODELS_DIR+'/test_model')
+        with self.assertRaises(TypeError):
+            model.id
+        
+        # Test parametric 
+        class TestParametricModelOne(Model):
+            def __init__(self, path=None, param1=0):
+                self.data = {}
+                self.data['param1'] = param1
+                super(TestParametricModelOne, self).__init__(path)
+        
+        test_parametric_model_one = TestParametricModelOne(param1=1)
+        self.assertTrue(test_parametric_model_one.is_parametric())
+        self.assertEqual(test_parametric_model_one._type, 'parametric')
+        self.assertEqual(test_parametric_model_one.data['param1'], 1)
+        test_parametric_model_one.save(TEMP_MODELS_DIR+'/test_parametric_model_one')
+        
+        test_parametric_model_one = TestParametricModelOne(TEMP_MODELS_DIR+'/test_parametric_model_one')
+        self.assertTrue(test_parametric_model_one.is_parametric())
+        self.assertEqual(test_parametric_model_one.data['param1'], 1)
 
-
-    def test_ParametricModel(self):
-        # TODO: decouple from the TimeSeriesParametricModel test below
-        parametric_model = ParametricModel()
+        # Test parametric with fit
+        class TestParametricModelTwo(Model):
+            def _fit(self, data):
+                self.data['param1'] = data
+            def _predict(self, data):
+                return self.data['param1'] + data
+            def _apply(self, data):
+                return self.data['param1'] + data
+            def _evaluate(self, data):
+                return self.data['param1'] + data
+        
+        test_parametric_model_two = TestParametricModelTwo()
+        self.assertTrue(test_parametric_model_two.is_parametric())
+        self.assertEqual(test_parametric_model_two._type, 'parametric')        
+        with self.assertRaises(NotFittedError):
+            test_parametric_model_two.predict(3)
+        with self.assertRaises(NotFittedError):
+            test_parametric_model_two.apply(3)
+        with self.assertRaises(NotFittedError):
+            test_parametric_model_two.evaluate(3)
+        with self.assertRaises(NotFittedError):
+            test_parametric_model_two.save(TEMP_MODELS_DIR+'/test_parametric_model_two')
+    
+        test_parametric_model_two.fit(2)
+        self.assertEqual(test_parametric_model_two.data['param1'], 2)
+        self.assertEqual(test_parametric_model_two.predict(3), 5)
+        self.assertEqual(test_parametric_model_two.apply(3), 5)
+        self.assertEqual(test_parametric_model_two.evaluate(3), 5)
+        self.assertEqual(test_parametric_model_two.apply(3), 5)
+        test_parametric_model_two.save(TEMP_MODELS_DIR+'/test_parametric_model_two')        
+        test_parametric_model_two = TestParametricModelTwo(TEMP_MODELS_DIR+'/test_parametric_model_two')
+        self.assertTrue(test_parametric_model_two.is_parametric())
+        self.assertEqual(test_parametric_model_two.data['param1'], 2)
         
   
-    def test_TimeSeriesParametricModel(self):
+    def test_TimeSeriesModel(self):
         
         # Define a trainable model mock
-        class ParametricModelMock(TimeSeriesParametricModel):            
+        class TimeSeriesModelMock(TimeSeriesModel):            
             def _fit(self, *args, **kwargs):
                 pass 
             def _evaluate(self, *args, **kwargs):
@@ -55,44 +109,44 @@ class TestBaseModelClasses(unittest.TestCase):
                                            DataTimeSlot(start=TimePoint(t=2), end=TimePoint(t=3), data={'metric1': 56}))
 
         # Instantiate a parametric model
-        parametric_model = ParametricModelMock()
-        parametric_model_id = parametric_model.id
+        timeseries_model = TimeSeriesModelMock()
+        timeseries_model_id = timeseries_model.id
 
         # Set model save path
         model_path = TEMP_MODELS_DIR+'/test_TSP_model'
         
         # Cannot apply model before fitting
         with self.assertRaises(NotFittedError):
-            parametric_model.apply(data_time_slot_series)   
+            timeseries_model.apply(data_time_slot_series)   
 
         # Cannot save model before fitting
         with self.assertRaises(NotFittedError):
-            parametric_model.save(model_path)  
+            timeseries_model.save(model_path)  
         
         # Call the mock train
         with self.assertRaises(TypeError):
-            parametric_model.fit('hello')
+            timeseries_model.fit('hello')
 
         with self.assertRaises(ValueError):
-            parametric_model.fit(empty_series)
+            timeseries_model.fit(empty_series)
                          
-        parametric_model.fit(data_time_slot_series)
+        timeseries_model.fit(data_time_slot_series)
         
         # Call the mock apply
         with self.assertRaises(TypeError):
-            parametric_model.apply('hello')
+            timeseries_model.apply('hello')
 
         with self.assertRaises(ValueError):
-            parametric_model.apply(empty_series)
+            timeseries_model.apply(empty_series)
                          
-        parametric_model.apply(data_time_slot_series)
+        timeseries_model.apply(data_time_slot_series)
         
         # And save        
-        parametric_model.save(model_path)
+        timeseries_model.save(model_path)
         
         # Now re-load
-        loaded_parametric_model = ParametricModelMock(model_path)
-        self.assertEqual(loaded_parametric_model.id, parametric_model_id)
+        loaded_timeseries_model = TimeSeriesModelMock(model_path)
+        self.assertEqual(loaded_timeseries_model.id, timeseries_model_id)
 
 
     def test_KerasModel(self):
