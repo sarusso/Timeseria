@@ -4,7 +4,7 @@
 from copy import deepcopy
 
 # Base models and utilities
-from .base import TimeSeriesParametricModel
+from .base import TimeSeriesModel
 from .forecasters import PeriodicAverageForecaster
 
 # Setup logging
@@ -23,7 +23,7 @@ except (ImportError,AttributeError):
 #  Generic Anomaly Detector
 #=============================
 
-class AnomalyDetector(TimeSeriesParametricModel):
+class AnomalyDetector(TimeSeriesModel):
     """A generic anomaly detection model.
     
     Args:

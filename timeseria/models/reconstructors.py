@@ -22,14 +22,14 @@ except (ImportError,AttributeError):
     pass
 
 # Base models and utilities
-from .base import TimeSeriesParametricModel, ProphetModel
+from .base import TimeSeriesModel, ProphetModel
 
 
 #=========================
 #  Generic Reconstructor
 #=========================
 
-class Reconstructor(TimeSeriesParametricModel):
+class Reconstructor(TimeSeriesModel):
     """A generic reconstruction model.
     
     Args:

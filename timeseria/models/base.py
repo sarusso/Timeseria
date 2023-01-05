@@ -28,78 +28,71 @@ except (ImportError,AttributeError):
 #======================
 
 class Model(object):
-    """A stateless model, or a white-box model. Exposes only ``predict()``, ``apply()`` and ``evaluate()``
-     methods, since it is assumed that all the information is coded and nothing is learnt from the data."""
+    """A generic model. This can be either a statelsess model, where all the information is coded and there are no parameters, or a
+    stateful (parametric) model, where there are a number of parameters which can be both set manually or learnt (fitted) from the data.
     
-    def __init__(self):
-        pass
-
-
-    def predict(self, data, *args, **kwargs):
-        """Call the model predict logic on some data"""
-        try:
-            self._predict
-        except AttributeError:
-            raise NotImplementedError('Predicting from this model is not implemented')
-        
-        return self._predict(data, *args, **kwargs)
-
-
-    def apply(self, data, *args, **kwargs):
-        """Apply the model on some data"""
-        try:
-            self._apply
-        except AttributeError:
-            raise NotImplementedError('Applying this model is not implemented')
-        
-        return self._apply(data, *args, **kwargs)
-
-
-    def evaluate(self, data, *args, **kwargs):
-        """Evaluate the model on some data"""
-        try:
-            self._evaluate
-        except AttributeError:
-            raise NotImplementedError('Evaluating this model is not implemented')
-        
-        return self._evaluate(data, *args, **kwargs)
-
-
-
-#=========================
-#  Base parametric models
-#=========================
-
-class ParametricModel(Model):
-    """A stateful model with parameters, or a (partly) black-box model. Parameters can be set manually or
-    learnt (fitted) from data. On top of the ``predict()``, ``apply()`` and ``evaluate()`` methods it provides
-    a ``save()`` method to store the parameters of the model, and optionally a ``fit()`` method if the parameters
-    are to be learnt form data.
+    All models expose a ``predict()``, ``apply()`` and ``evaluate()`` methods, while parametric models also provide a ``save()`` method to
+    store the parameters of the model, and an optional ``fit()`` method if the parameters are to be learnt form data. In this case also a
+    ``cross_validate()`` method is available.
     
     Args:
-        path (str): a path from which to load a saved model. Will override all other init settings.
- 
+        path (optional, str): a path from which to load a saved model. Will override all other init settings. Only for parametric models.
     """
-    
+   
     def __init__(self, path=None):
         
-        if path:
-            with open(path+'/data.json', 'r') as f:
-                self.data = json.loads(f.read())         
-            self.fitted = True
-            
+        # Set type
+        try:
+            self.data
+        except:
+            # No data (parameters) for the model. Check if there is a fit
+            try:
+                self._fit
+            except AttributeError:
+                # If not, then the model has no parameters at all
+                self._type = 'non-parametric'
+            else:
+                # Otherwise, the model is parameter and the parameters
+                # are still to be set via the fit
+                self._type = 'parametric'
         else:
-            id = str(uuid.uuid4())
-            self.fitted = False
-            self.data = {'id': id}
+            # If we have data, it means that there are parameters and
+            # the model is parametric.
+            self._type = 'parametric'
 
-        super(ParametricModel, self).__init__()
+        # Do we have to load the model (if parametric?)    
+        if self.is_parametric():
+            if path:
+                with open(path+'/data.json', 'r') as f:
+                    self.data = json.loads(f.read())         
+                self.fitted = True   
+            else:
+                id = str(uuid.uuid4())
+                self.fitted = False
+                try:
+                    self.data['id'] = id
+                except AttributeError:
+                    self.data = {'id': id}
+        else:
+            if path:
+                raise ValueError('Loading a non-parametric model from a path does not make sense')
 
 
     @property
     def id(self):
-        """A unique identifier for the model"""
-        return self.data['id']
+        """A unique identifier for the model. Only for parametric models."""
+        if not self.is_parametric():
+            raise TypeError('Non-parametric models have no ID') # TODO: is this the right exception?
+        else:
+            return self.data['id']
+
+
+    def is_parametric(self):
+        """If the model is parametric or not."""
+        if self._type == 'parametric':
+            return True
+        else:
+            return False
 
 
     def fit(self, data, *args, **kwargs):
@@ -119,41 +112,59 @@ class ParametricModel(Model):
 
 
     def predict(self, data, *args, **kwargs):
-
+        """Call the model predict logic on some data"""
         try:
             self._predict
         except AttributeError:
             raise NotImplementedError('Predicting from this model is not implemented')
-
-        if not self.fitted:
-            raise NotFittedError()
-
+        
+        # Ensure the model is fitted if it has to
+        try:
+            self._fit
+        except AttributeError:
+            pass
+        else:
+            if not self.fitted:
+                raise NotFittedError()
+        
         return self._predict(data, *args, **kwargs)
 
 
     def apply(self, data, *args, **kwargs):
-
+        """Apply the model on some data"""
         try:
             self._apply
         except AttributeError:
             raise NotImplementedError('Applying this model is not implemented')
 
-        if not self.fitted:
-            raise NotFittedError()
+        # Ensure the model is fitted if it has to
+        try:
+            self.fit
+        except NotImplementedError:
+            pass
+        else:
+            if not self.fitted:
+                raise NotFittedError()
 
         return self._apply(data, *args, **kwargs)
 
 
     def evaluate(self, data, *args, **kwargs):
-
+        """Evaluate the model on some data"""
         try:
             self._evaluate
         except AttributeError:
             raise NotImplementedError('Evaluating this model is not implemented')
 
-        if not self.fitted:
-            raise NotFittedError('This model is not fitted, cannot evaluate')
-                
+        # Ensure the model is fitted if it has to
+        try:
+            self._fit
+        except AttributeError:
+            pass
+        else:
+            if not self.fitted:
+                raise NotFittedError()
+
         return self._evaluate(data, *args, **kwargs)
 
 
@@ -172,8 +183,18 @@ class ParametricModel(Model):
         """Save the model in the given path. The model is saved in "directory format", 
          meaning that a new directory will be created containing the data for the model."""
 
-        if not self.fitted:
-            raise NotFittedError()
+        # Is this model parametric?
+        if not self.is_parametric():
+            raise TypeError('Saving a non-parametric model from a path does not make sense') # TODO: is this the right exception?
+
+        # Ensure the model is fitted if it has to
+        try:
+            self._fit
+        except AttributeError:
+            pass
+        else:
+            if not self.fitted:
+                raise NotFittedError()
 
         if not path:
             raise ValueError('Got empty path, cannot save')
@@ -190,18 +211,18 @@ class ParametricModel(Model):
 
 
 
-class TimeSeriesParametricModel(ParametricModel):
-    """A parametric model specifically designed to work with time series data. In particular,
-    it ensures resolution and data labels consistency between methods and save/load operations.
+class TimeSeriesModel(Model):
+    """A model specifically designed to work with time series data. In particular, it enforces
+    resolution and data labels consistency between methods and save/load operations.
 
     Args:
-        path (str): a path from which to load a saved model. Will override all other init settings.
+        path (optional, str): a path from which to load a saved model. Will override all other init settings. Only for parametric models.
     """ 
     
     def __init__(self, path=None):
 
         # Call parent init
-        super(TimeSeriesParametricModel, self).__init__(path)
+        super(TimeSeriesModel, self).__init__(path)
 
         # If the model has been loaded, convert resolution as TimeUnit
         if self.fitted:
@@ -215,7 +236,7 @@ class TimeSeriesParametricModel(ParametricModel):
         check_timeseries(timeseries)
         
         # Call parent fit
-        fit_output = super(TimeSeriesParametricModel, self).fit(timeseries, *args, **kwargs)
+        fit_output = super(TimeSeriesModel, self).fit(timeseries, *args, **kwargs)
         
         # Set timeseries resolution
         self.data['resolution'] = timeseries.resolution
@@ -240,7 +261,7 @@ class TimeSeriesParametricModel(ParametricModel):
             check_data_labels(timeseries, self.data['data_labels'])
                 
         # Call parent predict and return output
-        return super(TimeSeriesParametricModel, self).predict(timeseries, *args, **kwargs)
+        return super(TimeSeriesModel, self).predict(timeseries, *args, **kwargs)
 
     
     def apply(self, timeseries, *args, **kwargs):
@@ -254,7 +275,7 @@ class TimeSeriesParametricModel(ParametricModel):
             check_resolution(timeseries, self.data['resolution'])
         
         # Call parent apply and return output
-        return super(TimeSeriesParametricModel, self).apply(timeseries, *args, **kwargs)
+        return super(TimeSeriesModel, self).apply(timeseries, *args, **kwargs)
 
 
     def evaluate(self, timeseries, *args, **kwargs):
@@ -268,7 +289,7 @@ class TimeSeriesParametricModel(ParametricModel):
             check_resolution(timeseries, self.data['resolution'])
                 
         # Call parent evaluate and return output
-        return super(TimeSeriesParametricModel, self).evaluate(timeseries, *args, **kwargs)
+        return super(TimeSeriesModel, self).evaluate(timeseries, *args, **kwargs)
 
 
     def cross_validate(self, timeseries, rounds=10, **kwargs):
@@ -280,7 +301,7 @@ class TimeSeriesParametricModel(ParametricModel):
         Args:
             rounds(int): how many rounds of cross validation to run.
         """
-        return super(TimeSeriesParametricModel, self).cross_validate(timeseries, rounds, **kwargs)
+        return super(TimeSeriesModel, self).cross_validate(timeseries, rounds, **kwargs)
 
 
     def _cross_validate(self, timeseries, rounds=10, **kwargs):
@@ -375,7 +396,7 @@ class TimeSeriesParametricModel(ParametricModel):
             self.data['resolution'] = str(self.data['resolution'])
             
         # Call parent save
-        super(TimeSeriesParametricModel, self).save(path)
+        super(TimeSeriesModel, self).save(path)
         
         # Set back original data resolution
         self.data['resolution'] = orresolution

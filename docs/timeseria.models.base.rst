@@ -18,8 +18,7 @@
    .. autosummary::
 
       Model   
-      ParametricModel
-      TimeSeriesParametricModel
+      TimeSeriesModel
 
 ..
   This is a comment, and these are disabled.
