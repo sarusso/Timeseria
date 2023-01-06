@@ -139,8 +139,8 @@ class Model(object):
 
         # Ensure the model is fitted if it has to
         try:
-            self.fit
-        except NotImplementedError:
+            self._fit
+        except AttributeError:
             pass
         else:
             if not self.fitted:
@@ -225,8 +225,13 @@ class TimeSeriesModel(Model):
         super(TimeSeriesModel, self).__init__(path)
 
         # If the model has been loaded, convert resolution as TimeUnit
-        if self.fitted:
-            self.data['resolution'] = TimeUnit(self.data['resolution'])
+        try:
+            self.fitted
+        except AttributeError:
+            pass
+        else:
+            if self.fitted:
+                self.data['resolution'] = TimeUnit(self.data['resolution'])
 
 
     def fit(self, timeseries, *args, **kwargs):
@@ -255,11 +260,16 @@ class TimeSeriesModel(Model):
         check_timeseries(timeseries)
         
         # If fitted, check resolution and keys. If not fitted, the parent init will raise.
-        if self.fitted:
-            if len(timeseries) > 1:
-                check_resolution(timeseries, self.data['resolution'])
-            check_data_labels(timeseries, self.data['data_labels'])
-                
+        try:
+            self.fitted
+        except AttributeError:
+            pass
+        else:
+            if self.fitted:
+                if len(timeseries) > 1:
+                    check_resolution(timeseries, self.data['resolution'])
+                check_data_labels(timeseries, self.data['data_labels'])
+        
         # Call parent predict and return output
         return super(TimeSeriesModel, self).predict(timeseries, *args, **kwargs)
 
@@ -271,8 +281,13 @@ class TimeSeriesModel(Model):
         check_timeseries(timeseries)
         
         # If fitted, check resolution. If not fitted, the parent init will raise.
-        if self.fitted:
-            check_resolution(timeseries, self.data['resolution'])
+        try:
+            self.fitted
+        except AttributeError:
+            pass
+        else:
+            if self.fitted:
+                check_resolution(timeseries, self.data['resolution'])
         
         # Call parent apply and return output
         return super(TimeSeriesModel, self).apply(timeseries, *args, **kwargs)
@@ -285,9 +300,14 @@ class TimeSeriesModel(Model):
         check_timeseries(timeseries)
         
         # If fitted, check resolution. If not fitted, the parent init will raise.
-        if self.fitted:
-            check_resolution(timeseries, self.data['resolution'])
-                
+        try:
+            self.fitted
+        except AttributeError:
+            pass
+        else:
+            if self.fitted:
+                check_resolution(timeseries, self.data['resolution'])
+        
         # Call parent evaluate and return output
         return super(TimeSeriesModel, self).evaluate(timeseries, *args, **kwargs)
 
@@ -315,8 +335,13 @@ class TimeSeriesModel(Model):
         check_timeseries(timeseries)
         
         # If fitted, check resolution. If not fitted, the parent init will raise.
-        if self.fitted:
-            check_resolution(timeseries, self.data['resolution'])
+        try:
+            self.fitted
+        except AttributeError:
+            pass
+        else:
+            if self.fitted:
+                check_resolution(timeseries, self.data['resolution'])
         
         # Decouple fit from validate args
         fit_kwargs = {}
@@ -387,14 +412,19 @@ class TimeSeriesModel(Model):
     def save(self, path):
 
         # If fitted, handle resolution. If not fitted, the parent save will raise.
-        if self.fitted:
-        
-            # Save original data resolution (Unit or TimeUnit Object)
-            orresolution = self.data['resolution']
-    
-            # Temporarily change the model resolution unit as string representation
-            self.data['resolution'] = str(self.data['resolution'])
+        try:
+            self.fitted
+        except AttributeError:
+            pass
+        else:
+            if self.fitted:
             
+                # Save original data resolution (Unit or TimeUnit Object)
+                orresolution = self.data['resolution']
+        
+                # Temporarily change the model resolution unit as string representation
+                self.data['resolution'] = str(self.data['resolution'])
+        
         # Call parent save
         super(TimeSeriesModel, self).save(path)
         

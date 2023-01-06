@@ -1011,7 +1011,10 @@ class TimeSeries(Series):
     @property
     def items_type(self):
         """The type of the items of the time series."""
-        return self[0].__class__
+        if not self:
+            raise ValueError('The series is empty and has no items')
+        else:
+            return self[0].__class__
 
     #=========================
     #  Init
@@ -1557,7 +1560,7 @@ class TimeSeries(Series):
 #  Series slice
 #==============================
 
-class SeriesSlice(Series):
+class SeriesSlice(TimeSeries):
         
     def __init__(self, series, from_i, to_i, from_t=None, to_t=None, interpolation_method='linear', dense=False):
         # TODO: move to "fill_strategy" instead of "interpolation_mode"?
@@ -1687,7 +1690,18 @@ class SeriesSlice(Series):
                 for _ in self:
                     self.len+=1
             return self.len
-    
+
+    def __repr__(self):
+        if not self.series:
+            return 'Empty series slice'
+        else:
+            return 'Series slice'
+
+    @property
+    def items_type(self):
+        for item in self:
+            return item.__class__
+
     @property
     def resolution(self):
         return self.series.resolution
