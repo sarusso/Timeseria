@@ -218,9 +218,9 @@ def compute_coverage(series, from_t, to_t, sampling_interval=None):
             if point.valid_from >= to_t:
                 break 
             
-            # Skip if reconstructed as well
+            # Skip if interpolated as well
             try:
-                if point.reconstructed:
+                if point._interpolated:
                     continue
             except AttributeError:
                 pass

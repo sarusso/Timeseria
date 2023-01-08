@@ -8,6 +8,7 @@ from .operations import avg
 from .units import TimeUnit
 from .exceptions import ConsistencyException
 from . import operations as operations_module
+from .interpolators import LinearInterpolator
 
 # Setup logging
 import logging
@@ -20,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_point_i, slot_prev_point_i, slot_next_point_i,
                  unit, point_validity, timezone, fill_with, force_data_loss, fill_gaps, series_data_indexes, series_resolution,
-                 force_compute_data_loss, interpolation_method, operations=None):
+                 force_compute_data_loss, Interpolator, operations=None):
     
     # Log. Note: if slot_first_point_i < slot_last_point_i, this means that the prev and next are outside the slot.
     # It is not a bug, it is how the system works. perhaps we could pass here the slot_prev_i and sòlot_next_i
@@ -40,7 +41,7 @@ def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_poi
 
     # Create the slice of the series containing the slot datapoints plus the prev and next, 
     series_dense_slice_extended  = SeriesSlice(series, from_i=slot_prev_point_i, to_i=slot_next_point_i+1,  # Slicing exclude the right
-                                               from_t=from_t, to_t=to_t, interpolation_method=interpolation_method, dense=True)
+                                               from_t=from_t, to_t=to_t, dense=True, Interpolator=Interpolator)
 
     # Compute the data loss for the new element. This is forced
     # by the resampler or slotter if first or last point     
@@ -71,7 +72,7 @@ def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_poi
         point.weight = (this_point_valid_to-this_point_valid_from)/interval_duration
 
         # Log
-        logger.debug('Series point %s data: %s, weight: %s', point.t, point.data, point.weight)
+        logger.debug('Set series point @ %s weight: %s (data: %s)', point.dt, point.weight, point.data)
 
     # If creating slots, create also the slice of the series series containing only the slot datapoints    
     if target == 'slot':
@@ -86,7 +87,7 @@ def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_poi
                 series_dense_slice = None
                 for point in series_dense_slice_extended:
                     try:
-                        if point.reconstructed:
+                        if point._interpolated:
                             if series_dense_slice:
                                 raise ConsistencyException('Found more than one reconstructed point in a fully missing slot')
                             series_dense_slice = series.__class__(point) 
@@ -95,7 +96,7 @@ def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_poi
                 if not series_dense_slice:
                     raise ConsistencyException('Could not find any reconstructed point in a fully missing slot')
             else:
-                # Just create a point based on the series_dense_slice_extended weights (TODO: are we including the reconstructed?):
+                # Just create a point based on the series_dense_slice_extended weights (TODO: are we including the interpolated?):
                 new_point_data = {data_label:0 for data_label in data_labels}
                 for point in series_dense_slice_extended:
                     for data_label in data_labels:
@@ -107,7 +108,7 @@ def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_poi
             # Slice the original series to provide only the datapoints belonging to the slot 
             #logger.critical('Slicing dense series from {} to {}'.format(slot_first_point_i, slot_last_point_i+1))
             series_dense_slice = SeriesSlice(series, from_i=slot_first_point_i, to_i=slot_last_point_i+1, # Slicing exclude the right   
-                                             from_t=from_t, to_t=to_t, interpolation_method=interpolation_method, dense=True) 
+                                             from_t=from_t, to_t=to_t, dense=True, Interpolator=Interpolator) 
 
 
 
@@ -489,7 +490,7 @@ class SlottedTransformation(Transformation):
                                                 series_data_indexes = series_data_indexes,
                                                 series_resolution = series_resolution,
                                                 force_compute_data_loss = True if first else False,
-                                                interpolation_method=self.interpolation_method,
+                                                Interpolator=self.Interpolator,
                                                 operations = operations)
                         
                         # Set first to false
@@ -537,7 +538,7 @@ class SlottedTransformation(Transformation):
 class Resampler(SlottedTransformation):
     """Resampling transformation."""
 
-    def __init__(self, unit, interpolation_method='linear'):
+    def __init__(self, unit, Interpolator=LinearInterpolator):
 
         # Handle unit
         if isinstance(unit, TimeUnit):
@@ -547,8 +548,8 @@ class Resampler(SlottedTransformation):
         if self.time_unit.is_calendar():
             raise ValueError('Sorry, calendar time units are not supported by the Resampler (got "{}"). Use the Slotter instead.'.format(self.time_unit))
 
-        # Set interpolation method
-        self.interpolation_method=interpolation_method
+        # Set interpolator
+        self.Interpolator=Interpolator
 
     def process(self, *args, **kwargs):
         kwargs['target'] = 'points'
@@ -562,7 +563,7 @@ class Resampler(SlottedTransformation):
 class Aggregator(SlottedTransformation):
     """Aggregation transformation."""
 
-    def __init__(self, unit, operations=[avg], interpolation_method='linear'):
+    def __init__(self, unit, operations=[avg], Interpolator=LinearInterpolator):
         
         # Handle unit
         if isinstance(unit, TimeUnit):
@@ -585,8 +586,8 @@ class Aggregator(SlottedTransformation):
             operations.append(operation)
         self.operations = operations
         
-        # Set interpolation method
-        self.interpolation_method=interpolation_method
+        # Set interpolator
+        self.Interpolator=Interpolator
 
     def process(self, *args, **kwargs):
         kwargs['target'] = 'slots'
