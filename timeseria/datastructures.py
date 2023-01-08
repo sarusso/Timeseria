@@ -1559,20 +1559,23 @@ class TimeSeries(Series):
 #==============================
 #  Series slice
 #==============================
-
 class SeriesSlice(TimeSeries):
         
-    def __init__(self, series, from_i, to_i, from_t=None, to_t=None, interpolation_method='linear', dense=False):
-        # TODO: move to "fill_strategy" instead of "interpolation_mode"?
+    def __init__(self, series, from_i, to_i, from_t=None, to_t=None, dense=False, Interpolator=None):
         self.series = series
         self.from_i = from_i
         self.to_i = to_i
-        self.interpolation_method = interpolation_method
         self.len = None
         self.new_points = {}
         self.from_t = from_t
         self.to_t=to_t
         self.dense=dense
+        if self.dense:
+            if not Interpolator:
+                raise ValueError('If requesting a dense slice you must provide an interpolator')
+            self.interpolator = Interpolator(series)
+        else:
+            self.interpolator = None
     
     def __getitem__(self, i):
         if self.dense:
@@ -1617,6 +1620,8 @@ class SeriesSlice(TimeSeries):
                 
                 
                 if prev_point.valid_to < this_point.valid_from:
+                    
+                    # yes, we do have a gap. Add a missing point by interpolation
 
                     # Compute new point validity
                     if self.from_t is not None and prev_point.valid_to < self.from_t:
@@ -1640,32 +1645,14 @@ class SeriesSlice(TimeSeries):
                     # Log new point creation
                     logger.debug('New point t=,%s validity: [%s,%s]',new_point_t, new_point_valid_from,new_point_valid_to)
                                             
-                    # Compute the new point values with respect to the entire interpolation           
-                    new_point_data = {}
-                    for data_label in self.series.data_labels():
-        
-                        if self.interpolation_method == 'linear':
-        
-                            # Compute the "growth" ratio
-                            diff = this_point.data[data_label] - prev_point.data[data_label]
-                            delta_t = this_point.t - prev_point.t
-                            ratio = diff / delta_t
-                            
-                            # Compute the value of the data for the new point
-                            new_point_data[data_label] = prev_point.data[data_label] + ((new_point_t-prev_point.t)*ratio)
-        
-                        elif self.interpolation_method == 'uniform':
-                            raise NotImplementedError('uniform interpolation is not implemented yet')
-                            new_point_data[data_label] = (prev_point.data[data_label] + this_point.data[data_label]) /2
-                       
-                        else:
-                            raise Exception('Unknown interpolation method "{}"'.format(self.interpolation_method))
-            
+                    # Compute the new point values using the interpolator
+                    new_point_data = self.interpolator.evaluate(new_point_t, prev_i=this_i-1, next_i=this_i)
+                    
                     # Create the new point    
                     new_point = this_point.__class__(t = new_point_t, data = new_point_data)
                     new_point.valid_from = new_point_valid_from
                     new_point.valid_to = new_point_valid_to
-                    new_point.reconstructed = True
+                    new_point._interpolated = True
                     
                     # Set flag
                     self.prev_was_new = True 

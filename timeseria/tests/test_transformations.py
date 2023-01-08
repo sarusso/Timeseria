@@ -154,6 +154,64 @@ class TestResampler(unittest.TestCase):
         self.assertAlmostEqual(resampled_series[5].data_loss, 0.6666666666)
 
 
+    def test_resample_uniform_interpolator(self):
+    
+        # Test series
+        series = TimeSeries()
+        series.append(DataTimePoint(t=-3,  data={'value':3}))
+        series.append(DataTimePoint(t=-2,  data={'value':2}))
+        series.append(DataTimePoint(t=-1,  data={'value':1}))
+        series.append(DataTimePoint(t=0,  data={'value':0}))
+        series.append(DataTimePoint(t=1,  data={'value':1}))
+        series.append(DataTimePoint(t=2,  data={'value':2}))
+        series.append(DataTimePoint(t=3,  data={'value':3}))
+        series.append(DataTimePoint(t=4,  data={'value':4}))
+        series.append(DataTimePoint(t=5,  data={'value':5}))
+        series.append(DataTimePoint(t=6,  data={'value':6}))
+        series.append(DataTimePoint(t=7,  data={'value':7}))
+        series.append(DataTimePoint(t=16, data={'value':16}))
+        series.append(DataTimePoint(t=17, data={'value':17}))
+        series.append(DataTimePoint(t=18, data={'value':18}))
+    
+        from ..interpolators import UniformInterpolator
+    
+        # Resample for 3 seconds
+        resampled_series = series.resample(3, Interpolator=UniformInterpolator)
+
+        # Check len
+        self.assertEqual(len(resampled_series), 6)
+    
+        # Check for t = 0
+        self.assertEqual(resampled_series[0].t, 0)
+        self.assertAlmostEqual(resampled_series[0].data['value'], 0.6666666666)  # Expected: 0.66..
+        self.assertEqual(resampled_series[0].data_loss, 0)
+    
+        # Check for t = 3
+        self.assertEqual(resampled_series[1].t, 3)
+        self.assertEqual(resampled_series[1].data['value'], 3)  # Expected: 3
+        self.assertEqual(resampled_series[1].data_loss, 0)
+    
+        # Check for t = 6
+        self.assertEqual(resampled_series[2].t, 6)
+        self.assertEqual(resampled_series[2].data['value'], 6)  # Expected: 6
+        self.assertEqual(resampled_series[2].data_loss, 0)
+    
+        # Check for t = 9
+        self.assertEqual(resampled_series[3].t, 9)
+        self.assertEqual(resampled_series[3].data['value'], 11.5)  # Expected: 11.5 (fully reconstructed)
+        self.assertEqual(resampled_series[3].data_loss, 1)
+    
+        # Check for t = 12
+        self.assertEqual(resampled_series[4].t, 12)
+        self.assertEqual(resampled_series[4].data['value'], 11.5)  # Expected: 11.5 (fully reconstructed)
+        self.assertEqual(resampled_series[4].data_loss, 1)
+    
+        # Check for t = 15
+        self.assertEqual(resampled_series[5].t, 15)
+        self.assertEqual(resampled_series[5].data['value'], 13)  # Expected: 13 TODO: sure? Check math
+        self.assertAlmostEqual(resampled_series[5].data_loss, 0.6666666666)
+
+
     def test_upsample(self):
         
         # Test series

@@ -30,6 +30,15 @@ timeseria.exceptions module
    :undoc-members:
    :show-inheritance:
 
+timeseria.interpolators module
+---------------------------
+
+.. automodule:: timeseria.interpolators
+   :members:
+   :inherited-members:
+   :undoc-members:
+   :show-inheritance:
+
 timeseria.operations module
 ---------------------------
 

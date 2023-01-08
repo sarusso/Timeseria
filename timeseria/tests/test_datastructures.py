@@ -900,7 +900,8 @@ class TestSeriesSlices(unittest.TestCase):
             point.valid_from=validity_regions[point.t][0]
             point.valid_to=validity_regions[point.t][1]
 
-        series_slice = SeriesSlice(series, 2, 8, dense=True)
+        from ..interpolators import LinearInterpolator
+        series_slice = SeriesSlice(series, 2, 8, dense=True, Interpolator=LinearInterpolator)
 
         self.assertEqual(len(series_slice), 7)
 
