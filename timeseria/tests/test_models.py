@@ -320,6 +320,82 @@ class TestReconstructors(unittest.TestCase):
                     self.assertNotEqual(data_time_slot_series_reconstructed[i].data, data_time_slot_series[i].data, 'at position {}'.format(i))
 
 
+    def test_LinearInterpolationReconstructor(self):
+                
+        # Test series
+        series = TimeSeries()
+        series.append(DataTimePoint(t=-3,  data={'value':3}))
+        series.append(DataTimePoint(t=-2,  data={'value':2}))
+        series.append(DataTimePoint(t=-1,  data={'value':1}))
+        series.append(DataTimePoint(t=0,  data={'value':0}))
+        series.append(DataTimePoint(t=1,  data={'value':1}))
+        series.append(DataTimePoint(t=2,  data={'value':2}))
+        series.append(DataTimePoint(t=3,  data={'value':3}))
+        series.append(DataTimePoint(t=4,  data={'value':4}))
+        series.append(DataTimePoint(t=5,  data={'value':5}))
+        series.append(DataTimePoint(t=6,  data={'value':6}))
+        series.append(DataTimePoint(t=7,  data={'value':7}))
+        series.append(DataTimePoint(t=16, data={'value':16}))
+        series.append(DataTimePoint(t=17, data={'value':17}))
+        series.append(DataTimePoint(t=18, data={'value':18}))
+        
+        # Resample for 3 seconds
+        resampled_series = series.resample(3)
+        # DataTimePoint @ 0.0 (1970-01-01 00:00:00+00:00) with data "{'value': 0.6666666666666666}" and data_loss="0.0"
+        # DataTimePoint @ 3.0 (1970-01-01 00:00:03+00:00) with data "{'value': 3.0}" and data_loss="0.0"
+        # DataTimePoint @ 6.0 (1970-01-01 00:00:06+00:00) with data "{'value': 6.0}" and data_loss="0.0"
+        # DataTimePoint @ 9.0 (1970-01-01 00:00:09+00:00) with data "{'value': 9.0}" and data_loss="1.0"
+        # DataTimePoint @ 12.0 (1970-01-01 00:00:12+00:00) with data "{'value': 12.0}" and data_loss="1.0"
+        # DataTimePoint @ 15.0 (1970-01-01 00:00:15+00:00) with data "{'value': 15.0}" and data_loss="0.6666666666666667"
+        
+        from ..models.reconstructors import LinearInterpolationReconstructor
+        
+        # Fake data to check the recostructor is working correctly
+        resampled_series[3].data['value']=-9
+        resampled_series[4].data['value']=-12
+        
+        # Instantiate the reconstructor
+        reconstructor = LinearInterpolationReconstructor()
+        
+        # Check parametric param just in case
+        self.assertFalse(reconstructor.is_parametric())
+        
+        # Apply the reconstructor
+        reconstructed_series = reconstructor.apply(resampled_series)
+        
+        # Check len
+        self.assertEqual(len(reconstructed_series), 6)
+        
+        # Check for t = 0
+        self.assertEqual(reconstructed_series[0].t, 0)
+        self.assertAlmostEqual(reconstructed_series[0].data['value'], 0.6666666666)  # Expected: 0.66..
+        self.assertEqual(reconstructed_series[0].data_loss, 0)
+        
+        # Check for t = 3
+        self.assertEqual(reconstructed_series[1].t, 3)
+        self.assertEqual(reconstructed_series[1].data['value'], 3)  # Expected: 3
+        self.assertEqual(reconstructed_series[1].data_loss, 0)
+        
+        # Check for t = 6
+        self.assertEqual(reconstructed_series[2].t, 6)
+        self.assertEqual(reconstructed_series[2].data['value'], 6)  # Expected: 6
+        self.assertEqual(reconstructed_series[2].data_loss, 0)
+        
+        # Check for t = 9
+        self.assertEqual(reconstructed_series[3].t, 9)
+        self.assertEqual(reconstructed_series[3].data['value'], 9)  # Expected: 9 (fully reconstructed)
+        self.assertEqual(reconstructed_series[3].data_loss, 1)
+        
+        # Check for t = 12
+        self.assertEqual(reconstructed_series[4].t, 12)
+        self.assertEqual(reconstructed_series[4].data['value'], 12)  # Expected: 12 (fully reconstructed)
+        self.assertEqual(reconstructed_series[4].data_loss, 1)
+        
+        # Check for t = 15
+        self.assertEqual(reconstructed_series[5].t, 15)
+        self.assertEqual(reconstructed_series[5].data['value'], 15)  # Expected: 15
+        self.assertAlmostEqual(reconstructed_series[5].data_loss, 0.6666666666)
+
 
 class TestForecasters(unittest.TestCase):
 

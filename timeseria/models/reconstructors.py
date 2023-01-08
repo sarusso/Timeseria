@@ -297,6 +297,52 @@ class Reconstructor(TimeSeriesModel):
 
 
 
+
+#=====================================
+# Linear Interpolation Reconstructor
+#=====================================
+
+from ..interpolators import LinearInterpolator, UniformInterpolator
+from ..datastructures import SeriesSlice
+
+
+class LinearInterpolationReconstructor(Reconstructor):
+    """A reconstruction model based on linear interpolation.
+    
+    The main difference between an intepolator and a reconstructor is that interpolators are used in the transformations, *before*
+    resampling or aggregating and thus must support variable-resolution time series, while reconstructors are applied *after* resampling
+    or aggregating, when data has been made already uniform.
+    
+    In general, a reconstructor modifies (by reconstructing) data which is already present but that cannot be trusted, either because it
+    was created with a high data loss from a transformation or because of other domain-specific factors, while an interpolator creates
+    the missing samples of the underlying signal which are required for the transformations to work.
+    
+    Interpolators can be then seen as special case of data reconstruction models, that on one hand implement a simpler logic, but that
+    on the other must provide support for time-based math in order or to be able to work on varibale-resolution time series.
+    
+    This reconstructor wraps a linear interpolator in order to perform the data reconstruction, and can be useful for setting a baseline
+    when evaluating other, more sophisticated, data reconstruction models.
+    """
+
+    def _reconstruct(self, timeseries, key, from_index, to_index):
+        logger.debug('Reconstructing between "{}" and "{}" (excluded)'.format(from_index, to_index))
+        
+        try:
+            self.interpolator_initialize
+        except AttributeError:
+            self.interpolator = LinearInterpolator(timeseries)
+                
+        for i in range(from_index, to_index):
+
+            logger.debug('Processing point=%s', timeseries[i])
+            reconstructed_data = self.interpolator.evaluate(at=timeseries[i].t, prev_i=from_index-1, next_i=to_index)
+
+            logger.debug('Reconstructed data=%s', reconstructed_data)
+            timeseries[i]._data = reconstructed_data
+
+
+
+
 #=========================
 # P. Average Reconstructor
 #=========================

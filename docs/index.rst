@@ -30,20 +30,21 @@ Main modules and submodules
 .. autosummary::
      :toctree:
     
-     datastructures
-     units
-     transformations 
-     storages
      time
+     units
+     datastructures
+     interpolators
+     operations
+     transformations
      
      models.base
      models.forecasters
      models.reconstructors
      models.anomaly_detectors
      
-     operations
-     exceptions
+     storages
      plots
+     exceptions
      utilities
 
 |
