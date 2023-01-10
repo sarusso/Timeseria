@@ -2,7 +2,7 @@
 """Series transformations as resampling and aggregation."""
 
 from .time import dt_from_s, s_from_dt, as_timezone
-from .datastructures import DataTimeSlot, TimePoint, DataTimePoint, TimeSeries, SeriesSlice
+from .datastructures import DataTimeSlot, TimePoint, DataTimePoint, TimeSeries, _TimeSeriesSlice
 from .utilities import compute_data_loss, compute_validity_regions
 from .operations import avg
 from .units import TimeUnit
@@ -40,8 +40,8 @@ def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_poi
         slot_prev_point_i = slot_first_point_i
 
     # Create the slice of the series containing the slot datapoints plus the prev and next, 
-    series_dense_slice_extended  = SeriesSlice(series, from_i=slot_prev_point_i, to_i=slot_next_point_i+1,  # Slicing exclude the right
-                                               from_t=from_t, to_t=to_t, dense=True, Interpolator=Interpolator)
+    series_dense_slice_extended  = _TimeSeriesSlice(series, from_i=slot_prev_point_i, to_i=slot_next_point_i+1,  # Slicing exclude the right
+                                                   from_t=from_t, to_t=to_t, dense=True, Interpolator=Interpolator)
 
     # Compute the data loss for the new element. This is forced
     # by the resampler or slotter if first or last point     
@@ -107,8 +107,8 @@ def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_poi
         else:
             # Slice the original series to provide only the datapoints belonging to the slot 
             #logger.critical('Slicing dense series from {} to {}'.format(slot_first_point_i, slot_last_point_i+1))
-            series_dense_slice = SeriesSlice(series, from_i=slot_first_point_i, to_i=slot_last_point_i+1, # Slicing exclude the right   
-                                             from_t=from_t, to_t=to_t, dense=True, Interpolator=Interpolator) 
+            series_dense_slice = _TimeSeriesSlice(series, from_i=slot_first_point_i, to_i=slot_last_point_i+1, # Slicing exclude the right   
+                                                 from_t=from_t, to_t=to_t, dense=True, Interpolator=Interpolator) 
 
 
 

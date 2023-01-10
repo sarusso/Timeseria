@@ -1557,10 +1557,14 @@ class TimeSeries(Series):
 
 
 #==============================
-#  Series slice
+#  Time Series slice
 #==============================
-class SeriesSlice(TimeSeries):
-        
+class _TimeSeriesSlice(TimeSeries):
+    """A time series slice. Only used internally, maybe in future it could be made public
+    and be used for the slicing operation if the time series, perhaps making it generic.
+    
+    :meta private:
+    """
     def __init__(self, series, from_i, to_i, from_t=None, to_t=None, dense=False, Interpolator=None):
         self.series = series
         self.from_i = from_i

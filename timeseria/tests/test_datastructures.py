@@ -5,7 +5,7 @@ import pandas as pd
 
 from ..datastructures import Point, TimePoint, DataPoint, DataTimePoint
 from ..datastructures import Slot, TimeSlot, DataSlot, DataTimeSlot
-from ..datastructures import Series, TimeSeries, SeriesSlice 
+from ..datastructures import Series, TimeSeries, _TimeSeriesSlice
 from ..time import UTC, dt
 from ..units import Unit, TimeUnit
 
@@ -840,9 +840,9 @@ class TestTimeSeries(unittest.TestCase):
             timeseries.rename_data_label('notexistent_key','c')
 
 
-class TestSeriesSlices(unittest.TestCase):
+class Test_TimeSeriesSlices(unittest.TestCase):
 
-    def test_SeriesSlice(self):
+    def test__TimeSeriesSlices(self):
         series = TimeSeries()
         series.append(DataTimePoint(t = 0, data = {'value': 0}))
         series.append(DataTimePoint(t = 1, data = {'value': 1}))
@@ -861,7 +861,7 @@ class TestSeriesSlices(unittest.TestCase):
             point.valid_from=validity_regions[point.t][0]
             point.valid_to=validity_regions[point.t][1]
 
-        series_slice = SeriesSlice(series, 2, 5)
+        series_slice = _TimeSeriesSlice(series, 2, 5)
 
         self.assertEqual(len(series_slice), 3)
 
@@ -901,7 +901,7 @@ class TestSeriesSlices(unittest.TestCase):
             point.valid_to=validity_regions[point.t][1]
 
         from ..interpolators import LinearInterpolator
-        series_slice = SeriesSlice(series, 2, 8, dense=True, Interpolator=LinearInterpolator)
+        series_slice = _TimeSeriesSlice(series, 2, 8, dense=True, Interpolator=LinearInterpolator)
 
         self.assertEqual(len(series_slice), 7)
 
