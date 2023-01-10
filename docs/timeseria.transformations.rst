@@ -17,7 +17,9 @@
 
    .. autosummary::
 
-      Transformation   
+      Transformation
+      TimeSeriesTransformation
+      
       Resampler
       Aggregator
    

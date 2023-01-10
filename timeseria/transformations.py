@@ -230,20 +230,24 @@ def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_poi
 #==========================
 
 class Transformation(object):
-    """Base transformation class."""
+    """A generic transformation."""
     
     @classmethod
     def __str__(cls):
-        return '{} transformation'.format(cls.__name__.replace('Operator',''))
+        if cls.__name__ == 'Transformation':
+            return 'Generic transformation'
+        else:
+            return '{} transformation'.format(cls.__name__.replace('Transformation',''))
 
     def process(self, *args, **kwargs):
         raise NotImplementedError('This transformation is not implemented.')
 
 
 #==========================
-#  Slotted transformation
+# TimeSeries Transformation
 #==========================
-class SlottedTransformation(Transformation):
+class TimeSeriesTransformation(Transformation):
+    """A transformation for time series data."""
 
     def process(self, series, target, from_t=None, to_t=None, from_dt=None, to_dt=None, validity=None,
                 include_extremes=False, fill_with=None, force_data_loss=None, fill_gaps=True, force=False):
@@ -535,7 +539,7 @@ class SlottedTransformation(Transformation):
 #   Resampler
 #==========================
 
-class Resampler(SlottedTransformation):
+class Resampler(TimeSeriesTransformation):
     """Resampling transformation."""
 
     def __init__(self, unit, Interpolator=LinearInterpolator):
@@ -560,7 +564,7 @@ class Resampler(SlottedTransformation):
 #   Aggregator
 #==========================
 
-class Aggregator(SlottedTransformation):
+class Aggregator(TimeSeriesTransformation):
     """Aggregation transformation."""
 
     def __init__(self, unit, operations=[avg], Interpolator=LinearInterpolator):
