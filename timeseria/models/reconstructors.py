@@ -25,9 +25,9 @@ except (ImportError,AttributeError):
 from .base import TimeSeriesModel, ProphetModel
 
 
-#=========================
+#=====================================
 #  Generic Reconstructor
-#=========================
+#=====================================
 
 class Reconstructor(TimeSeriesModel):
     """A generic reconstruction model.
@@ -39,11 +39,9 @@ class Reconstructor(TimeSeriesModel):
     def predict(self, timeseries, *args, **kwargs):
         """Disabled. Reconstructors can be used only with the ``apply()`` method."""
         raise NotImplementedError('Anomaly detectors can be used only with the apply() method') from None
-        
-
+    
     def _predict(self, *args, **kwargs):
         raise NotImplementedError('Reconstructors can be used only from the apply() method.') from None
-
 
     def _apply(self, timeseries, remove_data_loss=False, data_loss_threshold=1, inplace=False):
         logger.debug('Using data_loss_threshold="%s"', data_loss_threshold)
@@ -291,20 +289,13 @@ class Reconstructor(TimeSeriesModel):
             
         return evaluation_score
 
-
     def _reconstruct(self, *args, **krargs):
         raise NotImplementedError('Reconstruction for this model is not yet implemented')
-
-
 
 
 #=====================================
 # Linear Interpolation Reconstructor
 #=====================================
-
-from ..interpolators import LinearInterpolator, UniformInterpolator
-from ..datastructures import SeriesSlice
-
 
 class LinearInterpolationReconstructor(Reconstructor):
     """A reconstruction model based on linear interpolation.
@@ -313,9 +304,9 @@ class LinearInterpolationReconstructor(Reconstructor):
     resampling or aggregating and thus must support variable-resolution time series, while reconstructors are applied *after* resampling
     or aggregating, when data has been made already uniform.
     
-    In general, a reconstructor modifies (by reconstructing) data which is already present but that cannot be trusted, either because it
-    was created with a high data loss from a transformation or because of other domain-specific factors, while an interpolator creates
-    the missing samples of the underlying signal which are required for the transformations to work.
+    In general, in Timeeseria a reconstructor modifies (by reconstructing) data which is already present but that cannot be trusted, either
+    because it was created with a high data loss from a transformation or because of other domain-specific factors, while an interpolator
+    creates the missing samples of the underlying signal which are required for the transformations to work.
     
     Interpolators can be then seen as special case of data reconstruction models, that on one hand implement a simpler logic, but that
     on the other must provide support for time-based math in order or to be able to work on varibale-resolution time series.
@@ -330,6 +321,7 @@ class LinearInterpolationReconstructor(Reconstructor):
         try:
             self.interpolator_initialize
         except AttributeError:
+            from ..interpolators import LinearInterpolator
             self.interpolator = LinearInterpolator(timeseries)
                 
         for i in range(from_index, to_index):
@@ -341,11 +333,9 @@ class LinearInterpolationReconstructor(Reconstructor):
             timeseries[i]._data = reconstructed_data
 
 
-
-
-#=========================
-# P. Average Reconstructor
-#=========================
+#=====================================
+#  Periodic Averages Reconstructor
+#=====================================
 
 class PeriodicAverageReconstructor(Reconstructor):
     """A reconstuction model based on periodic averages.
@@ -428,7 +418,6 @@ class PeriodicAverageReconstructor(Reconstructor):
         
         logger.debug('Processed "%s" items', processed)
 
-
     def _reconstruct(self, timeseries, key, from_index, to_index):
         logger.debug('Reconstructing between "{}" and "{}"'.format(from_index, to_index-1))
 
@@ -463,8 +452,7 @@ class PeriodicAverageReconstructor(Reconstructor):
             periodicity_index = get_periodicity_index(item_to_reconstruct, timeseries.resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])
             item_to_reconstruct.data[key] = self.data['averages'][periodicity_index] + offset
             item_to_reconstruct.data_indexes['data_reconstructed'] = 1
-                        
-
+        
     def _plot_averages(self, timeseries, **kwargs):   
         averages_timeseries = copy.deepcopy(timeseries)
         for item in averages_timeseries:
@@ -475,9 +463,9 @@ class PeriodicAverageReconstructor(Reconstructor):
         averages_timeseries.plot(**kwargs)
 
 
-#=========================
+#=====================================
 #  Prophet Reconstructor
-#=========================
+#=====================================
 
 class ProphetReconstructor(Reconstructor, ProphetModel):
     """A forecaster based on Prophet. Prophet (from Facebook) implements a procedure for forecasting time series data based
@@ -503,7 +491,6 @@ class ProphetReconstructor(Reconstructor, ProphetModel):
         
         # Fit tjhe Prophet model
         self.prophet_model.fit(data)
-
 
     def _reconstruct(self, timeseries, key, from_index, to_index):
         logger.debug('Reconstructing between "{}" and "{}"'.format(from_index, to_index-1))
