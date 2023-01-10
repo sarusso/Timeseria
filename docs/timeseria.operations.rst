@@ -18,8 +18,8 @@
    .. autosummary::
    
       Operation
-      ScalarOperation
       SeriesOperation
+      TimeSeriesOperation
       
       Min
       Max

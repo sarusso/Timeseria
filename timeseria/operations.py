@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Operations on the series, returning both scalar and other series."""
+"""Operations on the series."""
 
 from copy import copy, deepcopy
 from .time import s_from_dt
@@ -13,12 +13,12 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-#=======================
-#  Base Operation class
-#=======================
+#=================================
+#  Base Operation classes
+#=================================
 
 class Operation():
-    """Generic operation class (callable object)."""
+    """A generic operation (callable object)."""
 
     @classmethod
     def __str__(cls):
@@ -36,20 +36,22 @@ class Operation():
         return self.__class__.__name__.lower()
 
 
-class ScalarOperation(Operation):
-    """An operation operating on a series and returning a scalar (callable object)."""    
-    supports_weights = False
-
-
 class SeriesOperation(Operation):
-    """An operation operating on a series and returning a series (callable object)."""
+    """An operation operating on one or more series (callable object). Can return
+    another series, a scalar, a list of items, or any other valid data type."""    
+    _supports_weights = False
 
 
-#=======================
-#  Scalar Operations
-#=======================
+class TimeSeriesOperation(SeriesOperation):
+    """An operation operating on one or more time series (callable object). Can return
+     another time series, a scalar, a list of items, or any other valid data type."""  
 
-class Max(ScalarOperation):
+
+#=================================
+#  Operations returning scalars
+#=================================
+
+class Max(TimeSeriesOperation):
     """Maximum operation (callable object). Comes also pre-instantiated as the ``max()``
     function in the same module (accessible as ``timeseria.operations.max``)."""
     
@@ -78,7 +80,7 @@ class Max(ScalarOperation):
                 return mins
 
 
-class Min(ScalarOperation):
+class Min(TimeSeriesOperation):
     """Minimum operation (callable object). Comes also pre-instantiated as the ``min()``
     function in the same module (accessible as ``timeseria.operations.min``)."""
     
@@ -107,10 +109,10 @@ class Min(ScalarOperation):
                 return mins
 
 
-class Avg(ScalarOperation):
+class Avg(TimeSeriesOperation):
     """Weighted average operation (callable object)."""
     
-    supports_weights = True
+    _supports_weights = True
 
     def __call__(self, arg, data_label=None, **kwargs):
 
@@ -173,7 +175,7 @@ class Avg(ScalarOperation):
             return avgs
 
 
-class Sum(ScalarOperation):
+class Sum(TimeSeriesOperation):
     """Sum operation (callable object)."""
 
     def __init__(self):
@@ -196,11 +198,11 @@ class Sum(ScalarOperation):
                 return sums
 
 
-#=======================
-#  Series operations
-#=======================
+#=================================
+#  Operations returning series 
+#=================================
 
-class Derivative(SeriesOperation):
+class Derivative(TimeSeriesOperation):
     """Derivative operation (callable object)."""
     
     def __call__(self, series, inplace=False, normalize=True, diffs=False):
@@ -321,7 +323,7 @@ class Derivative(SeriesOperation):
             return der_series
 
 
-class Integral(SeriesOperation):
+class Integral(TimeSeriesOperation):
     """Integral operation (callable object)."""
     
     def __call__(self, series, inplace=False, normalize=True, c=0, offset=0):
@@ -458,7 +460,7 @@ class CSum(Integral):
         return super(CSum, self).__call__(series, inplace=inplace, normalize=False, offset=offset)
 
 
-class Normalize(SeriesOperation):
+class Normalize(TimeSeriesOperation):
     """Normalization operation (callable object)"""
     
     def __call__(self, series, range=[0,1], inplace=False):
@@ -510,14 +512,14 @@ class Normalize(SeriesOperation):
  
                 if isinstance(series[0], Point):
                     normalized_series.append(series[0].__class__(t = item.t,
-                                                                         tz = item.tz,
-                                                                         data = data,
-                                                                         data_loss = item.data_loss))         
+                                                                 tz = item.tz,
+                                                                 data = data,
+                                                                 data_loss = item.data_loss))         
                 elif isinstance(series[0], Slot):
                     normalized_series.append(series[0].__class__(start = item.start,
-                                                                         unit = item.unit,
-                                                                         data = data,
-                                                                         data_loss = item.data_loss))                
+                                                                 unit = item.unit,
+                                                                 data = data,
+                                                                 data_loss = item.data_loss))                
                 else:
                     raise NotImplementedError('Working on series other than slots or points not yet implemented')
  
@@ -525,9 +527,7 @@ class Normalize(SeriesOperation):
             return normalized_series
 
 
-
-
-class Rescale(SeriesOperation):
+class Rescale(TimeSeriesOperation):
     """Rescaling operation (callable object)"""
     
     def __call__(self, series, value, inplace=False):
@@ -560,14 +560,14 @@ class Rescale(SeriesOperation):
 
                 if isinstance(series[0], Point):
                     rescaled_series.append(series[0].__class__(t = item.t,
-                                                                         tz = item.tz,
-                                                                         data = rescaled_data,
-                                                                         data_loss = item.data_loss))         
+                                                               tz = item.tz,
+                                                               data = rescaled_data,
+                                                               data_loss = item.data_loss))         
                 elif isinstance(series[0], Slot):
                     rescaled_series.append(series[0].__class__(start = item.start,
-                                                                         unit = item.unit,
-                                                                         data = rescaled_data,
-                                                                         data_loss = item.data_loss))                
+                                                               unit = item.unit,
+                                                               data = rescaled_data,
+                                                               data_loss = item.data_loss))                
                 else:
                     raise NotImplementedError('Working on series other than slots or points not yet implemented')
  
@@ -575,7 +575,7 @@ class Rescale(SeriesOperation):
             return rescaled_series
 
 
-class Offset(SeriesOperation):
+class Offset(TimeSeriesOperation):
     """Offsetting operation (callable object)"""
     
     def __call__(self, series, value, inplace=False):
@@ -608,21 +608,19 @@ class Offset(SeriesOperation):
 
                 if isinstance(series[0], Point):
                     rescaled_series.append(series[0].__class__(t = item.t,
-                                                                         tz = item.tz,
-                                                                         data = offsetted_data,
-                                                                         data_loss = item.data_loss))         
+                                                               tz = item.tz,
+                                                               data = offsetted_data,
+                                                               data_loss = item.data_loss))         
                 elif isinstance(series[0], Slot):
                     rescaled_series.append(series[0].__class__(start = item.start,
-                                                                         unit = item.unit,
-                                                                         data = offsetted_data,
-                                                                         data_loss = item.data_loss))                
+                                                               unit = item.unit,
+                                                               data = offsetted_data,
+                                                               data_loss = item.data_loss))                
                 else:
                     raise NotImplementedError('Working on series other than slots or points not yet implemented')
  
         if not inplace:
             return rescaled_series
-
-
 
 
 class MAvg(SeriesOperation):
@@ -670,38 +668,6 @@ class MAvg(SeriesOperation):
                 raise NotImplementedError('Working on series other than slots or points not yet implemented')
 
         return mavg_series
-
-
-class Select(SeriesOperation):
-    """Select operation (callable object). Selects items of the series given SQL-like queries."""
-    
-    def __call__(self, series, query, *args, **kwargs):
-
-        if (' and ' or ' AND ' or ' or ' or ' OR ') in query:
-            raise NotImplementedError('Multiple conditions not yet supported')
-        
-        if '=' not in query:
-            raise NotImplementedError('Clauses other than the equality are not yet supported')
-        
-        # Get key
-        key = query.split('=')[0].strip()
-        if key.startswith('"'):
-            key=key[1:]
-        if key.endswith('"'):
-            key=key[:-1]
-        
-        # Get value
-        value = float(query.split('=')[1])
-
-        # Perform the select
-        selected = None
-        for item in series:
-            if item.data[key] == value:
-                try:
-                    selected.append(item)
-                except:
-                    selected = [item]
-        return selected 
 
 
 class Filter(SeriesOperation):
@@ -755,7 +721,7 @@ class Filter(SeriesOperation):
         return filtered_series 
 
 
-class Merge(SeriesOperation):
+class Merge(TimeSeriesOperation):
     """Merge two or more series (callable object)."""
     
     def __call__(self, *seriess):
@@ -877,6 +843,41 @@ class Merge(SeriesOperation):
 
         return result_series
 
+
+#=================================
+# Operations returning lists
+#=================================
+
+class Select(SeriesOperation):
+    """Select operation (callable object). Selects items of the series given SQL-like queries."""
+    
+    def __call__(self, series, query, *args, **kwargs):
+
+        if (' and ' or ' AND ' or ' or ' or ' OR ') in query:
+            raise NotImplementedError('Multiple conditions not yet supported')
+        
+        if '=' not in query:
+            raise NotImplementedError('Clauses other than the equality are not yet supported')
+        
+        # Get key
+        key = query.split('=')[0].strip()
+        if key.startswith('"'):
+            key=key[1:]
+        if key.endswith('"'):
+            key=key[:-1]
+        
+        # Get value
+        value = float(query.split('=')[1])
+
+        # Perform the select
+        selected = None
+        for item in series:
+            if item.data[key] == value:
+                try:
+                    selected.append(item)
+                except:
+                    selected = [item]
+        return selected 
 
 
 #========================

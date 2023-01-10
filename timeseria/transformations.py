@@ -136,10 +136,10 @@ def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_poi
             # Handle operations                
             for operation in operations:
                 try:
-                    operation_supports_weights = operation.supports_weights
+                    operation_supports_weights = operation._supports_weights
                 except AttributeError:
                     # This is because user-defined operations can be even simple functions
-                    # or based on custom classes without the supports_weights attribute
+                    # or based on custom classes without the _supports_weights attribute
                     operation_supports_weights = False
                 
                 if operation_supports_weights:
