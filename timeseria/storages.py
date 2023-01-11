@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Data storages, as the CSV file and SQLite database."""
+"""Data storages, as the CSV file storage."""
 
 import os
 import datetime

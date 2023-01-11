@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Provides base data structures: Points, Slots and Series with all their specializations."""
+"""Base data structures as Points, Slots and Series."""
 
 from .time import s_from_dt , dt_from_s, UTC, timezonize
 from .units import Unit, TimeUnit
@@ -1289,7 +1289,7 @@ class TimeSeries(Series):
             from .utilities import detect_sampling_interval
             self.__autodetected_sampling_interval, self.__autodetected_sampling_interval_confidence = detect_sampling_interval(self, confidence=True)           
             return self.__autodetected_sampling_interval_confidence
-    
+
     @property
     def resolution(self):
         """The (temporal) resolution of the time series.

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Provides time manipulation utilities, with a particular focus on proper timezone and DST handling."""
+"""Time manipulation utilities, with a particular focus on proper timezone and DST handling."""
 
 import datetime, calendar, pytz
 

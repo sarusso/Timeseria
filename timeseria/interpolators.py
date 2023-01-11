@@ -7,14 +7,14 @@ logger = logging.getLogger(__name__)
 
 
 class Interpolator():
-    """A generic interpolator"""
+    """A generic interpolator."""
     
     def evaluate(self, series, from_i, to_i):
         raise NotImplementedError('This interpolator is not implemented')
 
 
 class LinearInterpolator(Interpolator):
-    """A linear interpolator"""
+    """A linear interpolator."""
         
     def __init__(self, series):
         logger.debug('Initialized linear interpolator on series "{}"'.format(series))
@@ -81,7 +81,8 @@ class LinearInterpolator(Interpolator):
     
     
 class UniformInterpolator(Interpolator):
-    
+    """A uniform interpolator."""
+
     def __init__(self, series):
         logger.debug('Initialized uniform interpolator on series "{}"'.format(series))
         self.series = series

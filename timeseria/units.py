@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Provides Units and TimeUnits (which fully supports calendar arithmetic)."""
+"""Units and TimeUnits, which fully supports calendar arithmetic."""
 
 import re
 import datetime
