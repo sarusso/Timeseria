@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 class Interpolator():
     """A generic interpolator."""
     
-    def evaluate(self, series, from_i, to_i):
+    def evaluate(self, at, prev_i, next_i):
         raise NotImplementedError('This interpolator is not implemented')
 
 

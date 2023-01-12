@@ -752,7 +752,10 @@ class CSVFileStorage(Storage):
 
             # 2) Dump data (and data_indexes)
             for item in timeseries:
-                data_part = ','.join([str(item.data[key]) for key in timeseries.data_labels()])
+                if isinstance (timeseries[0].data, list) or isinstance (timeseries[0].data, tuple):
+                    data_part = ','.join([str(item.data[int(key)]) for key in timeseries.data_labels()])
+                else:
+                    data_part = ','.join([str(item.data[key]) for key in timeseries.data_labels()])
                 data_indexes_part = ','.join([str(getattr(item, index)) for index in data_indexes])
                 if data_indexes_part:
                     csv_file.write('{},{},{}\n'.format(item.t, data_part, data_indexes_part))

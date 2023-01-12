@@ -257,7 +257,10 @@ def _to_dg_data(serie, data_labels_to_plot, data_indexes_to_plot, full_precision
                 if label is None:
                     data = item.data
                 else:
-                    data = item.data[label]
+                    if isinstance(item.data, list) or isinstance(item.data, tuple):
+                        data = item.data[int(label)]
+                    else:
+                        data = item.data[label]
 
                 if full_precision:
                     data_part += '{},'.format(data)
@@ -614,11 +617,11 @@ function legendFormatter(data) {
     labels=''
     if data_labels_to_plot:
         for data_label_to_plot in data_labels_to_plot:
-            if isinstance(data_label_to_plot, int):
+            if isinstance(timeseries[0].data, list) or isinstance(timeseries[0].data, tuple):
                 if len(data_labels_to_plot) == 1:
                     labels='value,'
                 else:    
-                    labels += 'value {},'.format(data_label_to_plot+1)
+                    labels += 'value {},'.format(data_label_to_plot)
             else:
                 labels += '{},'.format(data_label_to_plot)
         # Remove last comma

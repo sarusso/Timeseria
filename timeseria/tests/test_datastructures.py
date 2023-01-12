@@ -110,7 +110,7 @@ class TestPoints(unittest.TestCase):
         
         # Test list and dict data labels
         data_point = DataPoint(1, 2, data=['hello', 'hola'])
-        self.assertEqual(data_point.data_labels(), [0,1])
+        self.assertEqual(data_point.data_labels(), ['0','1'])
         
         data_point = DataPoint(1, 2, data={'label1':'hello', 'label2':'hola'})
         self.assertEqual(data_point.data_labels(), ['label1','label2'])
@@ -285,7 +285,7 @@ class TestSlots(unittest.TestCase):
 
         # Test list and dict data labels
         data_slot = DataSlot(start=Point(1), end=Point(2), data=['hello', 'hola'])
-        self.assertEqual(data_slot.data_labels(), [0,1])
+        self.assertEqual(data_slot.data_labels(), ['0','1'])
         
         data_slot = DataSlot(start=Point(1), end=Point(2), data={'label1':'hello', 'label2':'hola'})
         self.assertEqual(data_slot.data_labels(), ['label1','label2'])
@@ -418,31 +418,19 @@ class TestSeries(unittest.TestCase):
         with self.assertRaises(NotImplementedError):
             succession_series.remove(one)
         
-        # Define a Series with fixed type
-        class FloatSeries(Series):
-            __TYPE__ = float
-
-        with self.assertRaises(TypeError):
-            FloatSeries(1,4,5, 'hello', None)
-
-        with self.assertRaises(TypeError):
-            FloatSeries(1,4,5)
-
-        with self.assertRaises(TypeError):
-            FloatSeries(1.0,4.0,None,5.0)
-            
-        float_series = FloatSeries(1.0,4.0,5.0)
-        self.assertEqual(float_series, [1.0,4.0,5.0])
-        self.assertEqual(len(float_series), 3)
+        # Test type
+        series = Series(1.0,4.0,5.0)
+        self.assertEqual(series, [1.0,4.0,5.0])
+        self.assertEqual(len(series), 3)
+        self.assertEqual(series.items_type, float)
         
-
         # Test head, tail & content
-        self.assertEqual(float_series.head(2),[1.0,4.0])
-        self.assertEqual(float_series.tail(2),[4.0,5.0])
-        self.assertEqual(float_series.contents(),[1.0,4.0,5.0])
+        series = Series(1.0,4.0,5.0)
+        self.assertEqual(series.head(2),[1.0,4.0])
+        self.assertEqual(series.tail(2),[4.0,5.0])
+        self.assertEqual(series.contents(),[1.0,4.0,5.0])
 
         # Test print with print mock?
-        #print()
         #float_series.print(3)
         
         # Test with data slots

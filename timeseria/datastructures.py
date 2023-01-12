@@ -54,13 +54,28 @@ class Point():
         return self.__repr__()
 
     def __eq__(self, other):
-        if not self.coordinates == other.coordinates:
-            return False
-        for i in range(0, len(self.coordinates)):
-            if self.coordinates[i] != other.coordinates[i]:
+        try:
+            if not self.coordinates == other.coordinates:
                 return False
-        return True
+            for i in range(0, len(self.coordinates)):
+                if self.coordinates[i] != other.coordinates[i]:
+                    return False
+            return True
+        except (AttributeError, IndexError):
+            return False
     
+    def __gt__(self, other):
+        if len(self.coordinates) > 1:
+            raise ValueError('Comparing multi-dimensional points does not make sense')
+        else:
+            try:
+                if len(other.coordinates) > 1:
+                    raise ValueError('Comparing multi-dimensional points does not make sense')
+                else:
+                    return self.coordinates[0] > other.coordinates[0]
+            except AttributeError:
+                return self.coordinates[0] > other
+
     def __getitem__(self,index):
         return self.coordinates[index]
 
@@ -207,8 +222,11 @@ class DataPoint(Point):
             return 'Point @ {} with data "{}"'.format(self.__coordinates_repr__, self.data)
     
     def __eq__(self, other):
-        if self._data != other._data:
-            return False
+        try:
+            if self._data != other._data:
+                return False
+        except AttributeError:
+            pass
         return super(DataPoint, self).__eq__(other)
 
     @property
@@ -238,12 +256,12 @@ class DataPoint(Point):
             return None
         
     def data_labels(self):
-        """Return the data labels. If data is a dictionary, then these are the dictionary keys,
-        if data is a list, then these are the list indexes. Other formats are not supported."""
+        """Return the data labels. If data is a dictionary, then these are the dictionary keys, if data 
+        is list-like, then these are the list indexes (as strings). Other formats are not supported."""
         try:
             return sorted(list(self.data.keys()))
         except AttributeError:
-            return list(range(len(self.data)))
+            return [str(i) for i in range(len(self.data))]
 
 
 class DataTimePoint(DataPoint, TimePoint):
@@ -538,12 +556,12 @@ class DataSlot(Slot):
             return None
 
     def data_labels(self):
-        """Return the data labels. If data is a dictionary, then these are the dictionary keys,
-        if data is a list, then these are the list indexes. Other formats are not supported."""
+        """Return the data labels. If data is a dictionary, then these are the dictionary keys, if data 
+        is list-like, then these are the list indexes (as strings). Other formats are not supported."""
         try:
             return sorted(list(self.data.keys()))
         except AttributeError:
-            return list(range(len(self.data)))    
+            return [str(i) for i in range(len(self.data))]
 
 
 class DataTimeSlot(DataSlot, TimeSlot):
@@ -584,9 +602,6 @@ class Series(list):
     # 5,6,7 are integer succession. 5.3, 5.4, 5.5 are too in a succesisons. 5,6,8 are not in a succession. 
     # a group or a number of related or similar things, events, etc., arranged or occurring in temporal, spatial, or other order or succession; sequence.
 
-    # By default the type is not defined
-    __TYPE__ = None
-    
     def __init__(self, *args, **kwargs):
 
         if kwargs:
@@ -597,6 +612,14 @@ class Series(list):
             
         self._title = None
 
+    @property
+    def items_type(self):
+        """The type of the items of the series."""
+        if not self:
+            return None
+        else:
+            return self[0].__class__
+
     def append(self, item):
         """Append an item to the series. Accepts only items of the same
         type of the items already present in the series (unless empty)"""
@@ -605,13 +628,10 @@ class Series(list):
         
         # logger.debug('Checking %s', item)
         
-        # Set type if not already done
-        if not self.__TYPE__:
-            self.__TYPE__ = type(item)
-
         # Check type
-        if not isinstance(item, self.__TYPE__):
-            raise TypeError('Got incompatible type "{}", can only accept "{}"'.format(item.__class__.__name__, self.__TYPE__.__name__))
+        if self.items_type:
+            if not isinstance(item, self.items_type):
+                raise TypeError('Got incompatible type "{}", can only accept "{}"'.format(item.__class__.__name__, self.items_type.__name__))
         
         # Check order or succession
         try:
@@ -626,6 +646,7 @@ class Series(list):
                         raise ValueError('Not in order ("{}" does not follow "{}")'.format(item,self[-1])) from None
                 except TypeError:
                     raise TypeError('Object of class "{}" does not implement a "__gt__" or a "__succedes__" method, cannot append it to a Series (which is ordered)'.format(item.__class__.__name__)) from None
+
         except IndexError:
             pass
 
@@ -677,8 +698,8 @@ class Series(list):
         
     # Python slice (i.e [0:35])
     def __getitem__(self, key):
-        if isinstance(key, slice):   
-            # TODO: improve and implement shallow copies please.         
+        if isinstance(key, slice):
+            # TODO: improve and implement shallow copies please. Consider using the _TimeSeriesSlice class (as SeriesSlice)
             indices = range(*key.indices(len(self)))
             series = self.__class__()
             for i in indices:
@@ -688,7 +709,7 @@ class Series(list):
             except:
                 pass
             return series
-        elif isinstance(key, str):   
+        elif isinstance(key, str):
             # Try filtering on this data key only
             return self.filter(key)
         else:
@@ -766,8 +787,8 @@ class Series(list):
         if len(self) > 0:
             
             # Check valid type
-            if not isinstance(x, self.__TYPE__):
-                raise TypeError('Got incompatible type "{}", can only accept "{}"'.format(x.__class__.__name__, self.__TYPE__.__name__))
+            if not isinstance(x, self.items_type):
+                raise TypeError('Got incompatible type "{}", can only accept "{}"'.format(x.__class__.__name__, self.items_type.__name__))
         
             # Check ordering/succession
             if i == 0:
@@ -1008,14 +1029,6 @@ class TimeSeries(Series):
             else:
                 raise ConsistencyException('Got no TimePoints nor TimeSlots in a Time Series, this is a consistency error (got {})'.format(self.items_type.__name__))
     
-    @property
-    def items_type(self):
-        """The type of the items of the time series."""
-        if not self:
-            raise ValueError('The series is empty and has no items')
-        else:
-            return self[0].__class__
-
     #=========================
     #  Init
     #=========================
@@ -1347,20 +1360,16 @@ class TimeSeries(Series):
     #=========================
 
     def data_labels(self):
-        """Returns the labels of the data carried by the points or slots.
-        If data is a dictionary, then these are the dictionary keys,
-        if data is a list, then these are the list indexes. Other
-        data formats are not supported."""
+        """Returns the labels of the data carried by the points or slots. If data is a dictionary,
+        then these are the dictionary keys, if data  is list-like, then these are the list indexes
+        (as strings). Other formats are not supported."""
         if len(self) > 0 and not self._item_data_reference:
             raise TypeError('Time series items have no data, cannot get data labels')
         if len(self) == 0:
             return None
         else:
             # TODO: can we optimize here? Computing them once and then serving them does not work if someone changes data keys...
-            try:
-                return sorted(list(self[0].data.keys()))
-            except AttributeError:
-                return list(range(len(self[0].data)))
+            return self[0].data_labels()
 
     def rename_data_label(self, old_key, new_key):
         """Rename a data key, in-place."""
