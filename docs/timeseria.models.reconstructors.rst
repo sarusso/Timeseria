@@ -18,6 +18,8 @@
    .. autosummary::
    
       Reconstructor
+      SeriesReconstructor
+      
       LinearInterpolationReconstructor
       PeriodicAverageReconstructor
       ProphetReconstructor

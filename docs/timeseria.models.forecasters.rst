@@ -18,6 +18,8 @@
    .. autosummary::
    
       Forecaster
+      SeriesForecaster
+      
       AARIMAForecaster
       ARIMAForecaster
       LSTMForecaster

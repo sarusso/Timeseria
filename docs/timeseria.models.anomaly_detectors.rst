@@ -18,12 +18,12 @@
    .. autosummary::
    
       AnomalyDetector
-      ForecastBasedAnomalyDetector
-      PeriodicAverageAnomalyDetector
-   
-   
+      SeriesAnomalyDetector
+      
+      ForecasterAnomalyDetector
+      PeriodicAverageForecasterAnomalyDetector
 
-   
+      
    
    
 

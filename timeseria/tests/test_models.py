@@ -3,11 +3,10 @@ import os
 import tempfile
 from math import sin, cos
 from ..datastructures import TimePoint, DataTimeSlot, DataTimePoint, TimeSeries
-from ..models import Model, TimeSeriesModel, KerasModel
-from ..models import PeriodicAverageReconstructor, PeriodicAverageForecaster, PeriodicAverageAnomalyDetector
-from ..models import ProphetForecaster, ProphetReconstructor
-from ..models import ARIMAForecaster, AARIMAForecaster
-from ..models import LSTMForecaster
+from ..models.base import Model, SeriesModel, _KerasModel
+from ..models.reconstructors import PeriodicAverageReconstructor, ProphetReconstructor
+from ..models.forecasters import ProphetForecaster, PeriodicAverageForecaster, ARIMAForecaster, AARIMAForecaster, LSTMForecaster
+from ..models.anomaly_detectors import PeriodicAverageAnomalyDetector
 from ..exceptions import NotFittedError, NonContiguityError
 from ..storages import CSVFileStorage
 from ..transformations import Resampler, Aggregator
@@ -92,10 +91,10 @@ class TestBaseModelClasses(unittest.TestCase):
         self.assertEqual(test_parametric_model_two.data['param1'], 2)
         
   
-    def test_TimeSeriesModel(self):
+    def test_SeriesModel(self):
         
-        # Define a trainable model mock
-        class TimeSeriesModelMock(TimeSeriesModel):            
+        # Define a (fittable) model mock
+        class SeriesModelMock(SeriesModel):   
             def _fit(self, *args, **kwargs):
                 pass 
             def _evaluate(self, *args, **kwargs):
@@ -109,11 +108,11 @@ class TestBaseModelClasses(unittest.TestCase):
                                            DataTimeSlot(start=TimePoint(t=2), end=TimePoint(t=3), data={'metric1': 56}))
 
         # Instantiate a parametric model
-        timeseries_model = TimeSeriesModelMock()
+        timeseries_model = SeriesModelMock()
         timeseries_model_id = timeseries_model.id
 
         # Set model save path
-        model_path = TEMP_MODELS_DIR+'/test_TSP_model'
+        model_path = TEMP_MODELS_DIR+'/test_time_series_model'
         
         # Cannot apply model before fitting
         with self.assertRaises(NotFittedError):
@@ -145,14 +144,14 @@ class TestBaseModelClasses(unittest.TestCase):
         timeseries_model.save(model_path)
         
         # Now re-load
-        loaded_timeseries_model = TimeSeriesModelMock(model_path)
+        loaded_timeseries_model = SeriesModelMock(model_path)
         self.assertEqual(loaded_timeseries_model.id, timeseries_model_id)
 
 
     def test_KerasModel(self):
         
         # Define a trainable model mock
-        class KerasModelMock(KerasModel):            
+        class KerasModelMock(_KerasModel):            
             def _fit(self, *args, **kwargs):
                 pass 
             def _evaluate(self, *args, **kwargs):
