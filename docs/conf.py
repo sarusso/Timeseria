@@ -19,7 +19,7 @@ sys.path.insert(0, os.path.abspath('..'))
 # -- Project information -----------------------------------------------------
 
 project = 'Timeseria'
-copyright = '2022, Stefano Alberto Russo'
+copyright = '2023, Stefano Alberto Russo'
 author = 'Stefano Alberto Russo'
 
 # The full version, including alpha/beta/rc tags
@@ -62,8 +62,21 @@ html_theme = 'sphinx_rtd_theme'
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
 
+def custom_skip_member(app, what, name, obj, skip, options):
+    #print('app="{}", what="{}", name="{}", obj="{}", skip="{}", options={}\n\n'.format(app, what, name, obj, skip, options))
+    
+    # Exclude all private members including the __call__ which would otherwise be included
+    if name.startswith('_'):
+        return True
+    
+    # Exclude exceptions unnecessary methods
+    if name in ['args', 'with_traceback']:
+        return True
+    
+    return None
 
 
 def setup(app):
+    app.connect('autodoc-skip-member', custom_skip_member)
     app.add_css_file('css/custom.css')
     
