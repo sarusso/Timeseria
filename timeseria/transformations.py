@@ -3,7 +3,7 @@
 
 from .time import dt_from_s, s_from_dt, as_timezone
 from .datastructures import DataTimeSlot, TimePoint, DataTimePoint, Series, TimeSeries, _TimeSeriesSlice
-from .utilities import compute_data_loss, compute_validity_regions
+from .utilities import _compute_data_loss, _compute_validity_regions
 from .operations import avg
 from .units import TimeUnit
 from .exceptions import ConsistencyException
@@ -45,7 +45,7 @@ def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_poi
 
     # Compute the data loss for the new element. This is forced
     # by the resampler or slotter if first or last point     
-    data_loss = compute_data_loss(series_dense_slice_extended,
+    data_loss = _compute_data_loss(series_dense_slice_extended,
                                   from_t = from_t,
                                   to_t = to_t,
                                   sampling_interval = point_validity,
@@ -350,7 +350,7 @@ class SeriesTransformation(Transformation):
             logger.warning('You are upsampling, which is not well tested yet. Expect potential issues.')
 
         # Compute validity regions
-        validity_regions = compute_validity_regions(series, sampling_interval=validity)
+        validity_regions = _compute_validity_regions(series, sampling_interval=validity)
 
         # Log
         logger.debug('Started resampling from "%s" (%s) to "%s" (%s)', from_dt, from_t, to_dt, to_t)

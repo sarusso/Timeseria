@@ -3,7 +3,7 @@
 
 import os
 import datetime
-from .utilities import detect_encoding, sanitize_string, is_list_of_integers, to_float
+from .utilities import detect_encoding, _sanitize_string, _is_list_of_integers, _to_float
 from .units import TimeUnit
 from .datastructures import TimePoint, DataTimePoint, DataTimeSlot, TimeSeries
 from .time import dt_from_str, dt_from_s, s_from_dt, timezonize, now_dt
@@ -212,7 +212,7 @@ class CSVFileStorage(Storage):
                 
                 # TODO: replace me using a custom line separator
                 line = csv_file.readline()
-                logger.debug('Processing line #%s: "%s"', line_number, sanitize_string(line,NO_DATA_PLACEHOLDERS))
+                logger.debug('Processing line #%s: "%s"', line_number, _sanitize_string(line,NO_DATA_PLACEHOLDERS))
 
                 # Do we have to stop? Note: empty lines still have the "\n" char.
                 if not line:
@@ -242,23 +242,23 @@ class CSVFileStorage(Storage):
                     not_converted = 0
                     for value in line_items:
                         try:
-                            float(sanitize_string(value,NO_DATA_PLACEHOLDERS))
+                            float(_sanitize_string(value,NO_DATA_PLACEHOLDERS))
                         except:
                             try:
-                                dt_from_str(sanitize_string(value,NO_DATA_PLACEHOLDERS))
+                                dt_from_str(_sanitize_string(value,NO_DATA_PLACEHOLDERS))
                             except:
                                 not_converted += 1
           
                     # If it is, use it as labels (and continue with the next line)
                     if not_converted: # == len(line_items):
-                        column_indexes = [i for i in range(len(line_items)) if sanitize_string(line_items[i],NO_DATA_PLACEHOLDERS)]
-                        column_labels = [sanitize_string(label,NO_DATA_PLACEHOLDERS) for label in line_items if sanitize_string(label,NO_DATA_PLACEHOLDERS)]
+                        column_indexes = [i for i in range(len(line_items)) if _sanitize_string(line_items[i],NO_DATA_PLACEHOLDERS)]
+                        column_labels = [_sanitize_string(label,NO_DATA_PLACEHOLDERS) for label in line_items if _sanitize_string(label,NO_DATA_PLACEHOLDERS)]
                         logger.debug('Set column indexes = "%s"  and column labels = "%s"', column_indexes, column_labels)
                         continue
                     
                     # Otherwise, just use integer keys (and go on)
                     else:
-                        column_indexes = [i for i in range(len(line_items)) if sanitize_string(line_items[i],NO_DATA_PLACEHOLDERS)]
+                        column_indexes = [i for i in range(len(line_items)) if _sanitize_string(line_items[i],NO_DATA_PLACEHOLDERS)]
                         logger.debug('Set column indexes = "%s"  and column labels = "%s"', column_indexes, column_labels)
 
                     # Note: above we only used labels and indexes that carry content after being sanitize_stringd.
@@ -330,18 +330,18 @@ class CSVFileStorage(Storage):
                 # Ok,now get the timestamp as string
                 if timestamp_label_index is not None:
                     # Just use the Timestamp column
-                    timestamp = sanitize_string(line_items[timestamp_label_index],NO_DATA_PLACEHOLDERS)
+                    timestamp = _sanitize_string(line_items[timestamp_label_index],NO_DATA_PLACEHOLDERS)
 
                 else:
                     # Time part
                     time_part=None
                     if time_label_index is not None:
-                        time_part = sanitize_string(line_items[time_label_index],NO_DATA_PLACEHOLDERS)
+                        time_part = _sanitize_string(line_items[time_label_index],NO_DATA_PLACEHOLDERS)
     
                     # Date part
                     date_part=None
                     if date_label_index is not None:
-                        date_part = sanitize_string(line_items[date_label_index],NO_DATA_PLACEHOLDERS)
+                        date_part = _sanitize_string(line_items[date_label_index],NO_DATA_PLACEHOLDERS)
                                        
                     # Assemble timestamp
                     if time_part is not None and date_part is not None:
@@ -426,7 +426,7 @@ class CSVFileStorage(Storage):
                     # Do we have to select only some data columns?
                     if data_labels != 'all':
                         
-                        if is_list_of_integers(data_labels):
+                        if _is_list_of_integers(data_labels):
                             # Case where we have been given a list of integers
                             data_label_indexes = data_labels
                             self.data_type = list
@@ -482,11 +482,11 @@ class CSVFileStorage(Storage):
                 try:
                     
                     if data_type == float:
-                        data = to_float(line_items[data_label_indexes[0]],NO_DATA_PLACEHOLDERS)
+                        data = _to_float(line_items[data_label_indexes[0]],NO_DATA_PLACEHOLDERS)
                     elif data_type == list:
-                        data = [to_float(line_items[index],NO_DATA_PLACEHOLDERS) for index in data_label_indexes]
+                        data = [_to_float(line_items[index],NO_DATA_PLACEHOLDERS) for index in data_label_indexes]
                     elif data_type == dict:
-                        data = {column_labels[index]: to_float(line_items[index],NO_DATA_PLACEHOLDERS,column_labels[index]) for index in data_label_indexes}
+                        data = {column_labels[index]: _to_float(line_items[index],NO_DATA_PLACEHOLDERS,column_labels[index]) for index in data_label_indexes}
                 
                 # TODO: here we drop the entire line. Instead, should we use a "None" and allow "Nones" in the DataPoints data? 
                 except FloatConversionError as e:

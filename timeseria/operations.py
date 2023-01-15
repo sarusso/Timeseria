@@ -4,7 +4,7 @@
 from copy import copy, deepcopy
 from .time import s_from_dt
 from .datastructures import Series, Slot, Point
-from .utilities import is_close
+from .utilities import _is_close
 from .units import TimeUnit, Unit
 from .exceptions import ConsistencyException 
 
@@ -760,7 +760,7 @@ class Merge(SeriesOperation):
                     abort = True
                     try:
                         # Handle floating point precision issues 
-                        if is_close(series.resolution, resolution):
+                        if _is_close(series.resolution, resolution):
                             abort = False
                     except (ValueError,TypeError):
                         pass

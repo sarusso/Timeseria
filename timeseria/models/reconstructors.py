@@ -3,7 +3,7 @@
 
 import copy
 import statistics
-from ..utilities import get_periodicity, get_periodicity_index, set_from_t_and_to_t, item_is_in_range, mean_absolute_percentage_error
+from ..utilities import detect_periodicity, _get_periodicity_index, _set_from_t_and_to_t, _item_is_in_range, mean_absolute_percentage_error
 from ..time import dt_from_s
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 from ..units import TimeUnit
@@ -65,7 +65,7 @@ class SeriesReconstructor(Reconstructor, SeriesModel):
 
         # TODO: understand if we want the apply from/to behavior. For now it is disabled
         # (add from_t=None, to_t=None, from_dt=None, to_dt=None in the function call above)
-        # from_t, to_t = set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
+        # from_t, to_t = _set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
         # Maybe also add a timeseries.mark=[from_dt, to_dt]
          
         from_t = None
@@ -163,7 +163,7 @@ class SeriesReconstructor(Reconstructor, SeriesModel):
          
             # Support vars
             evaluation_score = {}
-            from_t, to_t = set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
+            from_t, to_t = _set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
             warned = False
             
             # Log
@@ -186,7 +186,7 @@ class SeriesReconstructor(Reconstructor, SeriesModel):
     
                         # Skip if needed
                         try:
-                            if not item_is_in_range(timeseries[i], from_t, to_t):
+                            if not _item_is_in_range(timeseries[i], from_t, to_t):
                                 continue
                         except StopIteration:
                             break                  
@@ -405,11 +405,11 @@ class PeriodicAverageReconstructor(SeriesReconstructor):
             if len(timeseries.data_labels()) > 1:
                 raise NotImplementedError('Multivariate time series are not yet supported')
     
-            from_t, to_t = set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
+            from_t, to_t = _set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
             
             # Set or detect periodicity
             if periodicity == 'auto':
-                periodicity =  get_periodicity(timeseries)
+                periodicity =  detect_periodicity(timeseries)
                 try:
                     if isinstance(timeseries.resolution, TimeUnit):
                         logger.info('Detected periodicity: %sx %s', periodicity, timeseries.resolution)
@@ -429,14 +429,14 @@ class PeriodicAverageReconstructor(SeriesReconstructor):
                     
                     # Skip if needed
                     try:
-                        if not item_is_in_range(item, from_t, to_t):
+                        if not _item_is_in_range(item, from_t, to_t):
                             continue
                     except StopIteration:
                         break
                     
                     # Process. Note: we do fit on data losses = None!
                     if item.data_loss is None or item.data_loss < data_loss_threshold:
-                        periodicity_index = get_periodicity_index(item, timeseries.resolution, periodicity, dst_affected=dst_affected)
+                        periodicity_index = _get_periodicity_index(item, timeseries.resolution, periodicity, dst_affected=dst_affected)
                         if not periodicity_index in sums:
                             sums[periodicity_index] = item.data[key]
                             totals[periodicity_index] = 1
@@ -469,7 +469,7 @@ class PeriodicAverageReconstructor(SeriesReconstructor):
                 diffs=0
                 for j in range(from_index, to_index):
                     real_value = timeseries[j].data[key]
-                    periodicity_index = get_periodicity_index(timeseries[j], timeseries.resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])
+                    periodicity_index = _get_periodicity_index(timeseries[j], timeseries.resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])
                     reconstructed_value = self.data['averages'][periodicity_index]
                     diffs += (real_value - reconstructed_value)
                 offset = diffs/(to_index-from_index)
@@ -480,7 +480,7 @@ class PeriodicAverageReconstructor(SeriesReconstructor):
                 try:
                     for j in [from_index-1, to_index+1]:
                         real_value = timeseries[j].data[key]
-                        periodicity_index = get_periodicity_index(timeseries[j], timeseries.resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])
+                        periodicity_index = _get_periodicity_index(timeseries[j], timeseries.resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])
                         reconstructed_value = self.data['averages'][periodicity_index]
                         diffs += (real_value - reconstructed_value)
                     offset = diffs/2
@@ -492,7 +492,7 @@ class PeriodicAverageReconstructor(SeriesReconstructor):
             # Actually reconstruct
             for j in range(from_index, to_index):
                 item_to_reconstruct = timeseries[j]
-                periodicity_index = get_periodicity_index(item_to_reconstruct, timeseries.resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])
+                periodicity_index = _get_periodicity_index(item_to_reconstruct, timeseries.resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])
                 item_to_reconstruct.data[key] = self.data['averages'][periodicity_index] + offset
                 item_to_reconstruct.data_indexes['data_reconstructed'] = 1
 
@@ -503,7 +503,7 @@ class PeriodicAverageReconstructor(SeriesReconstructor):
     def _plot_averages(self, timeseries, **kwargs):   
         averages_timeseries = copy.deepcopy(timeseries)
         for item in averages_timeseries:
-            value = self.data['averages'][get_periodicity_index(item, averages_timeseries.resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])]
+            value = self.data['averages'][_get_periodicity_index(item, averages_timeseries.resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])]
             if not value:
                 value = 0
             item.data['periodic_average'] = value 
@@ -531,7 +531,7 @@ class ProphetReconstructor(SeriesReconstructor, _ProphetModel):
             
             from prophet import Prophet
     
-            from_t, to_t = set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
+            from_t, to_t = _set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
     
             if len(timeseries.data_labels()) > 1:
                 raise NotImplementedError('Multivariate time series are not yet supported')

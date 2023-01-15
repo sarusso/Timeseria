@@ -6,7 +6,7 @@ import json
 import uuid
 import statistics
 from ..exceptions import NotFittedError
-from ..utilities import check_timeseries, check_resolution, check_data_labels, item_is_in_range
+from ..utilities import _check_timeseries, _check_resolution, _check_data_labels, _item_is_in_range
 from ..time import now_s, dt_from_s
 from ..units import TimeUnit
 from ..datastructures import Point, Series, TimeSeries
@@ -257,7 +257,7 @@ class SeriesModel(Model):
 
         # If TimeSeries data, check the timeseries
         if isinstance(series, TimeSeries): 
-            check_timeseries(series)
+            _check_timeseries(series)
 
         # Call parent fit
         fit_output = super(SeriesModel, self).fit(series, *args, **kwargs)
@@ -297,12 +297,12 @@ class SeriesModel(Model):
                         # Do not check if the series is a point series and has only one item
                         pass
                     else:
-                        check_resolution(series, self.data['resolution'])
-                    check_data_labels(series, self.data['data_labels'])
+                        _check_resolution(series, self.data['resolution'])
+                    _check_data_labels(series, self.data['data_labels'])
         finally:
             # Check time series in any case
             if isinstance(series, TimeSeries):
-                check_timeseries(series)
+                _check_timeseries(series)
                         
         # Call parent predict and return output
         return super(SeriesModel, self).predict(series, *args, **kwargs)
@@ -327,12 +327,12 @@ class SeriesModel(Model):
                         # Do not check if the series is a point series and has only one item
                         pass
                     else:
-                        check_resolution(series, self.data['resolution'])
-                    check_data_labels(series, self.data['data_labels'])
+                        _check_resolution(series, self.data['resolution'])
+                    _check_data_labels(series, self.data['data_labels'])
         finally:
             # Check time series in any case
             if isinstance(series, TimeSeries):
-                check_timeseries(series)
+                _check_timeseries(series)
             
         # Call parent apply and return output
         return super(SeriesModel, self).apply(series, *args, **kwargs)
@@ -357,12 +357,12 @@ class SeriesModel(Model):
                         # Do not check if the series is a point series and has only one item
                         pass
                     else:
-                        check_resolution(series, self.data['resolution'])
-                    check_data_labels(series, self.data['data_labels'])
+                        _check_resolution(series, self.data['resolution'])
+                    _check_data_labels(series, self.data['data_labels'])
         finally:
             # Check time series in any case
             if isinstance(series, TimeSeries):
-                check_timeseries(series)
+                _check_timeseries(series)
 
         # Call parent evaluate and return output
         return super(SeriesModel, self).evaluate(series, *args, **kwargs)
@@ -394,12 +394,12 @@ class SeriesModel(Model):
                             # Do not check if the series is a point series and has only one item
                             pass
                         else:
-                            check_resolution(series, self.data['resolution'])
-                        check_data_labels(series, self.data['data_labels'])
+                            _check_resolution(series, self.data['resolution'])
+                        _check_data_labels(series, self.data['data_labels'])
             finally:
                 # Check time series in any case
                 if isinstance(series, TimeSeries):
-                    check_timeseries(series)
+                    _check_timeseries(series)
                     
             # Decouple fit from validate args
             fit_kwargs = {}
@@ -514,7 +514,7 @@ class _ProphetModel(Model):
             
             # Skip if needed
             try:
-                if not item_is_in_range(item, from_t, to_t):
+                if not _item_is_in_range(item, from_t, to_t):
                     continue
             except StopIteration:
                 break                

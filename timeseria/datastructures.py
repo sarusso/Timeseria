@@ -3,7 +3,7 @@
 
 from .time import s_from_dt , dt_from_s, UTC, timezonize
 from .units import Unit, TimeUnit
-from .utilities import is_close, to_time_unit_string
+from .utilities import _is_close, _to_time_unit_string
 from copy import deepcopy
 from pandas import DataFrame
 from datetime import datetime
@@ -433,7 +433,7 @@ class TimeSlot(Slot):
     def __succedes__(self, other):
         if other.end.t != self.start.t:
             # Take into account floating point rounding errors
-            if is_close(other.end.t, self.start.t):
+            if _is_close(other.end.t, self.start.t):
                 return True
             return False
         else:
@@ -1185,7 +1185,7 @@ class TimeSeries(Series):
                         self._resolution_as_seconds = item.t - self.prev_t 
                         
                         # Set the resolution
-                        self._resolution = TimeUnit(to_time_unit_string(item.t - self.prev_t, friendlier=True))
+                        self._resolution = TimeUnit(_to_time_unit_string(item.t - self.prev_t, friendlier=True))
                                         
                     else:
                         # If the resolution is constant (not variable), check that it still is
@@ -1224,7 +1224,7 @@ class TimeSeries(Series):
                     # Try for floating point precision errors
                     abort = False
                     try:
-                        if not is_close(self._resolution.value, item.unit.value):
+                        if not _is_close(self._resolution.value, item.unit.value):
                             abort = True
                     except (TypeError, ValueError):
                         abort = True
@@ -1335,7 +1335,7 @@ class TimeSeries(Series):
             try:
                 self._guessed_resolution
             except AttributeError:
-                self._guessed_resolution = TimeUnit(to_time_unit_string(self._autodetected_sampling_interval, friendlier=True))
+                self._guessed_resolution = TimeUnit(_to_time_unit_string(self._autodetected_sampling_interval, friendlier=True))
             finally:
                 if confidence:
                     return {'value': self._guessed_resolution, 'confidence': self._autodetected_sampling_interval_confidence}
@@ -1348,7 +1348,7 @@ class TimeSeries(Series):
             resolution_string = 'undefined resolution'
         else:
             if self.resolution == 'variable':
-                autodetected_sampling_interval_as_str = TimeUnit(to_time_unit_string(self._autodetected_sampling_interval, friendlier=True))
+                autodetected_sampling_interval_as_str = TimeUnit(_to_time_unit_string(self._autodetected_sampling_interval, friendlier=True))
                 resolution_string = 'variable resolution (~{})'.format(autodetected_sampling_interval_as_str)
             else:
                 resolution_string = '{} resolution'.format(self.resolution)

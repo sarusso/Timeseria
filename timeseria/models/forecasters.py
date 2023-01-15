@@ -4,7 +4,7 @@
 import copy
 from ..datastructures import DataTimeSlot, TimePoint, DataTimePoint, Slot, Point, TimeSeries
 from ..exceptions import NonContiguityError
-from ..utilities import get_periodicity, get_periodicity_index, set_from_t_and_to_t, item_is_in_range, mean_absolute_percentage_error
+from ..utilities import detect_periodicity, _get_periodicity_index, _set_from_t_and_to_t, _item_is_in_range, mean_absolute_percentage_error
 from ..time import dt_from_s
 from ..units import Unit, TimeUnit
 from pandas import DataFrame
@@ -281,7 +281,7 @@ class SeriesForecaster(Forecaster, SeriesModel):
             
             # Support vars
             results = {}
-            from_t, to_t = set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
+            from_t, to_t = _set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
             warned = False
     
             # Log
@@ -379,7 +379,7 @@ class SeriesForecaster(Forecaster, SeriesModel):
         
                             # Skip if needed
                             try:
-                                if not item_is_in_range(timeseries[i], from_t, to_t):
+                                if not _item_is_in_range(timeseries[i], from_t, to_t):
                                     continue
                             except StopIteration:
                                 break  
@@ -578,11 +578,11 @@ class PeriodicAverageForecaster(SeriesForecaster):
             if len(timeseries.data_labels()) > 1:
                 raise NotImplementedError('Multivariate time series are not yet supported')
     
-            from_t, to_t = set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
+            from_t, to_t = _set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
     
             # Set or detect periodicity
             if periodicity == 'auto':        
-                periodicity =  get_periodicity(timeseries)
+                periodicity =  detect_periodicity(timeseries)
                 logger.info('Detected periodicity: %sx %s', periodicity, timeseries.resolution)
                     
             self.data['periodicity']  = periodicity
@@ -603,13 +603,13 @@ class PeriodicAverageForecaster(SeriesForecaster):
     
                     # Skip if needed
                     try:
-                        if not item_is_in_range(item, from_t, to_t):
+                        if not _item_is_in_range(item, from_t, to_t):
                             continue                  
                     except StopIteration:
                         break
                     
                     # Process
-                    periodicity_index = get_periodicity_index(item, timeseries.resolution, periodicity, dst_affected)
+                    periodicity_index = _get_periodicity_index(item, timeseries.resolution, periodicity, dst_affected)
                     if not periodicity_index in sums:
                         sums[periodicity_index] = item.data[key]
                         totals[periodicity_index] = 1
@@ -656,7 +656,7 @@ class PeriodicAverageForecaster(SeriesForecaster):
             for j in range(self.data['window']):
                 serie_index = forecast_start - self.data['window'] + j
                 real_value = timeseries[serie_index].data[key]
-                forecast_value = self.data['averages'][get_periodicity_index(timeseries[serie_index], timeseries.resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])]
+                forecast_value = self.data['averages'][_get_periodicity_index(timeseries[serie_index], timeseries.resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])]
                 diffs += (real_value - forecast_value)            
     
             # Sum the avg diff between the real and the forecast on the window to the forecast (the offset)
@@ -679,7 +679,7 @@ class PeriodicAverageForecaster(SeriesForecaster):
                     forecast_timestamp = TimePoint(t = forecast_start_item.t + (timeseries.resolution.as_seconds()*step), tz = forecast_start_item.tz )
         
                 # Compute the real forecast data
-                periodicity_index = get_periodicity_index(forecast_timestamp, timeseries.resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])        
+                periodicity_index = _get_periodicity_index(forecast_timestamp, timeseries.resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])        
                 forecast_data.append({key: self.data['averages'][periodicity_index] + (offset*1.0)})
             
             # Return
@@ -692,7 +692,7 @@ class PeriodicAverageForecaster(SeriesForecaster):
     def _plot_averages(self, timeseries, **kwargs):      
         averages_timeseries = copy.deepcopy(timeseries)
         for item in averages_timeseries:
-            value = self.data['averages'][get_periodicity_index(item, averages_timeseries.resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])]
+            value = self.data['averages'][_get_periodicity_index(item, averages_timeseries.resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])]
             if not value:
                 value = 0
             item.data['periodic_average'] =value 
@@ -723,7 +723,7 @@ class ProphetForecaster(SeriesForecaster, _ProphetModel):
     
             from prophet import Prophet
     
-            from_t, to_t = set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
+            from_t, to_t = _set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
     
             data = self._from_timeseria_to_prophet(timeseries, from_t=from_t, to_t=to_t)
     
@@ -996,7 +996,7 @@ class LSTMForecaster(SeriesForecaster, _KerasModel):
             timeseries = series
             
             # Set from and to
-            from_t, to_t = set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
+            from_t, to_t = _set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
     
             # Set verbose switch
             if verbose:
