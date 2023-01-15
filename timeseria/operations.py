@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 #=================================
-#  Base Operation classes
+#  Base operation classes
 #=================================
 
 class Operation():
@@ -29,8 +29,17 @@ class Operation():
         return '{}'.format(cls.__name__.lower())
     
     def __call__(self, *args, **kwargs):
-        raise NotImplementedError('No operation logic implemented.')
-    
+        """Call self as a function.
+        
+        :meta private:
+        """
+        try:
+            self._compute
+        except AttributeError:
+            raise NotImplementedError('No operation logic implemented.')
+        else:
+            return self._compute(args, kwargs)
+
     @property
     def __name__(self):
         return self.__class__.__name__.lower()
@@ -41,87 +50,98 @@ class SeriesOperation(Operation):
     another series, a scalar, a list of items, or any other valid data type."""    
     _supports_weights = False
 
-
-class TimeSeriesOperation(SeriesOperation):
-    """An operation operating on one or more time series (callable object). Can return
-     another time series, a scalar, a list of items, or any other valid data type."""  
-
+    def __call__(self, series, *args, **kwargs):
+        """Call self as a function.
+        
+        :meta private:
+        """
+        
+        try:
+            self._compute
+        except AttributeError:
+            raise NotImplementedError('No operation logic implemented.')
+        else:
+            checked = False
+            if isinstance(series, Series):
+                # Checked single series OK
+                checked = True
+            else:
+                # Assume list and check
+                try:
+                    for a_series in series:
+                        if not isinstance(a_series, Series):
+                            raise TypeError('A series operation can work only on a Series or a list of Series, got a list of "{}"'.format(a_series.__class__.__name__))
+                    checked=True
+                except TypeError:
+                    # It was not iterable
+                    pass
+            
+            if not checked:
+                raise TypeError('A series operation  can work only on a Series or a list of Series, got "{}"'.format(series.__class__.__name__))
+            
+            # Call compute logic
+            return self._compute(series, *args, **kwargs)
+        
 
 #=================================
 #  Operations returning scalars
 #=================================
 
-class Max(TimeSeriesOperation):
+class Max(SeriesOperation):
     """Maximum operation (callable object). Comes also pre-instantiated as the ``max()``
     function in the same module (accessible as ``timeseria.operations.max``)."""
     
-    def __init__(self):
-        self.built_in_max = max
-    
-    def __call__(self, arg, data_label=None, **kwargs):
-        if not isinstance(arg, Series):
-            return self.built_in_max(arg)
+    def _compute(self, series, data_label=None):
+        maxs = {data_label: None for data_label in series.data_labels()}
+        for item in series:
+            for _data_label in maxs:
+                if maxs[_data_label] is None:
+                    maxs[_data_label] = item.data[_data_label]
+                else:
+                    if item.data[_data_label] > maxs[_data_label]:
+                        maxs[_data_label] = item.data[_data_label]
+        
+        if data_label is not None:
+            return maxs[data_label]
+        if len(maxs) == 1:
+            return maxs[series.data_labels()[0]]
         else:
-            series = arg
-            mins = {data_label: None for data_label in series.data_labels()}
-            for item in series:
-                for _data_label in mins:
-                    if mins[_data_label] is None:
-                        mins[_data_label] = item.data[_data_label]
-                    else:
-                        if item.data[_data_label] > mins[_data_label]:
-                            mins[_data_label] = item.data[_data_label]
-            
-            if data_label is not None:
-                return mins[data_label]
-            if len(mins) == 1:
-                return mins[series.data_labels()[0]]
-            else:
-                return mins
+            return maxs
 
 
-class Min(TimeSeriesOperation):
+class Min(SeriesOperation):
     """Minimum operation (callable object). Comes also pre-instantiated as the ``min()``
     function in the same module (accessible as ``timeseria.operations.min``)."""
     
-    def __init__(self):
-        self.built_in_min = min
-    
-    def __call__(self, arg, data_label=None, **kwargs):
-        if not isinstance(arg, Series):
-            return self.built_in_min(arg)
-        else:
-            series = arg
-            mins = {data_label: None for data_label in series.data_labels()}
-            for item in series:
-                for _data_label in mins:
-                    if mins[_data_label] is None:
+    def _compute(self, series, data_label=None):
+        mins = {data_label: None for data_label in series.data_labels()}
+        for item in series:
+            for _data_label in mins:
+                if mins[_data_label] is None:
+                    mins[_data_label] = item.data[_data_label]
+                else:
+                    if item.data[_data_label] < mins[_data_label]:
                         mins[_data_label] = item.data[_data_label]
-                    else:
-                        if item.data[_data_label] < mins[_data_label]:
-                            mins[_data_label] = item.data[_data_label]
-            
-            if data_label is not None:
-                return mins[data_label]
-            if len(mins) == 1:
-                return mins[series.data_labels()[0]]
-            else:
-                return mins
+        
+        if data_label is not None:
+            return mins[data_label]
+        if len(mins) == 1:
+            return mins[series.data_labels()[0]]
+        else:
+            return mins
 
 
-class Avg(TimeSeriesOperation):
+class Avg(SeriesOperation):
     """Weighted average operation (callable object)."""
     
     _supports_weights = True
 
-    def __call__(self, arg, data_label=None, **kwargs):
+    def _compute(self, series, data_label=None):
 
         # Log & checks
         logger.debug('Called avg operation')
-        if not isinstance(arg, Series):
-            raise NotImplementedError('Avg implemented only on series objects')
         try:
-            for item in arg:
+            for item in series:
                 item.weight
                 weighted=True
         except AttributeError:
@@ -129,7 +149,6 @@ class Avg(TimeSeriesOperation):
             #raise AttributeError('Trying to apply a weightd average on non-weigthed point')     
 
         # Prepare
-        series = arg
         sums = {data_label: None for data_label in series.data_labels()}
         
         # Compute
@@ -175,13 +194,10 @@ class Avg(TimeSeriesOperation):
             return avgs
 
 
-class Sum(TimeSeriesOperation):
+class Sum(SeriesOperation):
     """Sum operation (callable object)."""
 
-    def __init__(self):
-        self.built_in_sum = sum
-    
-    def __call__(self, arg, data_label=None, **kwargs):
+    def _compute(self, arg, data_label=None):
         if not isinstance(arg, Series):
             return self.built_in_sum(arg)
         else:
@@ -202,10 +218,10 @@ class Sum(TimeSeriesOperation):
 #  Operations returning series 
 #=================================
 
-class Derivative(TimeSeriesOperation):
+class Derivative(SeriesOperation):
     """Derivative operation (callable object)."""
     
-    def __call__(self, series, inplace=False, normalize=True, diffs=False):
+    def _compute(self, series, inplace=False, normalize=True, diffs=False):
         
         if len(series) == 0:
             if diffs:
@@ -323,10 +339,10 @@ class Derivative(TimeSeriesOperation):
             return der_series
 
 
-class Integral(TimeSeriesOperation):
+class Integral(SeriesOperation):
     """Integral operation (callable object)."""
     
-    def __call__(self, series, inplace=False, normalize=True, c=0, offset=0):
+    def _compute(self, series, inplace=False, normalize=True, c=0, offset=0):
         
         if normalize:
             if series.resolution == 'variable':
@@ -446,24 +462,24 @@ class Integral(TimeSeriesOperation):
 
 class Diff(Derivative):
     """Incremental differences operation (callable object). Reduces the series leght by one (the firts element), same as Pandas."""
-    def __call__(self, series, inplace=False):
+    def _compute(self, series, inplace=False):
         if series.resolution == 'variable':
             raise ValueError('The differences cannot be computed on variable resolution time series, resample it or use the derivative operation.')
-        return super(Diff, self).__call__(series, inplace=inplace, normalize=False, diffs=True)
+        return super(Diff, self)._compute(series, inplace=inplace, normalize=False, diffs=True)
 
 
 class CSum(Integral):
     """Cumulative sum operation (callable object)."""
-    def __call__(self, series, inplace=False, offset=None):
+    def _compute(self, series, inplace=False, offset=None):
         if series.resolution == 'variable':
             raise ValueError('The cumulative sums cannot be computed on variable resolution time series, resample it or use the integral operation.')
-        return super(CSum, self).__call__(series, inplace=inplace, normalize=False, offset=offset)
+        return super(CSum, self)._compute(series, inplace=inplace, normalize=False, offset=offset)
 
 
-class Normalize(TimeSeriesOperation):
+class Normalize(SeriesOperation):
     """Normalization operation (callable object)"""
     
-    def __call__(self, series, range=[0,1], inplace=False):
+    def _compute(self, series, range=[0,1], inplace=False):
         
         if range == [0,1]:
             custom_range = None
@@ -527,10 +543,10 @@ class Normalize(TimeSeriesOperation):
             return normalized_series
 
 
-class Rescale(TimeSeriesOperation):
+class Rescale(SeriesOperation):
     """Rescaling operation (callable object)"""
     
-    def __call__(self, series, value, inplace=False):
+    def _compute(self, series, value, inplace=False):
         
         if not inplace:
             rescaled_series = series.__class__()
@@ -575,10 +591,10 @@ class Rescale(TimeSeriesOperation):
             return rescaled_series
 
 
-class Offset(TimeSeriesOperation):
+class Offset(SeriesOperation):
     """Offsetting operation (callable object)"""
     
-    def __call__(self, series, value, inplace=False):
+    def _compute(self, series, value, inplace=False):
         
         if not inplace:
             rescaled_series = series.__class__()
@@ -626,7 +642,7 @@ class Offset(TimeSeriesOperation):
 class MAvg(SeriesOperation):
     """Moving average operation (callable object). Reduces the series lenght by n (the windowd length)."""
 
-    def __call__(self, series, window, inplace=False):
+    def _compute(self, series, window, inplace=False):
 
         if not window or window <1:
             raise ValueError('A integer window >0 is required (got window="{}"'.frmat(window))
@@ -673,7 +689,7 @@ class MAvg(SeriesOperation):
 class Filter(SeriesOperation):
     """Filter a series (callable object)."""
 
-    def __call__(self, series, data_label=None, from_t=None, to_t=None, from_dt=None, to_dt=None):
+    def _compute(self, series, data_label=None, from_t=None, to_t=None, from_dt=None, to_dt=None):
         if from_dt:
             if from_t is not None:
                 raise Exception('Cannot set both from_t and from_dt')
@@ -721,10 +737,12 @@ class Filter(SeriesOperation):
         return filtered_series 
 
 
-class Merge(TimeSeriesOperation):
+class Merge(SeriesOperation):
     """Merge two or more series (callable object)."""
     
-    def __call__(self, *seriess):
+    def _compute(self, *series):
+        
+        seriess = series
         
         # Support vars
         resolution = None
@@ -851,7 +869,7 @@ class Merge(TimeSeriesOperation):
 class Select(SeriesOperation):
     """Select operation (callable object). Selects items of the series given SQL-like queries."""
     
-    def __call__(self, series, query, *args, **kwargs):
+    def _compute(self, series, query):
 
         if (' and ' or ' AND ' or ' or ' or ' OR ') in query:
             raise NotImplementedError('Multiple conditions not yet supported')

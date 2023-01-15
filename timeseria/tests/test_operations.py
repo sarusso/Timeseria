@@ -7,7 +7,7 @@ from ..operations import Operation
 from .. import logger
 logger.setup()
 
-class TestBaseOpertions(unittest.TestCase):
+class TestOpertions(unittest.TestCase):
     
     def test_base(self):
         
@@ -18,9 +18,7 @@ class TestBaseOpertions(unittest.TestCase):
             pass
         
         self.assertEqual(operation_as_function.__name__, 'operation_as_function')
-        
 
-class TestMathOperations(unittest.TestCase):
   
     def test_diff_csum(self):
   
@@ -225,6 +223,7 @@ class TestMathOperations(unittest.TestCase):
         self.assertAlmostEqual(derivative_integral_series[3].data['value_derivative_integral'],2.5)
         self.assertAlmostEqual(derivative_integral_series[4].data['value_derivative_integral'],3.5)
 
+
     def test_normalize(self):
         series =  TimeSeries(DataTimePoint(t=60, data={'a':2, 'b':6}, data_loss=0.1),
                              DataTimePoint(t=120, data={'a':4, 'b':9}, data_loss=0.2),
@@ -250,7 +249,6 @@ class TestMathOperations(unittest.TestCase):
         self.assertAlmostEqual(custom_normalized_series[1].data['a'],0.83333333)
         self.assertEqual(custom_normalized_series[2].data['a'],1.5)
         
-
 
     def test_rescale(self):
         series = TimeSeries(DataTimePoint(t=60, data={'a':2, 'b':6}, data_loss=0.1),
@@ -342,13 +340,7 @@ class TestMathOperations(unittest.TestCase):
         
 
     def test_min_max_avg(self):
-        
-        # Test Python built-in default behaviour
-        self.assertEqual(str(min), 'Min operation')
-        self.assertEqual(min([1,2,3]),1)
-        self.assertEqual(str(max), 'Max operation')
-        self.assertEqual(max([1,2,3]),3)
-        
+
         # Test data
         series = TimeSeries()
         series.append(DataTimeSlot(start=TimePoint(0), end=TimePoint(60), data={'value':10}))
@@ -430,8 +422,6 @@ class TestMathOperations(unittest.TestCase):
         self.assertEqual(avg(series1), 1)
         self.assertEqual(avg(series2), 0.8571428571428571)
 
-
-class TestSeriesOperations(unittest.TestCase):
     
     def test_filter(self):
 

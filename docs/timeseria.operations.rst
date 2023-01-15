@@ -16,10 +16,9 @@
    .. rubric:: Classes
 
    .. autosummary::
-   
+
       Operation
       SeriesOperation
-      TimeSeriesOperation
       
       Min
       Max
