@@ -2,7 +2,7 @@
 """Series transformations as resampling and aggregation."""
 
 from .time import dt_from_s, s_from_dt, as_tz
-from .datastructures import DataTimeSlot, TimePoint, DataTimePoint, Series, TimeSeries, _TimeSeriesSlice
+from .datastructures import Point, Slot, DataTimeSlot, TimePoint, DataTimePoint, Series, TimeSeries, _TimeSeriesSlice
 from .utilities import _compute_data_loss, _compute_validity_regions
 from .operations import avg
 from .units import TimeUnit
@@ -259,6 +259,9 @@ class SeriesTransformation(Transformation):
 
         if not isinstance(series, TimeSeries):
             raise NotImplementedError('Transforming generic Series is not yet supported (got "{}"), only TimeSeries are'.format(series.__class__.__name__))
+
+        if not (issubclass(series.items_type, Point) or issubclass(series.items_type, Slot)):
+                raise TypeError('Series items are not Points nor Slots, cannot compute any transformation')
         
         # Checks
         if include_extremes:

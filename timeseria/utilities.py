@@ -602,8 +602,17 @@ def _check_data_labels(timeseries, keys):
         # TODO: logger.warning?
         raise ValueError('This model is fitted on "{}" data keys, while your data has "{}" data keys.'.format(keys, timeseries_data_labels))
 
-
-
+def _check_series_of_points_or_slots(series):
+    from .datastructures import DataPoint, DataSlot
+    if not (issubclass(series.items_type, DataPoint) or issubclass(series.items_type, DataSlot)):
+        raise TypeError('Cannot operate on a series of "{}", only series of DataPoints or DataSlots are supported'.format(series.items_type.__name__))
+    
+def _check_indexed_data(series):
+    try:
+        series.data_labels()
+    except TypeError:
+        raise TypeError('Cannot operate on a series of "{}" with "{}" data, only series of indexed data (as lists and dicts) are supported'.format(series.item_types.__name__, series[0].data.__class__.__name__))
+    
 def _get_periodicity_index(item, resolution, periodicity, dst_affected=False):
     """Get the periodicty index."""
     
