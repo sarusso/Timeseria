@@ -1,13 +1,13 @@
 import unittest
 from ..datastructures import TimePoint, DataTimePoint , DataTimeSlot, TimeSeries
-from ..operations import derivative, integral, diff, csum, min, max, avg, filter, select, mavg, normalize, merge, offset, rescale
+from ..operations import derivative, integral, diff, csum, min, max, avg, filter, select, mavg, normalize, merge, offset, rescale, slice
 from ..operations import Operation
 
 # Setup logging
 from .. import logger
 logger.setup()
 
-class TestBaseOpertions(unittest.TestCase):
+class TestOpertions(unittest.TestCase):
     
     def test_base(self):
         
@@ -18,9 +18,7 @@ class TestBaseOpertions(unittest.TestCase):
             pass
         
         self.assertEqual(operation_as_function.__name__, 'operation_as_function')
-        
 
-class TestMathOperations(unittest.TestCase):
   
     def test_diff_csum(self):
   
@@ -110,6 +108,17 @@ class TestMathOperations(unittest.TestCase):
         self.assertEqual(diff_csum_series[3].data['value_diff_csum'],16)
         self.assertEqual(diff_csum_series[3].data['another_value_diff_csum'],10)
 
+        # Test on list data as well
+        series = TimeSeries(DataTimePoint(t=60, data=[1.0,-4.0]),
+                            DataTimePoint(t=120, data=[2.0,-2.0]),
+                            DataTimePoint(t=180, data=[4.0,-1.0]))      
+        self.assertEqual(len(series.diff()),2)
+        self.assertEqual(series.diff()[0].data, [1.0, 2.0])
+        self.assertEqual(series.diff()[1].data, [2.0, 1.0])
+        self.assertEqual(len(series.csum()),3)
+        self.assertEqual(series.csum()[0].data, [1.0, -4.0])
+        self.assertEqual(series.csum()[1].data, [3.0, -6.0])
+        self.assertEqual(series.csum()[2].data, [7.0, -7.0])
 
     def test_derivative_integral(self):
 
@@ -225,31 +234,39 @@ class TestMathOperations(unittest.TestCase):
         self.assertAlmostEqual(derivative_integral_series[3].data['value_derivative_integral'],2.5)
         self.assertAlmostEqual(derivative_integral_series[4].data['value_derivative_integral'],3.5)
 
+
     def test_normalize(self):
         series =  TimeSeries(DataTimePoint(t=60, data={'a':2, 'b':6}, data_loss=0.1),
                              DataTimePoint(t=120, data={'a':4, 'b':9}, data_loss=0.2),
                              DataTimePoint(t=180, data={'a':8, 'b':3}, data_loss=0.3))
-
+        
         normalized_series = normalize(series)
-
+        
         self.assertEqual(normalized_series[0].data['a'],0)
         self.assertEqual(normalized_series[2].data['b'],0)
         
         self.assertEqual(normalized_series[2].data['a'],1)
         self.assertEqual(normalized_series[1].data['b'],1)
-
+        
         # Test data loss correctly carried forward by the operation
         self.assertEqual(normalized_series[0].data_loss, 0.1)
         self.assertEqual(normalized_series[1].data_loss, 0.2)
         self.assertEqual(normalized_series[2].data_loss, 0.3)
-
+        
         # Test normalize with respect to another range (other than 0-1):
         custom_normalized_series = normalize(series, [0.5,1.5])
-
+        
         self.assertEqual(custom_normalized_series[0].data['a'],0.5)
         self.assertAlmostEqual(custom_normalized_series[1].data['a'],0.83333333)
         self.assertEqual(custom_normalized_series[2].data['a'],1.5)
-        
+
+        # Test on list data as well
+        series = TimeSeries(DataTimePoint(t=60, data=[1.0,-3.0]),
+                            DataTimePoint(t=120, data=[2.0,-2.0]),
+                            DataTimePoint(t=180, data=[3.0,-1.0]))
+        self.assertEqual(series.normalize()[0].data, [0.0,0.0])
+        self.assertEqual(series.normalize()[1].data, [0.5,0.5])
+        self.assertEqual(series.normalize()[2].data, [1.0,1.0])
 
 
     def test_rescale(self):
@@ -282,6 +299,14 @@ class TestMathOperations(unittest.TestCase):
         self.assertEqual(rescaled_series[1].data_loss, 0.2)
         self.assertEqual(rescaled_series[2].data_loss, 0.3)
 
+        # Test on list data as well
+        series = TimeSeries(DataTimePoint(t=60, data=[1.0,-3.0]),
+                            DataTimePoint(t=120, data=[2.0,-2.0]),
+                            DataTimePoint(t=180, data=[3.0,-1.0]))
+        self.assertEqual(series.rescale(10)[0].data, [10.0,-30.0])
+        self.assertEqual(series.rescale(10)[1].data, [20.0,-20.0])
+        self.assertEqual(series.rescale(10)[2].data, [30.0,-10.0])
+
 
     def test_offset(self):
         series = TimeSeries(DataTimePoint(t=60, data={'a':2, 'b':6}, data_loss=0.1),
@@ -313,6 +338,14 @@ class TestMathOperations(unittest.TestCase):
         self.assertEqual(offsetted_series[1].data_loss, 0.2)
         self.assertEqual(offsetted_series[2].data_loss, 0.3)
 
+        # Test on list data as well
+        series = TimeSeries(DataTimePoint(t=60, data=[1.0,-3.0]),
+                            DataTimePoint(t=120, data=[2.0,-2.0]),
+                            DataTimePoint(t=180, data=[3.0,-1.0]))
+        self.assertEqual(series.offset(10)[0].data, [11.0,7.0])
+        self.assertEqual(series.offset(10)[1].data, [12.0,8.0])
+        self.assertEqual(series.offset(10)[2].data, [13.0,9.0])
+
 
     def test_mavg(self):
 
@@ -339,15 +372,20 @@ class TestMathOperations(unittest.TestCase):
         self.assertEqual(mavg_series[0].data_loss, None)
         self.assertEqual(mavg_series[1].data_loss, None)
         self.assertEqual(mavg_series[2].data_loss, None)
-        
+
+        # Test on list data as well
+        series = TimeSeries(DataTimePoint(t=60, data=[1.0,-3.0]),
+                            DataTimePoint(t=120, data=[2.0,-2.0]),
+                            DataTimePoint(t=180, data=[3.0,-1.0]))
+        self.assertEqual(len(series.mavg(2)),2)
+        #self.assertEqual(series.mavg(2)[0].data, {'0_mavg_2': 1.5, '1_mavg_2': -2.5})
+        #self.assertEqual(series.mavg(2)[1].data, {'0_mavg_2': 2.5, '1_mavg_2': -1.5})
+
+        self.assertEqual(series.mavg(2)[0].data, [1.5, -2.5])
+        self.assertEqual(series.mavg(2)[1].data, [2.5, -1.5])
+
 
     def test_min_max_avg(self):
-        
-        # Test Python built-in default behaviour
-        self.assertEqual(str(min), 'Min operation')
-        self.assertEqual(min([1,2,3]),1)
-        self.assertEqual(str(max), 'Max operation')
-        self.assertEqual(max([1,2,3]),3)
         
         # Test data
         series = TimeSeries()
@@ -384,6 +422,12 @@ class TestMathOperations(unittest.TestCase):
         self.assertEqual(series.avg(), {'value': 11, 'another_value': 45.5})
         self.assertEqual(series.avg(data_label='value'), 11)          
         self.assertEqual(series.avg(data_label='another_value'), 45.5)
+
+        # Test on list data as well
+        series = TimeSeries(DataTimePoint(t=60, data=[5.8,29.6]), DataTimePoint(t=120, data=[7.8,18.6]))
+        self.assertEqual(series.max(), {'0': 7.8, '1': 29.6})
+        self.assertEqual(series.min(), {'0': 5.8, '1': 18.6})
+        self.assertEqual(series.avg(), {'0': 6.8, '1': 24.1})
 
 
     def test_avg_weighted(self):
@@ -430,21 +474,8 @@ class TestMathOperations(unittest.TestCase):
         self.assertEqual(avg(series1), 1)
         self.assertEqual(avg(series2), 0.8571428571428571)
 
-
-class TestSeriesOperations(unittest.TestCase):
     
     def test_filter(self):
-
-        test_time_point_series = TimeSeries(TimePoint(t=60),TimePoint(t=120),TimePoint(t=130))
-
-        # Test from/to filtering
-        self.assertEqual(len(filter(test_time_point_series, from_t=1, to_t=140)),3)
-
-        # Test from/to filtering from the series
-        self.assertEqual(len(test_time_point_series.filter(from_t=1, to_t=140)),3)
-        self.assertEqual(len(test_time_point_series.filter(from_t=61, to_t=140)),2)
-        self.assertEqual(len(test_time_point_series.filter(from_t=61)),2)
-        self.assertEqual(len(test_time_point_series.filter(to_t=61)),1)
 
         # Test  data
         series =  TimeSeries(DataTimePoint(t=60, data={'a':1, 'b':2}),
@@ -463,6 +494,27 @@ class TestSeriesOperations(unittest.TestCase):
         # Test that we haven't modified the original series
         self.assertEqual(series.data_labels(), ['a', 'b'])
         self.assertEqual(series[1].data['b'], 4)
+        
+        series =  TimeSeries(DataTimePoint(t=60, data=[1,2]),
+                             DataTimePoint(t=120, data=[3,4]),
+                             DataTimePoint(t=180, data=[5,6]))
+        
+        with self.assertRaises(TypeError):
+            series.filter(data_label='0')
+
+
+    def test_slice(self):
+
+        test_time_point_series = TimeSeries(TimePoint(t=60),TimePoint(t=120),TimePoint(t=130))
+
+        # Test from/to filtering
+        self.assertEqual(len(slice(test_time_point_series, from_t=1, to_t=140)),3)
+
+        # Test from/to filtering from the series
+        self.assertEqual(len(test_time_point_series.slice(from_t=1, to_t=140)),3)
+        self.assertEqual(len(test_time_point_series.slice(from_t=61, to_t=140)),2)
+        self.assertEqual(len(test_time_point_series.slice(from_t=61)),2)
+        self.assertEqual(len(test_time_point_series.slice(to_t=61)),1)
 
 
     def test_select(self):

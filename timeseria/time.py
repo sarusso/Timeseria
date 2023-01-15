@@ -93,50 +93,53 @@ def dt(*args, **kwargs):
 
     return time_dt
 
+def _dt(*args, **kwargs):
+    return dt(*args, **kwargs)
 
-def get_tz_offset_s(time_dt):
+
+def get_tz_offset_s(dt):
     """Get the timezone offset in seconds."""
-    return s_from_dt(time_dt.replace(tzinfo=pytz.UTC)) - s_from_dt(time_dt)
+    return s_from_dt(dt.replace(tzinfo=pytz.UTC)) - s_from_dt(dt)
 
 
-def check_dt_consistency(date_dt):
-    """Check that the timezone is consistent with the datetime (some conditions in Python lead to have summertime set in winter)."""
+def check_dt_consistency(dt):
+    """Check that a datetieme object is consistent with its timezone (some conditions can lead to have summertime set in winter)."""
 
     # https://en.wikipedia.org/wiki/Tz_database
     # https://www.iana.org/time-zones
     
-    if date_dt.tzinfo is None:
+    if dt.tzinfo is None:
         return True
     else:
         
         # This check is quite heavy but there is apparently no other way to do it.
-        if date_dt.utcoffset() != dt_from_s(s_from_dt(date_dt), tz=date_dt.tzinfo).utcoffset():
+        if dt.utcoffset() != dt_from_s(s_from_dt(dt), tz=dt.tzinfo).utcoffset():
             return False
         else:
             return True
 
 
-def correct_dt_dst(datetime_obj):
-    """Check that the DST is correct and if not, change it."""
+def correct_dt_dst(dt):
+    """Correct the DST of a datetime object by re-creating it."""
 
     # https://en.wikipedia.org/wiki/Tz_database
     # https://www.iana.org/time-zones
 
-    if datetime_obj.tzinfo is None:
-        return datetime_obj
+    if dt.tzinfo is None:
+        return dt
 
     # Create and return a New datetime object. This corrects the DST if errors are present.
-    return dt(datetime_obj.year,
-              datetime_obj.month,
-              datetime_obj.day,
-              datetime_obj.hour,
-              datetime_obj.minute,
-              datetime_obj.second,
-              datetime_obj.microsecond,
-              tzinfo=datetime_obj.tzinfo)
+    return _dt(dt.year,
+               dt.month,
+               dt.day,
+               dt.hour,
+               dt.minute,
+               dt.second,
+               dt.microsecond,
+               tzinfo=dt.tzinfo)
 
 
-def as_timezone(dt, tz):
+def as_tz(dt, tz):
     """Get a datetime object as if it was on the given timezone.
     
     Arguments:
@@ -146,13 +149,13 @@ def as_timezone(dt, tz):
     return dt.astimezone(timezonize(tz))
 
 
-def dt_from_s(timestamp_s, tz='UTC'):
+def dt_from_s(s, tz='UTC'):
     """Create a datetime object from an epoch timestamp in seconds. If no timezone is given, UTC is assumed."""
 
     try:
-        timestamp_dt = datetime.datetime.utcfromtimestamp(float(timestamp_s))
+        timestamp_dt = datetime.datetime.utcfromtimestamp(float(s))
     except TypeError:
-        raise Exception('timestamp_s argument must be string or number, got {}'.format(type(timestamp_s)))
+        raise TypeError('The s argument must be string or number, got {}'.format(type(s)))
 
     pytz_tz = timezonize(tz)
     timestamp_dt = timestamp_dt.replace(tzinfo=pytz.utc).astimezone(pytz_tz)
@@ -251,7 +254,7 @@ def dt_to_str(dt):
 
 
 class dt_range(object):
-    """A datetime range object."""
+    """A datetime range object, with precise time math."""
 
     def __init__(self, from_dt, to_dt, time_unit):
 

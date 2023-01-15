@@ -3,14 +3,12 @@ import os
 import tempfile
 from math import sin, cos
 from ..datastructures import TimePoint, DataTimeSlot, DataTimePoint, TimeSeries
-from ..models import Model, TimeSeriesModel, KerasModel
-from ..models import PeriodicAverageReconstructor, PeriodicAverageForecaster, PeriodicAverageAnomalyDetector
-from ..models import ProphetForecaster, ProphetReconstructor
-from ..models import ARIMAForecaster, AARIMAForecaster
-from ..models import LSTMForecaster
+from ..models.base import Model, SeriesModel, _KerasModel
+from ..models.reconstructors import PeriodicAverageReconstructor, ProphetReconstructor
+from ..models.forecasters import ProphetForecaster, PeriodicAverageForecaster, ARIMAForecaster, AARIMAForecaster, LSTMForecaster
+from ..models.anomaly_detectors import PeriodicAverageAnomalyDetector
 from ..exceptions import NotFittedError, NonContiguityError
 from ..storages import CSVFileStorage
-from ..transformations import Resampler, Aggregator
 from ..time import dt
 
 # Setup logging
@@ -92,10 +90,10 @@ class TestBaseModelClasses(unittest.TestCase):
         self.assertEqual(test_parametric_model_two.data['param1'], 2)
         
   
-    def test_TimeSeriesModel(self):
+    def test_SeriesModel(self):
         
-        # Define a trainable model mock
-        class TimeSeriesModelMock(TimeSeriesModel):            
+        # Define a (fittable) model mock
+        class SeriesModelMock(SeriesModel):   
             def _fit(self, *args, **kwargs):
                 pass 
             def _evaluate(self, *args, **kwargs):
@@ -109,11 +107,11 @@ class TestBaseModelClasses(unittest.TestCase):
                                            DataTimeSlot(start=TimePoint(t=2), end=TimePoint(t=3), data={'metric1': 56}))
 
         # Instantiate a parametric model
-        timeseries_model = TimeSeriesModelMock()
+        timeseries_model = SeriesModelMock()
         timeseries_model_id = timeseries_model.id
 
         # Set model save path
-        model_path = TEMP_MODELS_DIR+'/test_TSP_model'
+        model_path = TEMP_MODELS_DIR+'/test_time_series_model'
         
         # Cannot apply model before fitting
         with self.assertRaises(NotFittedError):
@@ -145,14 +143,14 @@ class TestBaseModelClasses(unittest.TestCase):
         timeseries_model.save(model_path)
         
         # Now re-load
-        loaded_timeseries_model = TimeSeriesModelMock(model_path)
+        loaded_timeseries_model = SeriesModelMock(model_path)
         self.assertEqual(loaded_timeseries_model.id, timeseries_model_id)
 
 
     def test_KerasModel(self):
         
         # Define a trainable model mock
-        class KerasModelMock(KerasModel):            
+        class KerasModelMock(_KerasModel):            
             def _fit(self, *args, **kwargs):
                 pass 
             def _evaluate(self, *args, **kwargs):
@@ -283,7 +281,7 @@ class TestReconstructors(unittest.TestCase):
         with self.assertRaises(Exception):
             periodic_average_reconstructor.fit(data_time_point_series)
          
-        data_time_point_series = Resampler(600).process(data_time_point_series)
+        data_time_point_series = data_time_point_series.resample(600)
         periodic_average_reconstructor.fit(data_time_point_series)
          
         # TODO: do some actual testing.. not only that "it works"
@@ -300,7 +298,7 @@ class TestReconstructors(unittest.TestCase):
             
         # Get test data        
         data_time_point_series = CSVFileStorage(TEST_DATA_PATH + '/csv/temperature.csv').get(limit=200)
-        data_time_slot_series = Aggregator('3600s').process(data_time_point_series)
+        data_time_slot_series = data_time_point_series.aggregate(3600)
         
         # Instantiate
         prophet_reconstructor = ProphetReconstructor()
@@ -462,7 +460,7 @@ class TestForecasters(unittest.TestCase):
         with self.assertRaises(Exception):
             forecaster.fit(data_time_point_series)
           
-        data_time_point_series = Resampler(600).process(data_time_point_series)
+        data_time_point_series = data_time_point_series.resample(600)
         forecaster.fit(data_time_point_series)
           
         # TODO: do some actual testing.. not only that "it works"
@@ -517,7 +515,7 @@ class TestForecasters(unittest.TestCase):
         with self.assertRaises(Exception):
             forecaster.fit(data_time_point_series)
            
-        data_time_point_series = Resampler(600).process(data_time_point_series)
+        data_time_point_series = data_time_point_series.resample(600)
         forecaster.fit(data_time_point_series)
            
         # TODO: do some actual testing.. not only that "it works"
@@ -563,7 +561,7 @@ class TestForecasters(unittest.TestCase):
         with self.assertRaises(ValueError):
             forecaster.fit(data_time_point_series)
            
-        data_time_point_series = Resampler(600).process(data_time_point_series)
+        data_time_point_series = data_time_point_series.resample(600)
         forecaster.fit(data_time_point_series)
            
         # TODO: do some actual testing.. not only that "it works"
@@ -612,7 +610,7 @@ class TestForecasters(unittest.TestCase):
         with self.assertRaises(ValueError):
             forecaster.fit(data_time_point_series)
            
-        data_time_point_series = Resampler(600).process(data_time_point_series)
+        data_time_point_series = data_time_point_series.resample(600)
         forecaster.fit(data_time_point_series, max_p=2, max_d=1, max_q=2)
            
         # TODO: do some actual testing.. not only that "it works"
@@ -740,7 +738,7 @@ class TestAnomalyDetectors(unittest.TestCase):
         with self.assertRaises(ValueError):
             anomaly_detector.fit(data_time_point_series)
           
-        data_time_point_series = Resampler(600).process(data_time_point_series)
+        data_time_point_series = data_time_point_series.resample(600)
         anomaly_detector.fit(data_time_point_series)
           
         # TODO: do some actual testing.. not only that "it works"

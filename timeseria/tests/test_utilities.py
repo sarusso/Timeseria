@@ -1,11 +1,10 @@
 import unittest
 import os
-from ..utilities import detect_encoding, get_periodicity, detect_sampling_interval
-from ..utilities import compute_coverage, compute_data_loss, compute_validity_regions 
+from ..utilities import detect_encoding, detect_periodicity, detect_sampling_interval
+from ..utilities import _compute_coverage, _compute_data_loss, _compute_validity_regions 
 from ..datastructures import DataTimePoint, TimeSeries
 from ..time import dt, s_from_dt
 from ..storages import CSVFileStorage
-from ..transformations import Aggregator
 from ..units import TimeUnit
 
 # Setup logging
@@ -17,7 +16,7 @@ TEST_DATA_PATH = '/'.join(os.path.realpath(__file__).split('/')[0:-1]) + '/test_
 
 # Support functions
 def attach_validity_regions(series, sampling_interval=None):
-    validity_regions = compute_validity_regions(series, sampling_interval=sampling_interval)
+    validity_regions = _compute_validity_regions(series, sampling_interval=sampling_interval)
     for point in series:
         point.valid_from = validity_regions[point.t][0]
         point.valid_to = validity_regions[point.t][1]
@@ -44,22 +43,22 @@ class TestComputeValidityRegions(unittest.TestCase):
 
         # All of them
         expected_results = {7: [4.5, 9.5], 12: [9.5, 14.5], 17: [14.5, 19.5], 22: [19.5, 24.5], 27: [24.5, 29.5]}
-        results = compute_validity_regions(series)
+        results = _compute_validity_regions(series)
         self.assertEqual(results, expected_results)
         
         # Only from-to
         expected_results = {12: [9.5, 14.5], 17: [14.5, 19.5], 22: [19.5, 24.5]}
-        results = compute_validity_regions(series, from_t=10, to_t=20)
+        results = _compute_validity_regions(series, from_t=10, to_t=20)
         self.assertEqual(results, expected_results)
 
         # Shrink them according to the from-to
         expected_results = {12: [10, 14.5], 17: [14.5, 19.5], 22: [19.5, 20]}
-        results = compute_validity_regions(series, from_t=10, to_t=20, cut=True)
+        results = _compute_validity_regions(series, from_t=10, to_t=20, cut=True)
         self.assertEqual(results, expected_results)
         
         # Force a specific sampling intervals
         expected_results = {12: [11.5, 12.5], 17: [16.5, 17.5]}
-        results = compute_validity_regions(series, from_t=10, to_t=20, sampling_interval=1)
+        results = _compute_validity_regions(series, from_t=10, to_t=20, sampling_interval=1)
         self.assertEqual(results, expected_results)
   
         # Single-element series
@@ -69,10 +68,10 @@ class TestComputeValidityRegions(unittest.TestCase):
 
         # The series has only one element and no sampling_interval is provided, no idea how to compute validity        
         with self.assertRaises(ValueError):
-            compute_validity_regions(series = single_element_series, from_t = 30, to_t = 60) 
+            _compute_validity_regions(series = single_element_series, from_t = 30, to_t = 60) 
 
         # Call by providing the sampling_interval
-        results = compute_validity_regions(series = single_element_series, from_t = 30, to_t = 60, sampling_interval=10)
+        results = _compute_validity_regions(series = single_element_series, from_t = 30, to_t = 60, sampling_interval=10)
 
         self.assertEqual(results, expected_results)
 
@@ -87,12 +86,12 @@ class TestComputeValidityRegions(unittest.TestCase):
  
         # Test prev-next
         expected_results = {7: [4.5, 9.5], 12: [9.5, 14.5], 17: [14.5, 19.5], 22: [19.5, 24.5], 27: [24.5, 29.5]}
-        results = compute_validity_regions(series, from_t=9, to_t=25)
+        results = _compute_validity_regions(series, from_t=9, to_t=25)
         self.assertEqual(results, expected_results)
 
         # Test cutted prev-next
         expected_results = {7: [9, 9.5], 12: [9.5, 14.5], 17: [14.5, 19.5], 22: [19.5, 24.5], 27: [24.5, 25]}
-        results = compute_validity_regions(series, from_t=9, to_t=25, cut=True)
+        results = _compute_validity_regions(series, from_t=9, to_t=25, cut=True)
         self.assertEqual(results, expected_results)
  
  
@@ -107,7 +106,7 @@ class TestComputeValidityRegions(unittest.TestCase):
         series.append(DataTimePoint(t = 27, data = {'value': 27}))
 
         expected_results = {7: [4.5, 9.5], 12: [9.5, 12.5], 13: [12.5, 15], 17: [15, 19.5], 22: [19.5, 24.5], 27: [24.5, 29.5]}
-        results = compute_validity_regions(series)
+        results = _compute_validity_regions(series)
         self.assertEqual(results, expected_results)
 
 
@@ -124,7 +123,7 @@ class TestComputeValidityRegions(unittest.TestCase):
         series.append(DataTimePoint(t = 27, data = {'value': 27}))
 
         expected_results = {7: [4.5, 9.5], 12: [9.5, 12.05], 12.1: [12.05, 12.2], 12.3: [12.2, 12.65], 13: [12.65, 15.0], 17: [15.0, 19.5], 22: [19.5, 24.5], 27: [24.5, 29.5]}
-        results = compute_validity_regions(series)
+        results = _compute_validity_regions(series)
         self.assertEqual(results, expected_results)
 
 
@@ -207,35 +206,35 @@ class TestComputeCoverageAndDataLoss(unittest.TestCase):
         to_t   = 1436022000+1800  # 2015-07-04 17:30:00+02:00
 
         # A) Full coverage (coverage=1.0) and again, to test "reproducibility"
-        coverage = compute_coverage(series = self.data_time_point_series_1, from_t = from_t, to_t = to_t)  
+        coverage = _compute_coverage(series = self.data_time_point_series_1, from_t = from_t, to_t = to_t)  
         self.assertEqual(coverage, 1.0)
-        coverage = compute_coverage(series = self.data_time_point_series_1, from_t = from_t, to_t = to_t)  
+        coverage = _compute_coverage(series = self.data_time_point_series_1, from_t = from_t, to_t = to_t)  
         self.assertEqual(coverage, 1.0)       
 
   
         # B) Full coverage (coverage=1.0) witjout prev/next in the time series 
         # TODO: fix me
-        coverage = compute_coverage(series = self.data_time_point_series_1, from_t = from_t, to_t = to_t)  
+        coverage = _compute_coverage(series = self.data_time_point_series_1, from_t = from_t, to_t = to_t)  
         self.assertEqual(coverage, 1.0) 
         self.assertEqual(coverage, 1.0)  
 
  
         # C) Missing ten minutes over 30 at the end (coverage=0.683))
-        coverage = compute_coverage(series = self.data_time_point_series_3, from_t = from_t, to_t = to_t)  
+        coverage = _compute_coverage(series = self.data_time_point_series_3, from_t = from_t, to_t = to_t)  
 
         # 20 minutes plus other 30 secs validity for the 20th point over 30 minutes
         self.assertEqual(coverage, ( ((20*60.0)+30.0) / (30*60.0)) ) 
  
  
         # D) Missing ten minutes over 30 at the beginning (coverage=0.683)
-        coverage = compute_coverage(series = self.data_time_point_series_4, from_t = from_t, to_t = to_t)  
+        coverage = _compute_coverage(series = self.data_time_point_series_4, from_t = from_t, to_t = to_t)  
 
         # 20 minutes plus other 30 secs (previous) validity for the 10th point over 30 minutes
         self.assertEqual(coverage, ( ((20*60.0)+30.0) / (30*60.0)) ) 
  
  
         # E) Missing eleven minutes over 30 in the middle (coverage=0.66)
-        coverage = compute_coverage(series = self.data_time_point_series_5, from_t = from_t, to_t = to_t)  
+        coverage = _compute_coverage(series = self.data_time_point_series_5, from_t = from_t, to_t = to_t)  
 
         # 20 minutes plus other 30 secs (previous) validity for the 10th point over 30 minutes
         self.assertAlmostEqual(coverage, (2.0/3.0))
@@ -244,7 +243,7 @@ class TestComputeCoverageAndDataLoss(unittest.TestCase):
         # F) Missing half slot before slot re-start
         from_t = s_from_dt(dt=dt(2019,10,1,3,30,0, tzinfo='Europe/Rome'))
         to_t   = s_from_dt(dt=dt(2019,10,1,3,45,0, tzinfo='Europe/Rome'))
-        coverage = compute_coverage(series = self.data_time_point_series_6, from_t = from_t, to_t = to_t)  
+        coverage = _compute_coverage(series = self.data_time_point_series_6, from_t = from_t, to_t = to_t)  
      
         self.assertAlmostEqual(coverage, (0.5))
 
@@ -257,7 +256,7 @@ class TestComputeCoverageAndDataLoss(unittest.TestCase):
         data_time_point_series.append(DataTimePoint(t = 70, data = {'temperature': 23}))
         attach_validity_regions(data_time_point_series)
         
-        coverage = compute_coverage(series = data_time_point_series, from_t = 30, to_t = 60) 
+        coverage = _compute_coverage(series = data_time_point_series, from_t = 30, to_t = 60) 
         self.assertAlmostEqual(coverage, (2.0/3.0))
 
         # H) single-element series
@@ -268,9 +267,9 @@ class TestComputeCoverageAndDataLoss(unittest.TestCase):
         attach_validity_regions(single_element_series, sampling_interval=10)
 
         #with self.assertRaises(ValueError):
-        #    compute_coverage(series = single_element_series, from_t = 30, to_t = 60) 
+        #    _compute_coverage(series = single_element_series, from_t = 30, to_t = 60) 
 
-        coverage = compute_coverage(series = single_element_series, from_t = 30, to_t = 60, sampling_interval=10)
+        coverage = _compute_coverage(series = single_element_series, from_t = 30, to_t = 60, sampling_interval=10)
         # 30 to 60, point is from 35 to 45 -> 10 seconds out of 30
         self.assertAlmostEqual(coverage, (1.0/3.0))
 
@@ -287,12 +286,12 @@ class TestComputeCoverageAndDataLoss(unittest.TestCase):
         attach_validity_regions(series)
   
         # Test basic
-        self.assertAlmostEqual(compute_data_loss(series, from_t = 45, to_t = 55, sampling_interval=10), 1.0)
-        self.assertAlmostEqual(compute_data_loss(series, from_t = 50, to_t = 60, sampling_interval=10), 0.5)
-        self.assertAlmostEqual(compute_data_loss(series, from_t = 65, to_t = 75, sampling_interval=10), 0.0)
+        self.assertAlmostEqual(_compute_data_loss(series, from_t = 45, to_t = 55, sampling_interval=10), 1.0)
+        self.assertAlmostEqual(_compute_data_loss(series, from_t = 50, to_t = 60, sampling_interval=10), 0.5)
+        self.assertAlmostEqual(_compute_data_loss(series, from_t = 65, to_t = 75, sampling_interval=10), 0.0)
   
         # Test out of boundaries
-        data_loss = compute_data_loss(series, from_t = 100, to_t = 120, sampling_interval=10) 
+        data_loss = _compute_data_loss(series, from_t = 100, to_t = 120, sampling_interval=10) 
         self.assertEqual(data_loss, 1)    
   
         # Test for 1-element series
@@ -304,10 +303,10 @@ class TestComputeCoverageAndDataLoss(unittest.TestCase):
  
         # The series has only one element and no sampling_interval is provided, no idea how to compute validity        
         #with self.assertRaises(ValueError):
-        #    compute_data_loss(single_element_series, from_t = 30, to_t = 60) 
+        #    _compute_data_loss(single_element_series, from_t = 30, to_t = 60) 
   
         # Only 10 seconds out of 30 (point has validity regions 35-45, interval is from 30 to 60)
-        data_loss = compute_data_loss(single_element_series, from_t = 30, to_t = 60, sampling_interval=10) 
+        data_loss = _compute_data_loss(single_element_series, from_t = 30, to_t = 60, sampling_interval=10) 
         self.assertAlmostEqual(data_loss, (2.0/3.0))
  
         # Test two elements, some border condition for sull fata losses may arise
@@ -316,7 +315,7 @@ class TestComputeCoverageAndDataLoss(unittest.TestCase):
         series_two_elements.append(DataTimePoint(t = 60, data = {'temperature': 23}))
         attach_validity_regions(series_two_elements, sampling_interval=10)
          
-        self.assertEqual(compute_data_loss(series_two_elements, from_t = 45, to_t = 55, sampling_interval=10), 1)
+        self.assertEqual(_compute_data_loss(series_two_elements, from_t = 45, to_t = 55, sampling_interval=10), 1)
   
         # Series with pre-existent data losses, which have to be taken into account as well
         series_with_data_losses = TimeSeries()
@@ -328,20 +327,20 @@ class TestComputeCoverageAndDataLoss(unittest.TestCase):
         attach_validity_regions(series_with_data_losses)
  
         # Test missing + already ( 0 + 0.5 + 1 + 0 = 1.5 / 3 = 0.5)
-        data_loss = compute_data_loss(series_with_data_losses, from_t = 30, to_t = 60, sampling_interval=10, force=True) 
+        data_loss = _compute_data_loss(series_with_data_losses, from_t = 30, to_t = 60, sampling_interval=10, force=True) 
         self.assertAlmostEqual(data_loss, 0.5)
   
         # Test also on actually resampled series
         resampled_series = series.resample(10)
         attach_validity_regions(resampled_series)
  
-        data_loss = compute_data_loss(resampled_series, from_t = 30, to_t = 60)
+        data_loss = _compute_data_loss(resampled_series, from_t = 30, to_t = 60)
         self.assertAlmostEqual(data_loss, 1.0/3.0)
  
         resampled_series_5 = self.data_time_point_series_5.resample(60)  
         attach_validity_regions(resampled_series_5)
        
-        data_loss = compute_data_loss(resampled_series_5, from_t = 1436022300, to_t = 1436022600) 
+        data_loss = _compute_data_loss(resampled_series_5, from_t = 1436022300, to_t = 1436022600) 
         self.assertAlmostEqual(data_loss, 0.3)
          
         # TODO: This test come after a bug, needs to be better unrolled. the bug was
@@ -356,7 +355,7 @@ class TestComputeCoverageAndDataLoss(unittest.TestCase):
         
         attach_validity_regions(resampled_series)
         
-        data_loss = compute_data_loss(resampled_series, from_t = 1546700400, to_t = 1546711200) 
+        data_loss = _compute_data_loss(resampled_series, from_t = 1546700400, to_t = 1546711200) 
         self.assertAlmostEqual(data_loss, 1.0)
 
 
@@ -366,9 +365,9 @@ class TestGetPeriodicity(unittest.TestCase):
         
         univariate_data_time_point_series = CSVFileStorage(TEST_DATA_PATH + '/csv/temperature.csv').get()
         
-        univariate_1h_data_time_slot_series = Aggregator('1h').process(univariate_data_time_point_series)
+        univariate_1h_data_time_slot_series = univariate_data_time_point_series.aggregate('1h')
         
-        perdiodicity = get_periodicity(univariate_1h_data_time_slot_series)
+        perdiodicity = detect_periodicity(univariate_1h_data_time_slot_series)
 
         self.assertEqual(perdiodicity, 24)
 

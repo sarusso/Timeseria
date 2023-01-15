@@ -22,7 +22,7 @@ HARD_DEBUG = False
 
 
 def is_numerical(item):
-    """Check if item is numerical (float or int)"""
+    """Check if item is numerical (float or int, including Pandas data types)."""
     if isinstance(item, float):
         return True
     if isinstance(item, int):
@@ -35,7 +35,253 @@ def is_numerical(item):
         return False
 
 
-def set_from_t_and_to_t(from_dt, to_dt, from_t, to_t):
+def detect_encoding(file_name, streaming=False):
+    """Detect the encoding of a file."""
+    if streaming:
+        detector = UniversalDetector()
+        with open(file_name, 'rb') as file_pointer:      
+            for i, line in enumerate(file_pointer.readlines()):
+                if HARD_DEBUG: logger.debug('Itearation #%s: confidence=%s',i,detector.result['confidence'])
+                detector.feed(line)
+                if detector.done:  
+                    if HARD_DEBUG: logger.debug('Detected encoding at line "%s"', i)
+                    break
+        detector.close() 
+        chardet_results = detector.result
+
+    else:
+        with open(file_name, 'rb') as file_pointer:
+            chardet_results = chardet.detect(file_pointer.read())
+             
+    logger.debug('Detected encoding "%s" with "%s" confidence (streaming=%s)', chardet_results['encoding'],chardet_results['confidence'], streaming)
+    encoding = chardet_results['encoding']
+     
+    return encoding
+
+
+def detect_sampling_interval(time_series, confidence=False):
+    """Detect the sampling interval of a time series."""
+
+    diffs={}
+    prev_point=None
+    for point in time_series:
+        if prev_point is not None:
+            diff = point.t - prev_point.t
+            if diff not in diffs:
+                diffs[diff] = 1
+            else:
+                diffs[diff] +=1
+        prev_point = point
+    
+    # Iterate until the diffs are not too spread, then pick the maximum.
+    i=0
+    while _is_almost_equal(len(diffs), len(time_series)):
+        or_diffs=diffs
+        diffs={}
+        for diff in or_diffs:
+            diff=round(diff)
+            if diff not in diffs:
+                diffs[diff] = 1
+            else:
+                diffs[diff] +=1            
+        
+        if i > 10:
+            raise Exception('Cannot automatically detect the sampling interval')
+    
+    most_common_diff_total = 0
+    most_common_diff = None
+    for diff in diffs:
+        if diffs[diff] > most_common_diff_total:
+            most_common_diff_total = diffs[diff]
+            most_common_diff = diff
+
+    second_most_common_diff_total = 0
+    second_most_common_diff = None
+    for diff in diffs:
+        if diff == most_common_diff:
+            continue
+        if diffs[diff] > second_most_common_diff_total:
+            second_most_common_diff_total = diffs[diff]
+            second_most_common_diff = diff
+
+    if confidence:
+        if len(diffs) == 1:
+            confidence_value = 1.0
+        else:
+            # TODO: this is a totally arbitrary confidence metric, check me.
+            confidence_value = 1 - (second_most_common_diff_total / most_common_diff_total)
+        return most_common_diff, confidence_value
+    else:
+        return most_common_diff
+
+
+def detect_periodicity(time_series):
+    """Detect the periodicity of a time series."""
+    
+    _check_timeseries(time_series)
+    
+    # TODO: fix me, data_loss must not belong as key
+    data_labels = time_series.data_labels()
+    
+    if len(data_labels) > 1:
+        raise NotImplementedError()
+
+    # TODO: improve me, highly ineficcient
+    for key in data_labels:
+        
+        # Get data as a vector
+        y = []
+        for item in time_series:
+            y.append(item.data[key])
+        #y = [item.data[key] for item in time_series]
+
+        # Compute FFT (Fast Fourier Transform)
+        yf = fft.fft(y)
+
+        # Remove specular data        
+        len_yf = len(yf)
+        middle_point=round(len_yf/2)
+        yf = yf[0:middle_point]
+        
+        # To absolute values
+        yf = [abs(f) for f in yf]
+            
+        # Find FFT peaks
+        peak_indexes, _ = find_peaks(yf, height=None)
+        peaks = []
+        for i in peak_indexes:
+            peaks.append([i, yf[i]])
+        
+        # Sort by peaks intensity and compute actual frequency in base units
+        # TODO: round peak frequencies to integers and/or neighbours first
+        peaks = sorted(peaks, key=lambda t: t[1])
+        peaks.reverse()
+        
+        # Compute peak frequencies:
+        for i in range(len(peaks)):
+            
+            # Set peak frequency
+            peak_frequency = (len(y) / peaks[i][0])
+            peaks[i].append(peak_frequency)
+        
+        # Find most relevant frequency
+        max_peak_frequency = None
+        for i in range(len(peaks)):
+
+            logger.debug('Peak #%s: \t index=%s,\t value=%s, freq=%s (over %s)', i, peaks[i][0], int(peaks[i][1]), peaks[i][2], len(time_series))
+
+            # Do not consider lower frequencies if there is a closer and higher one
+            try:
+                diff1=peaks[i][1]-peaks[i+1][1]
+                diff2=peaks[i+1][1]-peaks[i+2][1]
+                if diff1 *3 < diff2:
+                    logger.debug('Peak #{} candidate to removal'.format(i))
+                    if (peaks[i][2] > peaks[i+1][2]*10) and (peaks[i][2] > len(time_series)/10):
+                        logger.debug('peak #{} marked to be removed'.format(i))
+                        continue
+            except IndexError:
+                pass
+            
+            if not max_peak_frequency:
+                max_peak_frequency = peaks[i][2]
+            if i>10:
+                break
+        
+        # Round max peak and return
+        return int(round(max_peak_frequency))
+
+
+def mean_absolute_percentage_error(list1, list2):
+    '''Compute the MAPE, list 1 are true values, list 2 are predicted values'''
+    
+    if len(list1) != len(list2):
+        raise ValueError('Lists have different lengths, cannot continue')
+    p_error_sum = 0
+    for i in range(len(list1)):
+        p_error_sum += abs((list1[i] - list2[i])/list1[i])
+    return p_error_sum/len(list1)
+
+
+def os_shell(command, capture=False, verbose=False, interactive=False, silent=False):
+    '''Execute a command in the OS shell. By default prints everything. If the capture switch is set,
+    then it returns a namedtuple with stdout, stderr, and exit code.'''
+    
+    if capture and verbose:
+        raise Exception('You cannot ask at the same time for capture and verbose, sorry')
+
+    # Log command
+    logger.debug('Shell executing command: "%s"', command)
+
+    # Execute command in interactive mode    
+    if verbose or interactive:
+        exit_code = subprocess.call(command, shell=True)
+        if exit_code == 0:
+            return True
+        else:
+            return False
+
+    # Execute command getting stdout and stderr
+    # http://www.saltycrane.com/blog/2008/09/how-get-stdout-and-stderr-using-python-subprocess-module/
+    
+    process          = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+    (stdout, stderr) = process.communicate()
+    exit_code        = process.wait()
+
+    # Convert to str (Python 3)
+    stdout = stdout.decode(encoding='UTF-8')
+    stderr = stderr.decode(encoding='UTF-8')
+
+    # Formatting..
+    stdout = stdout[:-1] if (stdout and stdout[-1] == '\n') else stdout
+    stderr = stderr[:-1] if (stderr and stderr[-1] == '\n') else stderr
+
+    # Output namedtuple
+    Output = namedtuple('Output', 'stdout stderr exit_code')
+
+    if exit_code != 0:
+        if capture:
+            return Output(stdout, stderr, exit_code)
+        else:
+            string  = '\n#---------------------------------'
+            string += '\n# Shell exited with exit code {}'.format(exit_code)
+            string += '\n#---------------------------------\n'
+            string += '\nStandard output: "'
+            string += stdout.encode("utf-8", errors="ignore")
+            string += '"\n\nStandard error: "'
+            string += stderr.encode("utf-8", errors="ignore") +'"\n\n'
+            string += '#---------------------------------\n'
+            string += '# End Shell output\n'
+            string += '#---------------------------------\n'
+            print(string)
+            return False    
+    else:
+        if capture:
+            return Output(stdout, stderr, exit_code)
+        elif not silent:
+            # Just print stdout and stderr cleanly
+            print(stdout)
+            print(stderr)
+            return True
+        else:
+            return True
+
+
+#===========================
+#  Private utilities
+#===========================
+
+def _is_close(a, b, rel_tol=1e-09, abs_tol=0.0):
+    return abs(a-b) <= max(rel_tol * max(abs(a), abs(b)), abs_tol)
+
+
+def _is_almost_equal(one, two):
+    if 0.95 < (one / two) <= 1.05:
+        return True
+    else:
+        return False 
+
+def _set_from_t_and_to_t(from_dt, to_dt, from_t, to_t):
+    """Set from_t and to_t from a (valid) combination of from_dt, to_dt, from_t, to_t."""
     
     # Sanity chceks
     if from_t is not None and not is_numerical(from_t):
@@ -58,7 +304,9 @@ def set_from_t_and_to_t(from_dt, to_dt, from_t, to_t):
     return from_t, to_t
 
 
-def item_is_in_range(item, from_t, to_t):
+def _item_is_in_range(item, from_t, to_t):
+    """Check if an item (*TimePoint or *TimeSlot) is within the specified time range"""
+    
     # TODO: maybe use a custom iterator for looping over time series items? 
     # see https://stackoverflow.com/questions/6920206/sending-stopiteration-to-for-loop-from-outside-of-the-iterator
     from .datastructures import Point, Slot
@@ -88,34 +336,9 @@ def item_is_in_range(item, from_t, to_t):
             return True    
     else:
         raise ConsistencyException('Got unknown type "{}'.format(item.__class__.__name__))
-        
 
 
-def detect_encoding(filename, streaming=False):
-    
-    if streaming:
-        detector = UniversalDetector()
-        with open(filename, 'rb') as file_pointer:      
-            for i, line in enumerate(file_pointer.readlines()):
-                if HARD_DEBUG: logger.debug('Itearation #%s: confidence=%s',i,detector.result['confidence'])
-                detector.feed(line)
-                if detector.done:  
-                    if HARD_DEBUG: logger.debug('Detected encoding at line "%s"', i)
-                    break
-        detector.close() 
-        chardet_results = detector.result
-
-    else:
-        with open(filename, 'rb') as file_pointer:
-            chardet_results = chardet.detect(file_pointer.read())
-             
-    logger.debug('Detected encoding "%s" with "%s" confidence (streaming=%s)', chardet_results['encoding'],chardet_results['confidence'], streaming)
-    encoding = chardet_results['encoding']
-     
-    return encoding
-
-
-def compute_validity_regions(series, from_t=None, to_t=None, sampling_interval=None, cut=False):
+def _compute_validity_regions(series, from_t=None, to_t=None, sampling_interval=None, cut=False):
     """
     Compute the validity regions for the series points. If from_t or to_t are given, computes them within that interval only.
     
@@ -180,7 +403,7 @@ def compute_validity_regions(series, from_t=None, to_t=None, sampling_interval=N
     return validity_segments
 
 
-def compute_coverage(series, from_t, to_t, sampling_interval=None):
+def _compute_coverage(series, from_t, to_t, sampling_interval=None):
     """
     Compute the coverage of an interval based on the points validity regions.
     
@@ -194,7 +417,7 @@ def compute_coverage(series, from_t, to_t, sampling_interval=None):
         float: the interval coverage.
     """
 
-    logger.debug('Called compute_coverage() from {} to {}'.format(from_t, to_t))
+    logger.debug('Called _compute_coverage() from {} to {}'.format(from_t, to_t))
 
     # Check from_t/to_t
     if from_t >= to_t:
@@ -205,7 +428,7 @@ def compute_coverage(series, from_t, to_t, sampling_interval=None):
         return 0.0
         
     # Compute the validity regions in the interval. if point haven't them?
-    # validity_regions = compute_validity_regions(series, from_t=from_t, to_t=to_t, cut=True, sampling_interval=sampling_interval)
+    # validity_regions = _compute_validity_regions(series, from_t=from_t, to_t=to_t, cut=True, sampling_interval=sampling_interval)
     # And now attach?
 
     # Sum all the validity regions according to the from/to:
@@ -241,11 +464,11 @@ def compute_coverage(series, from_t, to_t, sampling_interval=None):
     coverage = coverage_s / (to_t - from_t)
 
     # Return
-    logger.debug('compute_coverage: Returning %s (%s percent)', coverage, coverage*100.0)
+    logger.debug('_compute_coverage: Returning %s (%s percent)', coverage, coverage*100.0)
     return coverage
 
 
-def compute_data_loss(series, from_t, to_t, force=False, sampling_interval=None):
+def _compute_data_loss(series, from_t, to_t, force=False, sampling_interval=None):
     """
     Compute the data loss  of an interval based on the points validity regions.
     
@@ -260,29 +483,21 @@ def compute_data_loss(series, from_t, to_t, force=False, sampling_interval=None)
         float: the interval data loss.
     """
 
-    logger.debug('Called compute_data_loss() from {} to {}'.format(from_t, to_t))
-
+    logger.debug('Called _compute_data_loss() from {} to {}'.format(from_t, to_t))
 
     # Get the series sampling interval unless it is forced to a specific value
     if not sampling_interval:
         sampling_interval = series._autodetected_sampling_interval
        
-    #========================================
-    #  Data loss from missing coverage.
-    #========================================
-    
+    # Compute the data loss from missing coverage.
     # Note: to improve performance, this could be computed only if the series is "raw" or forced,
     # i.e. at first and last items since on the borders there still may be  data losses. 
-    data_loss_from_missing_coverage = 1 - compute_coverage(series, from_t, to_t, sampling_interval=sampling_interval)
+    data_loss_from_missing_coverage = 1 - _compute_coverage(series, from_t, to_t, sampling_interval=sampling_interval)
 
     logger.debug('Data loss from missing coverage: %s', data_loss_from_missing_coverage)
     
-    #========================================
-    #  Data loss from previous data losses.
-    #========================================
-
-    # Computed only if the resolutions is constant, as they can be defined only if the series was already 
-    # made uniform (i.e. by a resampling process), or if forced for testing or other potential reasons.
+    # Compute the data loss from previous data losses. Computed only if the resolutions is constant, as they can be defined only
+    # if the series was already  made uniform (i.e. by a resampling process), or if forced for testing or other potential reasons.
     data_loss_from_previously_computed = 0.0
 
     if (series.resolution is not None) or force:
@@ -335,24 +550,9 @@ def compute_data_loss(series, from_t, to_t, force=False, sampling_interval=None)
     return data_loss
 
 
-#==============================
-# Floating point comparisons
-#==============================
-def is_close(a, b, rel_tol=1e-09, abs_tol=0.0):
-    return abs(a-b) <= max(rel_tol * max(abs(a), abs(b)), abs_tol)
+def _check_timeseries(timeseries):
+    """Check a time series for type, not emptiness and fixed resolution."""
 
-def is_almost_equal(one, two):
-    if 0.95 < (one / two) <= 1.05:
-        return True
-    else:
-        return False 
-
-
-#==============================
-# Check timeseries
-#==============================
-
-def check_timeseries(timeseries, resolution=None):
     # Import here or you will end up with cyclic imports
     from .datastructures import TimeSeries 
     
@@ -366,9 +566,9 @@ def check_timeseries(timeseries, resolution=None):
         raise ValueError('Time series with undefined (variable) resolutions are not supported. Resample or slot the time series first.')
 
 
-def check_resolution(timeseries, resolution):
+def _check_resolution(timeseries, resolution):
     
-    def _check_resolution(timeseries, resolution):
+    def __check_resolution(timeseries, resolution):
         # TODO: Fix this mess.. Make the .resolution behavior consistent!
         if resolution == timeseries.resolution:
             return True
@@ -390,11 +590,11 @@ def check_resolution(timeseries, resolution):
         return False
             
     # Check timeseries resolution
-    if not _check_resolution(timeseries, resolution):
+    if not __check_resolution(timeseries, resolution):
         raise ValueError('This model is fitted on "{}" resolution data, while your data has "{}" resolution.'.format(resolution, timeseries.resolution))
 
 
-def check_data_labels(timeseries, keys):
+def _check_data_labels(timeseries, keys):
     timeseries_data_labels = timeseries.data_labels()
     if len(timeseries_data_labels) != len(keys):
         raise ValueError('This model is fitted on {} data keys, while your data has {} data keys.'.format(len(keys), len(timeseries_data_labels)))
@@ -402,96 +602,20 @@ def check_data_labels(timeseries, keys):
         # TODO: logger.warning?
         raise ValueError('This model is fitted on "{}" data keys, while your data has "{}" data keys.'.format(keys, timeseries_data_labels))
 
-
-#==============================
-# Periodicity
-#==============================
-
-def get_periodicity(timeseries):
+def _check_series_of_points_or_slots(series):
+    from .datastructures import DataPoint, DataSlot
+    if not (issubclass(series.items_type, DataPoint) or issubclass(series.items_type, DataSlot)):
+        raise TypeError('Cannot operate on a series of "{}", only series of DataPoints or DataSlots are supported'.format(series.items_type.__name__))
     
-    check_timeseries(timeseries)
+def _check_indexed_data(series):
+    try:
+        series.data_labels()
+    except TypeError:
+        raise TypeError('Cannot operate on a series of "{}" with "{}" data, only series of indexed data (as lists and dicts) are supported'.format(series.item_types.__name__, series[0].data.__class__.__name__))
     
-    # TODO: fix me, data_loss must not belong as key
-    data_labels = timeseries.data_labels()
+def _get_periodicity_index(item, resolution, periodicity, dst_affected=False):
+    """Get the periodicty index."""
     
-    if len(data_labels) > 1:
-        raise NotImplementedError()
-
-    # TODO: improve me, highly ineficcient
-    for key in data_labels:
-        
-        # Get data as a vector
-        y = []
-        for item in timeseries:
-            y.append(item.data[key])
-        #y = [item.data[key] for item in timeseries]
-
-        # Compute FFT (Fast Fourier Transform)
-        yf = fft.fft(y)
-
-        # Remove specular data        
-        len_yf = len(yf)
-        middle_point=round(len_yf/2)
-        yf = yf[0:middle_point]
-        
-        # To absolute values
-        yf = [abs(f) for f in yf]
-            
-        # Find FFT peaks
-        peak_indexes, _ = find_peaks(yf, height=None)
-        peaks = []
-        for i in peak_indexes:
-            peaks.append([i, yf[i]])
-        
-        # Sort by peaks intensity and compute actual frequency in base units
-        # TODO: round peak frequencies to integers and/or neighbours first
-        peaks = sorted(peaks, key=lambda t: t[1])
-        peaks.reverse()
-        
-        # Compute peak frequencies:
-        for i in range(len(peaks)):
-            
-            # Set peak frequency
-            peak_frequency = (len(y) / peaks[i][0])
-            peaks[i].append(peak_frequency)
-        
-        # Find most relevant frequency
-        max_peak_frequency = None
-        for i in range(len(peaks)):
-
-            logger.debug('Peak #%s: \t index=%s,\t value=%s, freq=%s (over %s)', i, peaks[i][0], int(peaks[i][1]), peaks[i][2], len(timeseries))
-
-            # Do not consider lower frequencies if there is a closer and higher one
-            try:
-                diff1=peaks[i][1]-peaks[i+1][1]
-                diff2=peaks[i+1][1]-peaks[i+2][1]
-                if diff1 *3 < diff2:
-                    logger.debug('Peak #{} candidate to removal'.format(i))
-                    if (peaks[i][2] > peaks[i+1][2]*10) and (peaks[i][2] > len(timeseries)/10):
-                        logger.debug('peak #{} marked to be removed'.format(i))
-                        continue
-            except IndexError:
-                pass
-            
-            if not max_peak_frequency:
-                max_peak_frequency = peaks[i][2]
-            if i>10:
-                break
-        
-        # Round max peak and return
-        return int(round(max_peak_frequency))
-
-def mean_absolute_percentage_error(list1, list2):
-    '''Computes the MAPE, list 1 are true values, list2 are predicted values'''
-    if len(list1) != len(list2):
-        raise ValueError('Lists have different lengths, cannot continue')
-    p_error_sum = 0
-    for i in range(len(list1)):
-        p_error_sum += abs((list1[i] - list2[i])/list1[i])
-    return p_error_sum/len(list1)
-
-
-def get_periodicity_index(item, resolution, periodicity, dst_affected=False):
     from .units import Unit, TimeUnit
     # Handle specific cases
     if isinstance(resolution, TimeUnit):  
@@ -538,72 +662,10 @@ def get_periodicity_index(item, resolution, periodicity, dst_affected=False):
 
     return periodicity_index
     
+
+def _sanitize_string(string, no_data_placeholders=[]):
+    """Sanitize the encofing of a stringwhile handling no data placeholders"""
     
-#==============================
-# Detetc sampling interval
-#==============================
-
-def detect_sampling_interval(time_series, confidence=False):
-    """Autodetect (guess) the sampling interval of a time series"""
-
-    diffs={}
-    prev_point=None
-    for point in time_series:
-        if prev_point is not None:
-            diff = point.t - prev_point.t
-            if diff not in diffs:
-                diffs[diff] = 1
-            else:
-                diffs[diff] +=1
-        prev_point = point
-    
-    # Iterate until the diffs are not too spread, then pick the maximum.
-    i=0
-    while is_almost_equal(len(diffs), len(time_series)):
-        or_diffs=diffs
-        diffs={}
-        for diff in or_diffs:
-            diff=round(diff)
-            if diff not in diffs:
-                diffs[diff] = 1
-            else:
-                diffs[diff] +=1            
-        
-        if i > 10:
-            raise Exception('Cannot automatically detect the sampling interval')
-    
-    most_common_diff_total = 0
-    most_common_diff = None
-    for diff in diffs:
-        if diffs[diff] > most_common_diff_total:
-            most_common_diff_total = diffs[diff]
-            most_common_diff = diff
-
-    second_most_common_diff_total = 0
-    second_most_common_diff = None
-    for diff in diffs:
-        if diff == most_common_diff:
-            continue
-        if diffs[diff] > second_most_common_diff_total:
-            second_most_common_diff_total = diffs[diff]
-            second_most_common_diff = diff
-
-    if confidence:
-        if len(diffs) == 1:
-            confidence_value = 1.0
-        else:
-            # TODO: this is a totally arbitrary confidence metric, check me.
-            confidence_value = 1 - (second_most_common_diff_total / most_common_diff_total)
-        return most_common_diff, confidence_value
-    else:
-        return most_common_diff
-
-
-#==============================
-# Storage utilities
-#==============================
-
-def sanitize_string(string, no_data_placeholders=[]):
     string = re.sub('\s+',' ',string).strip()
     if string.startswith('\'') or string.startswith('"'):
         string = string[1:]
@@ -615,15 +677,20 @@ def sanitize_string(string, no_data_placeholders=[]):
     return string
 
 
-def is_list_of_integers(list):
-    for item in list:
+def _is_list_of_integers(the_list):
+    """Check if the list if made of integers"""
+    
+    for item in the_list:
         if not isinstance(item, int):
             return False
     else:
         return True
 
-def to_float(string,no_data_placeholders=[],label=None):
-    sanitized_string_string = sanitize_string(string,no_data_placeholders)
+
+def _to_float(string,no_data_placeholders=[],label=None):
+    """Convert to float while handling no data placeholders and discarding data indexes"""
+    
+    sanitized_string_string = _sanitize_string(string,no_data_placeholders)
     if sanitized_string_string:
         sanitized_string_string = sanitized_string_string.replace(',','.')
     try:
@@ -636,8 +703,9 @@ def to_float(string,no_data_placeholders=[],label=None):
 
 
 
-def to_time_unit_string(seconds, friendlier=True):
-    """Converts seconds to a (friendlier) time unit string, as 1s, 1h, 10m etc.)"""    
+def _to_time_unit_string(seconds, friendlier=True):
+    """Converts seconds to a (friendlier) time unit string, as 1s, 1h, 10m etc.)"""
+        
     seconds_str = str(seconds).replace('.0', '')
     if friendlier:
         if seconds_str == '60':
@@ -653,78 +721,6 @@ def to_time_unit_string(seconds, friendlier=True):
     return seconds_str
 
 
-def sanitize_shell_encoding(text):
-    return text.encode("utf-8", errors="ignore")
-
-
-def format_shell_error(stdout, stderr, exit_code):
-    
-    string  = '\n#---------------------------------'
-    string += '\n# Shell exited with exit code {}'.format(exit_code)
-    string += '\n#---------------------------------\n'
-    string += '\nStandard output: "'
-    string += sanitize_shell_encoding(stdout)
-    string += '"\n\nStandard error: "'
-    string += sanitize_shell_encoding(stderr) +'"\n\n'
-    string += '#---------------------------------\n'
-    string += '# End Shell output\n'
-    string += '#---------------------------------\n'
-
-    return string
-
-
-def os_shell(command, capture=False, verbose=False, interactive=False, silent=False):
-    '''Execute a command in the OS shell. By default prints everything. If the capture switch is set,
-    then it returns a namedtuple with stdout, stderr, and exit code.'''
-    
-    if capture and verbose:
-        raise Exception('You cannot ask at the same time for capture and verbose, sorry')
-
-    # Log command
-    logger.debug('Shell executing command: "%s"', command)
-
-    # Execute command in interactive mode    
-    if verbose or interactive:
-        exit_code = subprocess.call(command, shell=True)
-        if exit_code == 0:
-            return True
-        else:
-            return False
-
-    # Execute command getting stdout and stderr
-    # http://www.saltycrane.com/blog/2008/09/how-get-stdout-and-stderr-using-python-subprocess-module/
-    
-    process          = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-    (stdout, stderr) = process.communicate()
-    exit_code        = process.wait()
-
-    # Convert to str (Python 3)
-    stdout = stdout.decode(encoding='UTF-8')
-    stderr = stderr.decode(encoding='UTF-8')
-
-    # Formatting..
-    stdout = stdout[:-1] if (stdout and stdout[-1] == '\n') else stdout
-    stderr = stderr[:-1] if (stderr and stderr[-1] == '\n') else stderr
-
-    # Output namedtuple
-    Output = namedtuple('Output', 'stdout stderr exit_code')
-
-    if exit_code != 0:
-        if capture:
-            return Output(stdout, stderr, exit_code)
-        else:
-            print(format_shell_error(stdout, stderr, exit_code))      
-            return False    
-    else:
-        if capture:
-            return Output(stdout, stderr, exit_code)
-        elif not silent:
-            # Just print stdout and stderr cleanly
-            print(stdout)
-            print(stderr)
-            return True
-        else:
-            return True
 
 
 

@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """Series transformations as resampling and aggregation."""
 
-from .time import dt_from_s, s_from_dt, as_timezone
-from .datastructures import DataTimeSlot, TimePoint, DataTimePoint, TimeSeries, _TimeSeriesSlice
-from .utilities import compute_data_loss, compute_validity_regions
+from .time import dt_from_s, s_from_dt, as_tz
+from .datastructures import Point, Slot, DataTimeSlot, TimePoint, DataTimePoint, Series, TimeSeries, _TimeSeriesSlice
+from .utilities import _compute_data_loss, _compute_validity_regions
 from .operations import avg
 from .units import TimeUnit
 from .exceptions import ConsistencyException
@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_point_i, slot_prev_point_i, slot_next_point_i,
                  unit, point_validity, timezone, fill_with, force_data_loss, fill_gaps, series_data_indexes, series_resolution,
-                 force_compute_data_loss, Interpolator, operations=None):
+                 force_compute_data_loss, interpolator_class, operations=None):
     
     # Log. Note: if slot_first_point_i < slot_last_point_i, this means that the prev and next are outside the slot.
     # It is not a bug, it is how the system works. perhaps we could pass here the slot_prev_i and sòlot_next_i
@@ -41,11 +41,11 @@ def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_poi
 
     # Create the slice of the series containing the slot datapoints plus the prev and next, 
     series_dense_slice_extended  = _TimeSeriesSlice(series, from_i=slot_prev_point_i, to_i=slot_next_point_i+1,  # Slicing exclude the right
-                                                   from_t=from_t, to_t=to_t, dense=True, Interpolator=Interpolator)
+                                                   from_t=from_t, to_t=to_t, dense=True, interpolator_class=interpolator_class)
 
     # Compute the data loss for the new element. This is forced
     # by the resampler or slotter if first or last point     
-    data_loss = compute_data_loss(series_dense_slice_extended,
+    data_loss = _compute_data_loss(series_dense_slice_extended,
                                   from_t = from_t,
                                   to_t = to_t,
                                   sampling_interval = point_validity,
@@ -108,7 +108,7 @@ def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_poi
             # Slice the original series to provide only the datapoints belonging to the slot 
             #logger.critical('Slicing dense series from {} to {}'.format(slot_first_point_i, slot_last_point_i+1))
             series_dense_slice = _TimeSeriesSlice(series, from_i=slot_first_point_i, to_i=slot_last_point_i+1, # Slicing exclude the right   
-                                                 from_t=from_t, to_t=to_t, dense=True, Interpolator=Interpolator) 
+                                                 from_t=from_t, to_t=to_t, dense=True, interpolator_class=interpolator_class) 
 
 
 
@@ -244,15 +244,24 @@ class Transformation(object):
 
 
 #==========================
-# TimeSeries Transformation
+#  Series Transformation
 #==========================
-class TimeSeriesTransformation(Transformation):
-    """A transformation for time series data."""
+class SeriesTransformation(Transformation):
+    """A transformation specifically designed to work with series data."""
 
     def process(self, series, target, from_t=None, to_t=None, from_dt=None, to_dt=None, validity=None,
                 include_extremes=False, fill_with=None, force_data_loss=None, fill_gaps=True, force=False):
         """Start the transformation process. If start and/or end are not set, they are set automatically
         based on first and last points of the series"""
+        
+        if not isinstance(series, Series):
+            raise TypeError('Requires Series-like, got "{}"'.format(series.__class__.__name__))
+
+        if not isinstance(series, TimeSeries):
+            raise NotImplementedError('Transforming generic Series is not yet supported (got "{}"), only TimeSeries are'.format(series.__class__.__name__))
+
+        if not (issubclass(series.items_type, Point) or issubclass(series.items_type, Slot)):
+                raise TypeError('Series items are not Points nor Slots, cannot compute any transformation')
         
         # Checks
         if include_extremes:
@@ -327,8 +336,8 @@ class TimeSeriesTransformation(Transformation):
                 raise ValueError('Don\'t know how to target "{}"'.format(target))           
         
         # Set/fix timezone
-        from_dt = as_timezone(from_dt, series.tz)
-        to_dt = as_timezone(to_dt, series.tz)
+        from_dt = as_tz(from_dt, series.tz)
+        to_dt = as_tz(to_dt, series.tz)
         
         # Log
         logger.debug('Computed from: %s', from_dt)
@@ -344,7 +353,7 @@ class TimeSeriesTransformation(Transformation):
             logger.warning('You are upsampling, which is not well tested yet. Expect potential issues.')
 
         # Compute validity regions
-        validity_regions = compute_validity_regions(series, sampling_interval=validity)
+        validity_regions = _compute_validity_regions(series, sampling_interval=validity)
 
         # Log
         logger.debug('Started resampling from "%s" (%s) to "%s" (%s)', from_dt, from_t, to_dt, to_t)
@@ -494,7 +503,7 @@ class TimeSeriesTransformation(Transformation):
                                                 series_data_indexes = series_data_indexes,
                                                 series_resolution = series_resolution,
                                                 force_compute_data_loss = True if first else False,
-                                                Interpolator=self.Interpolator,
+                                                interpolator_class=self.interpolator_class,
                                                 operations = operations)
                         
                         # Set first to false
@@ -536,13 +545,20 @@ class TimeSeriesTransformation(Transformation):
 
 
 #==========================
-#   Resampler
+#  Resamplers
 #==========================
 
-class Resampler(TimeSeriesTransformation):
-    """Resampling transformation."""
+class Resampler(Transformation):
+    """A generic resampler."""
+    
+    def __init__(self, unit, interpolator_class=LinearInterpolator):
+        raise NotImplementedError('This Resampler is not yet implemented')
 
-    def __init__(self, unit, Interpolator=LinearInterpolator):
+
+class SeriesResampler(Resampler, SeriesTransformation):
+    """A resampler specifically designed to work with series data."""
+
+    def __init__(self, unit, interpolator_class=LinearInterpolator):
 
         # Handle unit
         if isinstance(unit, TimeUnit):
@@ -553,21 +569,27 @@ class Resampler(TimeSeriesTransformation):
             raise ValueError('Sorry, calendar time units are not supported by the Resampler (got "{}"). Use the Slotter instead.'.format(self.time_unit))
 
         # Set interpolator
-        self.Interpolator=Interpolator
+        self.interpolator_class=interpolator_class
 
     def process(self, *args, **kwargs):
         kwargs['target'] = 'points'
-        return super(Resampler, self).process(*args, **kwargs) 
+        return super(SeriesResampler, self).process(*args, **kwargs) 
 
 
 #==========================
-#   Aggregator
+#   Aggregators
 #==========================
 
-class Aggregator(TimeSeriesTransformation):
-    """Aggregation transformation."""
+class Aggregator(Transformation):
+    """A generic aggregator."""
+    
+    def __init__(self, unit, interpolator_class=LinearInterpolator):
+        raise NotImplementedError('This Aggregator is not yet implemented')
 
-    def __init__(self, unit, operations=[avg], Interpolator=LinearInterpolator):
+class SeriesAggregator(Aggregator, SeriesTransformation):
+    """An aggregator specifically designed to work with series data"""
+
+    def __init__(self, unit, operations=[avg], interpolator_class=LinearInterpolator):
         
         # Handle unit
         if isinstance(unit, TimeUnit):
@@ -591,11 +613,11 @@ class Aggregator(TimeSeriesTransformation):
         self.operations = operations
         
         # Set interpolator
-        self.Interpolator=Interpolator
+        self.interpolator_class=interpolator_class
 
     def process(self, *args, **kwargs):
         kwargs['target'] = 'slots'
-        return super(Aggregator, self).process(*args, **kwargs) 
+        return super(SeriesAggregator, self).process(*args, **kwargs) 
 
 
 

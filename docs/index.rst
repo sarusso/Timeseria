@@ -58,6 +58,4 @@ Other resources
 
 * `GitHub <https://github.com/sarusso/Timeseria>`_
 
-* `Travis <https://travis-ci.org/sarusso/Timeseria>`_
-
 * `License <https://github.com/sarusso/Timeseria/blob/master/LICENSE>`_

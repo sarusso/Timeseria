@@ -3,7 +3,7 @@
 
 from .time import s_from_dt , dt_from_s, UTC, timezonize
 from .units import Unit, TimeUnit
-from .utilities import is_close, to_time_unit_string
+from .utilities import _is_close, _to_time_unit_string
 from copy import deepcopy
 from pandas import DataFrame
 from datetime import datetime
@@ -54,19 +54,35 @@ class Point():
         return self.__repr__()
 
     def __eq__(self, other):
-        if not self.coordinates == other.coordinates:
-            return False
-        for i in range(0, len(self.coordinates)):
-            if self.coordinates[i] != other.coordinates[i]:
+        try:
+            if not self.coordinates == other.coordinates:
                 return False
-        return True
+            for i in range(0, len(self.coordinates)):
+                if self.coordinates[i] != other.coordinates[i]:
+                    return False
+            return True
+        except (AttributeError, IndexError):
+            return False
     
+    def __gt__(self, other):
+        if len(self.coordinates) > 1:
+            raise ValueError('Comparing multi-dimensional points does not make sense')
+        else:
+            try:
+                if len(other.coordinates) > 1:
+                    raise ValueError('Comparing multi-dimensional points does not make sense')
+                else:
+                    return self.coordinates[0] > other.coordinates[0]
+            except AttributeError:
+                return self.coordinates[0] > other
+
     def __getitem__(self,index):
         return self.coordinates[index]
 
 
 class TimePoint(Point):
-    """A point in the time dimension.
+    """A point in the time dimension. Can be initialized using the special `t` and `dt` arguments,
+    for epoch seconds and datetime objects, respectively.
     
        Args:
            t (float): epoch timestamp, decimals for sub-second precision.
@@ -155,7 +171,7 @@ class TimePoint(Point):
     
 
 class DataPoint(Point):
-    """A point that carries some data.
+    """A point that carries some data. Data is attached using the respective data arguments.
     
        Args:
            *args (list): the coordinates.
@@ -207,8 +223,11 @@ class DataPoint(Point):
             return 'Point @ {} with data "{}"'.format(self.__coordinates_repr__, self.data)
     
     def __eq__(self, other):
-        if self._data != other._data:
-            return False
+        try:
+            if self._data != other._data:
+                return False
+        except AttributeError:
+            pass
         return super(DataPoint, self).__eq__(other)
 
     @property
@@ -238,16 +257,32 @@ class DataPoint(Point):
             return None
         
     def data_labels(self):
-        """Return the data labels. If data is a dictionary, then these are the dictionary keys,
-        if data is a list, then these are the list indexes. Other formats are not supported."""
+        """Return the data labels. If data is a dictionary, then these are the dictionary keys, if data 
+        is list-like, then these are the list indexes (as strings). Other formats are not supported."""
         try:
             return sorted(list(self.data.keys()))
         except AttributeError:
-            return list(range(len(self.data)))
+            return [str(i) for i in range(len(self.data))]
+
+    def _data_by_label(self, label):
+        try:
+            return self.data[label]
+        except TypeError:
+            try:
+                return self.data[int(label)]
+            except TypeError:
+                raise TypeError('Cannot get an element by label on non-indexed data')
+
+    def _data_keys(self):
+        try:
+            return sorted(list(self.data.keys()))
+        except AttributeError:
+            return [i for i in range(len(self.data))]
 
 
 class DataTimePoint(DataPoint, TimePoint):
-    """A point that carries some data in the time dimension.
+    """A point that carries some data in the time dimension. Can be initialized using the special `t` and `dt` arguments,
+    for epoch seconds and datetime objects, respectively. Data is attached using the respective data arguments.
     
        Args:
            t (float): epoch timestamp, decimals for sub-second precision.
@@ -272,7 +307,7 @@ class DataTimePoint(DataPoint, TimePoint):
 #======================
 
 class Slot():
-    """A slot. Can be initialized with start and end, or start and unit.
+    """A slot. Can be initialized with start and end or start and unit.
     
        Args:
            start(Point): the slot starting point.
@@ -365,9 +400,8 @@ class Slot():
 
 
 class TimeSlot(Slot):
-    """A slot in the time dimension. Can be initialized with start and end,
-       or start and unit. Can be also initialized using t, dt and tz, for the
-       starting point but mainly for internal use and should not be relied upon.
+    """A slot in the time dimension. Can be initialized with start and end
+       or start and unit.
     
        Args:
            start(TimePoint): the slot starting time point.
@@ -376,7 +410,12 @@ class TimeSlot(Slot):
 
     __POINT_TYPE__ = TimePoint
 
-    def __init__(self, start=None, end=None, unit=None, t=None, dt=None, tz=None):
+    def __init__(self, start=None, end=None, unit=None, **kwargs):
+        
+        # Internal-use init
+        t = kwargs.get('t', None)
+        dt = kwargs.get('dt', None)
+        tz = kwargs.get('tz', None)
         
         # Handle t and dt shortcuts
         if t:
@@ -415,7 +454,7 @@ class TimeSlot(Slot):
     def __succedes__(self, other):
         if other.end.t != self.start.t:
             # Take into account floating point rounding errors
-            if is_close(other.end.t, self.start.t):
+            if _is_close(other.end.t, self.start.t):
                 return True
             return False
         else:
@@ -453,7 +492,7 @@ class TimeSlot(Slot):
 
 class DataSlot(Slot):
     """A slot that carries some data. Can be initialized with start and end
-       or start and unit, plus the data argument.
+       or start and unit, plus the data arguments.
     
        Args:
            start(Point): the slot starting point.
@@ -538,19 +577,32 @@ class DataSlot(Slot):
             return None
 
     def data_labels(self):
-        """Return the data labels. If data is a dictionary, then these are the dictionary keys,
-        if data is a list, then these are the list indexes. Other formats are not supported."""
+        """Return the data labels. If data is a dictionary, then these are the dictionary keys, if data 
+        is list-like, then these are the list indexes (as strings). Other formats are not supported."""
         try:
             return sorted(list(self.data.keys()))
         except AttributeError:
-            return list(range(len(self.data)))    
+            return [str(i) for i in range(len(self.data))]
+
+    def _data_keys(self):
+        try:
+            return sorted(list(self.data.keys()))
+        except AttributeError:
+            return [i for i in range(len(self.data))]
+
+    def _data_by_label(self, label):
+        try:
+            return self.data[label]
+        except TypeError:
+            try:
+                return self.data[int(label)]
+            except TypeError:
+                raise TypeError('Cannot get an element by label on non-indexed data')
 
 
 class DataTimeSlot(DataSlot, TimeSlot):
     """A slot that carries some data in the time dimension. Can be initialized
-       with start and end, or start and unit, plus the data argument. Can be also
-       initialized using t, dt and tz, for the starting point but mainly for internal
-       use and should not be relied upon.
+       with start and end or start and unit, plus the data arguments.
     
        Args:
            start(TimePoint): the slot starting time point.
@@ -575,7 +627,7 @@ class DataTimeSlot(DataSlot, TimeSlot):
 class Series(list):
     """A list of items coming one after another, where every item
        is guaranteed to be of the same type and in order or succession.
-       
+
        Args:
            *args: the series items.    
     """
@@ -584,9 +636,6 @@ class Series(list):
     # 5,6,7 are integer succession. 5.3, 5.4, 5.5 are too in a succesisons. 5,6,8 are not in a succession. 
     # a group or a number of related or similar things, events, etc., arranged or occurring in temporal, spatial, or other order or succession; sequence.
 
-    # By default the type is not defined
-    __TYPE__ = None
-    
     def __init__(self, *args, **kwargs):
 
         if kwargs:
@@ -597,6 +646,14 @@ class Series(list):
             
         self._title = None
 
+    @property
+    def items_type(self):
+        """The type of the items of the series."""
+        if not self:
+            return None
+        else:
+            return self[0].__class__
+
     def append(self, item):
         """Append an item to the series. Accepts only items of the same
         type of the items already present in the series (unless empty)"""
@@ -605,13 +662,10 @@ class Series(list):
         
         # logger.debug('Checking %s', item)
         
-        # Set type if not already done
-        if not self.__TYPE__:
-            self.__TYPE__ = type(item)
-
         # Check type
-        if not isinstance(item, self.__TYPE__):
-            raise TypeError('Got incompatible type "{}", can only accept "{}"'.format(item.__class__.__name__, self.__TYPE__.__name__))
+        if self.items_type:
+            if not isinstance(item, self.items_type):
+                raise TypeError('Got incompatible type "{}", can only accept "{}"'.format(item.__class__.__name__, self.items_type.__name__))
         
         # Check order or succession
         try:
@@ -626,6 +680,7 @@ class Series(list):
                         raise ValueError('Not in order ("{}" does not follow "{}")'.format(item,self[-1])) from None
                 except TypeError:
                     raise TypeError('Object of class "{}" does not implement a "__gt__" or a "__succedes__" method, cannot append it to a Series (which is ordered)'.format(item.__class__.__name__)) from None
+
         except IndexError:
             pass
 
@@ -640,7 +695,7 @@ class Series(list):
                         raise ValueError('Got different data lengths: {} vs {}'.format(len(self._item_data_reference), len(item.data)))
                 if isinstance(self._item_data_reference, dict):
                     if set(self._item_data_reference.keys()) != set(item.data.keys()):
-                        raise ValueError('Got different data keys: {} vs {}'.format(self._item_data_reference.keys(), item.data.keys()))
+                        raise ValueError('Got different data labels: {} vs {}'.format(self._item_data_reference.keys(), item.data.keys()))
         except AttributeError:
             # logger.debug('Setting data reference: %s', item.data)
             try:
@@ -677,8 +732,8 @@ class Series(list):
         
     # Python slice (i.e [0:35])
     def __getitem__(self, key):
-        if isinstance(key, slice):   
-            # TODO: improve and implement shallow copies please.         
+        if isinstance(key, slice):
+            # TODO: improve and implement shallow copies please. Consider using the _TimeSeriesSlice class (as SeriesSlice)
             indices = range(*key.indices(len(self)))
             series = self.__class__()
             for i in indices:
@@ -688,8 +743,8 @@ class Series(list):
             except:
                 pass
             return series
-        elif isinstance(key, str):   
-            # Try filtering on this data key only
+        elif isinstance(key, str):
+            # Try filtering on this data label only
             return self.filter(key)
         else:
             return super(Series, self).__getitem__(key)
@@ -766,8 +821,8 @@ class Series(list):
         if len(self) > 0:
             
             # Check valid type
-            if not isinstance(x, self.__TYPE__):
-                raise TypeError('Got incompatible type "{}", can only accept "{}"'.format(x.__class__.__name__, self.__TYPE__.__name__))
+            if not isinstance(x, self.items_type):
+                raise TypeError('Got incompatible type "{}", can only accept "{}"'.format(x.__class__.__name__, self.items_type.__name__))
         
             # Check ordering/succession
             if i == 0:
@@ -870,10 +925,136 @@ class Series(list):
         """Disabled (reversing is not compatible with an ordering)."""
         raise NotImplementedError('Reversing is not compatible with an ordering')
 
-    # Operations
     def duplicate(self):
         """ Return a deep copy of the series."""
         return deepcopy(self)
+
+
+    #=========================
+    #  Data-related
+    #=========================
+
+    def data_labels(self):
+        """Returns the labels of the data carried by the series points or slots. If data is a dictionary,
+        then these are the dictionary keys, if data  is list-like, then these are the list indexes
+        (as strings). Other formats are not supported."""
+        if len(self) > 0 and not self._item_data_reference:
+            raise TypeError('Series items have no data, cannot get data labels')
+        if len(self) == 0:
+            return None
+        else:
+            return self[0].data_labels()
+
+    def _data_keys(self):
+        if len(self) > 0 and not self._item_data_reference:
+            raise TypeError('Series items have no data, cannot get data keys')
+        if len(self) == 0:
+            return None
+        else:
+            return self[0]._data_keys()
+    
+    def rename_data_label(self, old_data_label, new_data_label):
+        """Rename a data label, in-place."""
+        if len(self) > 0 and not self._item_data_reference:
+            raise TypeError('Series items have no data, cannot rename a label')
+        for item in self:
+            # TODO: move to the DataPoint/DataSlot?
+            item.data[new_data_label] = item.data.pop(old_data_label)
+
+    def remove_data_loss(self):
+        """Remove the ``data_loss`` index, in-place."""
+        if len(self) > 0 and not self._item_data_reference:
+            raise TypeError('Series items have no data, cannot remove the data loss')
+        for item in self:
+            item.data_indexes.pop('data_loss', None)
+
+    def remove_data_index(self, data_index):
+        """Remove a data index, in-place."""
+        if len(self) > 0 and not self._item_data_reference:
+            raise TypeError('Series items have no data, cannot rename data indexes')
+        for item in self:
+            item.data_indexes.pop(data_index, None)     
+
+
+    #=========================
+    #  Operations
+    #=========================
+
+    def min(self, *args, **kwargs):
+        """Get the minimum data value(s) of a series. Supports an optional ``data_label`` argument.
+        A series of DataPoints or DataSlots is required."""
+        from .operations import min as min_operation
+        return min_operation(self, *args, **kwargs)
+
+    def max(self, *args, **kwargs):
+        """Get the maximum data value(s) of a series. Supports an optional ``data_label`` argument.
+        A series of DataPoints or DataSlots is required."""
+        from .operations import max as max_operation
+        return max_operation(self, *args, **kwargs)    
+
+    def avg(self, *args, **kwargs):
+        """Get the average data value(s) of a series. Supports an optional ``data_label`` argument.
+        A series of DataPoints or DataSlots is required."""
+        from .operations import avg as avg_operation
+        return avg_operation(self, *args, **kwargs)   
+
+    def sum(self, *args, **kwargs):
+        """Sum every data value(s) of a series. Supports an optional ``data_label`` argument.
+        A series of DataPoints or DataSlots is required."""
+        from .operations import sum as sum_operation
+        return sum_operation(self, *args, **kwargs)  
+
+    def derivative(self, *args, **kwargs):
+        """Compute the derivative of the series. Extra parameters: ``inplace`` (defaulted to false),
+        ``normalize`` (defaulted to true), ``diffs`` (defaulted to false) to compute differences
+        instead of the derivative. A series of DataTimePoints or DataTimeSlots is required."""
+        from .operations import derivative as derivative_operation
+        return derivative_operation(self, *args, **kwargs)   
+
+    def integral(self, *args, **kwargs):
+        """Compute the integral of the series. Extra parameters: ``inplace`` (defaulted to false),
+        ``normalize`` (defaulted to true), ``c`` (defaulted to zero) for the integration constant.
+        A series of DataTimePoints or DataTimeSlots is required."""
+        from .operations import integral as integral_operation
+        return integral_operation(self, *args, **kwargs)   
+
+    def diff(self, *args, **kwargs):
+        """Compute the incremental differences. Extra parameters: ``inplace`` (defaulted to false).
+        A series of DataPoints or DataSlots is required."""
+        from .operations import diff as diff_operation
+        return diff_operation(self, *args, **kwargs)   
+
+    def csum(self, *args, **kwargs):
+        """Compute the incremental sum. Extra parameters: ``inplace`` (defaulted to false),
+        ``offset`` (defaulted to zero) to set the starting value where to apply the sums on.
+        A series of DataPoints or DataSlots is required."""
+        from .operations import csum as csum_operation
+        return csum_operation(self, *args, **kwargs)
+
+    def normalize(self, *args, **kwargs):
+        """Normalize the series data values. Extra parameters: ``inplace`` (defaulted to false).
+        A series of DataPoints or DataSlots is required."""
+        from .operations import normalize as normalize_operation
+        return normalize_operation(self, *args, **kwargs)   
+
+    def rescale(self, *args, **kwargs):
+        """Rescale the series data values. Extra parameters: ``inplace`` (defaulted to false).
+        A series of DataPoints or DataSlots is required."""
+        from .operations import rescale as rescale_operation
+        return rescale_operation(self, *args, **kwargs)
+
+    def offset(self, *args, **kwargs):
+        """Offset the series data values. Extra parameters: ``inplace`` (defaulted to false).
+        A series of DataPoints or DataSlots is required."""
+        from .operations import offset as offset_operation
+        return offset_operation(self, *args, **kwargs)  
+
+    def mavg(self, *args, **kwargs):
+        """Compute the moving average. Extra parameters: ``inplace`` (defaulted to false)
+        and ``window``, a required parameter, for the length of the moving average window.
+        A series of DataPoints or DataSlots is required."""
+        from .operations import mavg as mavg_operation
+        return mavg_operation(self, *args, **kwargs)
 
     def merge(self, *args, **kwargs):
         """Merge the series with one or more other series."""
@@ -881,18 +1062,42 @@ class Series(list):
         return merge_operation(self, *args, **kwargs)
 
     def filter(self, *args, **kwargs):
-        # TODO: refactor this to allow generic item properties? Maybe merge with the select operation? cfr same op in the time series below
-        """Filter a time series given one or more properties of its elements, e.g. by ``data_label``."""
+        # TODO: refactor this to allow generic item properties?
+        """Filter a series data, e.g. by ``data_label``. A series of DataPoints or DataSlots is required."""
         from .operations import filter as filter_operation
         return filter_operation(self, *args, **kwargs) 
 
+    def slice(self, *args, **kwargs):
+        """Slice a series."""
+        from .operations import slice as slice_operation
+        return slice_operation(self, *args, **kwargs) 
+
     def select(self, *args, **kwargs):
-        """Select one or more items of the time series given an SQL-like query."""
+        """Select one or more items of the series given an SQL-like query. A series of DataPoints or DataSlots is required."""
         from .operations import select as select_operation
         return select_operation(self, *args, **kwargs)
-    
-    # Inspection utilities
 
+
+    #=========================
+    #  Transformations
+    #=========================
+    def aggregate(self, unit, *args, **kwargs):
+        """Aggregate the series in slots of length set by the ``unit`` parameter. A series of DataPoints or DataSlots is required.""" 
+        from .transformations import SeriesAggregator
+        aggregator = SeriesAggregator(unit, *args, **kwargs)
+        return aggregator.process(self)  
+
+    def resample(self, unit, *args, **kwargs):
+        """Resample the series using a sampling interval of length set by the ``unit`` parameter. A series of DataPoints or DataSlots is required."""
+        from .transformations import SeriesResampler
+        resampler = SeriesResampler(unit, *args, **kwargs)
+        return resampler.process(self) 
+
+
+    #=========================
+    # Inspection utilities
+    #=========================
+    
     def _summary(self, limit=10):
 
         string = str(self)+':\n\n'
@@ -1008,14 +1213,6 @@ class TimeSeries(Series):
             else:
                 raise ConsistencyException('Got no TimePoints nor TimeSlots in a Time Series, this is a consistency error (got {})'.format(self.items_type.__name__))
     
-    @property
-    def items_type(self):
-        """The type of the items of the time series."""
-        if not self:
-            raise ValueError('The series is empty and has no items')
-        else:
-            return self[0].__class__
-
     #=========================
     #  Init
     #=========================
@@ -1172,7 +1369,7 @@ class TimeSeries(Series):
                         self._resolution_as_seconds = item.t - self.prev_t 
                         
                         # Set the resolution
-                        self._resolution = TimeUnit(to_time_unit_string(item.t - self.prev_t, friendlier=True))
+                        self._resolution = TimeUnit(_to_time_unit_string(item.t - self.prev_t, friendlier=True))
                                         
                     else:
                         # If the resolution is constant (not variable), check that it still is
@@ -1211,7 +1408,7 @@ class TimeSeries(Series):
                     # Try for floating point precision errors
                     abort = False
                     try:
-                        if not is_close(self._resolution.value, item.unit.value):
+                        if not _is_close(self._resolution.value, item.unit.value):
                             abort = True
                     except (TypeError, ValueError):
                         abort = True
@@ -1322,7 +1519,7 @@ class TimeSeries(Series):
             try:
                 self._guessed_resolution
             except AttributeError:
-                self._guessed_resolution = TimeUnit(to_time_unit_string(self._autodetected_sampling_interval, friendlier=True))
+                self._guessed_resolution = TimeUnit(_to_time_unit_string(self._autodetected_sampling_interval, friendlier=True))
             finally:
                 if confidence:
                     return {'value': self._guessed_resolution, 'confidence': self._autodetected_sampling_interval_confidence}
@@ -1335,154 +1532,12 @@ class TimeSeries(Series):
             resolution_string = 'undefined resolution'
         else:
             if self.resolution == 'variable':
-                autodetected_sampling_interval_as_str = TimeUnit(to_time_unit_string(self._autodetected_sampling_interval, friendlier=True))
+                autodetected_sampling_interval_as_str = TimeUnit(_to_time_unit_string(self._autodetected_sampling_interval, friendlier=True))
                 resolution_string = 'variable resolution (~{})'.format(autodetected_sampling_interval_as_str)
             else:
                 resolution_string = '{} resolution'.format(self.resolution)
         return resolution_string
 
-
-    #=========================
-    #  Data-related
-    #=========================
-
-    def data_labels(self):
-        """Returns the labels of the data carried by the points or slots.
-        If data is a dictionary, then these are the dictionary keys,
-        if data is a list, then these are the list indexes. Other
-        data formats are not supported."""
-        if len(self) > 0 and not self._item_data_reference:
-            raise TypeError('Time series items have no data, cannot get data labels')
-        if len(self) == 0:
-            return None
-        else:
-            # TODO: can we optimize here? Computing them once and then serving them does not work if someone changes data keys...
-            try:
-                return sorted(list(self[0].data.keys()))
-            except AttributeError:
-                return list(range(len(self[0].data)))
-
-    def rename_data_label(self, old_key, new_key):
-        """Rename a data key, in-place."""
-        if len(self) > 0 and not self._item_data_reference:
-            raise TypeError('Time series items have no data, cannot rename a label')
-        for item in self:
-            # TODO: move to the DataPoint/DataSlot?
-            item.data[new_key] = item.data.pop(old_key)
-
-    def remove_data_loss(self):
-        """Remove the ``data_loss`` index, in-place."""
-        if len(self) > 0 and not self._item_data_reference:
-            raise TypeError('Time series items have no data, cannot remove the data loss')
-        for item in self:
-            item.data_indexes.pop('data_loss', None)
-
-    def remove_data_index(self, data_index):
-        """Remove a data index, in-place."""
-        if len(self) > 0 and not self._item_data_reference:
-            raise TypeError('Time series items have no data, cannot rename data indexes')
-        for item in self:
-            item.data_indexes.pop(data_index, None)        
-
-
-    #=========================
-    #  Operations
-    #=========================
-
-    def min(self, *args, **kwargs):
-        """Get the minimum data value(s) of a series. Supports an optional ``data_label`` argument."""
-        if len(self) > 0 and not self._item_data_reference:
-            raise TypeError('Time series items have no data, cannot compute any operation')
-        from .operations import min as min_operation
-        return min_operation(self, *args, **kwargs)
-
-    def max(self, *args, **kwargs):
-        """Get the maximum data value(s) of a series. Supports an optional ``data_label`` argument."""
-        if len(self) > 0 and not self._item_data_reference:
-            raise TypeError('Time series items have no data, cannot compute any operation')
-        from .operations import max as max_operation
-        return max_operation(self, *args, **kwargs)    
-
-    def avg(self, *args, **kwargs):
-        """Get the average data value(s) of a series. Supports an optional ``data_label`` argument."""
-        if len(self) > 0 and not self._item_data_reference:
-            raise TypeError('Time series items have no data, cannot compute any operation')
-        from .operations import avg as avg_operation
-        return avg_operation(self, *args, **kwargs)   
-
-    def sum(self, *args, **kwargs):
-        """Sum every data value(s) of a series. Supports an optional ``data_label`` argument."""
-        if len(self) > 0 and not self._item_data_reference:
-            raise TypeError('Time series items have no data, cannot compute any operation')
-        from .operations import sum as sum_operation
-        return sum_operation(self, *args, **kwargs)  
-
-    def derivative(self, *args, **kwargs):
-        """Compute the derivative of the series. Extra parameters: ``inplace`` (defaulted to false),
-        ``normalize`` (defaulted to true), ``diffs`` (defaulted to false) to compute differences
-        instead of the derivative."""
-        if len(self) > 0 and not self._item_data_reference:
-            raise TypeError('Time series items have no data, cannot compute any operation')
-        from .operations import derivative as derivative_operation
-        return derivative_operation(self, *args, **kwargs)   
-
-    def integral(self, *args, **kwargs):
-        """Compute the integral of the series. Extra parameters: ``inplace`` (defaulted to false),
-        ``normalize`` (defaulted to true), ``c`` (defaulted to zero) for the integration constant."""
-        if len(self) > 0 and not self._item_data_reference:
-            raise TypeError('Time series items have no data, cannot compute any operation')
-        from .operations import integral as integral_operation
-        return integral_operation(self, *args, **kwargs)   
-
-    def diff(self, *args, **kwargs):
-        """Compute the incremental differences. Extra parameters: ``inplace`` (defaulted to false)."""
-        if len(self) > 0 and not self._item_data_reference:
-            raise TypeError('Time series items have no data, cannot compute any operation')
-        from .operations import diff as diff_operation
-        return diff_operation(self, *args, **kwargs)   
-
-    def csum(self, *args, **kwargs):
-        """Compute the incremental sum. Extra parameters: ``inplace`` (defaulted to false),
-        ``offset`` (defaulted to zero) to set the starting value where to apply the sums on."""
-        if len(self) > 0 and not self._item_data_reference:
-            raise TypeError('Time series items have no data, cannot compute any operation')
-        from .operations import csum as csum_operation
-        return csum_operation(self, *args, **kwargs)
-
-    def normalize(self, *args, **kwargs):
-        """Normalize the time series data values. Extra parameters: ``inplace`` (defaulted to false)."""
-        if len(self) > 0 and not self._item_data_reference:
-            raise TypeError('Time series items have no data, cannot compute any operation')
-        from .operations import normalize as normalize_operation
-        return normalize_operation(self, *args, **kwargs)   
-
-    def rescale(self, *args, **kwargs):
-        """Rescale the time series data values. Extra parameters: ``inplace`` (defaulted to false)."""
-        if len(self) > 0 and not self._item_data_reference:
-            raise TypeError('Time series items have no data, cannot compute any operation')
-        from .operations import rescale as rescale_operation
-        return rescale_operation(self, *args, **kwargs)
-
-    def offset(self, *args, **kwargs):
-        """Offset the time series data values. Extra parameters: ``inplace`` (defaulted to false)."""
-        if len(self) > 0 and not self._item_data_reference:
-            raise TypeError('Time series items have no data, cannot compute any operation')
-        from .operations import offset as offset_operation
-        return offset_operation(self, *args, **kwargs)  
-
-    def mavg(self, *args, **kwargs):
-        """Compute the moving average. Extra parameters: ``inplace`` (defaulted to false)
-        and ``window``, a required parameter, for the length of the moving average window."""
-        if len(self) > 0 and not self._item_data_reference:
-            raise TypeError('Time series items have no data, cannot compute any operation')
-        from .operations import mavg as mavg_operation
-        return mavg_operation(self, *args, **kwargs)
-    
-    def filter(self, *args, **kwargs):
-        # TODO: refactor this to allow generic item properties? Maybe merge with the select operation? cfr same op in the series above
-        """Filter a time series given one or more properties of its elements. Example filtering arguments: ``data_label``, ``from_t``, ``to_t``, ``from_dt``, ``to_dt``."""
-        from .operations import filter as filter_operation
-        return filter_operation(self, *args, **kwargs) 
 
     #=========================
     #  Conversion-related
@@ -1535,26 +1590,6 @@ class TimeSeries(Series):
             raise ValueError('Unknown plotting engine "{}'.format(engine))
 
 
-    #=========================
-    #  Transformations
-    #=========================
-    def aggregate(self, unit, *args, **kwargs):
-        """Aggregate the time series in slots of a length set by the ``unit`` parameter."""
-        if len(self) > 0 and not self._item_data_reference:
-            raise TypeError('Time series items have no data, cannot compute any transformation')
-        from .transformations import Aggregator
-        aggregator = Aggregator(unit, *args, **kwargs)
-        return aggregator.process(self)  
-
-    def resample(self, unit, *args, **kwargs):
-        """Resample the time series using a sampling interval of a length set by the ``unit`` parameter."""
-        if len(self) > 0 and not self._item_data_reference:
-            raise TypeError('Time series items have no data, cannot compute any transformation')
-        from .transformations import Resampler
-        resampler = Resampler(unit, *args, **kwargs)
-        return resampler.process(self) 
-   
-
 
 #==============================
 #  Time Series slice
@@ -1565,7 +1600,7 @@ class _TimeSeriesSlice(TimeSeries):
     
     :meta private:
     """
-    def __init__(self, series, from_i, to_i, from_t=None, to_t=None, dense=False, Interpolator=None):
+    def __init__(self, series, from_i, to_i, from_t=None, to_t=None, dense=False, interpolator_class=None):
         self.series = series
         self.from_i = from_i
         self.to_i = to_i
@@ -1575,9 +1610,9 @@ class _TimeSeriesSlice(TimeSeries):
         self.to_t=to_t
         self.dense=dense
         if self.dense:
-            if not Interpolator:
+            if not interpolator_class:
                 raise ValueError('If requesting a dense slice you must provide an interpolator')
-            self.interpolator = Interpolator(series)
+            self.interpolator = interpolator_class(series)
         else:
             self.interpolator = None
     
@@ -1699,6 +1734,9 @@ class _TimeSeriesSlice(TimeSeries):
 
     def data_labels(self):
         return self.series.data_labels()
+    
+    def _data_keys(self):
+        return self.series._data_keys()        
 
 
 

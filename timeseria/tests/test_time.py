@@ -1,7 +1,7 @@
 import unittest
 import datetime
 import pytz
-from ..time import dt, correct_dt_dst, dt_to_str, dt_from_str, s_from_dt, dt_from_s, as_timezone, timezonize
+from ..time import dt, correct_dt_dst, dt_to_str, dt_from_str, s_from_dt, dt_from_s, as_tz, timezonize
 from pandas import Timestamp as PandasTimestamp
 
 # Setup logging
@@ -153,7 +153,7 @@ class TestTime(unittest.TestCase):
 
 
     def test_as_timezone(self):
-        self.assertEqual(str(as_timezone(dt_from_str('1986-08-01T16:46:00.362752+02:00'), 'UTC')), '1986-08-01 14:46:00.362752+00:00')
+        self.assertEqual(str(as_tz(dt_from_str('1986-08-01T16:46:00.362752+02:00'), 'UTC')), '1986-08-01 14:46:00.362752+00:00')
 
 
     def tearDown(self):

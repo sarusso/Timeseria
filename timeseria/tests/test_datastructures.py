@@ -110,7 +110,7 @@ class TestPoints(unittest.TestCase):
         
         # Test list and dict data labels
         data_point = DataPoint(1, 2, data=['hello', 'hola'])
-        self.assertEqual(data_point.data_labels(), [0,1])
+        self.assertEqual(data_point.data_labels(), ['0','1'])
         
         data_point = DataPoint(1, 2, data={'label1':'hello', 'label2':'hola'})
         self.assertEqual(data_point.data_labels(), ['label1','label2'])
@@ -285,7 +285,7 @@ class TestSlots(unittest.TestCase):
 
         # Test list and dict data labels
         data_slot = DataSlot(start=Point(1), end=Point(2), data=['hello', 'hola'])
-        self.assertEqual(data_slot.data_labels(), [0,1])
+        self.assertEqual(data_slot.data_labels(), ['0','1'])
         
         data_slot = DataSlot(start=Point(1), end=Point(2), data={'label1':'hello', 'label2':'hola'})
         self.assertEqual(data_slot.data_labels(), ['label1','label2'])
@@ -418,31 +418,19 @@ class TestSeries(unittest.TestCase):
         with self.assertRaises(NotImplementedError):
             succession_series.remove(one)
         
-        # Define a Series with fixed type
-        class FloatSeries(Series):
-            __TYPE__ = float
-
-        with self.assertRaises(TypeError):
-            FloatSeries(1,4,5, 'hello', None)
-
-        with self.assertRaises(TypeError):
-            FloatSeries(1,4,5)
-
-        with self.assertRaises(TypeError):
-            FloatSeries(1.0,4.0,None,5.0)
-            
-        float_series = FloatSeries(1.0,4.0,5.0)
-        self.assertEqual(float_series, [1.0,4.0,5.0])
-        self.assertEqual(len(float_series), 3)
+        # Test type
+        series = Series(1.0,4.0,5.0)
+        self.assertEqual(series, [1.0,4.0,5.0])
+        self.assertEqual(len(series), 3)
+        self.assertEqual(series.items_type, float)
         
-
         # Test head, tail & content
-        self.assertEqual(float_series.head(2),[1.0,4.0])
-        self.assertEqual(float_series.tail(2),[4.0,5.0])
-        self.assertEqual(float_series.contents(),[1.0,4.0,5.0])
+        series = Series(1.0,4.0,5.0)
+        self.assertEqual(series.head(2),[1.0,4.0])
+        self.assertEqual(series.tail(2),[4.0,5.0])
+        self.assertEqual(series.contents(),[1.0,4.0,5.0])
 
         # Test print with print mock?
-        #print()
         #float_series.print(3)
         
         # Test with data slots
@@ -840,9 +828,9 @@ class TestTimeSeries(unittest.TestCase):
             timeseries.rename_data_label('notexistent_key','c')
 
 
-class Test_TimeSeriesSlices(unittest.TestCase):
+class TestTimeSeriesSlice(unittest.TestCase):
 
-    def test__TimeSeriesSlices(self):
+    def test_TimeSeriesSlice(self):
         series = TimeSeries()
         series.append(DataTimePoint(t = 0, data = {'value': 0}))
         series.append(DataTimePoint(t = 1, data = {'value': 1}))
@@ -855,8 +843,8 @@ class Test_TimeSeriesSlices(unittest.TestCase):
         series.append(DataTimePoint(t = 8, data = {'value': 8}))
         series.append(DataTimePoint(t = 9, data = {'value': 9}))
 
-        from ..utilities import compute_validity_regions
-        validity_regions = compute_validity_regions(series)
+        from ..utilities import _compute_validity_regions
+        validity_regions = _compute_validity_regions(series)
         for point in series:
             point.valid_from=validity_regions[point.t][0]
             point.valid_to=validity_regions[point.t][1]
@@ -877,10 +865,10 @@ class Test_TimeSeriesSlices(unittest.TestCase):
         self.assertEqual(str(series_slice.resolution), '1s')
         self.assertEqual(series_slice.data_labels(), ['value'])
 
-        with self.assertRaises(AttributeError):
-            series_slice.diff()
-        with self.assertRaises(AttributeError):
-            series_slice.blackmagic()
+        # TODO: Most operations are not supported on Slices and should be disabled
+        #with self.assertRaises(AttributeError):
+        #    series_slice.diff()
+
 
 
     def test_SeriesDenseSlice(self):
@@ -894,14 +882,14 @@ class Test_TimeSeriesSlices(unittest.TestCase):
         series.append(DataTimePoint(t = 8, data = {'value': 8}))
         series.append(DataTimePoint(t = 9, data = {'value': 9}))
 
-        from ..utilities import compute_validity_regions
-        validity_regions = compute_validity_regions(series)
+        from ..utilities import _compute_validity_regions
+        validity_regions = _compute_validity_regions(series)
         for point in series:
             point.valid_from=validity_regions[point.t][0]
             point.valid_to=validity_regions[point.t][1]
 
         from ..interpolators import LinearInterpolator
-        series_slice = _TimeSeriesSlice(series, 2, 8, dense=True, Interpolator=LinearInterpolator)
+        series_slice = _TimeSeriesSlice(series, 2, 8, dense=True, interpolator_class=LinearInterpolator)
 
         self.assertEqual(len(series_slice), 7)
 

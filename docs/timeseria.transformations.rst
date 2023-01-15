@@ -18,11 +18,13 @@
    .. autosummary::
 
       Transformation
-      TimeSeriesTransformation
+      SeriesTransformation
       
       Resampler
+      SeriesResampler
+      
       Aggregator
-   
+      SeriesAggregator
    
 
    
