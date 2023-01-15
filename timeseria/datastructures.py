@@ -81,7 +81,8 @@ class Point():
 
 
 class TimePoint(Point):
-    """A point in the time dimension.
+    """A point in the time dimension. Can be initialized using the special `t` and `dt` arguments,
+    for epoch seconds and datetime objects, respectively.
     
        Args:
            t (float): epoch timestamp, decimals for sub-second precision.
@@ -170,7 +171,7 @@ class TimePoint(Point):
     
 
 class DataPoint(Point):
-    """A point that carries some data.
+    """A point that carries some data. Data is attached using the respective data arguments.
     
        Args:
            *args (list): the coordinates.
@@ -265,7 +266,8 @@ class DataPoint(Point):
 
 
 class DataTimePoint(DataPoint, TimePoint):
-    """A point that carries some data in the time dimension.
+    """A point that carries some data in the time dimension. Can be initialized using the special `t` and `dt` arguments,
+    for epoch seconds and datetime objects, respectively. Data is attached using the respective data arguments.
     
        Args:
            t (float): epoch timestamp, decimals for sub-second precision.
@@ -290,7 +292,7 @@ class DataTimePoint(DataPoint, TimePoint):
 #======================
 
 class Slot():
-    """A slot. Can be initialized with start and end, or start and unit.
+    """A slot. Can be initialized with start and end or start and unit.
     
        Args:
            start(Point): the slot starting point.
@@ -383,9 +385,8 @@ class Slot():
 
 
 class TimeSlot(Slot):
-    """A slot in the time dimension. Can be initialized with start and end,
-       or start and unit. Can be also initialized using t, dt and tz, for the
-       starting point but mainly for internal use and should not be relied upon.
+    """A slot in the time dimension. Can be initialized with start and end
+       or start and unit.
     
        Args:
            start(TimePoint): the slot starting time point.
@@ -394,7 +395,12 @@ class TimeSlot(Slot):
 
     __POINT_TYPE__ = TimePoint
 
-    def __init__(self, start=None, end=None, unit=None, t=None, dt=None, tz=None):
+    def __init__(self, start=None, end=None, unit=None, **kwargs):
+        
+        # Internal-use init
+        t = kwargs.get('t', None)
+        dt = kwargs.get('dt', None)
+        tz = kwargs.get('tz', None)
         
         # Handle t and dt shortcuts
         if t:
@@ -471,7 +477,7 @@ class TimeSlot(Slot):
 
 class DataSlot(Slot):
     """A slot that carries some data. Can be initialized with start and end
-       or start and unit, plus the data argument.
+       or start and unit, plus the data arguments.
     
        Args:
            start(Point): the slot starting point.
@@ -566,9 +572,7 @@ class DataSlot(Slot):
 
 class DataTimeSlot(DataSlot, TimeSlot):
     """A slot that carries some data in the time dimension. Can be initialized
-       with start and end, or start and unit, plus the data argument. Can be also
-       initialized using t, dt and tz, for the starting point but mainly for internal
-       use and should not be relied upon.
+       with start and end or start and unit, plus the data arguments.
     
        Args:
            start(TimePoint): the slot starting time point.
