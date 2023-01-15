@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Series transformations as resampling and aggregation."""
 
-from .time import dt_from_s, s_from_dt, as_timezone
+from .time import dt_from_s, s_from_dt, as_tz
 from .datastructures import DataTimeSlot, TimePoint, DataTimePoint, Series, TimeSeries, _TimeSeriesSlice
 from .utilities import _compute_data_loss, _compute_validity_regions
 from .operations import avg
@@ -333,8 +333,8 @@ class SeriesTransformation(Transformation):
                 raise ValueError('Don\'t know how to target "{}"'.format(target))           
         
         # Set/fix timezone
-        from_dt = as_timezone(from_dt, series.tz)
-        to_dt = as_timezone(to_dt, series.tz)
+        from_dt = as_tz(from_dt, series.tz)
+        to_dt = as_tz(to_dt, series.tz)
         
         # Log
         logger.debug('Computed from: %s', from_dt)
