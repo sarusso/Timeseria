@@ -5,7 +5,6 @@ from ..utilities import compute_coverage, compute_data_loss, compute_validity_re
 from ..datastructures import DataTimePoint, TimeSeries
 from ..time import dt, s_from_dt
 from ..storages import CSVFileStorage
-from ..transformations import Aggregator
 from ..units import TimeUnit
 
 # Setup logging
@@ -366,7 +365,7 @@ class TestGetPeriodicity(unittest.TestCase):
         
         univariate_data_time_point_series = CSVFileStorage(TEST_DATA_PATH + '/csv/temperature.csv').get()
         
-        univariate_1h_data_time_slot_series = Aggregator('1h').process(univariate_data_time_point_series)
+        univariate_1h_data_time_slot_series = univariate_data_time_point_series.aggregate('1h')
         
         perdiodicity = get_periodicity(univariate_1h_data_time_slot_series)
 

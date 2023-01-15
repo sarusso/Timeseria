@@ -593,7 +593,7 @@ class DataTimeSlot(DataSlot, TimeSlot):
 class Series(list):
     """A list of items coming one after another, where every item
        is guaranteed to be of the same type and in order or succession.
-       
+
        Args:
            *args: the series items.    
     """
@@ -661,7 +661,7 @@ class Series(list):
                         raise ValueError('Got different data lengths: {} vs {}'.format(len(self._item_data_reference), len(item.data)))
                 if isinstance(self._item_data_reference, dict):
                     if set(self._item_data_reference.keys()) != set(item.data.keys()):
-                        raise ValueError('Got different data keys: {} vs {}'.format(self._item_data_reference.keys(), item.data.keys()))
+                        raise ValueError('Got different data labels: {} vs {}'.format(self._item_data_reference.keys(), item.data.keys()))
         except AttributeError:
             # logger.debug('Setting data reference: %s', item.data)
             try:
@@ -710,7 +710,7 @@ class Series(list):
                 pass
             return series
         elif isinstance(key, str):
-            # Try filtering on this data key only
+            # Try filtering on this data label only
             return self.filter(key)
         else:
             return super(Series, self).__getitem__(key)
@@ -1368,16 +1368,16 @@ class TimeSeries(Series):
         if len(self) == 0:
             return None
         else:
-            # TODO: can we optimize here? Computing them once and then serving them does not work if someone changes data keys...
+            # TODO: can we optimize here? Computing them once and then serving them does not work if someone changes data labels...
             return self[0].data_labels()
 
-    def rename_data_label(self, old_key, new_key):
-        """Rename a data key, in-place."""
+    def rename_data_label(self, old_data_label, new_data_label):
+        """Rename a data label, in-place."""
         if len(self) > 0 and not self._item_data_reference:
             raise TypeError('Time series items have no data, cannot rename a label')
         for item in self:
             # TODO: move to the DataPoint/DataSlot?
-            item.data[new_key] = item.data.pop(old_key)
+            item.data[new_data_label] = item.data.pop(old_data_label)
 
     def remove_data_loss(self):
         """Remove the ``data_loss`` index, in-place."""
@@ -1551,16 +1551,16 @@ class TimeSeries(Series):
         """Aggregate the time series in slots of a length set by the ``unit`` parameter."""
         if len(self) > 0 and not self._item_data_reference:
             raise TypeError('Time series items have no data, cannot compute any transformation')
-        from .transformations import Aggregator
-        aggregator = Aggregator(unit, *args, **kwargs)
+        from .transformations import SeriesAggregator
+        aggregator = SeriesAggregator(unit, *args, **kwargs)
         return aggregator.process(self)  
 
     def resample(self, unit, *args, **kwargs):
         """Resample the time series using a sampling interval of a length set by the ``unit`` parameter."""
         if len(self) > 0 and not self._item_data_reference:
             raise TypeError('Time series items have no data, cannot compute any transformation')
-        from .transformations import Resampler
-        resampler = Resampler(unit, *args, **kwargs)
+        from .transformations import SeriesResampler
+        resampler = SeriesResampler(unit, *args, **kwargs)
         return resampler.process(self) 
    
 

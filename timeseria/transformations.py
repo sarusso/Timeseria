@@ -2,7 +2,7 @@
 """Series transformations as resampling and aggregation."""
 
 from .time import dt_from_s, s_from_dt, as_timezone
-from .datastructures import DataTimeSlot, TimePoint, DataTimePoint, TimeSeries, _TimeSeriesSlice
+from .datastructures import DataTimeSlot, TimePoint, DataTimePoint, Series, TimeSeries, _TimeSeriesSlice
 from .utilities import compute_data_loss, compute_validity_regions
 from .operations import avg
 from .units import TimeUnit
@@ -244,15 +244,21 @@ class Transformation(object):
 
 
 #==========================
-# TimeSeries Transformation
+#  Series Transformation
 #==========================
-class TimeSeriesTransformation(Transformation):
-    """A transformation for time series data."""
+class SeriesTransformation(Transformation):
+    """A transformation specifically designed to work with series data."""
 
     def process(self, series, target, from_t=None, to_t=None, from_dt=None, to_dt=None, validity=None,
                 include_extremes=False, fill_with=None, force_data_loss=None, fill_gaps=True, force=False):
         """Start the transformation process. If start and/or end are not set, they are set automatically
         based on first and last points of the series"""
+        
+        if not isinstance(series, Series):
+            raise TypeError('Requires Series-like, got "{}"'.format(series.__class__.__name__))
+
+        if not isinstance(series, TimeSeries):
+            raise NotImplementedError('Transforming generic Series is not yet supported (got "{}"), only TimeSeries are'.format(series.__class__.__name__))
         
         # Checks
         if include_extremes:
@@ -536,11 +542,18 @@ class TimeSeriesTransformation(Transformation):
 
 
 #==========================
-#   Resampler
+#  Resamplers
 #==========================
 
-class Resampler(TimeSeriesTransformation):
-    """Resampling transformation."""
+class Resampler(Transformation):
+    """A generic resampler."""
+    
+    def __init__(self, unit, Interpolator=LinearInterpolator):
+        raise NotImplementedError('This Resampler is not yet implemented')
+
+
+class SeriesResampler(Resampler, SeriesTransformation):
+    """A resampler specifically designed to work with series data."""
 
     def __init__(self, unit, Interpolator=LinearInterpolator):
 
@@ -557,15 +570,21 @@ class Resampler(TimeSeriesTransformation):
 
     def process(self, *args, **kwargs):
         kwargs['target'] = 'points'
-        return super(Resampler, self).process(*args, **kwargs) 
+        return super(SeriesResampler, self).process(*args, **kwargs) 
 
 
 #==========================
-#   Aggregator
+#   Aggregators
 #==========================
 
-class Aggregator(TimeSeriesTransformation):
-    """Aggregation transformation."""
+class Aggregator(Transformation):
+    """A generic aggregator."""
+    
+    def __init__(self, unit, Interpolator=LinearInterpolator):
+        raise NotImplementedError('This Aggregator is not yet implemented')
+
+class SeriesAggregator(Aggregator, SeriesTransformation):
+    """An aggregator specifically designed to work with series data"""
 
     def __init__(self, unit, operations=[avg], Interpolator=LinearInterpolator):
         
@@ -595,7 +614,7 @@ class Aggregator(TimeSeriesTransformation):
 
     def process(self, *args, **kwargs):
         kwargs['target'] = 'slots'
-        return super(Aggregator, self).process(*args, **kwargs) 
+        return super(SeriesAggregator, self).process(*args, **kwargs) 
 
 
 

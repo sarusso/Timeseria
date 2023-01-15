@@ -9,7 +9,6 @@ from ..models.forecasters import ProphetForecaster, PeriodicAverageForecaster, A
 from ..models.anomaly_detectors import PeriodicAverageAnomalyDetector
 from ..exceptions import NotFittedError, NonContiguityError
 from ..storages import CSVFileStorage
-from ..transformations import Resampler, Aggregator
 from ..time import dt
 
 # Setup logging
@@ -282,7 +281,7 @@ class TestReconstructors(unittest.TestCase):
         with self.assertRaises(Exception):
             periodic_average_reconstructor.fit(data_time_point_series)
          
-        data_time_point_series = Resampler(600).process(data_time_point_series)
+        data_time_point_series = data_time_point_series.resample(600)
         periodic_average_reconstructor.fit(data_time_point_series)
          
         # TODO: do some actual testing.. not only that "it works"
@@ -299,7 +298,7 @@ class TestReconstructors(unittest.TestCase):
             
         # Get test data        
         data_time_point_series = CSVFileStorage(TEST_DATA_PATH + '/csv/temperature.csv').get(limit=200)
-        data_time_slot_series = Aggregator('3600s').process(data_time_point_series)
+        data_time_slot_series = data_time_point_series.aggregate(3600)
         
         # Instantiate
         prophet_reconstructor = ProphetReconstructor()
@@ -461,7 +460,7 @@ class TestForecasters(unittest.TestCase):
         with self.assertRaises(Exception):
             forecaster.fit(data_time_point_series)
           
-        data_time_point_series = Resampler(600).process(data_time_point_series)
+        data_time_point_series = data_time_point_series.resample(600)
         forecaster.fit(data_time_point_series)
           
         # TODO: do some actual testing.. not only that "it works"
@@ -516,7 +515,7 @@ class TestForecasters(unittest.TestCase):
         with self.assertRaises(Exception):
             forecaster.fit(data_time_point_series)
            
-        data_time_point_series = Resampler(600).process(data_time_point_series)
+        data_time_point_series = data_time_point_series.resample(600)
         forecaster.fit(data_time_point_series)
            
         # TODO: do some actual testing.. not only that "it works"
@@ -562,7 +561,7 @@ class TestForecasters(unittest.TestCase):
         with self.assertRaises(ValueError):
             forecaster.fit(data_time_point_series)
            
-        data_time_point_series = Resampler(600).process(data_time_point_series)
+        data_time_point_series = data_time_point_series.resample(600)
         forecaster.fit(data_time_point_series)
            
         # TODO: do some actual testing.. not only that "it works"
@@ -611,7 +610,7 @@ class TestForecasters(unittest.TestCase):
         with self.assertRaises(ValueError):
             forecaster.fit(data_time_point_series)
            
-        data_time_point_series = Resampler(600).process(data_time_point_series)
+        data_time_point_series = data_time_point_series.resample(600)
         forecaster.fit(data_time_point_series, max_p=2, max_d=1, max_q=2)
            
         # TODO: do some actual testing.. not only that "it works"
@@ -739,7 +738,7 @@ class TestAnomalyDetectors(unittest.TestCase):
         with self.assertRaises(ValueError):
             anomaly_detector.fit(data_time_point_series)
           
-        data_time_point_series = Resampler(600).process(data_time_point_series)
+        data_time_point_series = data_time_point_series.resample(600)
         anomaly_detector.fit(data_time_point_series)
           
         # TODO: do some actual testing.. not only that "it works"

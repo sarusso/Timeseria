@@ -1,7 +1,7 @@
 import unittest
 import os
 from ..datastructures import DataTimePoint, TimeSeries
-from ..transformations import Resampler, Aggregator 
+from ..transformations import SeriesResampler, SeriesAggregator 
 from ..time import dt, s_from_dt, dt_from_str
 from ..units import TimeUnit
 
@@ -13,7 +13,7 @@ logger.setup()
 TEST_DATA_PATH = '/'.join(os.path.realpath(__file__).split('/')[0:-1]) + '/test_data/'
 
 
-class TestResampler(unittest.TestCase):
+class TestSeriesResampler(unittest.TestCase):
 
     def test_resample_minimal(self):
         
@@ -262,7 +262,7 @@ class TestResampler(unittest.TestCase):
         series.append(DataTimePoint(t = (60*50), data = {'value': 1.73}))   # Try also 74? Will be imprecise...
         
         # Resample
-        resampled_series = Resampler('300s').process(series) 
+        resampled_series = SeriesResampler('300s').process(series) 
         
         # Check len
         self.assertEqual(len(resampled_series), 5)
@@ -310,7 +310,7 @@ class TestResampler(unittest.TestCase):
         series.append(DataTimePoint(t = (60*50)+10, data = {'value': 1.74}))
 
         # Resample
-        resampled_series = Resampler('300s').process(series) 
+        resampled_series = SeriesResampler('300s').process(series) 
         
         # Check len
         self.assertEqual(len(resampled_series), 5)
@@ -389,7 +389,7 @@ class TestResampler(unittest.TestCase):
         self.assertEqual(series._all_data_indexes(), ['data_reconstructed', 'data_loss', 'anomaly', 'forecast'])
         
         # Resample the time series
-        resampled_series = Resampler('600s').process(series)        
+        resampled_series = SeriesResampler('600s').process(series)        
 
         # Check that we have all the data_indexes
         self.assertEqual(resampled_series._all_data_indexes(), ['data_reconstructed', 'data_loss', 'anomaly', 'forecast'])
@@ -421,7 +421,7 @@ class TestResampler(unittest.TestCase):
 
 
 
-class TestAggregator(unittest.TestCase):
+class TestSeriesAggregator(unittest.TestCase):
 
     def setUp(self):       
                 
@@ -503,7 +503,7 @@ class TestAggregator(unittest.TestCase):
     def test_slot(self):
           
         # Time series at 1m resolution from 14:58:00 to 15:32:00 (UTC), no from/to
-        series = Aggregator('600s').process(self.series_1)        
+        series = SeriesAggregator('600s').process(self.series_1)        
         self.assertEqual(len(series), 3)
         self.assertEqual(series[0].start.dt, dt_from_str('2015-07-04 15:00:00+00:00'))
         self.assertEqual(series[1].start.dt, dt_from_str('2015-07-04 15:10:00+00:00'))
@@ -542,7 +542,7 @@ class TestAggregator(unittest.TestCase):
         #self.assertEqual(str(series[-1].start.dt), str('2015-07-04 15:30:00+00:00'))
 
         # Time series at 15m resolution from 01:00 to 06:00 (Europe/Rome), slot in 1h
-        series = Aggregator('1h').process(self.series_6)
+        series = SeriesAggregator('1h').process(self.series_6)
         self.assertEqual(len(series), 4)
         self.assertEqual(str(series[0].start.dt), str('2019-10-01 01:00:00+02:00'))
         self.assertEqual(str(series[1].start.dt), str('2019-10-01 02:00:00+02:00'))
@@ -551,7 +551,7 @@ class TestAggregator(unittest.TestCase):
  
         # Test with changing timezone of the series
         self.series_6.change_timezone('America/New_York')
-        series = Aggregator('1h').process(self.series_6)
+        series = SeriesAggregator('1h').process(self.series_6)
         self.assertEqual(len(series), 4)
         self.assertEqual(str(series[0].start.dt), str('2019-09-30 19:00:00-04:00'))
         self.assertEqual(str(series[1].start.dt), str('2019-09-30 20:00:00-04:00'))
@@ -559,7 +559,7 @@ class TestAggregator(unittest.TestCase):
         self.assertEqual(str(series[3].start.dt), str('2019-09-30 22:00:00-04:00'))
          
         # Time series from 2019,10,24,0,0,0 to 2019,10,31,0,0,0 (Europe/Rome), DST off -> 2 AM repeated
-        series = Aggregator('1h').process(self.series_7)
+        series = SeriesAggregator('1h').process(self.series_7)
         #print('=====================================')
         #for item in self.series_7:
         #    print(item)
@@ -575,7 +575,7 @@ class TestAggregator(unittest.TestCase):
         self.assertEqual(series[76].data['temperature_avg'],230.5)
 
         # Time series from 2019,10,24,0,0,0 to 2019,10,31,0,0,0 (Europe/Rome), DST off -> 2 AM repeated
-        series = Aggregator('1D').process(self.series_7)
+        series = SeriesAggregator('1D').process(self.series_7)
         self.assertEqual(len(series), 6)
         self.assertEqual(str(series[0].start.dt), str('2019-10-24 00:00:00+02:00'))
         self.assertEqual(str(series[-1].start.dt), str('2019-10-29 00:00:00+01:00')) # Last one not included as right excluded
@@ -592,7 +592,7 @@ class TestAggregator(unittest.TestCase):
         #for item in series: print(item)
         
         # This is a uplotting (upsampling), and there are data losses and strange values that should not be there.
-        aggregator = Aggregator('10m')
+        aggregator = SeriesAggregator('10m')
         aggregated_series = aggregator.process(series)
         self.assertEqual(len(aggregated_series), 12)
         
@@ -629,7 +629,7 @@ class TestAggregator(unittest.TestCase):
             series.append(point)
  
         # Add extra operations
-        slotted_series = Aggregator('600s', operations=[avg, min,max]).process(series)
+        slotted_series = SeriesAggregator('600s', operations=[avg, min,max]).process(series)
         self.assertAlmostEqual(slotted_series[0].data['temperature_min'], 156)
         self.assertAlmostEqual(slotted_series[0].data['temperature_max'], 165)
         self.assertAlmostEqual(slotted_series[0].data['temperature_avg'], 161)
@@ -638,7 +638,7 @@ class TestAggregator(unittest.TestCase):
         self.assertAlmostEqual(slotted_series[0].data['humidity_avg'], 5)
  
         # Entirely change the operation
-        slotted_series = Aggregator('600s', operations=[sum]).process(series)
+        slotted_series = SeriesAggregator('600s', operations=[sum]).process(series)
         # >>> (156*0.5)+157+158+159+160+161+162+163+164+165+(166*0.5)
         #1610.0
         #>>> 156+157+158+159+160+161+162+163+164+165
@@ -649,7 +649,7 @@ class TestAggregator(unittest.TestCase):
         self.assertEqual(slotted_series[1].data['humidity_sum'], 50)
  
         # Operations as string
-        slotted_series = Aggregator('600s', operations=['avg','min',max]).process(series)    
+        slotted_series = SeriesAggregator('600s', operations=['avg','min',max]).process(series)    
         self.assertAlmostEqual(slotted_series[0].data['temperature_min'], 156)
         self.assertAlmostEqual(slotted_series[0].data['temperature_max'], 165)
         self.assertAlmostEqual(slotted_series[0].data['temperature_avg'], 161)
@@ -667,7 +667,7 @@ class TestAggregator(unittest.TestCase):
                                       data = {'temperature': 154+i, 'humidity': 5})
                 series.append(point)
 
-        slotted_series = Aggregator('600s', operations=[avg, min,max]).process(series)   
+        slotted_series = SeriesAggregator('600s', operations=[avg, min,max]).process(series)   
         self.assertEqual(len(slotted_series), 3)
         
         self.assertAlmostEqual(slotted_series[0].data['humidity_min'], 5)
@@ -694,7 +694,7 @@ class TestAggregator(unittest.TestCase):
                                       data = {'temperature': 154+i, 'humidity': 5})
                 series.append(point)
 
-        slotted_series = Aggregator('600s', operations=[avg, min,max]).process(series)
+        slotted_series = SeriesAggregator('600s', operations=[avg, min,max]).process(series)
         self.assertEqual(len(slotted_series), 5)
   
         self.assertEqual(slotted_series[0].data['temperature_min'], 156)
@@ -705,11 +705,11 @@ class TestAggregator(unittest.TestCase):
         self.assertEqual(slotted_series[3].data['temperature_avg'], 191.0)
 
         # Re-slotting with the same time unit as the original points
-        slotted_series = Aggregator('60s').process(series)
+        slotted_series = SeriesAggregator('60s').process(series)
         # TODO: well.. tests it?
 
         # TODO: directly load a day-resolution time series in this test
-        slotted_series = Resampler(86400).process(self.series_7)
+        slotted_series = SeriesResampler(86400).process(self.series_7)
         # TODO: well.. tests it?
 
         # TODO: upsampling (upslotting) not supported yet if missing data
@@ -758,7 +758,7 @@ class TestAggregator(unittest.TestCase):
         self.assertEqual(series._all_data_indexes(), ['data_reconstructed', 'data_loss', 'anomaly', 'forecast'])
         
         # Slot the time series
-        slotted_series = Aggregator('600s').process(series)
+        slotted_series = SeriesAggregator('600s').process(series)
 
         # Check that we have all the data_indexes
         self.assertEqual(slotted_series._all_data_indexes(), ['data_reconstructed', 'data_loss', 'anomaly', 'forecast'])
