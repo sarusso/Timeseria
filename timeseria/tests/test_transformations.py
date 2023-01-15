@@ -176,7 +176,7 @@ class TestSeriesResampler(unittest.TestCase):
         from ..interpolators import UniformInterpolator
     
         # Resample for 3 seconds
-        resampled_series = series.resample(3, Interpolator=UniformInterpolator)
+        resampled_series = series.resample(3, interpolator_class=UniformInterpolator)
 
         # Check len
         self.assertEqual(len(resampled_series), 6)

@@ -1574,7 +1574,7 @@ class _TimeSeriesSlice(TimeSeries):
     
     :meta private:
     """
-    def __init__(self, series, from_i, to_i, from_t=None, to_t=None, dense=False, Interpolator=None):
+    def __init__(self, series, from_i, to_i, from_t=None, to_t=None, dense=False, interpolator_class=None):
         self.series = series
         self.from_i = from_i
         self.to_i = to_i
@@ -1584,9 +1584,9 @@ class _TimeSeriesSlice(TimeSeries):
         self.to_t=to_t
         self.dense=dense
         if self.dense:
-            if not Interpolator:
+            if not interpolator_class:
                 raise ValueError('If requesting a dense slice you must provide an interpolator')
-            self.interpolator = Interpolator(series)
+            self.interpolator = interpolator_class(series)
         else:
             self.interpolator = None
     

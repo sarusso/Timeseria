@@ -889,7 +889,7 @@ class Test_TimeSeriesSlices(unittest.TestCase):
             point.valid_to=validity_regions[point.t][1]
 
         from ..interpolators import LinearInterpolator
-        series_slice = _TimeSeriesSlice(series, 2, 8, dense=True, Interpolator=LinearInterpolator)
+        series_slice = _TimeSeriesSlice(series, 2, 8, dense=True, interpolator_class=LinearInterpolator)
 
         self.assertEqual(len(series_slice), 7)
 

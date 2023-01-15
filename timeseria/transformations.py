@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_point_i, slot_prev_point_i, slot_next_point_i,
                  unit, point_validity, timezone, fill_with, force_data_loss, fill_gaps, series_data_indexes, series_resolution,
-                 force_compute_data_loss, Interpolator, operations=None):
+                 force_compute_data_loss, interpolator_class, operations=None):
     
     # Log. Note: if slot_first_point_i < slot_last_point_i, this means that the prev and next are outside the slot.
     # It is not a bug, it is how the system works. perhaps we could pass here the slot_prev_i and sòlot_next_i
@@ -41,7 +41,7 @@ def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_poi
 
     # Create the slice of the series containing the slot datapoints plus the prev and next, 
     series_dense_slice_extended  = _TimeSeriesSlice(series, from_i=slot_prev_point_i, to_i=slot_next_point_i+1,  # Slicing exclude the right
-                                                   from_t=from_t, to_t=to_t, dense=True, Interpolator=Interpolator)
+                                                   from_t=from_t, to_t=to_t, dense=True, interpolator_class=interpolator_class)
 
     # Compute the data loss for the new element. This is forced
     # by the resampler or slotter if first or last point     
@@ -108,7 +108,7 @@ def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_poi
             # Slice the original series to provide only the datapoints belonging to the slot 
             #logger.critical('Slicing dense series from {} to {}'.format(slot_first_point_i, slot_last_point_i+1))
             series_dense_slice = _TimeSeriesSlice(series, from_i=slot_first_point_i, to_i=slot_last_point_i+1, # Slicing exclude the right   
-                                                 from_t=from_t, to_t=to_t, dense=True, Interpolator=Interpolator) 
+                                                 from_t=from_t, to_t=to_t, dense=True, interpolator_class=interpolator_class) 
 
 
 
@@ -500,7 +500,7 @@ class SeriesTransformation(Transformation):
                                                 series_data_indexes = series_data_indexes,
                                                 series_resolution = series_resolution,
                                                 force_compute_data_loss = True if first else False,
-                                                Interpolator=self.Interpolator,
+                                                interpolator_class=self.interpolator_class,
                                                 operations = operations)
                         
                         # Set first to false
@@ -548,14 +548,14 @@ class SeriesTransformation(Transformation):
 class Resampler(Transformation):
     """A generic resampler."""
     
-    def __init__(self, unit, Interpolator=LinearInterpolator):
+    def __init__(self, unit, interpolator_class=LinearInterpolator):
         raise NotImplementedError('This Resampler is not yet implemented')
 
 
 class SeriesResampler(Resampler, SeriesTransformation):
     """A resampler specifically designed to work with series data."""
 
-    def __init__(self, unit, Interpolator=LinearInterpolator):
+    def __init__(self, unit, interpolator_class=LinearInterpolator):
 
         # Handle unit
         if isinstance(unit, TimeUnit):
@@ -566,7 +566,7 @@ class SeriesResampler(Resampler, SeriesTransformation):
             raise ValueError('Sorry, calendar time units are not supported by the Resampler (got "{}"). Use the Slotter instead.'.format(self.time_unit))
 
         # Set interpolator
-        self.Interpolator=Interpolator
+        self.interpolator_class=interpolator_class
 
     def process(self, *args, **kwargs):
         kwargs['target'] = 'points'
@@ -580,13 +580,13 @@ class SeriesResampler(Resampler, SeriesTransformation):
 class Aggregator(Transformation):
     """A generic aggregator."""
     
-    def __init__(self, unit, Interpolator=LinearInterpolator):
+    def __init__(self, unit, interpolator_class=LinearInterpolator):
         raise NotImplementedError('This Aggregator is not yet implemented')
 
 class SeriesAggregator(Aggregator, SeriesTransformation):
     """An aggregator specifically designed to work with series data"""
 
-    def __init__(self, unit, operations=[avg], Interpolator=LinearInterpolator):
+    def __init__(self, unit, operations=[avg], interpolator_class=LinearInterpolator):
         
         # Handle unit
         if isinstance(unit, TimeUnit):
@@ -610,7 +610,7 @@ class SeriesAggregator(Aggregator, SeriesTransformation):
         self.operations = operations
         
         # Set interpolator
-        self.Interpolator=Interpolator
+        self.interpolator_class=interpolator_class
 
     def process(self, *args, **kwargs):
         kwargs['target'] = 'slots'
