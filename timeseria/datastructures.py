@@ -1211,11 +1211,21 @@ class TimeSeries(Series):
        is guaranteed to be of the same type and in order or succession.
        
        Time series accept only items of type :obj:`DataTimePoint` and :obj:`DataTimeSlot`
-       (or :obj:`TimePoint` and :obj:`TimeSlot`, which are useful in some particular circumstances).
+       (or :obj:`TimePoint` and :obj:`TimeSlot` which are useful in some particular circumstances), 
+       but can be created using some shortcuts, for example:
        
-       Time series can also be created providing a Pandas data frame with a time-based
-       index as first argument or using the keyword argument ``df``.
-     
+           * providing a Pandas Dataframe with a time-based index;
+            
+           * providing a list of dictionaries in the following forms, plus an optional ``slot_unit`` argument
+             if creating a slot series (e.g. ``slot_unit='1D'``):
+           
+               * ``[{'t':60, 'data':4}, {'t':120, 'data':6}, ... ]``
+               * ``[{'dt':dt(1970,1,1), 'data':4}, {'dt':dt(1970,1,2), 'data':6}, ... ]`` 
+             
+           * providing a string with a CSV file name, inclding its path, that will in turn use a
+             :obj:`timeseria.storages.CSVStorage`, in which case all the key-value parameters will be
+             forwarded to the storage object.
+       
        The square brackets notation can be used for accessing series items, slicing the series
        or to filter it on a specific data label, if its elements support it.
        
@@ -1250,8 +1260,7 @@ class TimeSeries(Series):
 
 
        Args:
-           *args: the time series items.
-           df (DataFrame, optional, also as first arg): a Pandas data frame with a time-based index.
+           *args: the time series items, or the right object for an alternative init method as described above.
     """
 
     def __repr__(self):
@@ -1271,17 +1280,15 @@ class TimeSeries(Series):
     
     def __init__(self, *args, **kwargs):
 
-        # Handle df kwarg
+        # Handle special df kwarg, mainly for back compatibility
         df = kwargs.pop('df', None)
-        items_type = kwargs.pop('items_type', None)
-        
-        # Handle first argument as dataframe
-        if args and (isinstance(args[0], DataFrame)):
-            df = args[0]
+              
+        # Create from Data Frame
+        if df or (args and (isinstance(args[0], DataFrame))):
+            if not df:
+                df = args[0]
+            items_type = kwargs.pop('items_type', None)
 
-        # Do we have to initialize the time series from a dataframe?        
-        if df is not None:
-            
             # Infer if we have to create points or slots and their unit
             unit_str_pd=df.index.inferred_freq
     
@@ -1374,6 +1381,69 @@ class TimeSeries(Series):
                 # Set the list of data time points
                 super(TimeSeries, self).__init__(*data_time_points, **kwargs)
         
+        # Create from list of dicts
+        elif args and (isinstance(args[0], list)):
+            
+            slot_unit = kwargs.pop('slot_unit', None)
+            if slot_unit and not isinstance(slot_unit, Unit):
+                slot_unit = TimeUnit(slot_unit)
+            series_items = []
+            
+            for item in args[0]:
+                
+                if not isinstance(item, dict):
+                    raise TypeError('List of dicts required, got "{}"'.format(item.__class__.__name__))
+                
+                item_t = item.get('t', None)
+                item_dt = item.get('dt', None)
+                if item_t is None and item_dt is None:
+                    raise ValueError('A "t" or "dt" key is required')
+                
+                data = item.get('data', None)
+                if not data:
+                    raise ValueError('A "data" key is required')
+                if not (isinstance(data, list) or isinstance(data, dict) or isinstance(data, tuple)):
+                    data = [data]
+
+                # Possible alternative approach
+                # value = item.get('value', None)
+                # values = item.get('values', None)
+                # if not value and not values:
+                #     raise ValueError('A "value" or "values" key is required')
+                # if values:
+                #     if not (isinstance(values, list) or isinstance(values, dict) or isinstance(values, tuple)):
+                #         raise ValueError('For "values", data must be list, dict or tuple (got "{}")'.format(item['values'].__class__.__name__))
+                #     data = values
+                # else:
+                #     data = [value]
+                                 
+                # Create the item
+                if slot_unit:
+                    if item_dt is not None:
+                        series_items.append(DataTimeSlot(dt=item_dt, unit=slot_unit, data=data))
+                    else:
+                        series_items.append(DataTimeSlot(t=item_t, unit=slot_unit, data=data))
+                else:
+                    if item_dt is not None:
+                        series_items.append((DataTimePoint(dt=item_dt, data=data)))
+                    else:
+                        series_items.append((DataTimePoint(t=item_t, data=data)))
+
+            # Set the list of data time points
+            super(TimeSeries, self).__init__(*series_items, **kwargs)                        
+
+        # Create from file
+        elif args and (isinstance(args[0], str)):
+            file_name = args[0]
+            from .storages import CSVFileStorage
+            storage = CSVFileStorage(file_name, **kwargs)
+            loaded_timeseries = storage.get()
+            
+            # TODO: the following might not perform well..
+            series_items = loaded_timeseries.contents()
+            super(TimeSeries, self).__init__(*series_items)
+
+        # Create from list of TimePoints or TimeSlots (just call parent init)
         else:
                
             # Handle timezone

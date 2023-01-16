@@ -890,6 +890,49 @@ class TestTimeSeries(unittest.TestCase):
             timeseries.rename_data_label('notexistent_key','c')
 
 
+    def test_TimeSeries_alternative_inits_besides_df(self):
+        
+        timeseries = TimeSeries([{'t':60, 'data':14},
+                                 {'t':120, 'data':18},
+                                 {'t':128, 'data':20}])
+        self.assertEqual(len(timeseries), 3)
+        self.assertEqual(timeseries[0].t, 60)
+        self.assertEqual(timeseries[0].data, [14])
+
+        timeseries = TimeSeries([{'t':60, 'data':{'a': 14}},
+                                 {'t':120, 'data':{'a': 18}},
+                                 {'t':128, 'data':{'a': 20}}])
+        self.assertEqual(len(timeseries), 3)
+        self.assertEqual(timeseries[0].t, 60)
+        self.assertEqual(timeseries[0].data, {'a': 14})
+
+        timeseries = TimeSeries([{'dt':dt(1970,1,1,0,1), 'data':14},
+                                 {'dt':dt(1970,1,1,0,2), 'data':18},
+                                 {'dt':dt(1970,1,1,0,3), 'data':20}],
+                                 slot_unit='60s')
+        self.assertEqual(len(timeseries), 3)
+        self.assertEqual(timeseries[0].start.t, 60)
+        self.assertEqual(timeseries[0].end.t, 120)
+        self.assertEqual(timeseries[0].data, [14])
+        
+        timeseries = TimeSeries(TEST_DATA_PATH + '/csv/single_value_no_labels.csv')
+        self.assertEqual(len(timeseries), 6)
+        self.assertEqual(timeseries[0].t, 946684800)
+        self.assertEqual(timeseries[0].data, [1000])
+
+        timeseries = TimeSeries(TEST_DATA_PATH + '/csv/only_date_no_meaningful_timestamp_label.csv',
+                                 timestamp_format = '%Y-%m-%d')
+        self.assertEqual(len(timeseries), 100)
+        self.assertEqual(timeseries[0].start.t, 1197244800)
+        self.assertTrue(isinstance(timeseries[0], Slot))
+
+        timeseries = TimeSeries(TEST_DATA_PATH + '/csv/only_date_no_meaningful_timestamp_label.csv',
+                                 timestamp_format = '%Y-%m-%d', series_type='points')
+        self.assertEqual(len(timeseries), 95)
+        self.assertEqual(timeseries[0].t, 1197244800)
+        self.assertTrue(isinstance(timeseries[0], Point))
+
+
 class TestTimeSeriesView(unittest.TestCase):
 
     def test_TimeSeriesView(self):
