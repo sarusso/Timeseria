@@ -16,6 +16,7 @@ logger.setup()
 # Set test data path
 TEST_DATA_PATH = '/'.join(os.path.realpath(__file__).split('/')[0:-1]) + '/test_data/'
 
+
 class TestPoints(unittest.TestCase):
 
     def test_Point(self):
@@ -39,7 +40,6 @@ class TestPoints(unittest.TestCase):
     def test_TimePoint(self):
         
         # Wrong init/casting
-
         with self.assertRaises(Exception):
             TimePoint()
         
@@ -126,13 +126,10 @@ class TestPoints(unittest.TestCase):
         self.assertEqual(data_point.data_indexes['data_loss'],0.5)
         self.assertEqual(data_point.data_indexes['my_index'],0.3)
 
-        # Test None index
-        #with self.assertRaises(ValueError):
+        # Test that a data index with None value is okay
         DataPoint(1, 2, data='hello', data_indexes={'data_loss':None, 'my_index':0.3})
 
                  
-
-
     def test_DataTimePoint(self):
         
         with self.assertRaises(Exception):
@@ -149,8 +146,8 @@ class TestPoints(unittest.TestCase):
         self.assertEqual(data_time_point.coordinates, (6,)) 
         self.assertEqual(data_time_point.t,6)
         self.assertEqual(data_time_point.data,'hello')
-        
-
+    
+    
     def test_casting(self):
         data_time_point = DataTimePoint(t=6, data='hello')
         casted_data_time_point_1 = TimePoint(data_time_point)
@@ -158,7 +155,8 @@ class TestPoints(unittest.TestCase):
         casted_data_time_point_2 = TimePoint(5)
         self.assertEqual(casted_data_time_point_2.t, 5) 
 
-    def test_Unit(self):      
+
+    def test_with_Unit(self):      
         self.assertEqual( (Point(1) + Unit(5)).coordinates[0], 6) 
         self.assertEqual( (TimePoint(1) + Unit(5)).coordinates[0], 6) 
 
@@ -301,12 +299,10 @@ class TestSlots(unittest.TestCase):
         self.assertEqual(data_slot.data_indexes['data_loss'],0.5)
         self.assertEqual(data_slot.data_indexes['my_index'],0.3)
         
-        # Test None index
-        #with self.assertRaises(ValueError):
+        # Test that a data index with None value is okay
         DataSlot(start=Point(1), end=Point(2), data='hello', data_indexes={'data_loss':None, 'my_index':0.3})
 
     
-
     def test_DataTimeSlots(self):
 
         with self.assertRaises(Exception):
@@ -317,7 +313,6 @@ class TestSlots(unittest.TestCase):
 
         with self.assertRaises(TypeError):
             DataTimeSlot(start=Point(x=1), end=Point(x=2), data='hello')
-
 
         data_time_slot_ = DataTimeSlot(start=TimePoint(t=1), end=TimePoint(t=2), data='hello')
         self.assertEqual(data_time_slot_.start.t,1)
@@ -385,7 +380,6 @@ class TestSeries(unittest.TestCase):
         two = IntegerNumber(2)
         three = IntegerNumber(3)
         four = IntegerNumber(4)
-        five = IntegerNumber(5)
 
         self.assertTrue(two.__succedes__(one))
         self.assertFalse(one.__succedes__(two))
@@ -430,7 +424,7 @@ class TestSeries(unittest.TestCase):
         self.assertEqual(series.tail(2),[4.0,5.0])
         self.assertEqual(series.contents(),[1.0,4.0,5.0])
 
-        # Test print with print mock?
+        # TOOD: test the print with a print mock?
         #float_series.print(3)
         
         # Test with data slots
@@ -447,112 +441,112 @@ class TestTimeSeries(unittest.TestCase):
 
     def test_TimeSeries_with_TimePoints(self):
         
-        timeseries = TimeSeries()
-        timeseries.append(TimePoint(t=60))
+        time_series = TimeSeries()
+        time_series.append(TimePoint(t=60))
                 
         # Test for UTC timezone (autodetect)
-        timeseries = TimeSeries()
-        timeseries.append(TimePoint(t=5))         
-        self.assertEqual(timeseries.tz, UTC)
-        self.assertEqual(type(timeseries.tz), type(UTC))
-        timeseries.append(TimePoint(t=10)) 
-        self.assertEqual(timeseries.tz, UTC)
-        self.assertEqual(type(timeseries.tz), type(UTC))
-        timeseries.append(TimePoint(t=15, tz='Europe/Rome')) # This will get ignored and timezone will stay on UTC
-        self.assertEqual(timeseries.tz, UTC)
-        self.assertEqual(type(timeseries.tz), type(UTC))
+        time_series = TimeSeries()
+        time_series.append(TimePoint(t=5))         
+        self.assertEqual(time_series.tz, UTC)
+        self.assertEqual(type(time_series.tz), type(UTC))
+        time_series.append(TimePoint(t=10)) 
+        self.assertEqual(time_series.tz, UTC)
+        self.assertEqual(type(time_series.tz), type(UTC))
+        time_series.append(TimePoint(t=15, tz='Europe/Rome')) # This will get ignored and timezone will stay on UTC
+        self.assertEqual(time_series.tz, UTC)
+        self.assertEqual(type(time_series.tz), type(UTC))
 
         # Test for Europe/Rome timezone
-        timeseries = TimeSeries() 
-        timeseries.append(TimePoint(t=15, tz='Europe/Rome'))
-        self.assertEqual(str(timeseries.tz), 'Europe/Rome')
+        time_series = TimeSeries() 
+        time_series.append(TimePoint(t=15, tz='Europe/Rome'))
+        self.assertEqual(str(time_series.tz), 'Europe/Rome')
 
         # Test for Europe/Rome timezone
-        timeseries = TimeSeries() 
-        timeseries.append(TimePoint(dt=dt(2015,3,5,9,27,tz='Europe/Rome')))
-        self.assertEqual(str(timeseries.tz), 'Europe/Rome')
+        time_series = TimeSeries() 
+        time_series.append(TimePoint(dt=dt(2015,3,5,9,27,tz='Europe/Rome')))
+        self.assertEqual(str(time_series.tz), 'Europe/Rome')
             
         # Change timezone
-        timeseries = TimeSeries()
-        timeseries.append(TimePoint(t=5))
-        timeseries.append(TimePoint(t=10))
-        timeseries.change_timezone('Europe/Rome')
-        self.assertEqual(str(timeseries.tz), 'Europe/Rome')
-        self.assertEqual(str(type(timeseries.tz)), "<class 'pytz.tzfile.Europe/Rome'>")
-        self.assertEqual(str(timeseries[0].tz), 'Europe/Rome')
+        time_series = TimeSeries()
+        time_series.append(TimePoint(t=5))
+        time_series.append(TimePoint(t=10))
+        time_series.change_timezone('Europe/Rome')
+        self.assertEqual(str(time_series.tz), 'Europe/Rome')
+        self.assertEqual(str(type(time_series.tz)), "<class 'pytz.tzfile.Europe/Rome'>")
+        self.assertEqual(str(time_series[0].tz), 'Europe/Rome')
 
         # Test for Europe/Rome timezone (set)
-        timeseries = TimeSeries(tz = 'Europe/Rome')
-        self.assertEqual(str(timeseries.tz), 'Europe/Rome')
-        self.assertEqual(str(type(timeseries.tz)), "<class 'pytz.tzfile.Europe/Rome'>")
-        timeseries.append(TimePoint(t=5))
-        self.assertEqual(str(timeseries.tz), 'Europe/Rome')
-        self.assertEqual(str(type(timeseries.tz)), "<class 'pytz.tzfile.Europe/Rome'>")        
+        time_series = TimeSeries(tz = 'Europe/Rome')
+        self.assertEqual(str(time_series.tz), 'Europe/Rome')
+        self.assertEqual(str(type(time_series.tz)), "<class 'pytz.tzfile.Europe/Rome'>")
+        time_series.append(TimePoint(t=5))
+        self.assertEqual(str(time_series.tz), 'Europe/Rome')
+        self.assertEqual(str(type(time_series.tz)), "<class 'pytz.tzfile.Europe/Rome'>")        
          
-        # Test for Europe/Rome timezone  (autodetect)
-        timeseries = TimeSeries()
-        timeseries.append(TimePoint(t=1569897900, tz='Europe/Rome')) 
-        self.assertEqual(str(timeseries.tz), 'Europe/Rome')
-        self.assertEqual(str(type(timeseries.tz)), "<class 'pytz.tzfile.Europe/Rome'>")
-        timeseries.append(TimePoint(t=1569897910, tz='Europe/Rome')) 
-        self.assertEqual(str(timeseries.tz), 'Europe/Rome')
-        self.assertEqual(str(type(timeseries.tz)), "<class 'pytz.tzfile.Europe/Rome'>")
-        timeseries.append(TimePoint(t=1569897920))
-        self.assertEqual(timeseries.tz, UTC)
-        self.assertEqual(type(timeseries.tz), type(UTC))
-        timeseries.change_timezone('Europe/Rome')
-        self.assertEqual(str(timeseries.tz), 'Europe/Rome')
-        self.assertEqual(str(type(timeseries.tz)), "<class 'pytz.tzfile.Europe/Rome'>")  
+        # Test for Europe/Rome timezone (autodetect)
+        time_series = TimeSeries()
+        time_series.append(TimePoint(t=1569897900, tz='Europe/Rome')) 
+        self.assertEqual(str(time_series.tz), 'Europe/Rome')
+        self.assertEqual(str(type(time_series.tz)), "<class 'pytz.tzfile.Europe/Rome'>")
+        time_series.append(TimePoint(t=1569897910, tz='Europe/Rome')) 
+        self.assertEqual(str(time_series.tz), 'Europe/Rome')
+        self.assertEqual(str(type(time_series.tz)), "<class 'pytz.tzfile.Europe/Rome'>")
+        time_series.append(TimePoint(t=1569897920))
+        self.assertEqual(time_series.tz, UTC)
+        self.assertEqual(type(time_series.tz), type(UTC))
+        time_series.change_timezone('Europe/Rome')
+        self.assertEqual(str(time_series.tz), 'Europe/Rome')
+        self.assertEqual(str(type(time_series.tz)), "<class 'pytz.tzfile.Europe/Rome'>")  
 
         # Test resolution: not defined as empty
-        timeseries = TimeSeries()
-        self.assertEqual(timeseries.resolution, None)
+        time_series = TimeSeries()
+        self.assertEqual(time_series.resolution, None)
         
         # Test resolution: not defined as just one point
-        timeseries = TimeSeries(TimePoint(t=60))
-        self.assertEqual(timeseries.resolution, None)
+        time_series = TimeSeries(TimePoint(t=60))
+        self.assertEqual(time_series.resolution, None)
         
         # Cannot guess resolution if only one point
         with self.assertRaises(ValueError):
-            timeseries.guess_resolution()
+            time_series.guess_resolution()
 
         # Test resolution: defined, two points, 61 seconds
-        timeseries = TimeSeries(TimePoint(t=60),TimePoint(t=121)) 
-        self.assertTrue(isinstance(timeseries.resolution,TimeUnit))
-        self.assertEqual(str(timeseries.resolution), '61s')
-        self.assertEqual(timeseries.resolution, 61) # TimeUnits support math
-        self.assertEqual(timeseries.resolution.value, '61s')
-        self.assertEqual(timeseries.resolution.as_seconds(), 61)
+        time_series = TimeSeries(TimePoint(t=60),TimePoint(t=121)) 
+        self.assertTrue(isinstance(time_series.resolution,TimeUnit))
+        self.assertEqual(str(time_series.resolution), '61s')
+        self.assertEqual(time_series.resolution, 61) # TimeUnits support math
+        self.assertEqual(time_series.resolution.value, '61s')
+        self.assertEqual(time_series.resolution.as_seconds(), 61)
         
         # Test resolution: defined, two points, 1 minute
-        timeseries = TimeSeries(TimePoint(t=60),TimePoint(t=120))
-        self.assertEqual(str(timeseries.resolution), '1m')
-        self.assertEqual(timeseries.resolution, 60) # TimeUnits support math
-        self.assertEqual(timeseries.resolution.value, '1m')
-        self.assertEqual(timeseries.resolution.as_seconds(), 60)
+        time_series = TimeSeries(TimePoint(t=60),TimePoint(t=120))
+        self.assertEqual(str(time_series.resolution), '1m')
+        self.assertEqual(time_series.resolution, 60) # TimeUnits support math
+        self.assertEqual(time_series.resolution.value, '1m')
+        self.assertEqual(time_series.resolution.as_seconds(), 60)
 
         # Test resolution: variable, three points
-        timeseries = TimeSeries(TimePoint(t=60),TimePoint(t=120),TimePoint(t=130))
-        self.assertEqual(timeseries.resolution, 'variable')
-        self.assertEqual(timeseries.guess_resolution(), 60)
-        self.assertEqual(str(timeseries.guess_resolution()), '1m')
-        self.assertEqual(timeseries.guess_resolution().as_seconds(), 60)
-        self.assertEqual(timeseries.guess_resolution(confidence=True)['value'],60)
-        self.assertEqual(timeseries.guess_resolution(confidence=True)['confidence'],0)
+        time_series = TimeSeries(TimePoint(t=60),TimePoint(t=120),TimePoint(t=130))
+        self.assertEqual(time_series.resolution, 'variable')
+        self.assertEqual(time_series.guess_resolution(), 60)
+        self.assertEqual(str(time_series.guess_resolution()), '1m')
+        self.assertEqual(time_series.guess_resolution().as_seconds(), 60)
+        self.assertEqual(time_series.guess_resolution(confidence=True)['value'],60)
+        self.assertEqual(time_series.guess_resolution(confidence=True)['confidence'],0)
 
         # Test resolution: variable, four points
-        timeseries = TimeSeries(TimePoint(t=60),TimePoint(t=120),TimePoint(t=180),TimePoint(t=190))
-        self.assertEqual(timeseries.resolution, 'variable')
-        self.assertEqual(timeseries.guess_resolution(), 60)
-        self.assertEqual(str(timeseries.guess_resolution()), '1m')
-        self.assertEqual(timeseries.guess_resolution().as_seconds(), 60)
-        self.assertEqual(timeseries.guess_resolution(confidence=True)['value'],60)
-        self.assertEqual(timeseries.guess_resolution(confidence=True)['confidence'],0.5)
+        time_series = TimeSeries(TimePoint(t=60),TimePoint(t=120),TimePoint(t=180),TimePoint(t=190))
+        self.assertEqual(time_series.resolution, 'variable')
+        self.assertEqual(time_series.guess_resolution(), 60)
+        self.assertEqual(str(time_series.guess_resolution()), '1m')
+        self.assertEqual(time_series.guess_resolution().as_seconds(), 60)
+        self.assertEqual(time_series.guess_resolution(confidence=True)['value'],60)
+        self.assertEqual(time_series.guess_resolution(confidence=True)['confidence'],0.5)
 
         # Test resolution: defined, three points
-        timeseries = TimeSeries(TimePoint(t=60),TimePoint(t=120),TimePoint(t=180))
-        self.assertEqual(timeseries.duplicate().resolution, 60)
-        self.assertEqual(timeseries[0:2].resolution, 60)
+        time_series = TimeSeries(TimePoint(t=60),TimePoint(t=120),TimePoint(t=180))
+        self.assertEqual(time_series.duplicate().resolution, 60)
+        self.assertEqual(time_series[0:2].resolution, 60)
         
 
     def test_TimeSeries_with_DataTimePoints(self):
@@ -571,193 +565,179 @@ class TestTimeSeries(unittest.TestCase):
             TimeSeries(DataTimePoint(t=60, data=23.8),
                        DataTimePoint(t=60, data=24.1))
         
-        timeseries = TimeSeries(DataTimePoint(t=60, data=23.8),
-                                DataTimePoint(t=120, data=24.1),
-                                DataTimePoint(t=180, data=23.9),
-                                DataTimePoint(t=240, data=23.1),
-                                DataTimePoint(t=300, data=22.7))
+        time_series = TimeSeries(DataTimePoint(t=60, data=23.8),
+                                 DataTimePoint(t=120, data=24.1),
+                                 DataTimePoint(t=180, data=23.9),
+                                 DataTimePoint(t=240, data=23.1),
+                                 DataTimePoint(t=300, data=22.7))
                                                 
-        timeseries.append(DataTimePoint(t=360, data=21.9))
-        self.assertTrue(len(timeseries), 6)
+        time_series.append(DataTimePoint(t=360, data=21.9))
+        self.assertTrue(len(time_series), 6)
    
 
-        timeseries = TimeSeries(DataTimePoint(t=60, data=23.8),
-                                DataTimePoint(t=120, data=24.1),
-                                DataTimePoint(t=240, data=23.1),
-                                DataTimePoint(t=300, data=22.7))
-        self.assertTrue(len(timeseries), 5)
+        time_series = TimeSeries(DataTimePoint(t=60, data=23.8),
+                                 DataTimePoint(t=120, data=24.1),
+                                 DataTimePoint(t=240, data=23.1),
+                                 DataTimePoint(t=300, data=22.7))
+        self.assertTrue(len(time_series), 5)
 
         # Try to append a different data type
-        timeseries = TimeSeries(DataTimePoint(t=60, data=[23.8]))
+        time_series = TimeSeries(DataTimePoint(t=60, data=[23.8]))
         with self.assertRaises(TypeError):
-            timeseries.append(DataTimePoint(t=120, data={'a':56}))
+            time_series.append(DataTimePoint(t=120, data={'a':56}))
 
         # Try to append the same data type but with different cardinality
-        timeseries = TimeSeries(DataTimePoint(t=60, data=[23.8]))
+        time_series = TimeSeries(DataTimePoint(t=60, data=[23.8]))
         with self.assertRaises(ValueError):
-            timeseries.append(DataTimePoint(t=180, data=[23.8,31.3]))
+            time_series.append(DataTimePoint(t=180, data=[23.8,31.3]))
 
         # Try to append the same data type but with different keys
-        timeseries = TimeSeries(DataTimePoint(t=60, data={'a':56, 'b':67}))
+        time_series = TimeSeries(DataTimePoint(t=60, data={'a':56, 'b':67}))
         with self.assertRaises(ValueError):
-            timeseries.append(DataTimePoint(t=180, data={'a':56, 'c':67}))            
+            time_series.append(DataTimePoint(t=180, data={'a':56, 'c':67}))            
 
-        # Test creating a time series from a Pandas data frame 
-        df = pd.read_csv(TEST_DATA_PATH+'csv/format3.csv', header=3, parse_dates=[0], index_col=0)
-        timeseries = TimeSeries(df)
-        self.assertEqual(len(timeseries),6)
-        self.assertEqual(timeseries[0].dt,dt(2020,4,3,0,0,0))
-        self.assertEqual(timeseries[5].dt,dt(2020,4,3,5,0,0))
-        
-        # Test creating a Pandas data frame from a time series
-        self.assertEqual(len(timeseries.df),6)
-        self.assertEqual(timeseries.df.index[0],dt(2020,4,3,0,0,0))
-        self.assertEqual(list(timeseries.df.columns),['C','RH'])
-        self.assertEqual(timeseries.df.iloc[0][0],21.7)
-        self.assertEqual(timeseries.df.iloc[0][1],54.9)
-
-        # Test loading a Pandas data frame as a time series        
-        loaded_timeseries = TimeSeries(timeseries.df)
-        self.assertEqual(loaded_timeseries[0].dt,dt(2020,4,3,0,0,0))
-        self.assertEqual(loaded_timeseries[5].dt,dt(2020,4,3,5,0,0))
-        self.assertEqual((loaded_timeseries[0].data['C']), 21.7)
-        self.assertEqual((loaded_timeseries[0].data['RH']), 54.9)
+        # Test accessing the time series as Pandas data frame
+        time_series =  TimeSeries(DataTimePoint(t=0, data={'C': 23.8, 'RH': 57.2}),
+                                  DataTimePoint(t=60, data={'C': 23.8, 'RH': 57.2}),
+                                  DataTimePoint(t=120, data={'C': 23.8, 'RH': 57.2}))
+        self.assertEqual(len(time_series.df),3)
+        self.assertEqual(time_series.df.index[0],dt(1970,1,1,0,0,0))
+        self.assertEqual(time_series.df.index[1],dt(1970,1,1,0,1,0))
+        self.assertEqual(list(time_series.df.columns),['C','RH'])
+        self.assertEqual(time_series.df.iloc[0][0],23.8)
+        self.assertEqual(time_series.df.iloc[0][1],57.2)
 
         # Test resolution
-        timeseries = TimeSeries(DataTimePoint(dt=dt(2015,10,24,0,0,0, tzinfo='Europe/Rome'), data=23.8),
-                                DataTimePoint(dt=dt(2015,10,25,0,0,0, tzinfo='Europe/Rome'), data=24.1),
-                                DataTimePoint(dt=dt(2015,10,26,0,0,0, tzinfo='Europe/Rome'), data=23.1))
-        self.assertEqual(timeseries.resolution, 'variable') # DST occurred, resolution marked as undefined
-        self.assertEqual(timeseries.guess_resolution(), 86400)
+        time_series = TimeSeries(DataTimePoint(dt=dt(2015,10,24,0,0,0, tzinfo='Europe/Rome'), data=23.8),
+                                 DataTimePoint(dt=dt(2015,10,25,0,0,0, tzinfo='Europe/Rome'), data=24.1),
+                                 DataTimePoint(dt=dt(2015,10,26,0,0,0, tzinfo='Europe/Rome'), data=23.1))
+        self.assertEqual(time_series.resolution, 'variable') # DST occurred, resolution marked as undefined
+        self.assertEqual(time_series.guess_resolution(), 86400)
 
-        timeseries = TimeSeries(DataTimePoint(dt=dt(2015,10,27,0,0,0, tzinfo='Europe/Rome'), data={'a':23.8}),
-                                DataTimePoint(dt=dt(2015,10,28,0,0,0, tzinfo='Europe/Rome'), data={'a':24.1}),
-                                DataTimePoint(dt=dt(2015,10,29,0,0,0, tzinfo='Europe/Rome'), data={'a':23.1}))
-        self.assertEqual(timeseries.resolution, 86400) # No DST occured
-        self.assertEqual(timeseries.resolution, '86400s') # No DST occured
-
+        time_series = TimeSeries(DataTimePoint(dt=dt(2015,10,27,0,0,0, tzinfo='Europe/Rome'), data={'a':23.8}),
+                                 DataTimePoint(dt=dt(2015,10,28,0,0,0, tzinfo='Europe/Rome'), data={'a':24.1}),
+                                 DataTimePoint(dt=dt(2015,10,29,0,0,0, tzinfo='Europe/Rome'), data={'a':23.1}))
+        self.assertEqual(time_series.resolution, 86400) # No DST occurred
+        self.assertEqual(time_series.resolution, '86400s') # No DST occurred
 
         # Test data keys and rename a data key
-        # TODO: move this test where to test data point series ?
-        timeseries = TimeSeries(DataTimePoint(dt=dt(2015,10,27,0,0,0, tzinfo='Europe/Rome'), data={'a':23.8, 'b':1}),
-                                DataTimePoint(dt=dt(2015,10,28,0,0,0, tzinfo='Europe/Rome'), data={'a':24.1, 'b':2}),
-                                DataTimePoint(dt=dt(2015,10,29,0,0,0, tzinfo='Europe/Rome'), data={'a':23.1, 'b':3}))        
-        self.assertEqual(timeseries.data_labels(), ['a','b'])
-        timeseries.rename_data_label('b','c')
-        self.assertEqual(timeseries.data_labels(), ['a','c'])
+        time_series = TimeSeries(DataTimePoint(dt=dt(2015,10,27,0,0,0, tzinfo='Europe/Rome'), data={'a':23.8, 'b':1}),
+                                 DataTimePoint(dt=dt(2015,10,28,0,0,0, tzinfo='Europe/Rome'), data={'a':24.1, 'b':2}),
+                                 DataTimePoint(dt=dt(2015,10,29,0,0,0, tzinfo='Europe/Rome'), data={'a':23.1, 'b':3}))        
+        self.assertEqual(time_series.data_labels(), ['a','b'])
+        time_series.rename_data_label('b','c')
+        self.assertEqual(time_series.data_labels(), ['a','c'])
         
         with self.assertRaises(KeyError):
-            timeseries.rename_data_label('notexistent_key','c')
+            time_series.rename_data_label('notexistent_key','c')
 
         # Check timezone
-        timeseries = TimeSeries(DataTimePoint(dt=dt(2015,10,25,0,0,0, tz='Europe/Rome'), data={'a':23.8}),
-                                DataTimePoint(dt=dt(2015,10,26,0,0,0, tz='Europe/Rome'), data={'a':23.8}))
-        self.assertEqual(str(timeseries.tz), 'Europe/Rome')
+        time_series = TimeSeries(DataTimePoint(dt=dt(2015,10,25,0,0,0, tz='Europe/Rome'), data={'a':23.8}),
+                                 DataTimePoint(dt=dt(2015,10,26,0,0,0, tz='Europe/Rome'), data={'a':23.8}))
+        self.assertEqual(str(time_series.tz), 'Europe/Rome')
             
         # Test test square brackets notation for filtering (more testing is done in the filter operation tests)
-        timeseries =  TimeSeries(DataTimePoint(t=60, data={'a':1, 'b':2}))
-        self.assertEqual(timeseries['a'][0].data, {'a': 1})        
+        time_series =  TimeSeries(DataTimePoint(t=60, data={'a':1, 'b':2}))
+        self.assertEqual(time_series['a'][0].data, {'a': 1})        
     
         # Test square brackets notation for getting items and slicing
-        timeseries = TimeSeries(DataTimePoint(dt=dt(2015,10,25,6,15,0, tz='Europe/Rome'), data={'a':11, 'b':12, 'c':13}), #
-                                DataTimePoint(dt=dt(2015,10,25,6,16,0, tz='Europe/Rome'), data={'a':21, 'b':22, 'c':23}), #
-                                DataTimePoint(dt=dt(2015,10,25,6,17,0, tz='Europe/Rome'), data={'a':31, 'b':32, 'c':33}), #
-                                DataTimePoint(dt=dt(2015,10,25,6,18,0, tz='Europe/Rome'), data={'a':41, 'b':42, 'c':43}), #
-                                DataTimePoint(dt=dt(2015,10,25,6,19,0, tz='Europe/Rome'), data={'a':51, 'b':52, 'c':53}), # 1445750340
-                                DataTimePoint(dt=dt(2015,10,25,6,20,0, tz='Europe/Rome'), data={'a':61, 'b':62, 'c':63}), # 1445750400
-                                DataTimePoint(dt=dt(2015,10,25,6,21,0, tz='Europe/Rome'), data={'a':71, 'b':72, 'c':73}), # 1445750460
-                                DataTimePoint(dt=dt(2015,10,25,6,22,0, tz='Europe/Rome'), data={'a':81, 'b':82, 'c':83})) # 1445750520
+        time_series = TimeSeries(DataTimePoint(dt=dt(2015,10,25,6,15,0, tz='Europe/Rome'), data={'a':11, 'b':12, 'c':13}), # 1445753700
+                                 DataTimePoint(dt=dt(2015,10,25,6,16,0, tz='Europe/Rome'), data={'a':21, 'b':22, 'c':23}), # 1445753760
+                                 DataTimePoint(dt=dt(2015,10,25,6,17,0, tz='Europe/Rome'), data={'a':31, 'b':32, 'c':33}), # 1445753820
+                                 DataTimePoint(dt=dt(2015,10,25,6,18,0, tz='Europe/Rome'), data={'a':41, 'b':42, 'c':43}), # 1445753880
+                                 DataTimePoint(dt=dt(2015,10,25,6,19,0, tz='Europe/Rome'), data={'a':51, 'b':52, 'c':53}), # 1445750340
+                                 DataTimePoint(dt=dt(2015,10,25,6,20,0, tz='Europe/Rome'), data={'a':61, 'b':62, 'c':63}), # 1445750400
+                                 DataTimePoint(dt=dt(2015,10,25,6,21,0, tz='Europe/Rome'), data={'a':71, 'b':72, 'c':73}), # 1445750460
+                                 DataTimePoint(dt=dt(2015,10,25,6,22,0, tz='Europe/Rome'), data={'a':81, 'b':82, 'c':83})) # 1445750520
         
         # Get item by t
         with self.assertRaises(ValueError):
-            timeseries['t=5']
-        self.assertEqual(timeseries['t=1445750340'], timeseries[4])
+            time_series['t=5']
+        self.assertEqual(time_series['t=1445750340'], time_series[4])
         with self.assertRaises(ValueError):
-            timeseries[{'t':5}]
-        self.assertEqual(timeseries[{'t':1445750340}], timeseries[4])
+            time_series[{'t':5}]
+        self.assertEqual(time_series[{'t':1445750340}], time_series[4])
 
         # Get item by dt
         with self.assertRaises(ValueError):
-            timeseries['dt=2035-10-25 00:00:00+01:00']         
-        self.assertEqual(timeseries['dt=2015-10-25 06:19:00+01:00'], timeseries[4])
-        self.assertEqual(timeseries['dt=2015-10-25T06:19:00+01:00'], timeseries[4])
+            time_series['dt=2035-10-25 00:00:00+01:00']         
+        self.assertEqual(time_series['dt=2015-10-25 06:19:00+01:00'], time_series[4])
+        self.assertEqual(time_series['dt=2015-10-25T06:19:00+01:00'], time_series[4])
         with self.assertRaises(ValueError):
-            timeseries[{'dt': dt(2035,10,25,0,0,0, tz='Europe/Rome')}]         
-        self.assertEqual(timeseries[{'dt': dt(2015,10,25,6,19,0, tz='Europe/Rome')}], timeseries[4])
+            time_series[{'dt': dt(2035,10,25,0,0,0, tz='Europe/Rome')}]         
+        self.assertEqual(time_series[{'dt': dt(2015,10,25,6,19,0, tz='Europe/Rome')}], time_series[4])
         
         # Test square brackets notation for slicing
-        self.assertEqual(len(timeseries['t=1445750340':'t=1445750460']), 2)
-        self.assertEqual(timeseries['t=1445750340':'t=1445750460'][0], timeseries[4])
-        self.assertEqual(timeseries['t=1445750340':'t=1445750460'][1], timeseries[5])
+        self.assertEqual(len(time_series['t=1445750340':'t=1445750460']), 2)
+        self.assertEqual(time_series['t=1445750340':'t=1445750460'][0], time_series[4])
+        self.assertEqual(time_series['t=1445750340':'t=1445750460'][1], time_series[5])
 
-        self.assertEqual(len(timeseries['t=1445750340':'t=1445750461']), 3)
-        self.assertEqual(timeseries['t=1445750340':'t=1445750461'][0], timeseries[4])
-        self.assertEqual(timeseries['t=1445750340':'t=1445750461'][1], timeseries[5])
-        self.assertEqual(timeseries['t=1445750340':'t=1445750461'][2], timeseries[6])
+        self.assertEqual(len(time_series['t=1445750340':'t=1445750461']), 3)
+        self.assertEqual(time_series['t=1445750340':'t=1445750461'][0], time_series[4])
+        self.assertEqual(time_series['t=1445750340':'t=1445750461'][1], time_series[5])
+        self.assertEqual(time_series['t=1445750340':'t=1445750461'][2], time_series[6])
 
-        self.assertEqual(len(timeseries[{'t':1445750340}:{'t':1445750460}]), 2)
-        self.assertEqual(timeseries[{'t':1445750340}:{'t':1445750460}][0], timeseries[4])
-        self.assertEqual(timeseries[{'t':1445750340}:{'t':1445750460}][1], timeseries[5])
+        self.assertEqual(len(time_series[{'t':1445750340}:{'t':1445750460}]), 2)
+        self.assertEqual(time_series[{'t':1445750340}:{'t':1445750460}][0], time_series[4])
+        self.assertEqual(time_series[{'t':1445750340}:{'t':1445750460}][1], time_series[5])
 
-        self.assertEqual(len(timeseries[{'t':1445750340}:{'t':1445750460}]), 2)
-        self.assertEqual(timeseries[{'t':1445750340}:{'t':1445750460}][0], timeseries[4])
-        self.assertEqual(timeseries[{'t':1445750340}:{'t':1445750460}][1], timeseries[5])
+        self.assertEqual(len(time_series[{'t':1445750340}:{'t':1445750460}]), 2)
+        self.assertEqual(time_series[{'t':1445750340}:{'t':1445750460}][0], time_series[4])
+        self.assertEqual(time_series[{'t':1445750340}:{'t':1445750460}][1], time_series[5])
 
-        self.assertEqual(len(timeseries[{'t':1445750340}:]), 4)
-        self.assertEqual(timeseries[{'t':1445750340}:][0], timeseries[4])
-        self.assertEqual(timeseries[{'t':1445750340}:][1], timeseries[5])
-        self.assertEqual(timeseries[{'t':1445750340}:][2], timeseries[6])
-        self.assertEqual(timeseries[{'t':1445750340}:][3], timeseries[7])
+        self.assertEqual(len(time_series[{'t':1445750340}:]), 4)
+        self.assertEqual(time_series[{'t':1445750340}:][0], time_series[4])
+        self.assertEqual(time_series[{'t':1445750340}:][1], time_series[5])
+        self.assertEqual(time_series[{'t':1445750340}:][2], time_series[6])
+        self.assertEqual(time_series[{'t':1445750340}:][3], time_series[7])
 
-        self.assertEqual(len(timeseries[:{'t':1445750340}]), 4)
-        self.assertEqual(timeseries[:{'t':1445750340}][0], timeseries[0])
-        self.assertEqual(timeseries[:{'t':1445750340}][1], timeseries[1])
-        self.assertEqual(timeseries[:{'t':1445750340}][2], timeseries[2])
-        self.assertEqual(timeseries[:{'t':1445750340}][3], timeseries[3])
+        self.assertEqual(len(time_series[:{'t':1445750340}]), 4)
+        self.assertEqual(time_series[:{'t':1445750340}][0], time_series[0])
+        self.assertEqual(time_series[:{'t':1445750340}][1], time_series[1])
+        self.assertEqual(time_series[:{'t':1445750340}][2], time_series[2])
+        self.assertEqual(time_series[:{'t':1445750340}][3], time_series[3])
 
         # Start = end and start > end 
-        self.assertEqual(len(timeseries[{'t':1445750340}:{'t':1445750340}]), 0)
-        self.assertEqual(len(timeseries[{'t':4445750340}:{'t':1445750340}]), 0)
-
+        self.assertEqual(len(time_series[{'t':1445750340}:{'t':1445750340}]), 0)
+        self.assertEqual(len(time_series[{'t':4445750340}:{'t':1445750340}]), 0)
 
 
     def test_TimeSeries_with_TimeSlots(self):
 
         # Basic tests
-        timeseries = TimeSeries(TimeSlot(start=TimePoint(0), end=TimePoint(10)))
+        time_series = TimeSeries(TimeSlot(start=TimePoint(0), end=TimePoint(10)))
         with self.assertRaises(ValueError):
             # Cannot add items with different units (I have "10.0" and you tried to add "11.0")
-            timeseries.append(TimeSlot(start=TimePoint(10), end=TimePoint(21)))
-        timeseries.append(TimeSlot(start=TimePoint(10), end=TimePoint(20)))
+            time_series.append(TimeSlot(start=TimePoint(10), end=TimePoint(21)))
+        time_series.append(TimeSlot(start=TimePoint(10), end=TimePoint(20)))
 
-
-        timeseries = TimeSeries()
-        timeseries.append(TimeSlot(start=TimePoint(t=0), end=TimePoint(t=60)))
+        time_series = TimeSeries()
+        time_series.append(TimeSlot(start=TimePoint(t=0), end=TimePoint(t=60)))
         with self.assertRaises(ValueError):
-            timeseries.append(TimeSlot(start=TimePoint(t=0), end=TimePoint(t=60)))
+            time_series.append(TimeSlot(start=TimePoint(t=0), end=TimePoint(t=60)))
         with self.assertRaises(ValueError):
-            timeseries.append(TimeSlot(start=TimePoint(t=120), end=TimePoint(t=180)))
+            time_series.append(TimeSlot(start=TimePoint(t=120), end=TimePoint(t=180)))
 
-        timeseries.append(TimeSlot(start=TimePoint(t=60), end=TimePoint(t=120)))
+        time_series.append(TimeSlot(start=TimePoint(t=60), end=TimePoint(t=120)))
 
-        self.assertEqual(len(timeseries),2)
-        self.assertEqual(timeseries[0].start.t,0)
-        self.assertEqual(timeseries[0].end.t,60)
-        self.assertEqual(timeseries[1].start.t,60)
-        self.assertEqual(timeseries[1].end.t,120) 
+        self.assertEqual(len(time_series),2)
+        self.assertEqual(time_series[0].start.t,0)
+        self.assertEqual(time_series[0].end.t,60)
+        self.assertEqual(time_series[1].start.t,60)
+        self.assertEqual(time_series[1].end.t,120) 
 
         # Test timezone
-        timeseries = TimeSeries()
-        timeseries.append(TimeSlot(start=TimePoint(t=0, tz='Europe/Rome'), end=TimePoint(t=60, tz='Europe/Rome')))
+        time_series = TimeSeries()
+        time_series.append(TimeSlot(start=TimePoint(t=0, tz='Europe/Rome'), end=TimePoint(t=60, tz='Europe/Rome')))
         with self.assertRaises(ValueError):
-            timeseries.append(TimeSlot(start=TimePoint(t=60), end=TimePoint(t=210)))
-        timeseries.append(TimeSlot(start=TimePoint(t=60, tz='Europe/Rome'), end=TimePoint(t=120, tz='Europe/Rome')))
+            time_series.append(TimeSlot(start=TimePoint(t=60), end=TimePoint(t=210)))
+        time_series.append(TimeSlot(start=TimePoint(t=60, tz='Europe/Rome'), end=TimePoint(t=120, tz='Europe/Rome')))
 
         # Test slot unit
-        self.assertEqual(timeseries.resolution, Unit(60.0))
+        self.assertEqual(time_series.resolution, Unit(60.0))
 
         # Test resolution 
-        self.assertEqual(timeseries.resolution, Unit(60))
+        self.assertEqual(time_series.resolution, Unit(60))
 
 
     def test_TimeSeries_with_DataTimeSlots(self):
@@ -765,7 +745,7 @@ class TestTimeSeries(unittest.TestCase):
         with self.assertRaises(TypeError):
             TimeSeries(DataTimeSlot(start=TimePoint(t=60), end=TimePoint(t=120), data=23.8),
                        DataTimeSlot(start=TimePoint(t=120), end=TimePoint(t=180), data=24.1),
-                        DataTimeSlot(start=TimePoint(t=180), end=TimePoint(t=240), data=None))
+                       DataTimeSlot(start=TimePoint(t=180), end=TimePoint(t=240), data=None))
 
         with self.assertRaises(ValueError):
             TimeSeries(DataTimeSlot(start=TimePoint(t=180), end=TimePoint(t=20), data=24.1),
@@ -779,158 +759,163 @@ class TestTimeSeries(unittest.TestCase):
             TimeSeries(DataTimeSlot(start=TimePoint(t=60), end=TimePoint(t=120), data=23.8),
                        DataTimeSlot(start=TimePoint(t=60), end=TimePoint(t=120), data=24.1))
 
-        timeseries = TimeSeries(DataTimeSlot(start=TimePoint(t=60),  end=TimePoint(t=120), data=23.8),
-                                DataTimeSlot(start=TimePoint(t=120), end=TimePoint(t=180), data=24.1),
-                                DataTimeSlot(start=TimePoint(t=180), end=TimePoint(t=240), data=23.1))
+        time_series = TimeSeries(DataTimeSlot(start=TimePoint(t=60),  end=TimePoint(t=120), data=23.8),
+                                 DataTimeSlot(start=TimePoint(t=120), end=TimePoint(t=180), data=24.1),
+                                 DataTimeSlot(start=TimePoint(t=180), end=TimePoint(t=240), data=23.1))
 
-        timeseries.append(DataTimeSlot(start=TimePoint(t=240), end=TimePoint(t=300), data=22.7))
-        self.assertTrue(len(timeseries), 4)
+        time_series.append(DataTimeSlot(start=TimePoint(t=240), end=TimePoint(t=300), data=22.7))
+        self.assertTrue(len(time_series), 4)
 
         # Try to append a different data type
-        timeseries = TimeSeries(DataTimeSlot(start=TimePoint(t=60), end=TimePoint(t=120), data=23.8))
+        time_series = TimeSeries(DataTimeSlot(start=TimePoint(t=60), end=TimePoint(t=120), data=23.8))
         with self.assertRaises(TypeError):
-            timeseries.append(DataTimeSlot(start=TimePoint(t=120), end=TimePoint(t=180), data={'a':56}))
+            time_series.append(DataTimeSlot(start=TimePoint(t=120), end=TimePoint(t=180), data={'a':56}))
 
         # Try to append the same data type but with different cardinality
-        timeseries = TimeSeries(DataTimeSlot(start=TimePoint(t=60), end=TimePoint(t=120), data=[23.8]))
+        time_series = TimeSeries(DataTimeSlot(start=TimePoint(t=60), end=TimePoint(t=120), data=[23.8]))
         with self.assertRaises(ValueError):
-            timeseries.append(DataTimeSlot(start=TimePoint(t=120), end=TimePoint(t=180), data=[23.8,31.3]))
+            time_series.append(DataTimeSlot(start=TimePoint(t=120), end=TimePoint(t=180), data=[23.8,31.3]))
 
         # Try to append the same data type but with different keys
-        timeseries = TimeSeries(DataTimeSlot(start=TimePoint(t=60), end=TimePoint(t=120), data={'a':56, 'b':67}))
+        time_series = TimeSeries(DataTimeSlot(start=TimePoint(t=60), end=TimePoint(t=120), data={'a':56, 'b':67}))
         with self.assertRaises(ValueError):
-            timeseries.append(DataTimeSlot(start=TimePoint(t=120), end=TimePoint(t=180), data={'a':56, 'c':67}))            
+            time_series.append(DataTimeSlot(start=TimePoint(t=120), end=TimePoint(t=180), data={'a':56, 'c':67}))            
 
         # Test with units
-        self.assertEqual(timeseries.resolution, Unit(60.0))
+        self.assertEqual(time_series.resolution, Unit(60.0))
         self.assertEqual(TimeSeries(DataTimeSlot(start=TimePoint(t=60), end=TimePoint(t=120), data=23.8, unit=TimeUnit('60s'))).resolution, TimeUnit('60s'))
 
-        timeseries = TimeSeries()
+        time_series = TimeSeries()
         prev_t = 1595862221
         for _ in range (0, 10):
             t = prev_t + 60
-            timeseries.append(DataTimeSlot(start=TimePoint(t=t), unit=TimeUnit('60s'), data=[5]))    
+            time_series.append(DataTimeSlot(start=TimePoint(t=t), unit=TimeUnit('60s'), data=[5]))    
             prev_t = t
-        self.assertEqual(len(timeseries),10)
-        self.assertEqual(timeseries[0].unit,TimeUnit('60s'))
-        self.assertEqual(timeseries[0].unit, Unit(60))
+        self.assertEqual(len(time_series),10)
+        self.assertEqual(time_series[0].unit,TimeUnit('60s'))
+        self.assertEqual(time_series[0].unit, Unit(60))
 
         # Time series with calendar time units
-        timeseries = TimeSeries()
+        time_series = TimeSeries()
         prev_t = 1595862221
         for _ in range (0, 10):
             t = prev_t + 86400
-            timeseries.append(DataTimeSlot(start=TimePoint(t=t), unit=TimeUnit('1D'), data=[5]))    
+            time_series.append(DataTimeSlot(start=TimePoint(t=t), unit=TimeUnit('1D'), data=[5]))    
             prev_t = t
-        self.assertEqual(len(timeseries),10)
-        self.assertEqual(timeseries[0].unit,TimeUnit('1D'))
+        self.assertEqual(len(time_series),10)
+        self.assertEqual(time_series[0].unit,TimeUnit('1D'))
 
-        # Test creating a time series from a Pandas data frame 
-        df = pd.read_csv(TEST_DATA_PATH+'csv/format4.csv', header=0, parse_dates=[0], index_col=0)
-        timeseries = TimeSeries(df, items_type=DataTimeSlot)
-        self.assertEqual(len(timeseries),5)
-        self.assertEqual(timeseries[0].start.dt,dt(2020,4,3,0,0,0))
-        self.assertEqual(timeseries[4].end.dt,dt(2020,4,3,10,0,0))
-
-        # Test creating a Pandas data frame from a time series
-        self.assertEqual(len(timeseries.df),5)
-        self.assertEqual(timeseries.df.index[0],dt(2020,4,3,0,0,0))
-        self.assertEqual(list(timeseries.df.columns),['C','RH'])
-        self.assertEqual(timeseries.df.iloc[0][0],21.7)
-        self.assertEqual(timeseries.df.iloc[0][1],54.9)
-
-        # Test loading a Pandas data frame as a time series        
-        loaded_timeseries = TimeSeries(timeseries.df, items_type=DataTimeSlot)
-        self.assertEqual(loaded_timeseries[0].start.dt,dt(2020,4,3,0,0,0))
-        self.assertEqual(loaded_timeseries[4].end.dt,dt(2020,4,3,10,0,0))
-        self.assertEqual((loaded_timeseries[0].data['C']), 21.7)
-        self.assertEqual((loaded_timeseries[0].data['RH']), 54.9)
+        # Test accessing the time series as Pandas data frame
+        time_series =  TimeSeries(DataTimeSlot(start=TimePoint(t=0),  end=TimePoint(t=86400), data={'C': 23.8, 'RH': 57.2}),
+                                  DataTimeSlot(start=TimePoint(t=86400), end=TimePoint(t=86400*2), data={'C': 23.8, 'RH': 57.2}),
+                                  DataTimeSlot(start=TimePoint(t=86400*2), end=TimePoint(t=86400*3), data={'C': 23.8, 'RH': 57.2}))
+        self.assertEqual(len(time_series.df),3)
+        self.assertEqual(time_series.df.index[0],dt(1970,1,1,0,0,0))
+        self.assertEqual(time_series.df.index[1],dt(1970,1,2,0,0,0))
+        self.assertEqual(list(time_series.df.columns),['C','RH'])
+        self.assertEqual(time_series.df.iloc[0][0],23.8)
+        self.assertEqual(time_series.df.iloc[0][1],57.2)
 
         # Test resolution
-        timeseries =  TimeSeries(DataTimeSlot(start=TimePoint(t=60),  end=TimePoint(t=120), data=23.8),
-                                 DataTimeSlot(start=TimePoint(t=120), end=TimePoint(t=180), data=24.1),
-                                 DataTimeSlot(start=TimePoint(t=180), end=TimePoint(t=240), data=23.1))
-        self.assertEqual(timeseries.resolution, Unit(60))
+        time_series =  TimeSeries(DataTimeSlot(start=TimePoint(t=60),  end=TimePoint(t=120), data=23.8),
+                                  DataTimeSlot(start=TimePoint(t=120), end=TimePoint(t=180), data=24.1),
+                                  DataTimeSlot(start=TimePoint(t=180), end=TimePoint(t=240), data=23.1))
+        self.assertEqual(time_series.resolution, Unit(60))
 
-        timeseries =  TimeSeries(DataTimeSlot(start=TimePoint(t=60),  unit=TimeUnit('1m'), data=23.8),
-                                 DataTimeSlot(start=TimePoint(t=120), unit=TimeUnit('1m'), data=24.1),
-                                 DataTimeSlot(start=TimePoint(t=180), unit=TimeUnit('1m'), data=23.1)) 
-        self.assertEqual(timeseries.resolution, TimeUnit('1m'))
-
+        time_series =  TimeSeries(DataTimeSlot(start=TimePoint(t=60),  unit=TimeUnit('1m'), data=23.8),
+                                  DataTimeSlot(start=TimePoint(t=120), unit=TimeUnit('1m'), data=24.1),
+                                  DataTimeSlot(start=TimePoint(t=180), unit=TimeUnit('1m'), data=23.1)) 
+        self.assertEqual(time_series.resolution, TimeUnit('1m'))
 
         # Test change timezone
         from ..time import timezonize
-        timeseries_UTC =  TimeSeries(DataTimeSlot(start=TimePoint(t=60),  end=TimePoint(t=120), data=23.8),
-                                     DataTimeSlot(start=TimePoint(t=120), end=TimePoint(t=180), data=24.1),
-                                     DataTimeSlot(start=TimePoint(t=180), end=TimePoint(t=240), data=23.1))
+        time_series_UTC =  TimeSeries(DataTimeSlot(start=TimePoint(t=60),  end=TimePoint(t=120), data=23.8),
+                                      DataTimeSlot(start=TimePoint(t=120), end=TimePoint(t=180), data=24.1),
+                                      DataTimeSlot(start=TimePoint(t=180), end=TimePoint(t=240), data=23.1))
 
-        timeseries_UTC.change_timezone('Europe/Rome')
-        self.assertEqual(timeseries_UTC.tz, timezonize('Europe/Rome'))
-        self.assertEqual(timeseries_UTC[0].tz, timezonize('Europe/Rome'))
-        self.assertEqual(timeseries_UTC[0].start.tz, timezonize('Europe/Rome'))
-        self.assertEqual(timeseries_UTC[0].end.tz, timezonize('Europe/Rome'))
-
+        time_series_UTC.change_timezone('Europe/Rome')
+        self.assertEqual(time_series_UTC.tz, timezonize('Europe/Rome'))
+        self.assertEqual(time_series_UTC[0].tz, timezonize('Europe/Rome'))
+        self.assertEqual(time_series_UTC[0].start.tz, timezonize('Europe/Rome'))
+        self.assertEqual(time_series_UTC[0].end.tz, timezonize('Europe/Rome'))
 
         # Test get item by string key (filter on data labels). More testing is done in the operation tests
-        timeseries =  TimeSeries(DataTimeSlot(start=TimePoint(t=60),  end=TimePoint(t=120), data={'a':1, 'b':2}))
-        self.assertEqual(timeseries['a'][0].data, {'a': 1})
-
+        time_series =  TimeSeries(DataTimeSlot(start=TimePoint(t=60),  end=TimePoint(t=120), data={'a':1, 'b':2}))
+        self.assertEqual(time_series['a'][0].data, {'a': 1})
 
         # Test data keys and rename a data key
-        # TODO: move this test where to test data point series ?
-        timeseries = TimeSeries(DataTimeSlot(dt=dt(2015,10,27,0,0,0), unit='1D', data={'a':23.8, 'b':1}),
-                                DataTimeSlot(dt=dt(2015,10,28,0,0,0), unit='1D', data={'a':24.1, 'b':2}),
-                                DataTimeSlot(dt=dt(2015,10,29,0,0,0), unit='1D', data={'a':23.1, 'b':3}))
+        time_series = TimeSeries(DataTimeSlot(dt=dt(2015,10,27,0,0,0), unit='1D', data={'a':23.8, 'b':1}),
+                                 DataTimeSlot(dt=dt(2015,10,28,0,0,0), unit='1D', data={'a':24.1, 'b':2}),
+                                 DataTimeSlot(dt=dt(2015,10,29,0,0,0), unit='1D', data={'a':23.1, 'b':3}))
 
-        self.assertEqual(timeseries.data_labels(), ['a','b'])
-        timeseries.rename_data_label('b','c')
-        self.assertEqual(timeseries.data_labels(), ['a','c'])
+        self.assertEqual(time_series.data_labels(), ['a','b'])
+        time_series.rename_data_label('b','c')
+        self.assertEqual(time_series.data_labels(), ['a','c'])
 
         with self.assertRaises(KeyError):
-            timeseries.rename_data_label('notexistent_key','c')
+            time_series.rename_data_label('notexistent_key','c')
 
 
-    def test_TimeSeries_alternative_inits_besides_df(self):
+    def test_TimeSeries_alternative_inits(self):
         
-        timeseries = TimeSeries([{'t':60, 'data':14},
+        # Test init from a Pandas data frame
+        df = pd.read_csv(TEST_DATA_PATH+'csv/format3.csv', header=3, parse_dates=[0], index_col=0)
+        time_series = TimeSeries(df)
+        self.assertEqual(len(time_series),6)
+        self.assertEqual(time_series[0].dt,dt(2020,4,3,0,0,0))
+        self.assertEqual(time_series[5].dt,dt(2020,4,3,5,0,0))
+        self.assertEqual((time_series[0].data['C']), 21.7)
+        self.assertEqual((time_series[0].data['RH']), 54.9)
+ 
+        df = pd.read_csv(TEST_DATA_PATH+'csv/format4.csv', header=0, parse_dates=[0], index_col=0)
+        time_series = TimeSeries(df, items_type=DataTimeSlot)
+        self.assertEqual(len(time_series),5)
+        self.assertEqual(time_series[0].start.dt,dt(2020,4,3,0,0,0))
+        self.assertEqual(time_series[4].end.dt,dt(2020,4,3,10,0,0))
+        self.assertEqual((time_series[0].data['C']), 21.7)
+        self.assertEqual((time_series[0].data['RH']), 54.9)
+
+        # Test init from list of dicts
+        time_series = TimeSeries([{'t':60, 'data':14},
                                  {'t':120, 'data':18},
                                  {'t':128, 'data':20}])
-        self.assertEqual(len(timeseries), 3)
-        self.assertEqual(timeseries[0].t, 60)
-        self.assertEqual(timeseries[0].data, [14])
+        self.assertEqual(len(time_series), 3)
+        self.assertEqual(time_series[0].t, 60)
+        self.assertEqual(time_series[0].data, [14])
 
-        timeseries = TimeSeries([{'t':60, 'data':{'a': 14}},
+        time_series = TimeSeries([{'t':60, 'data':{'a': 14}},
                                  {'t':120, 'data':{'a': 18}},
                                  {'t':128, 'data':{'a': 20}}])
-        self.assertEqual(len(timeseries), 3)
-        self.assertEqual(timeseries[0].t, 60)
-        self.assertEqual(timeseries[0].data, {'a': 14})
+        self.assertEqual(len(time_series), 3)
+        self.assertEqual(time_series[0].t, 60)
+        self.assertEqual(time_series[0].data, {'a': 14})
 
-        timeseries = TimeSeries([{'dt':dt(1970,1,1,0,1), 'data':14},
+        time_series = TimeSeries([{'dt':dt(1970,1,1,0,1), 'data':14},
                                  {'dt':dt(1970,1,1,0,2), 'data':18},
                                  {'dt':dt(1970,1,1,0,3), 'data':20}],
                                  slot_unit='60s')
-        self.assertEqual(len(timeseries), 3)
-        self.assertEqual(timeseries[0].start.t, 60)
-        self.assertEqual(timeseries[0].end.t, 120)
-        self.assertEqual(timeseries[0].data, [14])
+        self.assertEqual(len(time_series), 3)
+        self.assertEqual(time_series[0].start.t, 60)
+        self.assertEqual(time_series[0].end.t, 120)
+        self.assertEqual(time_series[0].data, [14])
         
-        timeseries = TimeSeries(TEST_DATA_PATH + '/csv/single_value_no_labels.csv')
-        self.assertEqual(len(timeseries), 6)
-        self.assertEqual(timeseries[0].t, 946684800)
-        self.assertEqual(timeseries[0].data, [1000])
+        # Test init from CSV files
+        time_series = TimeSeries(TEST_DATA_PATH + '/csv/single_value_no_labels.csv')
+        self.assertEqual(len(time_series), 6)
+        self.assertEqual(time_series[0].t, 946684800)
+        self.assertEqual(time_series[0].data, [1000])
 
-        timeseries = TimeSeries(TEST_DATA_PATH + '/csv/only_date_no_meaningful_timestamp_label.csv',
+        time_series = TimeSeries(TEST_DATA_PATH + '/csv/only_date_no_meaningful_timestamp_label.csv',
                                  timestamp_format = '%Y-%m-%d')
-        self.assertEqual(len(timeseries), 100)
-        self.assertEqual(timeseries[0].start.t, 1197244800)
-        self.assertTrue(isinstance(timeseries[0], Slot))
+        self.assertEqual(len(time_series), 100)
+        self.assertEqual(time_series[0].start.t, 1197244800)
+        self.assertTrue(isinstance(time_series[0], Slot))
 
-        timeseries = TimeSeries(TEST_DATA_PATH + '/csv/only_date_no_meaningful_timestamp_label.csv',
+        time_series = TimeSeries(TEST_DATA_PATH + '/csv/only_date_no_meaningful_timestamp_label.csv',
                                  timestamp_format = '%Y-%m-%d', series_type='points')
-        self.assertEqual(len(timeseries), 95)
-        self.assertEqual(timeseries[0].t, 1197244800)
-        self.assertTrue(isinstance(timeseries[0], Point))
+        self.assertEqual(len(time_series), 95)
+        self.assertEqual(time_series[0].t, 1197244800)
+        self.assertTrue(isinstance(time_series[0], Point))
 
 
 class TestTimeSeriesView(unittest.TestCase):
@@ -970,12 +955,12 @@ class TestTimeSeriesView(unittest.TestCase):
         self.assertEqual(str(series_view.resolution), '1s')
         self.assertEqual(series_view.data_labels(), ['value'])
 
-        # TODO: Most operations are not supported on Slices and should be disabled
+        # TODO: Most operations are not supported on a TimeSeriesView and should be disabled
         #with self.assertRaises(AttributeError):
         #    series_view.diff()
 
 
-    def test_SeriesDenseSlice(self):
+    def test_dense_TimeSeriesView(self):
         series = TimeSeries()
         series.append(DataTimePoint(t = 0, data = {'value': 0}))
         series.append(DataTimePoint(t = 1, data = {'value': 1}))
@@ -1009,33 +994,4 @@ class TestTimeSeriesView(unittest.TestCase):
         self.assertEqual(series_view_materialized[4].t, 7)
         self.assertEqual(series_view_materialized[5].t, 8)
         self.assertEqual(series_view_materialized[6].t, 9)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

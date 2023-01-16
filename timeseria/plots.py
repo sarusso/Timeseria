@@ -1,12 +1,15 @@
 # -*- coding: utf-8 -*-
 """Plotting utilities."""
-# Note: the code in this module is spaghetti-ish code, and there are no tests. A major refactoring is required.'''
+
+#==================================================================================================================#
+# WARNING: the code in this module is spaghetti-ish code, and there are no tests. A major refactoring is required. #
+#==================================================================================================================#
 
 import os
 import uuid
 import datetime
 from .datastructures import DataTimePoint, DataTimeSlot
-from .time import dt_from_s, dt_to_str, dt_from_str
+from .time import dt_from_s, dt_to_str, dt_from_str, s_from_dt
 from .units import TimeUnit
 from .utilities import is_numerical, os_shell
 try:
@@ -66,8 +69,6 @@ def _utc_fake_s_from_dt(dt):
     else:
         raise ValueError('Cannot convert to fake UTC epoch a datetime without a timezone')
 
-
-
 def _check_data_for_plot(data):
     if is_numerical(data):
         keys = []
@@ -88,7 +89,7 @@ def _check_data_for_plot(data):
         raise Exception('Don\'t know how to plot data "{}" of type "{}"'.format(data, data.__class__.__name__))
     return keys
 
-from timeseria.time import s_from_dt
+
 def _to_dg_time(dt):
     '''Get Dygraphs time form datetime'''
     #return '{}{:02d}-{:02d}T{:02d}:{:02d}:{:02d}+00:00'.format(dt.year, dt.month, dt.day, dt.hour, dt.minute,dt.second)
@@ -97,7 +98,6 @@ def _to_dg_time(dt):
         return 'new Date(Date.UTC({}, {}, {}, {}, {}, {}, {}))'.format(dt.year, dt.month-1, dt.day, dt.hour, dt.minute, dt.second, dt.microsecond/1000)
     else:
         return 'new Date(Date.UTC({}, {}, {}, {}, {}, {}))'.format(dt.year, dt.month-1, dt.day, dt.hour, dt.minute, dt.second)
-
 
 def _to_dg_data(serie, data_labels_to_plot, data_indexes_to_plot, full_precision, aggregate_by=0):
     '''{% for timestamp,value in metric_data.items %}{{timestamp}},{{value}}\n{%endfor%}}'''
@@ -489,7 +489,7 @@ def dygraphs_plot(timeseries, data_labels='all', data_indexes='all', aggregate=N
         serie_mark_html=''
         serie_mark_html_off = ''
 
-    # Dygraphs javascript
+    # Dygraphs Javascript
     dygraphs_javascript = """
 // Taken and adapted from dygraph.js
 function legendFormatter(data) {
@@ -764,7 +764,6 @@ animatedZooms: true,"""
          color: '"""+data_index_color+"""'             // Alpha here is used for the legend 
        },"""    
 
-
     # Add data mark index series
     dygraphs_javascript += """
        'data_mark': {
@@ -983,3 +982,4 @@ def matplotlib_plot(timeseries):
     from matplotlib import pyplot
     pyplot.plot(timeseries.df)
     pyplot.show()
+

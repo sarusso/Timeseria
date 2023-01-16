@@ -13,7 +13,7 @@ from .exceptions import ConsistencyException
 import logging
 logger = logging.getLogger(__name__)
 
-
+# Hard debug switch
 HARD_DEBUG = False
 
 
@@ -73,7 +73,6 @@ class Unit(object):
     def __rsub__(self, other):
         return -self.__sub__(other)
 
-
     def __truediv__(self, other):
 
         # Divide with numerical
@@ -87,7 +86,6 @@ class Unit(object):
 
     def __rtruediv__(self, other):
         return ( 1 / self.__truediv__(other))
-
 
     def __mul__(self, other):
 
@@ -258,15 +256,6 @@ class TimeUnit(Unit):
     def value(self):
         """The value of the TimeUnit, as its string representation."""
         return(str(self))
-        
-        #try:
-        #    return self._value
-        #except AttributeError:
-        #    if self.type == self._CALENDAR:
-        #        raise TypeError('Sorry, the value of a calendar TimeUnit is not defined. use as_seconds() providing the starting point.') from None
-        #    self._value = self.as_seconds()
-        #    return self._value
-
 
     def __repr__(self):
         string = ''
@@ -381,7 +370,6 @@ class TimeUnit(Unit):
                 if self.as_seconds() == other.as_seconds():
                     return True
 
-  
         # Check for direct equality with value, i.e. comparing with a string
         if self.value == other:
             return True
@@ -408,17 +396,6 @@ class TimeUnit(Unit):
         for item in self._mapping_table:
             if getattr(self, self._mapping_table[item]): types +=1
         return True if types > 1 else False 
-
-    #@property
-    #def value(self):
-    #    """The value of the TimeUnit, in seconds. Not defined for calendar time units (as they have variable duration)."""
-    #    try:
-    #        return self._value
-    #    except AttributeError:
-    #        if self.type == self._CALENDAR:
-    #            raise TypeError('Sorry, the value of a calendar TimeUnit is not defined. use as_seconds() providing the starting point.') from None
-    #        self._value = self.as_seconds()
-    #        return self._value
 
     @property
     def type(self):
@@ -686,3 +663,4 @@ class TimeUnit(Unit):
             return end.__class__(labels=end.labels, values=new_values, tz=end.tz) 
         else:
             raise ValueError('get_center: Got not end not start') 
+

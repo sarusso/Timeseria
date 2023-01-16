@@ -24,7 +24,6 @@ except (ImportError,AttributeError):
     pass
 
 
-
 #=====================================
 #  Generic Reconstructor
 #=====================================
@@ -36,7 +35,6 @@ class Reconstructor(Model):
         path (str): a path from which to load a saved model. Will override all other init settings.
     """
     pass
-
 
 
 #=====================================
@@ -54,10 +52,8 @@ class SeriesReconstructor(Reconstructor, SeriesModel):
         """Disabled. Reconstructors can be used only with the ``apply()`` method."""
         raise NotImplementedError('Reconstructors can be used only with the apply() method') from None
  
-    
     def _predict(self, series, *args, **kwargs):
         raise NotImplementedError('Reconstructors can be used only with the apply() method.') from None
-
 
     def _apply(self, series, remove_data_loss=False, data_loss_threshold=1, inplace=False):
 
@@ -121,7 +117,6 @@ class SeriesReconstructor(Reconstructor, SeriesModel):
         else:
             return None
 
-
     def evaluate(self, series, steps='auto', limit=None, data_loss_threshold=1, metrics=['RMSE', 'MAE'], details=False, from_t=None, to_t=None, from_dt=None, to_dt=None):
         """Evaluate the reconstructor on a series.
 
@@ -142,7 +137,6 @@ class SeriesReconstructor(Reconstructor, SeriesModel):
             to_dt(datetime) : evaluation ending datetime.
         """
         return super(Reconstructor, self).evaluate(series, steps, limit, data_loss_threshold, metrics, details, from_t, to_t, from_dt, to_dt)
-
 
     def _evaluate(self, series, steps='auto', limit=None, data_loss_threshold=1, metrics=['RMSE', 'MAE'], details=False, from_t=None, to_t=None, from_dt=None, to_dt=None):
 
@@ -319,7 +313,6 @@ class SeriesReconstructor(Reconstructor, SeriesModel):
         raise NotImplementedError('Reconstruction for this model is not yet implemented')
 
 
-
 #=====================================
 # Linear Interpolation Reconstructor
 #=====================================
@@ -360,7 +353,6 @@ class LinearInterpolationReconstructor(SeriesReconstructor):
             series[i]._data = reconstructed_data
 
 
-
 #=====================================
 #  Periodic Average Reconstructor
 #=====================================
@@ -391,7 +383,6 @@ class PeriodicAverageReconstructor(SeriesReconstructor):
             to_dt(datetime) : fit ending datetime.
         """
         return super(PeriodicAverageReconstructor, self).fit(series, data_loss_threshold, periodicity, dst_affected, offset_method, from_t, to_t, from_dt, to_dt)
-
 
     def _fit(self, series, data_loss_threshold=0.5, periodicity='auto', dst_affected=False, offset_method='average', from_t=None, to_t=None, from_dt=None, to_dt=None):
 
@@ -455,7 +446,6 @@ class PeriodicAverageReconstructor(SeriesReconstructor):
         else:
             raise NotImplementedError('Fitting this model on data types other than TimeSeries is not yet implemented')
 
-
     def _reconstruct(self, series, key, from_index, to_index):
         
         if isinstance (series, TimeSeries):
@@ -499,7 +489,6 @@ class PeriodicAverageReconstructor(SeriesReconstructor):
         else:
             raise NotImplementedError('Reconstructing with this model on data types other than TimeSeries is not yet implemented')
 
-   
     def _plot_averages(self, timeseries, **kwargs):   
         averages_timeseries = copy.deepcopy(timeseries)
         for item in averages_timeseries:
@@ -508,7 +497,6 @@ class PeriodicAverageReconstructor(SeriesReconstructor):
                 value = 0
             item.data['periodic_average'] = value 
         averages_timeseries.plot(**kwargs)
-
 
 
 #=====================================
@@ -545,7 +533,6 @@ class ProphetReconstructor(SeriesReconstructor, _ProphetModel):
             self.prophet_model.fit(data)
         else:
             raise NotImplementedError('Fitting this model on data types other than TimeSeries is not yet implemented')
-            
 
     def _reconstruct(self, series, key, from_index, to_index):
         

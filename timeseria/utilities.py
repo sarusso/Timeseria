@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """Utility functions."""
 
-import os
 import re
 import chardet
 from chardet.universaldetector import UniversalDetector
@@ -18,6 +17,7 @@ from collections import namedtuple
 import logging
 logger = logging.getLogger(__name__)
 
+# Hard debug switch
 HARD_DEBUG = False
 
 
@@ -720,10 +720,3 @@ def _to_time_unit_string(seconds, friendlier=True):
         seconds_str = seconds_str+'s'
     return seconds_str
 
-
-
-
-
-    
-    
-    

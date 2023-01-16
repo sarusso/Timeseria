@@ -36,7 +36,6 @@ except ImportError:
     pass
 
 
-
 #======================
 #  Generic Forecaster
 #======================
@@ -60,7 +59,6 @@ class Forecaster(Model):
             raise NotImplementedError('Forecasting for this model is not implemented')
     
         return self._forecast(*args, **kwargs)
-
 
 
 #======================
@@ -87,7 +85,6 @@ class SeriesForecaster(Forecaster, SeriesModel):
         
         # Call parent predict
         return super(Forecaster, self).predict(series, steps, *args, **kwargs)
-
 
     def forecast(self, series, steps=1, forecast_start=None):
         """Forecast n steps-ahead data points or slots."""
@@ -148,11 +145,9 @@ class SeriesForecaster(Forecaster, SeriesModel):
         else:
             raise NotImplementedError('This model can work only on TimeSeries right now')
 
-
     def apply(self, series, steps=1, *args, **kwargs):
         """Apply the forecast on a series for n steps-ahead"""
         return super(Forecaster, self).apply(series, steps, *args, **kwargs)
-
 
     def _apply(self, series, steps=1, inplace=False):
 
@@ -199,7 +194,6 @@ class SeriesForecaster(Forecaster, SeriesModel):
         else:
             return None
 
-
     def evaluate(self, series, steps='auto', limit=None, plot=False, plots=False, metrics=['RMSE', 'MAE'], details=False, from_t=None, to_t=None, from_dt=None, to_dt=None, evaluation_timeseries=False):
         """Evaluate the forecaster on a series.
 
@@ -225,7 +219,6 @@ class SeriesForecaster(Forecaster, SeriesModel):
             evaluation_timeseries(bool): if to add to the results an evaluation timeseirs containing the eror metrics. Defaulted to false.
         """
         return super(Forecaster, self).evaluate(series, steps, limit, plots, plot, metrics, details, from_t, to_t, from_dt, to_dt, evaluation_timeseries)
-
 
     def _evaluate(self, series, steps='auto', limit=None, plots=False, plot=False, metrics=['RMSE', 'MAE'], details=False, from_t=None, to_t=None, from_dt=None, to_dt=None, evaluation_timeseries=False):
 
@@ -536,7 +529,7 @@ class PeriodicAverageForecaster(SeriesForecaster):
         path (str): a path from which to load a saved model. Will override all other init settings.
         window (int): the window length. If set to ``auto``, then it will be automatically handled based on the time series periodicity.
     """
-
+    
     def __init__(self, path=None, window='auto'):
 
         # Set window
@@ -554,7 +547,6 @@ class PeriodicAverageForecaster(SeriesForecaster):
         if self.fitted:
             self.data['averages'] = {int(key):value for key, value in self.data['averages'].items()}
         
-
     def fit(self, series, periodicity='auto', dst_affected=False, from_t=None, to_t=None, from_dt=None, to_dt=None):
         """Fit the model on a series.
 
@@ -568,7 +560,6 @@ class PeriodicAverageForecaster(SeriesForecaster):
         """
         return super(PeriodicAverageForecaster, self).fit(series, periodicity, dst_affected, from_t, to_t, from_dt, to_dt)
 
-      
     def _fit(self, series, periodicity='auto', dst_affected=False, from_t=None, to_t=None, from_dt=None, to_dt=None):
 
         if isinstance(series, TimeSeries):
@@ -627,7 +618,6 @@ class PeriodicAverageForecaster(SeriesForecaster):
             
         else:
             raise NotImplementedError('Fitting this model on data types other than TimeSeries is not yet implemented')
-
 
     def _predict(self, series, steps=1, forecast_start=None):
         
@@ -688,7 +678,6 @@ class PeriodicAverageForecaster(SeriesForecaster):
         else:
             raise NotImplementedError('Fitting this model on data types other than TimeSeries is not yet implemented')
 
-    
     def _plot_averages(self, timeseries, **kwargs):      
         averages_timeseries = copy.deepcopy(timeseries)
         for item in averages_timeseries:
@@ -697,7 +686,6 @@ class PeriodicAverageForecaster(SeriesForecaster):
                 value = 0
             item.data['periodic_average'] =value 
         averages_timeseries.plot(**kwargs)
-
 
 
 #=========================
@@ -742,7 +730,6 @@ class ProphetForecaster(SeriesForecaster, _ProphetModel):
         else:
             raise NotImplementedError('Fitting this model on data types other than TimeSeries is not yet implemented')
 
-
     def _predict(self, series, steps=1):
 
         if isinstance(series, TimeSeries):
@@ -780,7 +767,6 @@ class ProphetForecaster(SeriesForecaster, _ProphetModel):
             raise NotImplementedError('Using this model on data types other than TimeSeries is not yet implemented')
 
 
-
 #=========================
 #  ARIMA Forecaster
 #=========================
@@ -806,7 +792,6 @@ class ARIMAForecaster(SeriesForecaster, _ARIMAModel):
         self.q = q
         # TODO: save the above in data[]?
         super(ARIMAForecaster, self).__init__(path)
-
 
     def _fit(self, series):
 
@@ -834,9 +819,7 @@ class ARIMAForecaster(SeriesForecaster, _ARIMAModel):
 
         else:
             raise NotImplementedError('Fitting this model on data types other than TimeSeries is not yet implemented')
-
-     
-        
+    
     def _predict(self, series, steps=1):
 
         if isinstance(series, TimeSeries):
@@ -854,7 +837,6 @@ class ARIMAForecaster(SeriesForecaster, _ARIMAModel):
 
         else:
             raise NotImplementedError('Using this model on data types other than TimeSeries is not yet implemented')
-
 
 
 #=========================
@@ -909,7 +891,6 @@ class AARIMAForecaster(SeriesForecaster, _ARIMAModel):
         else:
             raise NotImplementedError('Fitting this model on data types other than TimeSeries is not yet implemented')
 
-
     def _predict(self, series, steps=1):
 
         if isinstance(series, TimeSeries):
@@ -927,7 +908,6 @@ class AARIMAForecaster(SeriesForecaster, _ARIMAModel):
 
         else:
             raise NotImplementedError('Using this model on data types other than TimeSeries is not yet implemented')
-
 
 
 #=========================
@@ -979,7 +959,6 @@ class LSTMForecaster(SeriesForecaster, _KerasModel):
         # Set external model architecture if any
         self.keras_model = keras_model
 
-
     def save(self, path):
 
         # Call parent save
@@ -987,7 +966,6 @@ class LSTMForecaster(SeriesForecaster, _KerasModel):
 
         # Now save the Keras model itself
         self._save_keras_model(path)
-
 
     def _fit(self, series, from_t=None, to_t=None, from_dt=None, to_dt=None, verbose=False, epochs=30, normalize=True):
 
@@ -1065,7 +1043,6 @@ class LSTMForecaster(SeriesForecaster, _KerasModel):
         else:
             raise NotImplementedError('Fitting this model on data types other than TimeSeries is not yet implemented')
 
-
     def _predict(self, series, steps=1, verbose=False):
 
         if isinstance(series, TimeSeries):
@@ -1124,3 +1101,4 @@ class LSTMForecaster(SeriesForecaster, _KerasModel):
 
         else:
             raise NotImplementedError('Using this model on data types other than TimeSeries is not yet implemented')
+

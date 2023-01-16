@@ -41,7 +41,6 @@ class Point():
 
     @property
     def __coordinates_repr__(self):
-        #return ','.join(str(coordinate) for coordinate in self.coordinates)
         if len(self.coordinates)==1:
             return str(self.coordinates[0])
         else:
@@ -300,8 +299,6 @@ class DataTimePoint(DataPoint, TimePoint):
 
 
 
-
-
 #======================
 #  Slots
 #======================
@@ -554,8 +551,8 @@ class DataSlot(Slot):
     def data(self):
         """The data."""
         # Data is set like this as it cannot be set if not in the init (read: changed after created)
-        # to prevent this to happend when the point is in a series where they are all supposed
-        # to carry the same data type and with the same number of elements. TODO: check!
+        # to prevent this to happened when the point is in a series where they are all supposed
+        # to carry the same data type and with the same number of elements. TODO: check me!
         return self._data
 
     @property
@@ -1099,6 +1096,7 @@ class Series(list):
     #=========================
     #  Transformations
     #=========================
+    
     def aggregate(self, unit, *args, **kwargs):
         """Aggregate the series in slots of length set by the ``unit`` parameter. A series of DataPoints or DataSlots is required.""" 
         from .transformations import SeriesAggregator
@@ -1206,6 +1204,7 @@ class Series(list):
 #==============================
 #  Time Series 
 #==============================
+
 class TimeSeries(Series):
     """A list of items coming one after another over time, where every item
        is guaranteed to be of the same type and in order or succession.
@@ -1274,6 +1273,7 @@ class TimeSeries(Series):
             else:
                 raise ConsistencyException('Got no TimePoints nor TimeSlots in a Time Series, this is a consistency error (got {})'.format(self.items_type.__name__))
     
+
     #=========================
     #  Init
     #=========================
@@ -1460,9 +1460,11 @@ class TimeSeries(Series):
         storage = CSVFileStorage(file_name, **kwargs)
         storage.put(self, overwrite=overwrite)
 
+
     #=========================
     #  Append
     #=========================
+ 
     def append(self, item):
         """Append an item to the time series. Accepts only items of type :obj:`DataTimePoint` and :obj:`DataTimeSlot`
         (or :obj:`TimePoint` and :obj:`TimeSlot`, which are useful in some particular circumstances) and in any case 
@@ -1550,8 +1552,7 @@ class TimeSeries(Series):
 
         # Lastly, call the series append
         super(TimeSeries, self).append(item)
-
-
+ 
     def _item_by_t(self, t):
         # TODO: improve performance, bisection first, then use an index?
         for item in self:
@@ -1853,6 +1854,7 @@ class TimeSeries(Series):
 #==============================
 #  Time Series view
 #==============================
+
 class _TimeSeriesView(TimeSeries):
     """A time series view. Only used internally, maybe in future it could be made public
     as a more optimized way for performing some operations, as filtering and slicing.
@@ -2000,7 +2002,7 @@ class _TimeSeriesView(TimeSeries):
 
 
 #=========================
-# For back-compatibility
+#  Back-compatibility
 #=========================
 
 class DataPointSeries(Series): 
@@ -2056,3 +2058,4 @@ class DataTimeSlotSeries(TimeSeries):
     def __init__(self, *args, **kwargs):
         logger.warning('The DataTimeSlotSeries class is deprecated, please replace it with the new TimeSeries class.')
         super(DataTimeSlotSeries, self).__init__(*args, **kwargs)
+

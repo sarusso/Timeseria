@@ -15,10 +15,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-#==========================
-#  Support functions
-#==========================
-
+#  Support function for computing new items
 def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_point_i, slot_prev_point_i, slot_next_point_i,
                  unit, point_validity, timezone, fill_with, force_data_loss, fill_gaps, series_data_indexes, series_resolution,
                  force_compute_data_loss, interpolator_class, operations=None):
@@ -423,7 +420,7 @@ class SeriesTransformation(Transformation):
                 # This approach is to detect if the current slot is "outdated" and spin a new one if so.
                 # Works only for slots at the beginning and in the middle, but not for the last slot
                 # or the missing slots at the end which need to be closed down here
-                logger.debug('Detetcted outdated slot')
+                logger.debug('Detected outdated slot')
                 
                 # Keep spinning new slots until the current data point falls in one of them.
                 # NOTE: Read the following "while" more as an "if" which can also lead to spin multiple
@@ -618,20 +615,4 @@ class SeriesAggregator(Aggregator, SeriesTransformation):
     def process(self, *args, **kwargs):
         kwargs['target'] = 'slots'
         return super(SeriesAggregator, self).process(*args, **kwargs) 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

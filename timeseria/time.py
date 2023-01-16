@@ -9,6 +9,7 @@ logger = logging.getLogger(__name__)
 
 UTC = pytz.UTC
 
+
 def timezonize(tz):
     """Convert a string representation of a timezone to its pytz object,
     or do nothing if the argument is already a pytz timezone."""
@@ -27,6 +28,7 @@ def timezonize(tz):
         tz = pytz.timezone(tz)
   
     return tz
+
 
 def now_s():
     """Return the current time in epoch seconds."""
@@ -92,6 +94,7 @@ def dt(*args, **kwargs):
             raise ValueError('Sorry, time {} does not exists on timezone {}'.format(time_dt, timezone))
 
     return time_dt
+
 
 def _dt(*args, **kwargs):
     return dt(*args, **kwargs)
