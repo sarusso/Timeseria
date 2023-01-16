@@ -1572,9 +1572,9 @@ class TimeSeries(Series):
             requested_start_t = None
             requested_stop_t = None
             if isinstance(arg.start, str):
-                if arg.start.startswith('t'):
+                if arg.start.startswith('t='):
                     requested_start_t = float(arg.start.split('=')[1])
-                elif arg.start.startswith('dt'):
+                elif arg.start.startswith('dt='):
                     requested_start_t = s_from_dt(dt_from_str(arg.split('=')[1].replace(' ', 'T')))
                 else:
                     raise ValueError('Don\'t know how to parse slicing start "{}"'.format(arg.start))
@@ -1587,9 +1587,9 @@ class TimeSeries(Series):
                     raise ValueError('Getting items by dict requires a "t" or a "dt" dict key, found none (Got dict={})'.format(arg))  
             
             if isinstance(arg.stop, str):
-                if arg.start.startswith('t'):
+                if arg.start.startswith('t='):
                     requested_stop_t = float(arg.stop.split('=')[1])
-                elif arg.start.startswith('dt'):
+                elif arg.start.startswith('dt='):
                     requested_stop_t = s_from_dt(dt_from_str(arg.split('=')[1].replace(' ', 'T')))
                 else:
                     raise ValueError('Don\'t know how to parse slicing stop "{}"'.format(arg.stop))
@@ -1639,7 +1639,7 @@ class TimeSeries(Series):
         elif isinstance(arg, str):
             
             # Are we filtering against t or dt?
-            if arg.startswith('t'):
+            if arg.startswith('t='):
                 requested_t = float(arg.split('=')[1])
                 logger.debug('Will look up item for t="%s"', requested_t)
                 try:
@@ -1647,7 +1647,7 @@ class TimeSeries(Series):
                 except ValueError:
                     raise ValueError('Cannot find any item for t="{}"'.format(requested_t))
             
-            if arg.startswith('dt'):
+            if arg.startswith('dt='):
                 requested_dt = dt_from_str(arg.split('=')[1].replace(' ', 'T'))
                 logger.debug('Will look up item for dt="%s"', requested_dt)
                 try:
@@ -1655,7 +1655,6 @@ class TimeSeries(Series):
                 except ValueError:
                     raise ValueError('Cannot find any item for dt="{}"'.format(requested_dt))
         
-
             # Try filtering on this data label only
             return self.filter(arg)
         
