@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Base data structures as Points, Slots and Series."""
 
-from .time import s_from_dt , dt_from_s, UTC, timezonize
+from .time import s_from_dt , dt_from_s, UTC, timezonize, dt_from_str
 from .units import Unit, TimeUnit
 from .utilities import _is_close, _to_time_unit_string
 from copy import deepcopy
@@ -627,6 +627,19 @@ class DataTimeSlot(DataSlot, TimeSlot):
 class Series(list):
     """A list of items coming one after another, where every item
        is guaranteed to be of the same type and in order or succession.
+       
+       The square brackets notation can be used both for slicing the series
+       or to filter it on a specific data label, if its elements support it.
+
+       The square brackets notation can be used for accessing series items, slicing the series
+       or to filter it on a specific data label, if its elements support it:
+       
+           * ``series[3]`` will access the item in position #3;
+
+           * ``series[3:5]`` will slice the time series from item in position #3 to item in position #5 (excluded);
+           
+           * ``series['temperature']`` will filter the time series keeping only the temperature data, assuming that
+             in the original series there were also other data labels (e.g. humidity).
 
        Args:
            *args: the series items.    
@@ -730,25 +743,6 @@ class Series(list):
     def __str__(self):
         return self.__repr__()
         
-    # Python slice (i.e [0:35])
-    def __getitem__(self, key):
-        if isinstance(key, slice):
-            # TODO: improve and implement shallow copies please. Consider using the _TimeSeriesSlice class (as SeriesSlice)
-            indices = range(*key.indices(len(self)))
-            series = self.__class__()
-            for i in indices:
-                series.append(super(Series, self).__getitem__(i))
-            try:
-                series.mark = self.mark
-            except:
-                pass
-            return series
-        elif isinstance(key, str):
-            # Try filtering on this data label only
-            return self.filter(key)
-        else:
-            return super(Series, self).__getitem__(key)
-
     def _all_data_indexes(self):
         """Return all the data_indexes of the series, to be intended as custom
         defined indicators (i.e. data_loss, anomaly_index, etc.)."""
@@ -928,6 +922,30 @@ class Series(list):
     def duplicate(self):
         """ Return a deep copy of the series."""
         return deepcopy(self)
+
+
+    #=========================
+    # Square brackets notation
+    #=========================
+
+    def __getitem__(self, key):
+        if isinstance(key, slice):
+            indices = range(*key.indices(len(self)))
+            # Prepare the new series and return it
+            series = self.__class__()
+            for i in indices:
+                series.append(super(Series, self).__getitem__(i))
+            try:
+                # Preserve mark if any
+                series.mark = self.mark
+            except:
+                pass
+            return series
+        elif isinstance(key, str):
+            # Try filtering on this data label only
+            return self.filter(key)
+        else:
+            return super(Series, self).__getitem__(key)
 
 
     #=========================
@@ -1195,8 +1213,42 @@ class TimeSeries(Series):
        Time series accept only items of type :obj:`DataTimePoint` and :obj:`DataTimeSlot`
        (or :obj:`TimePoint` and :obj:`TimeSlot`, which are useful in some particular circumstances).
        
-       Time series can also be created providing a Pandas data frame with a time-based index as first argument or using the keyword argument ``df``.
+       Time series can also be created providing a Pandas data frame with a time-based
+       index as first argument or using the keyword argument ``df``.
      
+       The square brackets notation can be used for accessing series items, slicing the series
+       or to filter it on a specific data label, if its elements support it.
+       
+       Accessing time series items can be done by position, using a string with special ``t`` or ``dt``
+       keywords, or using a dictionary with ``t`` or ``dt`` keys:
+       
+           * ``series[3]`` will access the item in position #3;
+           
+           * ``series['t=1446073200.7']`` and ``series[{'t': 1446073200.7}]`` will both access the item
+             for the corresponding epoch timestamp;
+             
+           * ``series['dt=2015-10-25 06:19:00+01:00']`` and ``series[{'dt': dt(2015,10,25,6,19,0,0)}]`` will both
+             access the item for the corresponding datetime timestamp. In the string notation, this can be both an
+             ISO8601 timestamp and the string representation of the datetime object.
+
+       Similarly, also slicing time series can be done by position, using a string with special ``t`` or ``dt`` keywords,
+       or using a dictionary with ``t`` or ``dt`` keys:
+       
+           * ``series[3:5]`` will slice the time series from item in position #3 to item in position #5 (excluded);
+           
+           * ``series['t=1446073200.7':'t=1446073600.9']`` and ``series[{'t': 1446073200.7}:{'t': 1446073200.7}]`` will both
+             slice the time series according to the respective epoch timestamps (right excluded);
+             
+           * ``series['dt=2015-10-25 06:19:00+01:00':'dt=2015-10-25 06:23:00+01:00']`` and
+             ``series[{'dt': dt(2015,10,25,6,19,0,0)}:{'dt': dt(2015,10,25,6,19,0,0)}]`` will both
+             slice the time series according to the respective datetime timestamps (right excluded).
+
+        Filtering a series on a data label  requires just to pass the data label in the square brackets notation:
+        
+           * ``series['temperature']`` will filter the time series keeping only the temperature data, assuming that
+             in the original series there were also other data labels (e.g. humidity).
+
+
        Args:
            *args: the time series items.
            df (DataFrame, optional, also as first arg): a Pandas data frame with a time-based index.
@@ -1331,7 +1383,7 @@ class TimeSeries(Series):
             
             # Call parent init
             super(TimeSeries, self).__init__(*args, **kwargs)
-    
+
     #=========================
     #  Append
     #=========================
@@ -1422,6 +1474,137 @@ class TimeSeries(Series):
 
         # Lastly, call the series append
         super(TimeSeries, self).append(item)
+
+
+    def _item_by_t(self, t):
+        # TODO: improve performance, bisection first, then use an index?
+        for item in self:
+            if item.t == t:
+                return item
+        raise ValueError('Cannot find any item for t="{}"'.format(t))
+
+
+    #=========================
+    # Square brackets notation
+    #=========================
+
+    def __getitem__(self, arg):
+        if isinstance(arg, slice):
+            
+            # Handle time-based slicing
+            requested_start_t = None
+            requested_stop_t = None
+            if isinstance(arg.start, str):
+                if arg.start.startswith('t'):
+                    requested_start_t = float(arg.start.split('=')[1])
+                elif arg.start.startswith('dt'):
+                    requested_start_t = s_from_dt(dt_from_str(arg.split('=')[1].replace(' ', 'T')))
+                else:
+                    raise ValueError('Don\'t know how to parse slicing start "{}"'.format(arg.start))
+            elif isinstance(arg.start, dict):
+                if 't' in arg.start:
+                    requested_start_t = arg.start['t']
+                elif 'dt' in arg.start:
+                    requested_start_t = s_from_dt(arg.start['dt'])
+                else:
+                    raise ValueError('Getting items by dict requires a "t" or a "dt" dict key, found none (Got dict={})'.format(arg))  
+            
+            if isinstance(arg.stop, str):
+                if arg.start.startswith('t'):
+                    requested_stop_t = float(arg.stop.split('=')[1])
+                elif arg.start.startswith('dt'):
+                    requested_stop_t = s_from_dt(dt_from_str(arg.split('=')[1].replace(' ', 'T')))
+                else:
+                    raise ValueError('Don\'t know how to parse slicing stop "{}"'.format(arg.stop))
+            elif isinstance(arg.stop, dict):
+                if 't' in arg.stop:
+                    requested_stop_t = arg.stop['t']
+                elif 'dt' in arg.stop:
+                    requested_stop_t = s_from_dt(arg.stop['dt'])
+                else:
+                    raise ValueError('Getting items by dict requires a "t" or a "dt" dict key, found none (Got dict={})'.format(arg))  
+
+            # Set slice indexes
+            if requested_start_t is not None or requested_stop_t is not None:
+                if requested_start_t is not None and requested_stop_t is not None:
+                    if requested_start_t >= requested_stop_t:
+                        return self.__class__()
+                indices = []
+                if requested_start_t is None:
+                    requested_start_t = 0
+                if requested_stop_t is None:
+                    requested_stop_t = super(Series, self).__getitem__(-1).t+1 # +1 to avoid excluding the last point
+                started = False
+                for i, item in enumerate(self):
+                    if started:
+                        # Right is always excluded
+                        if item.t >= requested_stop_t:
+                            break
+                    # Left is always included
+                    if item.t >= requested_start_t:
+                        indices.append(i)
+                        if not started:
+                            started = True
+            else:
+                indices = range(*arg.indices(len(self)))
+
+            # Prepare the new series and return it
+            series = self.__class__()
+            for i in indices:
+                series.append(super(Series, self).__getitem__(i))
+            try:
+                # Preserve mark if any
+                series.mark = self.mark
+            except:
+                pass
+            return series
+        
+        elif isinstance(arg, str):
+            
+            # Are we filtering against t or dt?
+            if arg.startswith('t'):
+                requested_t = float(arg.split('=')[1])
+                logger.debug('Will look up item for t="%s"', requested_t)
+                try:
+                    return self._item_by_t(requested_t)
+                except ValueError:
+                    raise ValueError('Cannot find any item for t="{}"'.format(requested_t))
+            
+            if arg.startswith('dt'):
+                requested_dt = dt_from_str(arg.split('=')[1].replace(' ', 'T'))
+                logger.debug('Will look up item for dt="%s"', requested_dt)
+                try:
+                    return self._item_by_t(s_from_dt(requested_dt))
+                except ValueError:
+                    raise ValueError('Cannot find any item for dt="{}"'.format(requested_dt))
+        
+
+            # Try filtering on this data label only
+            return self.filter(arg)
+        
+        elif isinstance(arg, dict):
+            
+            if 't' in arg:
+                requested_t = arg['t']
+                logger.debug('Will look up item for t="%s"', requested_t)
+                try:
+                    return self._item_by_t(requested_t)
+                except ValueError:
+                    raise ValueError('Cannot find any item for t="{}"'.format(requested_t))
+        
+            elif 'dt' in arg:
+                requested_dt = arg['dt']
+                logger.debug('Will look up item for dt="%s"', requested_dt)
+                try:
+                    return self._item_by_t(s_from_dt(requested_dt))
+                except ValueError:
+                    raise ValueError('Cannot find any item for dt="{}"'.format(requested_dt))
+        
+            else:
+                raise ValueError('Getting items by dict requires a "t" or a "dt" dict key, found none (Got dict={})'.format(arg))
+        
+        else:
+            return super(Series, self).__getitem__(arg)
 
 
     #=========================

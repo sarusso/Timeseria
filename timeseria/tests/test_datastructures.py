@@ -636,10 +636,6 @@ class TestTimeSeries(unittest.TestCase):
         self.assertEqual(timeseries.resolution, 86400) # No DST occured
         self.assertEqual(timeseries.resolution, '86400s') # No DST occured
 
-        # Test get item by string key (filter on data labels). More testing is done in the operation tests
-        timeseries =  TimeSeries(DataTimePoint(t=60, data={'a':1, 'b':2}))
-        self.assertEqual(timeseries['a'][0].data, {'a': 1})
-
 
         # Test data keys and rename a data key
         # TODO: move this test where to test data point series ?
@@ -657,6 +653,72 @@ class TestTimeSeries(unittest.TestCase):
         timeseries = TimeSeries(DataTimePoint(dt=dt(2015,10,25,0,0,0, tz='Europe/Rome'), data={'a':23.8}),
                                 DataTimePoint(dt=dt(2015,10,26,0,0,0, tz='Europe/Rome'), data={'a':23.8}))
         self.assertEqual(str(timeseries.tz), 'Europe/Rome')
+            
+        # Test test square brackets notation for filtering (more testing is done in the filter operation tests)
+        timeseries =  TimeSeries(DataTimePoint(t=60, data={'a':1, 'b':2}))
+        self.assertEqual(timeseries['a'][0].data, {'a': 1})        
+    
+        # Test square brackets notation for getting items and slicing
+        timeseries = TimeSeries(DataTimePoint(dt=dt(2015,10,25,6,15,0, tz='Europe/Rome'), data={'a':11, 'b':12, 'c':13}), #
+                                DataTimePoint(dt=dt(2015,10,25,6,16,0, tz='Europe/Rome'), data={'a':21, 'b':22, 'c':23}), #
+                                DataTimePoint(dt=dt(2015,10,25,6,17,0, tz='Europe/Rome'), data={'a':31, 'b':32, 'c':33}), #
+                                DataTimePoint(dt=dt(2015,10,25,6,18,0, tz='Europe/Rome'), data={'a':41, 'b':42, 'c':43}), #
+                                DataTimePoint(dt=dt(2015,10,25,6,19,0, tz='Europe/Rome'), data={'a':51, 'b':52, 'c':53}), # 1445750340
+                                DataTimePoint(dt=dt(2015,10,25,6,20,0, tz='Europe/Rome'), data={'a':61, 'b':62, 'c':63}), # 1445750400
+                                DataTimePoint(dt=dt(2015,10,25,6,21,0, tz='Europe/Rome'), data={'a':71, 'b':72, 'c':73}), # 1445750460
+                                DataTimePoint(dt=dt(2015,10,25,6,22,0, tz='Europe/Rome'), data={'a':81, 'b':82, 'c':83})) # 1445750520
+        
+        # Get item by t
+        with self.assertRaises(ValueError):
+            timeseries['t=5']
+        self.assertEqual(timeseries['t=1445750340'], timeseries[4])
+        with self.assertRaises(ValueError):
+            timeseries[{'t':5}]
+        self.assertEqual(timeseries[{'t':1445750340}], timeseries[4])
+
+        # Get item by dt
+        with self.assertRaises(ValueError):
+            timeseries['dt=2035-10-25 00:00:00+01:00']         
+        self.assertEqual(timeseries['dt=2015-10-25 06:19:00+01:00'], timeseries[4])
+        self.assertEqual(timeseries['dt=2015-10-25T06:19:00+01:00'], timeseries[4])
+        with self.assertRaises(ValueError):
+            timeseries[{'dt': dt(2035,10,25,0,0,0, tz='Europe/Rome')}]         
+        self.assertEqual(timeseries[{'dt': dt(2015,10,25,6,19,0, tz='Europe/Rome')}], timeseries[4])
+        
+        # Test square brackets notation for slicing
+        self.assertEqual(len(timeseries['t=1445750340':'t=1445750460']), 2)
+        self.assertEqual(timeseries['t=1445750340':'t=1445750460'][0], timeseries[4])
+        self.assertEqual(timeseries['t=1445750340':'t=1445750460'][1], timeseries[5])
+
+        self.assertEqual(len(timeseries['t=1445750340':'t=1445750461']), 3)
+        self.assertEqual(timeseries['t=1445750340':'t=1445750461'][0], timeseries[4])
+        self.assertEqual(timeseries['t=1445750340':'t=1445750461'][1], timeseries[5])
+        self.assertEqual(timeseries['t=1445750340':'t=1445750461'][2], timeseries[6])
+
+        self.assertEqual(len(timeseries[{'t':1445750340}:{'t':1445750460}]), 2)
+        self.assertEqual(timeseries[{'t':1445750340}:{'t':1445750460}][0], timeseries[4])
+        self.assertEqual(timeseries[{'t':1445750340}:{'t':1445750460}][1], timeseries[5])
+
+        self.assertEqual(len(timeseries[{'t':1445750340}:{'t':1445750460}]), 2)
+        self.assertEqual(timeseries[{'t':1445750340}:{'t':1445750460}][0], timeseries[4])
+        self.assertEqual(timeseries[{'t':1445750340}:{'t':1445750460}][1], timeseries[5])
+
+        self.assertEqual(len(timeseries[{'t':1445750340}:]), 4)
+        self.assertEqual(timeseries[{'t':1445750340}:][0], timeseries[4])
+        self.assertEqual(timeseries[{'t':1445750340}:][1], timeseries[5])
+        self.assertEqual(timeseries[{'t':1445750340}:][2], timeseries[6])
+        self.assertEqual(timeseries[{'t':1445750340}:][3], timeseries[7])
+
+        self.assertEqual(len(timeseries[:{'t':1445750340}]), 4)
+        self.assertEqual(timeseries[:{'t':1445750340}][0], timeseries[0])
+        self.assertEqual(timeseries[:{'t':1445750340}][1], timeseries[1])
+        self.assertEqual(timeseries[:{'t':1445750340}][2], timeseries[2])
+        self.assertEqual(timeseries[:{'t':1445750340}][3], timeseries[3])
+
+        # Start = end and start > end 
+        self.assertEqual(len(timeseries[{'t':1445750340}:{'t':1445750340}]), 0)
+        self.assertEqual(len(timeseries[{'t':4445750340}:{'t':1445750340}]), 0)
+
 
 
     def test_TimeSeries_with_TimeSlots(self):
@@ -868,7 +930,6 @@ class TestTimeSeriesSlice(unittest.TestCase):
         # TODO: Most operations are not supported on Slices and should be disabled
         #with self.assertRaises(AttributeError):
         #    series_slice.diff()
-
 
 
     def test_SeriesDenseSlice(self):
