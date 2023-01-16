@@ -9,7 +9,6 @@ from .datastructures import TimePoint, DataTimePoint, DataTimeSlot, TimeSeries
 from .time import dt_from_str, dt_from_s, s_from_dt, timezonize, now_dt
 from .exceptions import NoDataException, FloatConversionError, ConsistencyException
 
-
 # Setup logging
 import logging
 logger = logging.getLogger(__name__)
@@ -24,6 +23,7 @@ DEFAULT_SLOT_DATA_LOSS = None
 #======================
 #  Base Storage class
 #======================
+
 class Storage(object):
     """The base storage class. Can be implemented to store one or more time serieses. If storing more than
     one, then the id of which serises to load must be provided in the ``get()`` and ``put()`` methods."""
@@ -40,7 +40,7 @@ class Storage(object):
 #======================
 
 class CSVFileStorage(Storage):
-    """A CSV file storage. Supports creating both point and slot time series.
+    """A CSV file storage. Supports both point and slot time series.
     
     The file encoding, the series type and the tiemstamp columns are all auto-detect with an heuristic approach
     by defaaul, and asked to be set by ony if the euristic fails. In particular, wether to create point or solot
@@ -171,8 +171,7 @@ class CSVFileStorage(Storage):
             data_label: get only a specific data label.
         """
         
-        
-        # TODO: add from_dt / to_dt /from_t / to_t. Cfr series.filter()
+        # TODO: add from_dt /to_dt /from_t /to_t. Cfr series.filter()
 
         # Sanity checks
         if as_points and as_slots:
@@ -740,7 +739,6 @@ class CSVFileStorage(Storage):
             else:
                 raise TypeError('Can store only time series of DataTimePoints or DataTimeSlots')
 
-
             # 1) Dump headers
             data_labels_part = ','.join([str(key) for key in timeseries.data_labels()])
             data_indexes_part = ','.join(['__'+index for index in data_indexes])
@@ -749,7 +747,6 @@ class CSVFileStorage(Storage):
             else:
                 csv_file.write('epoch,{}\n'.format(data_labels_part))
             
-
             # 2) Dump data (and data_indexes)
             for item in timeseries:
                 if isinstance (timeseries[0].data, list) or isinstance (timeseries[0].data, tuple):

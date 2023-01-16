@@ -17,7 +17,6 @@ except (ImportError,AttributeError):
     pass
 
 
-
 #==================================
 #  Generic Anomaly Detector
 #==================================
@@ -51,7 +50,6 @@ class AnomalyDetector(Model):
         raise NotImplementedError('Anomaly detectors cannot be evaluated yet.') from None
 
 
-
 #==================================
 #  Series Anomaly Detector
 #==================================
@@ -74,7 +72,6 @@ class SeriesAnomalyDetector(AnomalyDetector, SeriesModel):
     def cross_validate(self, series, *args, **kwargs):
         """Disabled. Anomaly detectors cannot be evaluated yet."""
         raise NotImplementedError('Anomaly detectors cannot be evaluated yet.') from None
-
 
 
 #==================================
@@ -135,7 +132,6 @@ class ForecasterAnomalyDetector(SeriesAnomalyDetector):
         # ..and save the forecaster as nested model
         self.forecaster.save(path+'/'+str(self.forecaster.id))
 
-
     def __get_actual_and_predicted(self, series, i, key, forecaster_window):
 
         # Call model predict logic and compare with the actual data
@@ -174,7 +170,6 @@ class ForecasterAnomalyDetector(SeriesAnomalyDetector):
         """
         return super(ForecasterAnomalyDetector, self).fit(series, *args, stdevs=stdevs, **kwargs)
     
-
     def _fit(self, series, *args, stdevs=3, **kwargs):
 
         if len(series.data_labels()) > 1:
@@ -207,7 +202,6 @@ class ForecasterAnomalyDetector(SeriesAnomalyDetector):
         self.data['stdev'] = stdev
         self.data['stdevs'] = stdevs
         self.data['AE_threshold'] = stdev*stdevs
-
 
     def _apply(self, series, inplace=False, details=False, logs=False, stdevs=None):
         
@@ -287,3 +281,4 @@ class PeriodicAverageAnomalyDetector(PeriodicAverageForecasterAnomalyDetector):
     def __init__(self, *args, **kwargs):
         logger.warning('The PeriodicAverageAnomalyDetector class is deprecated, please replace it with the new PeriodicAverageForecasterAnomalyDetector class.')
         super(PeriodicAverageAnomalyDetector, self).__init__(*args, **kwargs)
+

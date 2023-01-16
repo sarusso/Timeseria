@@ -7,6 +7,7 @@ from ..operations import Operation
 from .. import logger
 logger.setup()
 
+
 class TestOpertions(unittest.TestCase):
     
     def test_base(self):
@@ -22,8 +23,6 @@ class TestOpertions(unittest.TestCase):
   
     def test_diff_csum(self):
   
-        # TODO: duplicate the test for points/slots? At the moment points are tested at the end
-
         # Test on empty, single point or variable resolution time serie
         series = TimeSeries()
         with self.assertRaises(ValueError):
@@ -76,19 +75,6 @@ class TestOpertions(unittest.TestCase):
         # Test standalone
         self.assertEqual(len(diff(series)), 3)
   
-        # Test in-place  behavior
-        # TODO: disabled as not implemented anymore (would change the series length and reduce it by one)
-        #diff(series, inplace=True)
-        #self.assertEqual(len(series), 4)
-        #self.assertEqual(series[0].data['value'],10)
-        #self.assertEqual(series[0].data['value_diff'],0)
-        #self.assertEqual(series[1].data['value'],12)
-        #self.assertEqual(series[1].data['value_diff'],2)
-        #self.assertEqual(series[2].data['value'],15)
-        #self.assertEqual(series[2].data['value_diff'],3)
-        #self.assertEqual(series[3].data['value'],16)
-        #self.assertEqual(series[3].data['value_diff'],1)
-
         # Multi-key Test data (on points)
         series = TimeSeries()
         series.append(DataTimePoint(t=0, data={'value':10, 'another_value': 75}))
@@ -120,6 +106,7 @@ class TestOpertions(unittest.TestCase):
         self.assertEqual(series.csum()[1].data, [3.0, -6.0])
         self.assertEqual(series.csum()[2].data, [7.0, -7.0])
 
+
     def test_derivative_integral(self):
 
         # Test on empty, single point or variable resolution time serie
@@ -139,7 +126,7 @@ class TestOpertions(unittest.TestCase):
         series.append(DataTimeSlot(start=TimePoint(2), end=TimePoint(3), data={'value':15}, data_loss=0.3))
         series.append(DataTimeSlot(start=TimePoint(3), end=TimePoint(4), data={'value':16}, data_loss=0.4))
         
-        # Test standard derivativeative behavior, from the series
+        # Test standard derivative behavior, from the series
         derivative_series = derivative(series)
         self.assertEqual(len(derivative_series), 4)
         self.assertAlmostEqual(derivative_series[0].data['value_derivative'],2)     # 0
@@ -505,16 +492,16 @@ class TestOpertions(unittest.TestCase):
 
     def test_slice(self):
 
-        test_time_point_series = TimeSeries(TimePoint(t=60),TimePoint(t=120),TimePoint(t=130))
+        series = TimeSeries(TimePoint(t=60),TimePoint(t=120),TimePoint(t=130))
 
         # Test from/to filtering
-        self.assertEqual(len(slice(test_time_point_series, from_t=1, to_t=140)),3)
+        self.assertEqual(len(slice(series, from_t=1, to_t=140)),3)
 
         # Test from/to filtering from the series
-        self.assertEqual(len(test_time_point_series.slice(from_t=1, to_t=140)),3)
-        self.assertEqual(len(test_time_point_series.slice(from_t=61, to_t=140)),2)
-        self.assertEqual(len(test_time_point_series.slice(from_t=61)),2)
-        self.assertEqual(len(test_time_point_series.slice(to_t=61)),1)
+        self.assertEqual(len(series.slice(from_t=1, to_t=140)),3)
+        self.assertEqual(len(series.slice(from_t=61, to_t=140)),2)
+        self.assertEqual(len(series.slice(from_t=61)),2)
+        self.assertEqual(len(series.slice(to_t=61)),1)
 
 
     def test_select(self):
@@ -575,3 +562,4 @@ class TestOpertions(unittest.TestCase):
         self.assertEqual(merged[2].data_loss, (0.3+0.03)/2)
         self.assertEqual(merged[3].data_loss, 0.4)
         self.assertEqual(merged[4].data_loss, 0.5)
+

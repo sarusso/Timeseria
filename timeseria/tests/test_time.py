@@ -8,10 +8,8 @@ from pandas import Timestamp as PandasTimestamp
 from .. import logger
 logger.setup()
 
-class TestTime(unittest.TestCase):
 
-    def setUp(self):       
-        pass
+class TestTime(unittest.TestCase):
 
     def test_correct_dt_dst(self):
         
@@ -85,7 +83,7 @@ class TestTime(unittest.TestCase):
         date_time = dt(2001,12,1,16,46,10,6575, tzinfo='Europe/Rome')
         self.assertEqual(s_from_dt(date_time), 1007221570.006575)
         
-        # With some combinations of Python/Pands versions i.e. Pandas 0.22.0  and Python 3.4.4 this is created as
+        # With some combinations of Python/Pandas versions i.e. Pandas 0.22.0  and Python 3.4.4 this is created as
         # 2001-12-01 16:56:10.006575+01:00 (note the minutes): it is a bug. Probably because of setting the timezone.
         date_time_pandas = PandasTimestamp(year=2001,month=12,day=1,hour=16,minute=46,second=10,microsecond=6575, tzinfo=timezonize('Europe/Rome'))
         self.assertEqual(s_from_dt(date_time_pandas), 1007221570.006575)
@@ -101,9 +99,10 @@ class TestTime(unittest.TestCase):
         date_time = date_time.replace(tzinfo = pytz.utc)
         self.assertEqual(s_from_dt(date_time),1197244800)
         
-        # Note: some versiosn of Python 3 assume a naive datetime on local time
+        # Note: some versions of Python 3 assume a naive datetime on local time
         # when using the .timestamp() or the .strftime('%s') methods.
         # For this timestamp: 1197244800.0 (UTC) vs 1197241200.0 (Europe/Rome)
+
 
     def test_dt_from_s(self):
 
@@ -132,7 +131,7 @@ class TestTime(unittest.TestCase):
         # 2016-06-29T19:36:29.3453-0400
         # 2016-06-29T20:56:35.450686+05:00
 
-        # From ISO without offset is not allowed -> Not anymore, see test "From ISO assuming UTC"]
+        # From ISO without offset is not allowed -> Not anymore, see test "From ISO assuming UTC" below
         #with self.assertRaises(ValueError):
         #    dt_from_str('1986-08-01T16:46:00')
        
@@ -154,8 +153,4 @@ class TestTime(unittest.TestCase):
 
     def test_as_timezone(self):
         self.assertEqual(str(as_tz(dt_from_str('1986-08-01T16:46:00.362752+02:00'), 'UTC')), '1986-08-01 14:46:00.362752+00:00')
-
-
-    def tearDown(self):
-        pass
 

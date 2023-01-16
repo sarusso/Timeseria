@@ -11,23 +11,15 @@ from ..units import TimeUnit
 from .. import logger
 logger.setup()
 
-# Set test data path
-TEST_DATA_PATH = '/'.join(os.path.realpath(__file__).split('/')[0:-1]) + '/test_data/'
-
-# Support functions
+# Support function for attaching validity regions to a series
 def attach_validity_regions(series, sampling_interval=None):
     validity_regions = _compute_validity_regions(series, sampling_interval=sampling_interval)
     for point in series:
         point.valid_from = validity_regions[point.t][0]
         point.valid_to = validity_regions[point.t][1]
 
-
-class TestDetectEncoding(unittest.TestCase):
-
-    def test_detect_encoding(self):
-        
-        encoding = detect_encoding('{}/csv/shampoo_sales.csv'.format(TEST_DATA_PATH), streaming=False)
-        self.assertEqual(encoding, 'ascii')
+# Set test data path
+TEST_DATA_PATH = '/'.join(os.path.realpath(__file__).split('/')[0:-1]) + '/test_data/'
 
 
 class TestComputeValidityRegions(unittest.TestCase):
@@ -127,6 +119,7 @@ class TestComputeValidityRegions(unittest.TestCase):
         self.assertEqual(results, expected_results)
 
 
+
 class TestComputeCoverageAndDataLoss(unittest.TestCase):
 
     def setUp(self):       
@@ -212,7 +205,7 @@ class TestComputeCoverageAndDataLoss(unittest.TestCase):
         self.assertEqual(coverage, 1.0)       
 
   
-        # B) Full coverage (coverage=1.0) witjout prev/next in the time series 
+        # B) Full coverage (coverage=1.0) without prev/next in the time series 
         # TODO: fix me
         coverage = _compute_coverage(series = self.data_time_point_series_1, from_t = from_t, to_t = to_t)  
         self.assertEqual(coverage, 1.0) 
@@ -389,9 +382,11 @@ class TestDetectSamplingInterval(unittest.TestCase):
         data_time_point_series = CSVFileStorage(TEST_DATA_PATH + '/csv/temp_short_1h.csv').get()
         self.assertEqual(detect_sampling_interval(data_time_point_series), 3600)
 
+
+class TestDetectEncoding(unittest.TestCase):
+
+    def test_detect_encoding(self):
         
-        
-
-
-
+        encoding = detect_encoding('{}/csv/shampoo_sales.csv'.format(TEST_DATA_PATH), streaming=False)
+        self.assertEqual(encoding, 'ascii')
 

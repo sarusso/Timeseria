@@ -394,14 +394,6 @@ class TestSeriesResampler(unittest.TestCase):
         # Check that we have all the data_indexes
         self.assertEqual(resampled_series._all_data_indexes(), ['data_reconstructed', 'data_loss', 'anomaly', 'forecast'])
 
-        #print('===========================================')
-        #for i, item in enumerate(series):
-        #    print('{}: dl={}, dr={}, a={}, f={}'.format(item.dt, item.data_loss, item.data_reconstructed, item.anomaly, item.forecast))
-        #print('-------------------------------------------')
-        #for item in resampled_series:
-        #    print(item)
-        #print('===========================================')
-
         # Check data_indexes math
         self.assertAlmostEqual(resampled_series[0].data_indexes['data_reconstructed'], 0.4)
         self.assertAlmostEqual(resampled_series[0].data_indexes['anomaly'], 0.275)
@@ -560,13 +552,6 @@ class TestSeriesAggregator(unittest.TestCase):
          
         # Time series from 2019,10,24,0,0,0 to 2019,10,31,0,0,0 (Europe/Rome), DST off -> 2 AM repeated
         series = SeriesAggregator('1h').process(self.series_7)
-        #print('=====================================')
-        #for item in self.series_7:
-        #    print(item)
-        #print('-------------------------------------')
-        #for item in series:
-        #    print(item)
-        #print('=====================================') 
         self.assertEqual(len(series), 168)
         self.assertEqual(str(series[73].start.dt), str('2019-10-27 01:00:00+02:00'))
         self.assertEqual(str(series[74].start.dt), str('2019-10-27 02:00:00+02:00'))
@@ -588,18 +573,11 @@ class TestSeriesAggregator(unittest.TestCase):
         series.append(DataTimePoint(t = 3600, data = {'value': 3600}))
         series.append(DataTimePoint(t = 7200, data = {'value': 7200}))
         
-        #print('============================================')
-        #for item in series: print(item)
-        
-        # This is a uplotting (upsampling), and there are data losses and strange values that should not be there.
+        # This is a uplsotting (upsampling), and there are data losses and strange values that should not be there.
         aggregator = SeriesAggregator('10m')
         aggregated_series = aggregator.process(series)
         self.assertEqual(len(aggregated_series), 12)
         
-        #print('--------------------------------------------')
-        #for i, item in enumerate(aggregated_series): print(i, item)
-        #print('============================================')
-  
         # TODO: this is all wrong...
         # 0 DataTimeSlot @ [0.0,600.0] ([1970-01-01 00:00:00+00:00,1970-01-01 00:10:00+00:00]) with data={'value_avg': 0.0} and data_loss=0.0
         # 1 DataTimeSlot @ [600.0,1200.0] ([1970-01-01 00:10:00+00:00,1970-01-01 00:20:00+00:00]) with data={'value_avg': 0.0} and data_loss=0.0
@@ -657,7 +635,6 @@ class TestSeriesAggregator(unittest.TestCase):
         self.assertAlmostEqual(slotted_series[0].data['humidity_max'], 5)
         self.assertAlmostEqual(slotted_series[0].data['humidity_avg'], 5)
 
-
         # Time series from 16:58:00 to 17:32:00 (Europe/Rome) with a full short (single-slot) gap to be interpolated
         series = TimeSeries()
         start_t = 1436022000 - 120
@@ -683,8 +660,7 @@ class TestSeriesAggregator(unittest.TestCase):
         self.assertAlmostEqual(slotted_series[1].data['temperature_min'], 171)
         self.assertAlmostEqual(slotted_series[1].data['temperature_max'], 171)
         self.assertAlmostEqual(slotted_series[1].data['temperature_avg'], 171)
-
-            
+       
         # Time series from 16:58:00 to 17:32:00 (Europe/Rome) with a full long (multi-slot) gap to be interpolated
         series = TimeSeries()
         start_t = 1436022000 - 120
@@ -763,14 +739,6 @@ class TestSeriesAggregator(unittest.TestCase):
         # Check that we have all the data_indexes
         self.assertEqual(slotted_series._all_data_indexes(), ['data_reconstructed', 'data_loss', 'anomaly', 'forecast'])
 
-        #print('===========================================')
-        #for i, item in enumerate(series):
-        #    print('{}: dl={}, dr={}, a={}, f={}'.format(item.dt, item.data_loss, item.data_reconstructed, item.anomaly, item.forecast))
-        #print('-------------------------------------------')
-        #for item in slotted_series:
-        #    print(item)
-        #print('===========================================')
-
         # Check data_indexes math
         self.assertAlmostEqual(slotted_series[0].data_indexes['anomaly'], 0.0375)
         self.assertAlmostEqual(slotted_series[0].data_indexes['data_reconstructed'], 0.15)
@@ -787,7 +755,4 @@ class TestSeriesAggregator(unittest.TestCase):
         # The following is re-computed from missing coverage only, and not marked as None.
         # See the compute_data_loss function fore more details and some more comments.
         self.assertEqual(slotted_series[2].data_loss, 0) 
-
-
-
 

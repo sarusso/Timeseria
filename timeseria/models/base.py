@@ -79,8 +79,7 @@ class Model():
         else:
             if path:
                 raise ValueError('Loading a non-parametric model from a path does not make sense')
-    
-    
+     
     @property
     def id(self):
         """A unique identifier for the model. Only for parametric models."""
@@ -89,14 +88,12 @@ class Model():
         else:
             return self.data['id']
 
-
     def is_parametric(self):
         """If the model is parametric or not."""
         if self._type == 'parametric':
             return True
         else:
             return False
-
 
     def fit(self, *args, **kwargs):
         """Fit the model."""
@@ -112,7 +109,6 @@ class Model():
         self.fitted = True
 
         return fit_output
-
 
     def predict(self, *args, **kwargs):
         """Call the model predict logic."""
@@ -132,7 +128,6 @@ class Model():
 
         return self._predict(*args, **kwargs)
 
-
     def apply(self, *args, **kwargs):
         """Apply the model."""
         try:
@@ -150,7 +145,6 @@ class Model():
                 raise NotFittedError()
 
         return self._apply(*args, **kwargs)
-
 
     def evaluate(self, *args, **kwargs):
         """Evaluate the model."""
@@ -170,7 +164,6 @@ class Model():
 
         return self._evaluate(*args, **kwargs)
 
-
     def cross_validate(self, *args, rounds=10, **kwargs):
         """Cross validate the model, by default with 10 fit/evaluate rounds.
         
@@ -185,7 +178,6 @@ class Model():
         except AttributeError:
             raise NotImplementedError('Cross validating this model is not yet implemented')
         return self._cross_validate(*args, rounds=rounds, **kwargs)
-
 
     def save(self, path):
         """Save the model in the given path. The model is saved in "directory format", 
@@ -218,7 +210,6 @@ class Model():
             f.write(json.dumps(self.data))
         
         logger.info('Saved model with id "%s" in "%s"', self.data['id'], path)
-
 
 
 #======================
@@ -277,7 +268,6 @@ class SeriesModel(Model):
         # Return output
         return fit_output
 
-
     def predict(self, series, *args, **kwargs):
         """Call the model predict logic on a series."""
         
@@ -306,8 +296,7 @@ class SeriesModel(Model):
                         
         # Call parent predict and return output
         return super(SeriesModel, self).predict(series, *args, **kwargs)
-
-    
+ 
     def apply(self, series, *args, **kwargs):
         """Apply the model on a series."""
         
@@ -336,7 +325,6 @@ class SeriesModel(Model):
             
         # Call parent apply and return output
         return super(SeriesModel, self).apply(series, *args, **kwargs)
-
 
     def evaluate(self, series, *args, **kwargs):
         """Evaluate the model on a series."""
@@ -367,10 +355,8 @@ class SeriesModel(Model):
         # Call parent evaluate and return output
         return super(SeriesModel, self).evaluate(series, *args, **kwargs)
 
-
     def cross_validate(self, series, *args, **kwargs):
         return super(SeriesModel, self).cross_validate(series, *args, **kwargs)
-
 
     def _cross_validate(self, series, rounds, *args, **kwargs):
         """The cross validate logic for series models."""
@@ -469,7 +455,6 @@ class SeriesModel(Model):
         else:
             raise NotImplementedError('Cross validating on data types other than TimeSeries in not yet implemented')
 
-
     def save(self, path):
 
         # Temporary change the resolution to its string representation (if any)
@@ -484,7 +469,6 @@ class SeriesModel(Model):
             # In any case revert resolution back to object (if any)
             if 'resolution' in self.data:  
                 self.data['resolution'] = resolution_obj
-
 
 
 #=========================
@@ -528,7 +512,6 @@ class _ProphetModel(Model):
         data = DataFrame(data_as_list, columns = ['ds', 'y'])
 
         return data
-
 
 
 #=========================
@@ -580,7 +563,6 @@ class _ARIMAModel(Model):
         return (start_index, end_index)
 
 
-
 #=========================
 #  Base Keras model
 #=========================
@@ -604,7 +586,7 @@ class _KerasModel(Model):
             shutil.rmtree(path)
             raise e
     
-    # TODO: since we are extenting a generic ParametricModel, the following methods should not be here.
+    # TODO: since we are extending a generic ParametricModel, the following methods should not be here.
     # Maybe only if extending a TimeSeriesParametricModel, and still it is probably the wrong place, as for the
     # ARIMA and Prophet above also. Consider moving them in a "utility" package or directly in the models.
     

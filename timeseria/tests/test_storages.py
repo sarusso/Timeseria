@@ -86,6 +86,7 @@ class TestCSVFileStorage(unittest.TestCase):
         with self.assertRaises(Exception):
             storage.get()
 
+
     def test_CSVFileStorage_dirty(self):
 
         # Basic iso8601 with two columns, one for the timestamp and one for the value, no labels, dirty
@@ -107,6 +108,7 @@ class TestCSVFileStorage(unittest.TestCase):
         self.assertEqual(data_time_point_series[1], DataTimePoint(t= 946706400, data={'flow': 1100.0, 'temp': 10.7}))
         self.assertEqual(data_time_point_series[2], DataTimePoint(t= 946713600, data={'flow': 1300.0, 'temp': 10.0}))
 
+
     def test_CSVFileStorage_unordered(self):
 
         storage = CSVFileStorage(TEST_DATA_PATH + '/csv/multi_values_with_labels_unordered.csv', sort=True)
@@ -116,6 +118,7 @@ class TestCSVFileStorage(unittest.TestCase):
         self.assertEqual(data_time_point_series[0].data, {'flow': 1000.0, 'temp': 10.0})
         self.assertEqual(data_time_point_series[-1].t, 946684800 + 60*60*4)
         self.assertEqual(data_time_point_series[-1].data, {'flow': 1040.0, 'temp': 14.0})
+
 
     def test_CSVFileStorage_datetimeformats(self):
 
@@ -151,7 +154,6 @@ class TestCSVFileStorage(unittest.TestCase):
         self.assertEqual(data_time_point_series[0].t, 978307200)
         self.assertEqual(data_time_point_series[-1].t, 1070236800)
 
-
         # Separate time and date columns, custom format
         storage = CSVFileStorage(TEST_DATA_PATH + '/csv/format2.csv',
                                  date_label = 'Date',
@@ -163,7 +165,6 @@ class TestCSVFileStorage(unittest.TestCase):
         self.assertEqual(data_time_point_series[0].t, 1583280000)
         self.assertEqual(data_time_point_series[-1].t, 1583298000)
 
-
         # Test only date column and without meaningful timestamp label (and force points)
         storage = CSVFileStorage(TEST_DATA_PATH + '/csv/only_date_no_meaningful_timestamp_label.csv',
                                  timestamp_format = '%Y-%m-%d', series_type='points')
@@ -173,14 +174,12 @@ class TestCSVFileStorage(unittest.TestCase):
         self.assertEqual(data_time_point_series[0].t, 1197244800)
         self.assertEqual(data_time_point_series[-1].t, 1205798400)
 
-
         # Test data with quotes
         storage = CSVFileStorage(TEST_DATA_PATH + '/csv/format5.csv')
         data_time_point_series = storage.get()
         self.assertEqual(len(data_time_point_series), 6)
         self.assertEqual(data_time_point_series[2].data['temp'], 23.34)
         self.assertEqual(data_time_point_series[3].data['humi'], 55)
-
 
         # Test getting only a specific data labels
         storage = CSVFileStorage(TEST_DATA_PATH + '/csv/format5.csv')
@@ -287,7 +286,7 @@ class TestCSVFileStorage(unittest.TestCase):
             self.assertEqual(series[0].data_indexes['data_loss'], 0.1)
             self.assertEqual(series[3].data_indexes['data_loss'], 0.4)
             
-            # Now tes on slots
+            # Now test on slots
             data_time_point_series = TimeSeries(DataTimeSlot(t=60, unit=TimeUnit('1m'), data=[23.8,3], data_loss=0.1),
                                                 DataTimeSlot(t=120, unit=TimeUnit('1m'), data=[24.1,4], data_loss=0.2),
                                                 DataTimeSlot(t=180, unit=TimeUnit('1m'), data=[23.1,5], data_loss=0.3),
@@ -311,21 +310,4 @@ class TestCSVFileStorage(unittest.TestCase):
             self.assertEqual(len(series[0].data_indexes),1)
             self.assertEqual(series[0].data_indexes['data_loss'], 0.1)
             self.assertEqual(series[3].data_indexes['data_loss'], 0.4)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
