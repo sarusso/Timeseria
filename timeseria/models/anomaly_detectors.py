@@ -149,7 +149,7 @@ class ForecasterAnomalyDetector(SeriesAnomalyDetector):
             if '_predict() got an unexpected keyword argument \'forecast_start\'' in str(e):
                 # Otherwise, create on the fly a slice of the series for the window.
                 # If items are Slots or Points, there are only linked, not copied,
-                # so this is just a minor overhead. # TODO: series.view() ? Using an adapted _TimeSeriesSlice?
+                # so this is just a minor overhead. # TODO: series.view() ? Using an adapted _TimeSeriesView?
                 window_series = series[i-forecaster_window:i]
                 prediction = self.forecaster.predict(window_series, steps=1)
             else:

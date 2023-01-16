@@ -5,7 +5,7 @@ import pandas as pd
 
 from ..datastructures import Point, TimePoint, DataPoint, DataTimePoint
 from ..datastructures import Slot, TimeSlot, DataSlot, DataTimeSlot
-from ..datastructures import Series, TimeSeries, _TimeSeriesSlice
+from ..datastructures import Series, TimeSeries, _TimeSeriesView
 from ..time import UTC, dt
 from ..units import Unit, TimeUnit
 
@@ -890,9 +890,9 @@ class TestTimeSeries(unittest.TestCase):
             timeseries.rename_data_label('notexistent_key','c')
 
 
-class TestTimeSeriesSlice(unittest.TestCase):
+class TestTimeSeriesView(unittest.TestCase):
 
-    def test_TimeSeriesSlice(self):
+    def test_TimeSeriesView(self):
         series = TimeSeries()
         series.append(DataTimePoint(t = 0, data = {'value': 0}))
         series.append(DataTimePoint(t = 1, data = {'value': 1}))
@@ -911,25 +911,25 @@ class TestTimeSeriesSlice(unittest.TestCase):
             point.valid_from=validity_regions[point.t][0]
             point.valid_to=validity_regions[point.t][1]
 
-        series_slice = _TimeSeriesSlice(series, 2, 5)
+        series_view = _TimeSeriesView(series, 2, 5)
 
-        self.assertEqual(len(series_slice), 3)
+        self.assertEqual(len(series_view), 3)
 
-        for i, point in enumerate(series_slice):
+        for i, point in enumerate(series_view):
             self.assertEqual(point.t, 2+i)
 
-        self.assertEqual(series_slice[0].t, 2)
-        self.assertEqual(series_slice[1].t, 3)
-        self.assertEqual(series_slice[2].t, 4)
-        self.assertEqual(series_slice[-1].t, 4)
+        self.assertEqual(series_view[0].t, 2)
+        self.assertEqual(series_view[1].t, 3)
+        self.assertEqual(series_view[2].t, 4)
+        self.assertEqual(series_view[-1].t, 4)
 
         # Test extra attributes
-        self.assertEqual(str(series_slice.resolution), '1s')
-        self.assertEqual(series_slice.data_labels(), ['value'])
+        self.assertEqual(str(series_view.resolution), '1s')
+        self.assertEqual(series_view.data_labels(), ['value'])
 
         # TODO: Most operations are not supported on Slices and should be disabled
         #with self.assertRaises(AttributeError):
-        #    series_slice.diff()
+        #    series_view.diff()
 
 
     def test_SeriesDenseSlice(self):
@@ -950,22 +950,22 @@ class TestTimeSeriesSlice(unittest.TestCase):
             point.valid_to=validity_regions[point.t][1]
 
         from ..interpolators import LinearInterpolator
-        series_slice = _TimeSeriesSlice(series, 2, 8, dense=True, interpolator_class=LinearInterpolator)
+        series_view = _TimeSeriesView(series, 2, 8, dense=True, interpolator_class=LinearInterpolator)
 
-        self.assertEqual(len(series_slice), 7)
+        self.assertEqual(len(series_view), 7)
 
-        series_slice_materialized=[]
-        for point in series_slice:
-            series_slice_materialized.append(point)
+        series_view_materialized=[]
+        for point in series_view:
+            series_view_materialized.append(point)
 
-        self.assertEqual(series_slice_materialized[0].t, 2)
-        self.assertEqual(series_slice_materialized[1].t, 3)
-        self.assertEqual(series_slice_materialized[2].t, 4)
-        self.assertEqual(series_slice_materialized[3].t, 5.5)
-        self.assertEqual(series_slice_materialized[3].data['value'], 5.5)
-        self.assertEqual(series_slice_materialized[4].t, 7)
-        self.assertEqual(series_slice_materialized[5].t, 8)
-        self.assertEqual(series_slice_materialized[6].t, 9)
+        self.assertEqual(series_view_materialized[0].t, 2)
+        self.assertEqual(series_view_materialized[1].t, 3)
+        self.assertEqual(series_view_materialized[2].t, 4)
+        self.assertEqual(series_view_materialized[3].t, 5.5)
+        self.assertEqual(series_view_materialized[3].data['value'], 5.5)
+        self.assertEqual(series_view_materialized[4].t, 7)
+        self.assertEqual(series_view_materialized[5].t, 8)
+        self.assertEqual(series_view_materialized[6].t, 9)
 
 
 

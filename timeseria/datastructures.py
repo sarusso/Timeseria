@@ -1775,11 +1775,11 @@ class TimeSeries(Series):
 
 
 #==============================
-#  Time Series slice
+#  Time Series view
 #==============================
-class _TimeSeriesSlice(TimeSeries):
-    """A time series slice. Only used internally, maybe in future it could be made public
-    and be used for the slicing operation if the time series, perhaps making it generic.
+class _TimeSeriesView(TimeSeries):
+    """A time series view. Only used internally, maybe in future it could be made public
+    as a more optimized way for performing some operations, as filtering and slicing.
     
     :meta private:
     """

@@ -2,7 +2,7 @@
 """Series transformations as resampling and aggregation."""
 
 from .time import dt_from_s, s_from_dt, as_tz
-from .datastructures import Point, Slot, DataTimeSlot, TimePoint, DataTimePoint, Series, TimeSeries, _TimeSeriesSlice
+from .datastructures import Point, Slot, DataTimeSlot, TimePoint, DataTimePoint, Series, TimeSeries, _TimeSeriesView
 from .utilities import _compute_data_loss, _compute_validity_regions
 from .operations import avg
 from .units import TimeUnit
@@ -39,13 +39,13 @@ def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_poi
     if slot_prev_point_i is None:
         slot_prev_point_i = slot_first_point_i
 
-    # Create the slice of the series containing the slot datapoints plus the prev and next, 
-    series_dense_slice_extended  = _TimeSeriesSlice(series, from_i=slot_prev_point_i, to_i=slot_next_point_i+1,  # Slicing exclude the right
-                                                   from_t=from_t, to_t=to_t, dense=True, interpolator_class=interpolator_class)
+    # Create a view of the series containing the slot datapoints plus the prev and next, 
+    series_dense_view_extended  = _TimeSeriesView(series, from_i=slot_prev_point_i, to_i=slot_next_point_i+1,  # Slicing exclude the right
+                                                  from_t=from_t, to_t=to_t, dense=True, interpolator_class=interpolator_class)
 
     # Compute the data loss for the new element. This is forced
     # by the resampler or slotter if first or last point     
-    data_loss = _compute_data_loss(series_dense_slice_extended,
+    data_loss = _compute_data_loss(series_dense_view_extended,
                                   from_t = from_t,
                                   to_t = to_t,
                                   sampling_interval = point_validity,
@@ -53,7 +53,7 @@ def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_poi
     logger.debug('Computed data loss: "{}"'.format(data_loss))
 
     # For each point, attach the "weight"/"contirbution
-    for point in series_dense_slice_extended:
+    for point in series_dense_view_extended:
         
         # Weight zero if completely outside the interval, which is required if in the operation
         # there is the need of knowing the next(or prev) value, even if it was far away
@@ -80,35 +80,35 @@ def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_poi
         if slot_first_point_i is None and slot_last_point_i is None:
             # If we have no datapoints at all in the slot, we must create one to let operations not
             # supporting weights to properly work. If we have a full data loss, this can be just the
-            # middle point from the series_dense_slice_extended. Otherwise, we must compute it from
+            # middle point from the series_dense_view_extended. Otherwise, we must compute it from
             # scratch as we are upsamping with no data loss but still no points belonging to the slot.
 
             if data_loss==1:
-                series_dense_slice = None
-                for point in series_dense_slice_extended:
+                series_dense_view = None
+                for point in series_dense_view_extended:
                     try:
                         if point._interpolated:
-                            if series_dense_slice:
+                            if series_dense_view:
                                 raise ConsistencyException('Found more than one reconstructed point in a fully missing slot')
-                            series_dense_slice = series.__class__(point) 
+                            series_dense_view = series.__class__(point) 
                     except AttributeError:
                         pass
-                if not series_dense_slice:
+                if not series_dense_view:
                     raise ConsistencyException('Could not find any reconstructed point in a fully missing slot')
             else:
-                # Just create a point based on the series_dense_slice_extended weights (TODO: are we including the interpolated?):
+                # Just create a point based on the series_dense_view_extended weights (TODO: are we including the interpolated?):
                 new_point_data = {data_label:0 for data_label in data_labels}
-                for point in series_dense_slice_extended:
+                for point in series_dense_view_extended:
                     for data_label in data_labels:
                         point.data[data_label] += point.data[data_label] * point.weight
                 new_point_t = (to_t - from_t) /2
-                series_dense_slice = TimeSeries(DataTimePoint(t=new_point_t, data=new_point_data, tz=series.tz))
+                series_dense_view = TimeSeries(DataTimePoint(t=new_point_t, data=new_point_data, tz=series.tz))
 
         else:
-            # Slice the original series to provide only the datapoints belonging to the slot 
+            # Create a view of the original series to provide only the datapoints belonging to the slot 
             #logger.critical('Slicing dense series from {} to {}'.format(slot_first_point_i, slot_last_point_i+1))
-            series_dense_slice = _TimeSeriesSlice(series, from_i=slot_first_point_i, to_i=slot_last_point_i+1, # Slicing exclude the right   
-                                                 from_t=from_t, to_t=to_t, dense=True, interpolator_class=interpolator_class) 
+            series_dense_view = _TimeSeriesView(series, from_i=slot_first_point_i, to_i=slot_last_point_i+1, # Slicing exclude the right   
+                                                from_t=from_t, to_t=to_t, dense=True, interpolator_class=interpolator_class) 
 
 
 
@@ -116,7 +116,7 @@ def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_poi
     if target=='point':
 
         # Compute the (weighted) average of all point contributions
-        avgs = avg(series_dense_slice_extended)
+        avgs = avg(series_dense_view_extended)
         
         # ...and assign them to the data value
         if isinstance(avgs, dict):
@@ -143,9 +143,9 @@ def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_poi
                     operation_supports_weights = False
                 
                 if operation_supports_weights:
-                    operation_data = operation(series_dense_slice_extended)
+                    operation_data = operation(series_dense_view_extended)
                 else:
-                    operation_data = operation(series_dense_slice)
+                    operation_data = operation(series_dense_view)
                     
                 # ...and add to the data
                 if isinstance(operation_data, dict):
@@ -189,10 +189,10 @@ def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_poi
         if index == 'data_loss':
             continue
         
-        if series_dense_slice_extended:
+        if series_dense_view_extended:
             index_total = 0
             index_total_weights = 0
-            for point in series_dense_slice_extended:
+            for point in series_dense_view_extended:
                 
                 # Get index value
                 try:
