@@ -1454,6 +1454,12 @@ class TimeSeries(Series):
             # Call parent init
             super(TimeSeries, self).__init__(*args, **kwargs)
 
+    def save(self, file_name, overwrite=False, **kwargs):
+        """Save the time series as a CSV file."""
+        from .storages import CSVFileStorage
+        storage = CSVFileStorage(file_name, **kwargs)
+        storage.put(self, overwrite=overwrite)
+
     #=========================
     #  Append
     #=========================
