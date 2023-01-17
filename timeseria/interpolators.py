@@ -22,12 +22,12 @@ class LinearInterpolator(Interpolator):
     
     def evaluate(self, at, prev_i=None, next_i=None):
 
-        if prev_i and next_i is None:
+        if prev_i is not None and next_i is None:
             raise ValueError('If you provide the prev_i you also need to provide the next_i')
-        if next_i and prev_i is None:
+        if next_i is not None  and prev_i is None:
             raise ValueError('If you provide the next_i you also need to provide the prev_i')
 
-        if not prev_i:
+        if prev_i is None and next_i is None:
             logger.warning('You are not providing the prev_i and next_i, this will cause the interpolator to look for them and likely introduce a slow down')
 
             # Search for the prev_i:

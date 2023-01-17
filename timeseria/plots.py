@@ -148,11 +148,10 @@ def _to_dg_data(serie, data_labels_to_plot, data_indexes_to_plot, full_precision
                     if label is None:
                         datas.append(item.data)
                     else:
-                        datas.append(item.data[label])
+                        datas.append(item._data_by_label(label))
             else:
                 datas = [item.data]
-            
-            
+                  
             # Loop over data labels, including the "None" label if we have no labels (float data), and add data
             for j, data in enumerate(datas):
                 
@@ -257,10 +256,7 @@ def _to_dg_data(serie, data_labels_to_plot, data_indexes_to_plot, full_precision
                 if label is None:
                     data = item.data
                 else:
-                    if isinstance(item.data, list) or isinstance(item.data, tuple):
-                        data = item.data[int(label)]
-                    else:
-                        data = item.data[label]
+                    data = item._data_by_label(label)
 
                 if full_precision:
                     data_part += '{},'.format(data)

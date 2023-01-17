@@ -834,8 +834,7 @@ class Filter(SeriesOperation):
         _check_indexed_data(series)
         
         if from_t or to_t or from_dt or to_dt:
-            logger.warning('The from_t, to_t, from_dt and to_d arguments are deprecated, \
-            please use the slice() operation instead or the square brackets notation.')
+            logger.warning('The from_t, to_t, from_dt and to_d arguments are deprecated, please use the slice() operation instead or the square brackets notation.')
 
         if from_dt:
             if from_t is not None:
