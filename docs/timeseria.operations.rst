@@ -23,8 +23,6 @@
       Min
       Max
       Avg
-      MAvg
-      WAvg
       Sum
       
       Derivative
@@ -32,9 +30,15 @@
   
       Diff
       CSum
-
-      Filter      
+      
+      MAvg
+      Normalize
+      Offset
+      Rescale
+            
       Merge
+      Filter
+      Slice
       Select
       
       

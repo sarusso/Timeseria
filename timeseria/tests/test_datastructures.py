@@ -435,6 +435,10 @@ class TestSeries(unittest.TestCase):
         self.assertEqual(series[0].end.coordinates[0],2)
         self.assertEqual(series[0].data,'hello') 
 
+        # Test unrealistic case with strings just for completeness
+        Series('a', 'b')
+        with self.assertRaises(ValueError):
+            Series('b', 'a')
 
 
 class TestTimeSeries(unittest.TestCase):

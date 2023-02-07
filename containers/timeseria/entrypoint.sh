@@ -41,7 +41,7 @@ if [[ "x$@" == "x" ]] ; then
     
     cd /opt/Timeseria
     jupyter nbextension enable --py widgetsnbextension &> /dev/null
-    jupyter trust $BASE_DIR/*
+    jupyter trust $BASE_DIR/*.ipynb
     jupyter notebook --ip=0.0.0.0 --port=$BASE_PORT --NotebookApp.token='' --NotebookApp.notebook_dir=$BASE_DIR
 
 else
