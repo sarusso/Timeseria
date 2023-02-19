@@ -3,7 +3,7 @@
 
 from copy import deepcopy
 from .forecasters import PeriodicAverageForecaster
-from .base import Model, SeriesModel
+from .base import Model
 
 # Setup logging
 import logging
@@ -22,55 +22,31 @@ except (ImportError,AttributeError):
 #==================================
 
 class AnomalyDetector(Model):
-    """A generic anomaly detection model.
-    
-    Args:
-        path (str): a path from which to load a saved model. Will override all other init settings.
-    """
-    
-    def predict(self, *args, **kwargs):
-        """Disabled. Anomaly detectors can be used only with the ``apply()`` method."""
-        raise NotImplementedError('Anomaly detectors can be used only with the apply() method') from None
-        
-    def _predict(self, *args, **kwargs):
-        raise NotImplementedError('Anomaly detectors can be used only with the apply() method') from None
-
-    def evaluate(self, *args, **kwargs):
-        """Disabled. Anomaly detectors cannot be evaluated yet."""
-        raise NotImplementedError('Anomaly detectors cannot be evaluated yet.') from None
-        
-    def _evaluate(self, *args, **kwargs):
-        raise NotImplementedError('Anomaly detectors cannot be evaluated yet.') from None
-
-    def cross_validate(self, *args, **kwargs):
-        """Disabled. Anomaly detectors cannot be evaluated yet."""
-        raise NotImplementedError('Anomaly detectors cannot be evaluated yet.') from None
-
-    def _cross_validate(self, *args, **kwargs):
-        raise NotImplementedError('Anomaly detectors cannot be evaluated yet.') from None
-
-
-#==================================
-#  Series Anomaly Detector
-#==================================
-
-class SeriesAnomalyDetector(AnomalyDetector, SeriesModel):
     """An anomaly detector specifically designed to work with series data.
  
     Args:
         path (str): a path from which to load a saved model. Will override all other init settings.
     """
-    
-    def predict(self, series, *args, **kwargs):
+
+    def predict(self, input_data, *args, **kwargs):
         """Disabled. Anomaly detectors can be used only with the ``apply()`` method."""
         raise NotImplementedError('Anomaly detectors can be used only with the apply() method') from None
-        
-    def evaluate(self, series, *args, **kwargs):
+
+    def _predict(self, input_data, *args, **kwargs):
+        raise NotImplementedError('Anomaly detectors can be used only with the apply() method') from None
+
+    def evaluate(self, input_data, *args, **kwargs):
         """Disabled. Anomaly detectors cannot be evaluated yet."""
         raise NotImplementedError('Anomaly detectors cannot be evaluated yet.') from None
-        
+
+    def _evaluate(self, input_data, *args, **kwargs):
+        raise NotImplementedError('Anomaly detectors cannot be evaluated yet.') from None
+
     def cross_validate(self, series, *args, **kwargs):
         """Disabled. Anomaly detectors cannot be evaluated yet."""
+        raise NotImplementedError('Anomaly detectors cannot be evaluated yet.') from None
+
+    def _cross_validate(self, input_data, *args, **kwargs):
         raise NotImplementedError('Anomaly detectors cannot be evaluated yet.') from None
 
 
@@ -78,7 +54,7 @@ class SeriesAnomalyDetector(AnomalyDetector, SeriesModel):
 #  Forecast Anomaly detector
 #==================================
 
-class ForecasterAnomalyDetector(SeriesAnomalyDetector):
+class ForecasterAnomalyDetector(AnomalyDetector):
     """An anomaly detection model based on a forecaster. The concept is simple: for each element of the time series where
     the anomaly detection model is applied, the forecaster is asked to make a prediction. If the actual value is too "far"
     from the prediction, then that is an anomaly. The "far" concept is expressed in terms of error standard deviations.
@@ -159,7 +135,7 @@ class ForecasterAnomalyDetector(SeriesAnomalyDetector):
         
         return (actual, predicted)
 
-    def fit(self, series, *args, stdevs=3, **kwargs):
+    def fit(self, input_data, *args, stdevs=3, **kwargs):
         """Fit the anomaly detection model.
         
         All the parameters except ``stdevs`` are forwareded to the forecaster ``fit()`` method.
@@ -168,28 +144,30 @@ class ForecasterAnomalyDetector(SeriesAnomalyDetector):
             stdevs(float): how many standard deviations must there be between the actual and the predicted value
                            by the forecaster in order to mark a point or slot as anomalous.
         """
-        return super(ForecasterAnomalyDetector, self).fit(series, *args, stdevs=stdevs, **kwargs)
+        return super(ForecasterAnomalyDetector, self).fit(input_data, *args, stdevs=stdevs, **kwargs)
     
-    def _fit(self, series, *args, stdevs=3, **kwargs):
+    def _fit(self, input_data, *args, stdevs=3, **kwargs):
 
-        if len(series.data_labels()) > 1:
+        timeseries = input_data
+
+        if len(timeseries.data_labels()) > 1:
             raise NotImplementedError('Multivariate time series are not yet supported')
 
         # Fit the forecaster
-        self.forecaster.fit(series, *args, **kwargs)
+        self.forecaster.fit(timeseries, *args, **kwargs)
         
         # Evaluate the forecaster for one step ahead and get AEs
         AEs = []
-        for key in series.data_labels():
+        for key in timeseries.data_labels():
             
-            for i, _ in enumerate(series):
+            for i, _ in enumerate(timeseries):
                 
                 forecaster_window = self.forecaster.data['window']
                 
                 if i <=  forecaster_window:    
                     continue
                 
-                actual, predicted = self.__get_actual_and_predicted(series, i, key, forecaster_window)
+                actual, predicted = self.__get_actual_and_predicted(timeseries, i, key, forecaster_window)
                 
                 AEs.append(abs(actual-predicted))
 
@@ -203,24 +181,26 @@ class ForecasterAnomalyDetector(SeriesAnomalyDetector):
         self.data['stdevs'] = stdevs
         self.data['AE_threshold'] = stdev*stdevs
 
-    def _apply(self, series, inplace=False, details=False, logs=False, stdevs=None):
+    def _apply(self, input_data, inplace=False, details=False, logs=False, stdevs=None):
+        
+        timeseries = input_data
         
         if inplace:
             raise Exception('Anomaly detection cannot be run inplace')
 
-        if len(series.data_labels()) > 1:
-            raise NotImplementedError('Multivariate time series are not yet supported')
+        if len(timeseries.data_labels()) > 1:
+            raise NotImplementedError('Multivariate time timeseries are not yet supported')
         
-        result_series = series.__class__()
+        result_series = timeseries.__class__()
 
-        for key in series.data_labels():
+        for key in timeseries.data_labels():
             
-            for i, item in enumerate(series):
+            for i, item in enumerate(timeseries):
                 forecaster_window = self.forecaster.data['window']
                 if i <=  forecaster_window:    
                     continue
                 
-                actual, predicted = self.__get_actual_and_predicted(series, i, key, forecaster_window)
+                actual, predicted = self.__get_actual_and_predicted(timeseries, i, key, forecaster_window)
                 #if logs:
                 #    logger.info('{}: {} vs {}'.format(timeseries[i].dt, actual, predicted))
 
@@ -260,7 +240,7 @@ class ForecasterAnomalyDetector(SeriesAnomalyDetector):
 # PAvg Forecaster Anomaly detector
 #==================================
 
-class PeriodicAverageForecasterAnomalyDetector(ForecasterAnomalyDetector):
+class PeriodicAverageAnomalyDetector(ForecasterAnomalyDetector):
     """An anomaly detection model based on a periodic average forecaster. The concept is simple: for each element of the time series
     where the anomaly detection model is applied, the forecaster is asked to make a prediction. If the actual value is too "far" 
     from the prediction, then that is an anomaly. The "far" concept is expressed in terms of error standard deviations.
@@ -271,14 +251,3 @@ class PeriodicAverageForecasterAnomalyDetector(ForecasterAnomalyDetector):
     """
     
     forecaster_class = PeriodicAverageForecaster
-
-
-class PeriodicAverageAnomalyDetector(PeriodicAverageForecasterAnomalyDetector):
-    """This class is deprecated in favour of the PeriodicAverageForecasterAnomalyDetector class.
-    
-    :meta private:
-    """
-    def __init__(self, *args, **kwargs):
-        logger.warning('The PeriodicAverageAnomalyDetector class is deprecated, please replace it with the new PeriodicAverageForecasterAnomalyDetector class.')
-        super(PeriodicAverageAnomalyDetector, self).__init__(*args, **kwargs)
-
