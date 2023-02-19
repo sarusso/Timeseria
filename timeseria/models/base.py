@@ -559,7 +559,7 @@ class _KerasModel(Model):
         
         Args:
             window_datapoints (list): The list with the data points (or slots)
-            data_labels(dict): the keys of the point (or slot) data.
+            data_labels(dict): the labels of the point (or slot) data.
             features(list): the list of the features to compute.
                 Supported values are:
                 ``values`` (use the data values), 
@@ -578,7 +578,7 @@ class _KerasModel(Model):
             
             datapoint_features = []
             
-            # 1) datapoint values (for all keys)
+            # 1) Data point/slot values (for all data labels)
             if 'values' in features:
                 for data_label in data_labels:
                     datapoint_features.append(window_datapoints[i].data[data_label])

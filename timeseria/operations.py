@@ -560,7 +560,7 @@ class Normalize(Operation):
 
         data_labels = series.data_labels()
 
-        # Get min and max for the data keys
+        # Get min and max for the data labels
         for i, item in enumerate(series):
             
             if i == 0:

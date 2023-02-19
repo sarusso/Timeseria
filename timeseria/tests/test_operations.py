@@ -75,7 +75,7 @@ class TestOpertions(unittest.TestCase):
         # Test standalone
         self.assertEqual(len(diff(series)), 3)
   
-        # Multi-key Test data (on points)
+        # Multi data labels Test data (on points)
         series = TimeSeries()
         series.append(DataTimePoint(t=0, data={'value':10, 'another_value': 75}))
         series.append(DataTimePoint(t=60, data={'value':12, 'another_value': 65}))
@@ -168,7 +168,7 @@ class TestOpertions(unittest.TestCase):
         self.assertAlmostEqual(derivative_series[2].data['value_derivative'],0.2)
         self.assertAlmostEqual(derivative_series[3].data['value_derivative'],0.1)        
 
-        # Multi-key Test data
+        # Multi data labels Test data
         series = TimeSeries()
         series.append(DataTimePoint(t=0, data={'value':10, 'another_value': 75}))
         series.append(DataTimePoint(t=10, data={'value':12, 'another_value': 65}))
@@ -391,7 +391,7 @@ class TestOpertions(unittest.TestCase):
         self.assertEqual(series.max(), {'value':16})
         self.assertEqual(series.avg(), {'value':11})
 
-        # Multi-key Test data
+        # Multi data labels Test data
         series = TimeSeries()
         series.append(DataTimePoint(t=0, data={'value':10, 'another_value': 75}))
         series.append(DataTimePoint(t=60, data={'value':12, 'another_value': 65}))

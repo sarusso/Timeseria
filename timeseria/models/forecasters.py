@@ -270,7 +270,7 @@ class Forecaster(Model):
             model_values = []
             processed_samples = 0
     
-            for key in series.data_labels():
+            for data_label in series.data_labels():
                 
                 # If the model has no window, evaluate on the entire time series
                 
@@ -342,10 +342,10 @@ class Forecaster(Model):
                     # forecast series we added an "artificial" first point to use the apply()
                     for i in range(1, evaluate_samples+1):
                         
-                        model_value = forecast_series[i].data[key]
+                        model_value = forecast_series[i].data[data_label]
                         model_values.append(model_value)
                         
-                        real_value = series[i-1].data[key]
+                        real_value = series[i-1].data[data_label]
                         real_values.append(real_value)
 
 
@@ -403,10 +403,10 @@ class Forecaster(Model):
     
                             forecast_index = self.data['window'] + step
     
-                            model_value = forecast_series[forecast_index].data[key]
+                            model_value = forecast_series[forecast_index].data[data_label]
                             model_values.append(model_value)
                             
-                            real_value = series[original_index].data[key]
+                            real_value = series[original_index].data[data_label]
                             real_values.append(real_value)
      
                         processed_samples+=1
@@ -431,24 +431,24 @@ class Forecaster(Model):
                 results['MAE_{}_steps'.format(steps_round)] = mean_absolute_error(real_values, model_values)
                 if evaluation_series:
                     for i in range(len(model_values)):
-                        evaluation_series[i].data['{}_AE'.format(key)] = abs(real_values[i] - model_values[i])  
+                        evaluation_series[i].data['{}_AE'.format(data_label)] = abs(real_values[i] - model_values[i])  
             if 'MAPE' in metrics:
                 results['MAPE_{}_steps'.format(steps_round)] = mean_absolute_percentage_error(real_values, model_values)
                 if evaluation_series:
                     for i in range(len(model_values)):
-                        evaluation_series[i].data['{}_APE'.format(key)] = abs(real_values[i] - model_values[i]) / real_values[i]
+                        evaluation_series[i].data['{}_APE'.format(data_label)] = abs(real_values[i] - model_values[i]) / real_values[i]
             
             if evaluation_series:
                 for i in range(len(model_values)):
-                    evaluation_series[i].data['{}_pred'.format(key)] = model_values[i]
+                    evaluation_series[i].data['{}_pred'.format(data_label)] = model_values[i]
         
         # Compute overall RMSE
         if 'RMSE' in metrics:
             sum_rmse = 0
             count = 0
-            for key in results:
-                if key.startswith('RMSE_'):
-                    sum_rmse += results[key]
+            for data_label in results:
+                if data_label.startswith('RMSE_'):
+                    sum_rmse += results[data_label]
                     count += 1
             results['RMSE'] = sum_rmse/count
 
@@ -456,9 +456,9 @@ class Forecaster(Model):
         if 'MAE' in metrics:
             sum_me = 0
             count = 0
-            for key in results:
-                if key.startswith('MAE_'):
-                    sum_me += results[key]
+            for data_label in results:
+                if data_label.startswith('MAE_'):
+                    sum_me += results[data_label]
                     count += 1
             results['MAE'] = sum_me/count
 
@@ -466,9 +466,9 @@ class Forecaster(Model):
         if 'MAPE' in metrics:
             sum_me = 0
             count = 0
-            for key in results:
-                if key.startswith('MAPE_'):
-                    sum_me += results[key]
+            for data_label in results:
+                if data_label.startswith('MAPE_'):
+                    sum_me += results[data_label]
                     count += 1
             results['MAPE'] = sum_me/count
         
@@ -563,7 +563,7 @@ class PeriodicAverageForecaster(Forecaster):
             logger.info('Using a window of "{}"'.format(periodicity))
             self.data['window'] = periodicity
 
-        for key in series.data_labels():
+        for data_label in series.data_labels():
             sums   = {}
             totals = {}
             processed = 0
@@ -579,10 +579,10 @@ class PeriodicAverageForecaster(Forecaster):
                 # Process
                 periodicity_index = _get_periodicity_index(item, series.resolution, periodicity, dst_affected)
                 if not periodicity_index in sums:
-                    sums[periodicity_index] = item.data[key]
+                    sums[periodicity_index] = item.data[data_label]
                     totals[periodicity_index] = 1
                 else:
-                    sums[periodicity_index] += item.data[key]
+                    sums[periodicity_index] += item.data[data_label]
                     totals[periodicity_index] +=1
                 processed += 1
 
@@ -600,7 +600,7 @@ class PeriodicAverageForecaster(Forecaster):
         # TODO: remove the forecast_start or move it in the parent(s).
       
         # Univariate is enforced by the fit
-        key = self.data['data_labels'][0]
+        data_label = self.data['data_labels'][0]
       
         # Set forecast starting item
         if forecast_start is None:
@@ -617,7 +617,7 @@ class PeriodicAverageForecaster(Forecaster):
         diffs  = 0                
         for j in range(self.data['window']):
             serie_index = forecast_start - self.data['window'] + j
-            real_value = series[serie_index].data[key]
+            real_value = series[serie_index].data[data_label]
             forecast_value = self.data['averages'][_get_periodicity_index(series[serie_index], series.resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])]
             diffs += (real_value - forecast_value)            
 
@@ -642,7 +642,7 @@ class PeriodicAverageForecaster(Forecaster):
     
             # Compute the real forecast data
             periodicity_index = _get_periodicity_index(forecast_timestamp, series.resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])        
-            forecast_data.append({key: self.data['averages'][periodicity_index] + (offset*1.0)})
+            forecast_data.append({data_label: self.data['averages'][periodicity_index] + (offset*1.0)})
         
         # Return
         return forecast_data
@@ -698,7 +698,7 @@ class ProphetForecaster(Forecaster, _ProphetModel):
 
         series = data
     
-        key = self.data['data_labels'][0]
+        data_label = self.data['data_labels'][0]
 
         # Prepare a dataframe with all the timestamps to forecast
         last_item    = series[-1]
@@ -720,7 +720,7 @@ class ProphetForecaster(Forecaster, _ProphetModel):
         # Re arrange predict results
         forecasted_items = []
         for i in range(steps):
-            forecasted_items.append({key: float(forecast['yhat'][i])})
+            forecasted_items.append({data_label: float(forecast['yhat'][i])})
 
         # Return
         return forecasted_items      
@@ -759,10 +759,10 @@ class ARIMAForecaster(Forecaster, _ARIMAModel):
         import statsmodels.api as sm
 
         if len(series.data_labels()) > 1:
-            raise Exception('Multivariate time series require to have the key of the prediction specified')
-        key=series.data_labels()[0]
+            raise Exception('Multivariate time series require to have the data_label of the prediction specified')
+        data_label=series.data_labels()[0]
                             
-        data = array(series.df[key])
+        data = array(series.df[data_label])
         
         # Save model and fit
         self.model = sm.tsa.ARIMA(data, (self.p,self.d,self.q))
@@ -778,14 +778,14 @@ class ARIMAForecaster(Forecaster, _ARIMAModel):
 
         series = data
 
-        key = self.data['data_labels'][0]
+        data_label = self.data['data_labels'][0]
 
         # Chack that we are applying on a time series ending with the same data point where the fit series was
         if self.fit_series[-1].t != series[-1].t:
             raise NonContiguityError('Sorry, this model can be applied only on a time series ending with the same timestamp as the time series used for the fit.')
 
         # Return the predicion. We need the [0] to access yhat, other indexes are erorrs etc.
-        return [{key: value} for value in self.model_res.forecast(steps)[0]] 
+        return [{data_label: value} for value in self.model_res.forecast(steps)[0]] 
 
 
 #=========================
@@ -807,10 +807,10 @@ class AARIMAForecaster(Forecaster, _ARIMAModel):
         import pmdarima as pm
 
         if len(series.data_labels()) > 1:
-            raise Exception('Multivariate time series require to have the key of the prediction specified')
-        key=series.data_labels()[0]
+            raise Exception('Multivariate time series require to have the data_label of the prediction specified')
+        data_label=series.data_labels()[0]
                             
-        data = array(series.df[key])
+        data = array(series.df[data_label])
 
         # Change some defaults
         trace = kwargs.pop('trace', False)
@@ -839,14 +839,14 @@ class AARIMAForecaster(Forecaster, _ARIMAModel):
 
         series = data
 
-        key = self.data['data_labels'][0]
+        data_label = self.data['data_labels'][0]
 
         # Chack that we are applying on a time series ending with the same datapoint where the fit series was
         if self.fit_series[-1].t != series[-1].t:
             raise NonContiguityError('Sorry, this model can be applied only on a time series ending with the same timestamp as the time series used for the fit.')
 
         # Return the predicion. We need the [0] to access yhat, other indexes are erorrs etc.
-        return [{key: value} for value in self.model.predict(steps)]
+        return [{data_label: value} for value in self.model.predict(steps)]
 
 
 #=========================
@@ -919,7 +919,7 @@ class LSTMForecaster(Forecaster, _KerasModel):
         else:
             verbose=0
 
-        # Data keys shortcut
+        # Data labels shortcut
         data_labels = series.data_labels()
 
         if normalize:

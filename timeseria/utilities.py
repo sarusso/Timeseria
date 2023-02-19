@@ -120,20 +120,20 @@ def detect_periodicity(time_series):
     
     _check_time_series(time_series)
     
-    # TODO: fix me, data_loss must not belong as key
+    # TODO: fix me, data_loss must not belong as data_label
     data_labels = time_series.data_labels()
     
     if len(data_labels) > 1:
         raise NotImplementedError()
 
     # TODO: improve me, highly ineficcient
-    for key in data_labels:
+    for data_label in data_labels:
         
         # Get data as a vector
         y = []
         for item in time_series:
-            y.append(item.data[key])
-        #y = [item.data[key] for item in time_series]
+            y.append(item.data[data_label])
+        #y = [item.data[data_label] for item in time_series]
 
         # Compute FFT (Fast Fourier Transform)
         yf = fft.fft(y)
@@ -593,14 +593,13 @@ def _check_resolution(series, resolution):
     if not __check_resolution(series, resolution):
         raise ValueError('This model is fitted on "{}" resolution data, while your data has "{}" resolution.'.format(resolution, series.resolution))
 
-
-def _check_data_labels(series, keys):
+def _check_data_labels(series, data_labels):
     series_data_labels = series.data_labels()
-    if len(series_data_labels) != len(keys):
-        raise ValueError('This model is fitted on {} data keys, while your data has {} data keys.'.format(len(keys), len(series_data_labels)))
-    if series_data_labels != keys:
+    if len(series_data_labels) != len(data_labels):
+        raise ValueError('This model is fitted on {} data labels, while your data has {} data labels.'.format(len(data_labels), len(series_data_labels)))
+    if series_data_labels != data_labels:
         # TODO: logger.warning?
-        raise ValueError('This model is fitted on "{}" data keys, while your data has "{}" data keys.'.format(keys, series_data_labels))
+        raise ValueError('This model is fitted on "{}" data labels, while your data has "{}" data labels.'.format(data_labels, series_data_labels))
 
 def _check_series_of_points_or_slots(series):
     from .datastructures import DataPoint, DataSlot

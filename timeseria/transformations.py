@@ -117,7 +117,7 @@ def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_poi
         
         # ...and assign them to the data value
         if isinstance(avgs, dict):
-            data = {key:avgs[key] for key in data_labels}
+            data = {data_label:avgs[data_label] for data_label in data_labels}
         else:
             data = {data_labels[0]: avgs}
              
@@ -125,9 +125,9 @@ def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_poi
     elif target=='slot':
         
         if data_loss == 1 and fill_with:
-            for key in data_labels:
+            for data_label in data_labels:
                 for operation in operations:
-                    data['{}_{}'.format(key, operation.__name__)] = fill_with
+                    data['{}_{}'.format(data_label, operation.__name__)] = fill_with
 
         else:
             # Handle operations                
@@ -146,8 +146,8 @@ def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_poi
                     
                 # ...and add to the data
                 if isinstance(operation_data, dict):
-                    for result_key in operation_data:
-                        data['{}_{}'.format(result_key, operation.__name__)] = operation_data[result_key]
+                    for result_data_label in operation_data:
+                        data['{}_{}'.format(result_data_label, operation.__name__)] = operation_data[result_data_label]
                 else:
                     data['{}_{}'.format(data_labels[0], operation.__name__)] = operation_data
     

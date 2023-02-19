@@ -108,10 +108,10 @@ class ForecasterAnomalyDetector(AnomalyDetector):
         # ..and save the forecaster as nested model
         self.forecaster.save(path+'/'+str(self.forecaster.id))
 
-    def __get_actual_and_predicted(self, series, i, key, forecaster_window):
+    def __get_actual_and_predicted(self, series, i, data_label, forecaster_window):
 
         # Call model predict logic and compare with the actual data
-        actual = series[i].data[key]
+        actual = series[i].data[data_label]
         
         try:
             # Try the optimized predict call (which just use the data as-is)
@@ -129,9 +129,9 @@ class ForecasterAnomalyDetector(AnomalyDetector):
 
         # TODO: this is because of forecasters not supporting multi-step forecasts.
         if not isinstance(prediction, list):
-            predicted = prediction[key]
+            predicted = prediction[data_label]
         else:
-            predicted = prediction[0][key]
+            predicted = prediction[0][data_label]
         
         return (actual, predicted)
 
@@ -158,7 +158,7 @@ class ForecasterAnomalyDetector(AnomalyDetector):
         
         # Evaluate the forecaster for one step ahead and get AEs
         AEs = []
-        for key in series.data_labels():
+        for data_label in series.data_labels():
             
             for i, _ in enumerate(series):
                 
@@ -167,7 +167,7 @@ class ForecasterAnomalyDetector(AnomalyDetector):
                 if i <=  forecaster_window:    
                     continue
                 
-                actual, predicted = self.__get_actual_and_predicted(series, i, key, forecaster_window)
+                actual, predicted = self.__get_actual_and_predicted(series, i, data_label, forecaster_window)
                 
                 AEs.append(abs(actual-predicted))
 
@@ -193,14 +193,14 @@ class ForecasterAnomalyDetector(AnomalyDetector):
         
         result_series = series.__class__()
 
-        for key in series.data_labels():
+        for data_label in series.data_labels():
             
             for i, item in enumerate(series):
                 forecaster_window = self.forecaster.data['window']
                 if i <=  forecaster_window:    
                     continue
                 
-                actual, predicted = self.__get_actual_and_predicted(series, i, key, forecaster_window)
+                actual, predicted = self.__get_actual_and_predicted(series, i, data_label, forecaster_window)
                 #if logs:
                 #    logger.info('{}: {} vs {}'.format(series[i].dt, actual, predicted))
 
@@ -224,12 +224,12 @@ class ForecasterAnomalyDetector(AnomalyDetector):
                 if details:
                     if isinstance(details, list):
                         if 'AE' in details:
-                            item.data['AE_{}'.format(key)] = AE
+                            item.data['AE_{}'.format(data_label)] = AE
                         if 'predicted' in details:
-                            item.data['{}_predicted'.format(key)] = predicted
+                            item.data['{}_predicted'.format(data_label)] = predicted
                     else:
-                        item.data['AE_{}'.format(key)] = AE
-                        item.data['{}_predicted'.format(key)] = predicted
+                        item.data['AE_{}'.format(data_label)] = AE
+                        item.data['{}_predicted'.format(data_label)] = predicted
 
                 result_series.append(item)
         

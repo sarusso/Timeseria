@@ -595,7 +595,7 @@ class TestTimeSeries(unittest.TestCase):
         with self.assertRaises(ValueError):
             time_series.append(DataTimePoint(t=180, data=[23.8,31.3]))
 
-        # Try to append the same data type but with different keys
+        # Try to append the same data type but with different labels
         time_series = TimeSeries(DataTimePoint(t=60, data={'a':56, 'b':67}))
         with self.assertRaises(ValueError):
             time_series.append(DataTimePoint(t=180, data={'a':56, 'c':67}))            
@@ -624,7 +624,7 @@ class TestTimeSeries(unittest.TestCase):
         self.assertEqual(time_series.resolution, 86400) # No DST occurred
         self.assertEqual(time_series.resolution, '86400s') # No DST occurred
 
-        # Test data keys and rename a data key
+        # Test data labels and rename a data labels
         time_series = TimeSeries(DataTimePoint(dt=dt(2015,10,27,0,0,0, tzinfo='Europe/Rome'), data={'a':23.8, 'b':1}),
                                  DataTimePoint(dt=dt(2015,10,28,0,0,0, tzinfo='Europe/Rome'), data={'a':24.1, 'b':2}),
                                  DataTimePoint(dt=dt(2015,10,29,0,0,0, tzinfo='Europe/Rome'), data={'a':23.1, 'b':3}))        
@@ -633,7 +633,7 @@ class TestTimeSeries(unittest.TestCase):
         self.assertEqual(time_series.data_labels(), ['a','c'])
         
         with self.assertRaises(KeyError):
-            time_series.rename_data_label('notexistent_key','c')
+            time_series.rename_data_label('notexistent_label','c')
 
         # Check timezone
         time_series = TimeSeries(DataTimePoint(dt=dt(2015,10,25,0,0,0, tz='Europe/Rome'), data={'a':23.8}),
@@ -780,7 +780,7 @@ class TestTimeSeries(unittest.TestCase):
         with self.assertRaises(ValueError):
             time_series.append(DataTimeSlot(start=TimePoint(t=120), end=TimePoint(t=180), data=[23.8,31.3]))
 
-        # Try to append the same data type but with different keys
+        # Try to append the same data type but with different labels
         time_series = TimeSeries(DataTimeSlot(start=TimePoint(t=60), end=TimePoint(t=120), data={'a':56, 'b':67}))
         with self.assertRaises(ValueError):
             time_series.append(DataTimeSlot(start=TimePoint(t=120), end=TimePoint(t=180), data={'a':56, 'c':67}))            
@@ -847,7 +847,7 @@ class TestTimeSeries(unittest.TestCase):
         time_series =  TimeSeries(DataTimeSlot(start=TimePoint(t=60),  end=TimePoint(t=120), data={'a':1, 'b':2}))
         self.assertEqual(time_series['a'][0].data, {'a': 1})
 
-        # Test data keys and rename a data key
+        # Test data labels and rename a data label
         time_series = TimeSeries(DataTimeSlot(dt=dt(2015,10,27,0,0,0), unit='1D', data={'a':23.8, 'b':1}),
                                  DataTimeSlot(dt=dt(2015,10,28,0,0,0), unit='1D', data={'a':24.1, 'b':2}),
                                  DataTimeSlot(dt=dt(2015,10,29,0,0,0), unit='1D', data={'a':23.1, 'b':3}))
@@ -857,7 +857,7 @@ class TestTimeSeries(unittest.TestCase):
         self.assertEqual(time_series.data_labels(), ['a','c'])
 
         with self.assertRaises(KeyError):
-            time_series.rename_data_label('notexistent_key','c')
+            time_series.rename_data_label('notexistent_label','c')
 
 
     def test_TimeSeries_alternative_inits(self):

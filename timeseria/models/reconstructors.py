@@ -64,7 +64,7 @@ class Reconstructor(Model):
         if len(series.data_labels()) > 1:
             raise NotImplementedError('Multivariate time series are not yet supported')
 
-        for key in series.data_labels():
+        for data_label in series.data_labels():
             
             gap_started = None
             
@@ -91,7 +91,7 @@ class Reconstructor(Model):
                     if gap_started is not None:
                     
                         # Reconstruct for this gap
-                        self._reconstruct(series, from_index=gap_started, to_index=i, key=key)
+                        self._reconstruct(series, from_index=gap_started, to_index=i, data_label=data_label)
                         gap_started = None
                     
                     item.data_indexes['data_reconstructed'] = 0
@@ -101,7 +101,7 @@ class Reconstructor(Model):
             
             # Reconstruct the last gap as well if left "open"
             if gap_started is not None:
-                self._reconstruct(series, from_index=gap_started, to_index=i+1, key=key)
+                self._reconstruct(series, from_index=gap_started, to_index=i+1, data_label=data_label)
 
         if not inplace:
             return series
@@ -154,7 +154,7 @@ class Reconstructor(Model):
         logger.info('Will evaluate model for %s steps with metrics %s', steps, metrics)
         
         # Find areas where to evaluate the model
-        for key in series.data_labels():
+        for data_label in series.data_labels():
              
             for steps_round in steps:
                 
@@ -193,8 +193,8 @@ class Reconstructor(Model):
                         continue
                             
                     # Set prev and next
-                    prev_value = series[i-1].data[key]
-                    next_value = series[i+steps_round].data[key]
+                    prev_value = series[i-1].data[data_label]
+                    next_value = series[i+steps_round].data[data_label]
                     
                     # Compute average value
                     average_value = (prev_value+next_value)/2
@@ -210,10 +210,10 @@ class Reconstructor(Model):
                         item = copy.deepcopy(series[i+j])
                         # Set the data_loss to one so the item will be reconstructed
                         item.data_indexes['data_loss'] = 1
-                        item.data[key] = average_value
+                        item.data[data_label] = average_value
                         series_to_reconstruct.append(item)
                         
-                        real_values.append(series[i+j].data[key])
+                        real_values.append(series[i+j].data[data_label])
               
                     # Append next
                     #series_to_reconstruct.append(copy.deepcopy(series[i+steps_round]))
@@ -229,7 +229,7 @@ class Reconstructor(Model):
 
                     # Store reconstructed values
                     for j in range(steps_round):
-                        reconstructed_values.append(series_to_reconstruct[j].data[key])
+                        reconstructed_values.append(series_to_reconstruct[j].data[data_label])
                     
                     # Break if we have to
                     if limit is not None and processed_samples >= limit:
@@ -258,9 +258,9 @@ class Reconstructor(Model):
         if 'RMSE' in metrics:
             sum_rmse = 0
             count = 0
-            for key in evaluation_score:
-                if key.startswith('RMSE_'):
-                    sum_rmse += evaluation_score[key]
+            for data_label in evaluation_score:
+                if data_label.startswith('RMSE_'):
+                    sum_rmse += evaluation_score[data_label]
                     count += 1
             evaluation_score['RMSE'] = sum_rmse/count
 
@@ -268,9 +268,9 @@ class Reconstructor(Model):
         if 'MAE' in metrics:
             sum_me = 0
             count = 0
-            for key in evaluation_score:
-                if key.startswith('MAE_'):
-                    sum_me += evaluation_score[key]
+            for data_label in evaluation_score:
+                if data_label.startswith('MAE_'):
+                    sum_me += evaluation_score[data_label]
                     count += 1
             evaluation_score['MAE'] = sum_me/count
 
@@ -278,9 +278,9 @@ class Reconstructor(Model):
         if 'MAPE' in metrics:
             sum_me = 0
             count = 0
-            for key in evaluation_score:
-                if key.startswith('MAPE_'):
-                    sum_me += evaluation_score[key]
+            for data_label in evaluation_score:
+                if data_label.startswith('MAPE_'):
+                    sum_me += evaluation_score[data_label]
                     count += 1
             evaluation_score['MAPE'] = sum_me/count
         
@@ -322,7 +322,7 @@ class LinearInterpolationReconstructor(Reconstructor):
     when evaluating other, more sophisticated, data reconstruction models.
     """
 
-    def _reconstruct(self, data, key, from_index, to_index):
+    def _reconstruct(self, data, data_label, from_index, to_index):
         logger.debug('Reconstructing between "{}" and "{}" (excluded)'.format(from_index, to_index))
         
         try:
@@ -398,7 +398,7 @@ class PeriodicAverageReconstructor(Reconstructor):
         self.data['periodicity']  = periodicity
         self.data['dst_affected'] = dst_affected 
                 
-        for key in series.data_labels():
+        for data_label in series.data_labels():
             sums   = {}
             totals = {}
             processed = 0
@@ -415,10 +415,10 @@ class PeriodicAverageReconstructor(Reconstructor):
                 if item.data_loss is None or item.data_loss < data_loss_threshold:
                     periodicity_index = _get_periodicity_index(item, series.resolution, periodicity, dst_affected=dst_affected)
                     if not periodicity_index in sums:
-                        sums[periodicity_index] = item.data[key]
+                        sums[periodicity_index] = item.data[data_label]
                         totals[periodicity_index] = 1
                     else:
-                        sums[periodicity_index] += item.data[key]
+                        sums[periodicity_index] += item.data[data_label]
                         totals[periodicity_index] +=1
                 processed += 1
 
@@ -429,7 +429,7 @@ class PeriodicAverageReconstructor(Reconstructor):
         
         logger.debug('Processed "%s" items', processed)
 
-    def _reconstruct(self, data, key, from_index, to_index):
+    def _reconstruct(self, data, data_label, from_index, to_index):
  
         series = data
             
@@ -439,7 +439,7 @@ class PeriodicAverageReconstructor(Reconstructor):
         if self.offset_method == 'average':
             diffs=0
             for j in range(from_index, to_index):
-                real_value = series[j].data[key]
+                real_value = series[j].data[data_label]
                 periodicity_index = _get_periodicity_index(series[j], series.resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])
                 reconstructed_value = self.data['averages'][periodicity_index]
                 diffs += (real_value - reconstructed_value)
@@ -450,7 +450,7 @@ class PeriodicAverageReconstructor(Reconstructor):
             diffs=0
             try:
                 for j in [from_index-1, to_index+1]:
-                    real_value = series[j].data[key]
+                    real_value = series[j].data[data_label]
                     periodicity_index = _get_periodicity_index(series[j], series.resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])
                     reconstructed_value = self.data['averages'][periodicity_index]
                     diffs += (real_value - reconstructed_value)
@@ -464,7 +464,7 @@ class PeriodicAverageReconstructor(Reconstructor):
         for j in range(from_index, to_index):
             item_to_reconstruct = series[j]
             periodicity_index = _get_periodicity_index(item_to_reconstruct, series.resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])
-            item_to_reconstruct.data[key] = self.data['averages'][periodicity_index] + offset
+            item_to_reconstruct.data[data_label] = self.data['averages'][periodicity_index] + offset
             item_to_reconstruct.data_indexes['data_reconstructed'] = 1
 
     def _plot_averages(self, series, **kwargs):   
@@ -508,7 +508,7 @@ class ProphetReconstructor(Reconstructor, _ProphetModel):
         # Fit tjhe Prophet model
         self.prophet_model.fit(data)
 
-    def _reconstruct(self, data, key, from_index, to_index):
+    def _reconstruct(self, data, data_label, from_index, to_index):
 
         series = data
         
@@ -529,6 +529,6 @@ class ProphetReconstructor(Reconstructor, _ProphetModel):
         for i, j in enumerate(range(from_index, to_index)):
             #logger.debug('Reconstructing item #{} with reconstucted item #{}'.format(j,i))
             item_to_reconstruct = series[j]
-            item_to_reconstruct.data[key] = forecast['yhat'][i]
+            item_to_reconstruct.data[data_label] = forecast['yhat'][i]
             item_to_reconstruct.data_indexes['data_reconstructed'] = 1
 

@@ -272,12 +272,6 @@ class DataPoint(Point):
             except TypeError:
                 raise TypeError('Cannot get an element by label on non-indexed data')
 
-    def _data_keys(self):
-        try:
-            return sorted(list(self.data.keys()))
-        except AttributeError:
-            return [i for i in range(len(self.data))]
-
 
 class DataTimePoint(DataPoint, TimePoint):
     """A point that carries some data in the time dimension. Can be initialized using the special `t` and `dt` arguments,
@@ -580,12 +574,6 @@ class DataSlot(Slot):
             return sorted(list(self.data.keys()))
         except AttributeError:
             return [str(i) for i in range(len(self.data))]
-
-    def _data_keys(self):
-        try:
-            return sorted(list(self.data.keys()))
-        except AttributeError:
-            return [i for i in range(len(self.data))]
 
     def _data_by_label(self, label):
         try:
@@ -960,14 +948,6 @@ class Series(list):
         else:
             return self[0].data_labels()
 
-    def _data_keys(self):
-        if len(self) > 0 and not self._item_data_reference:
-            raise TypeError('Series items have no data, cannot get data keys')
-        if len(self) == 0:
-            return None
-        else:
-            return self[0]._data_keys()
-    
     def rename_data_label(self, old_data_label, new_data_label):
         """Rename a data label, in-place."""
         if len(self) > 0 and not self._item_data_reference:
@@ -1820,7 +1800,7 @@ class TimeSeries(Series):
             
         df = DataFrame(columns=columns)
         for item in self:
-            values = [item.data[key] for key in data_labels]
+            values = [item.data[data_label] for data_label in data_labels]
             if dump_data_loss:
                 df = df.append(DataFrame([[item.dt]+values+[item.data_loss]], columns=columns))
             else:
@@ -1994,9 +1974,6 @@ class _TimeSeriesView(TimeSeries):
 
     def data_labels(self):
         return self.series.data_labels()
-    
-    def _data_keys(self):
-        return self.series._data_keys()        
 
 
 

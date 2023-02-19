@@ -71,23 +71,18 @@ def _utc_fake_s_from_dt(dt):
 
 def _check_data_for_plot(data):
     if is_numerical(data):
-        keys = []
+        pass
     elif isinstance(data, list):
-        keys = []
-        for key,item in enumerate(data): 
+        for _,item in enumerate(data): 
             if not is_numerical(item):
                 raise Exception('Don\'t know how to plot item "{}" of type "{}"'.format(item, item.__class__.__name__))
-            keys.append(key)
     
     elif isinstance(data, dict):
-        keys = []
-        for key,item in data.items(): 
+        for _,item in data.items(): 
             if not is_numerical(item):
                 raise Exception('Don\'t know how to plot item "{}" of type "{}"'.format(item, item.__class__.__name__))
-            keys.append(key)            
     else:
         raise Exception('Don\'t know how to plot data "{}" of type "{}"'.format(data, data.__class__.__name__))
-    return keys
 
 
 def _to_dg_time(dt):
@@ -609,7 +604,7 @@ function legendFormatter(data) {
     # Check data for plot.
     _check_data_for_plot(timeseries[0].data)
 
-    # Loop over all the keys
+    # Loop over all the data labels
     labels=''
     if data_labels_to_plot:
         for data_label_to_plot in data_labels_to_plot:
