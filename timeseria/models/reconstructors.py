@@ -109,7 +109,7 @@ class Reconstructor(Model):
             return None
 
     def evaluate(self, data, steps='auto', limit=None, data_loss_threshold=1, metrics=['RMSE', 'MAE'], details=False, from_t=None, to_t=None, from_dt=None, to_dt=None):
-        """Evaluate the reconstructor on a data.
+        """Evaluate the reconstructor on some data.
 
         Args:
             steps (int, list): a single value or a list of values for how many steps (intended as missing data points or slots) 
@@ -356,7 +356,7 @@ class PeriodicAverageReconstructor(Reconstructor):
         
         # TODO: periodicity, dst_affected, offset_method -> move them in the init?
         """
-        Fit the reconstructor on a series.
+        Fit the reconstructor on some data.
  
         Args:
             data_loss_threshold(float): the threshold of the data_loss index for discarding an element from the fit.

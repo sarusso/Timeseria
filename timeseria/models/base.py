@@ -105,7 +105,7 @@ class Model():
             return False
 
     def fit(self, data, *args, **kwargs):
-        """Fit the model."""
+        """Fit the model on some data."""
 
         # Check if fit logic is implemented
         try:
@@ -143,7 +143,7 @@ class Model():
         return fit_output
 
     def predict(self, data, *args, **kwargs):
-        """Call the model predict logic."""
+        """Call the model predict logic on some data."""
 
         # Check if predict logic is implemented
         try:
@@ -179,7 +179,7 @@ class Model():
         return self._predict(data, *args, **kwargs)
 
     def apply(self, data, *args, **kwargs):
-        """Apply the model."""
+        """Apply the model on some data."""
         
         # Check if apply logic is implemented
         try:
@@ -215,7 +215,7 @@ class Model():
         return self._apply(data, *args, **kwargs)
 
     def evaluate(self, data, *args, **kwargs):
-        """Evaluate the model."""
+        """Evaluate the model on some data."""
         
         # Check if evaluate logic is implemented
         try:
@@ -251,7 +251,7 @@ class Model():
         return self._evaluate(data, *args, **kwargs)
 
     def cross_validate(self, data, rounds=10, *args, **kwargs):
-        """Cross validate the model, by default with 10 fit/evaluate rounds.
+        """Cross validate the model on some data, by default with 10 fit/evaluate rounds.
         
         All the parameters starting with the ``fit_`` prefix are forwarded to the model ``fit()`` method (without the prefix), and
         all the parameters starting with the ``evaluate_`` prefix are forwarded to the model ``evaluate()`` method (without the prefix).

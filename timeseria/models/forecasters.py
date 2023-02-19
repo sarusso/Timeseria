@@ -72,7 +72,7 @@ class Forecaster(Model):
         return super(Forecaster, self).predict(data, steps, *args, **kwargs)
 
     def forecast(self, data, steps=1, forecast_start=None):
-        """Forecast n steps-ahead data points or slots."""
+        """Forecast n steps-ahead, on some data."""
 
         # Check data
         if not isinstance(data, TimeSeries):
@@ -130,7 +130,7 @@ class Forecaster(Model):
         return forecast
 
     def apply(self, data, steps=1, *args, **kwargs):
-        """Apply the forecast on the data for n steps-ahead"""
+        """Apply the forecast on the data for n steps-ahead on some data."""
         return super(Forecaster, self).apply(data, steps, *args, **kwargs)
 
     def _apply(self, data, steps=1, inplace=False):
@@ -179,7 +179,7 @@ class Forecaster(Model):
             return None
 
     def evaluate(self, data, steps='auto', limit=None, plot=False, plots=False, metrics=['RMSE', 'MAE'], details=False, from_t=None, to_t=None, from_dt=None, to_dt=None, evaluation_series=False):
-        """Evaluate the forecaster on a data.
+        """Evaluate the forecaster on some data.
 
         Args:
             steps (int,list): a single value or a list of values for how many steps-ahead to forecast in the evaluation. Default to automatic detection based on the model.
@@ -527,7 +527,7 @@ class PeriodicAverageForecaster(Forecaster):
             self.data['averages'] = {int(key):value for key, value in self.data['averages'].items()}
         
     def fit(self, data, periodicity='auto', dst_affected=False, from_t=None, to_t=None, from_dt=None, to_dt=None):
-        """Fit the model.
+        """Fit the model on some data.
 
         Args:
             periodicity(int): the periodicty of the series. If set to ``auto`` then it will be automatically detected using a FFT.
