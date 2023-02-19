@@ -233,15 +233,15 @@ class Transformation(object):
     def __str__(cls):
         return '{} transformation'.format(cls.__name__.replace('Transformation',''))
 
-    def process(self, input_data, target, from_t=None, to_t=None, from_dt=None, to_dt=None, validity=None,
+    def process(self, data, target, from_t=None, to_t=None, from_dt=None, to_dt=None, validity=None,
                 include_extremes=False, fill_with=None, force_data_loss=None, fill_gaps=True, force=False):
         """Start the transformation process. If start and/or end are not set, they are set automatically
         based on first and last points of the series"""
         
-        if not isinstance(input_data, TimeSeries):
-            raise NotImplementedError('Transformations work only with TimeSeries data for now (got "{}")'.format(input_data.__class__.__name__))
+        if not isinstance(data, TimeSeries):
+            raise NotImplementedError('Transformations work only with TimeSeries data for now (got "{}")'.format(data.__class__.__name__))
         
-        series = input_data
+        series = data
 
         if not (issubclass(series.items_type, Point) or issubclass(series.items_type, Slot)):
                 raise TypeError('Series items are not Points nor Slots, cannot compute any transformation')

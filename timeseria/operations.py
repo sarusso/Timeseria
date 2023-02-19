@@ -31,7 +31,7 @@ class Operation():
     def __repr__(cls):
         return '{}'.format(cls.__name__.lower())
     
-    def __call__(self, input_data, *args, **kwargs):
+    def __call__(self, data, *args, **kwargs):
         """Call self as a function.
         
         :meta private:
@@ -43,29 +43,29 @@ class Operation():
             raise NotImplementedError('No operation logic implemented.')
         else:
             checked = False
-            if isinstance(input_data, Series):
-                # Checked single input_data OK
-                if not input_data:
-                    raise ValueError('Cannot operate on an empty input_data')
+            if isinstance(data, Series):
+                # Checked single data OK
+                if not data:
+                    raise ValueError('Cannot operate on an empty data')
                 checked = True
             else:
                 # Assume list and check
                 try:
-                    for item in input_data:
+                    for item in data:
                         if not isinstance(item, Series):
                             raise TypeError('Operations can work only on a Series or a list of Series for now, got a list of "{}"'.format(item.__class__.__name__))
                         if not item:
-                            raise ValueError('Cannot operate on an empty input_data')
+                            raise ValueError('Cannot operate on an empty data')
                     checked=True
                 except TypeError:
                     # It was not iterable
                     pass
             
             if not checked:
-                raise TypeError('Operations can work only on a Series or a list of Series for now, got "{}"'.format(input_data.__class__.__name__))
+                raise TypeError('Operations can work only on a Series or a list of Series for now, got "{}"'.format(data.__class__.__name__))
             
             # Call compute logic
-            return self._compute(input_data, *args, **kwargs)
+            return self._compute(data, *args, **kwargs)
 
     @property
     def __name__(self):
@@ -80,9 +80,9 @@ class Max(Operation):
     """Maximum operation (callable object). Comes also pre-instantiated as the ``max()``
     function in the same module (accessible as ``timeseria.operations.max``)."""
 
-    def _compute(self, input_data, data_label=None):
+    def _compute(self, data, data_label=None):
 
-        series = input_data
+        series = data
 
         _check_series_of_points_or_slots(series)
         _check_indexed_data(series)
@@ -109,9 +109,9 @@ class Min(Operation):
     """Minimum operation (callable object). Comes also pre-instantiated as the ``min()``
     function in the same module (accessible as ``timeseria.operations.min``)."""
     
-    def _compute(self, input_data, data_label=None):
+    def _compute(self, data, data_label=None):
 
-        series = input_data
+        series = data
 
         _check_series_of_points_or_slots(series)
         _check_indexed_data(series)
@@ -138,9 +138,9 @@ class Avg(Operation):
     
     _supports_weights = True
 
-    def _compute(self, input_data, data_label=None):
+    def _compute(self, data, data_label=None):
 
-        series = input_data
+        series = data
 
         _check_series_of_points_or_slots(series)
         _check_indexed_data(series)
@@ -204,9 +204,9 @@ class Avg(Operation):
 class Sum(Operation):
     """Sum operation (callable object)."""
 
-    def _compute(self, input_data, data_label=None):
+    def _compute(self, data, data_label=None):
 
-        series = input_data
+        series = data
 
         _check_series_of_points_or_slots(series)
         _check_indexed_data(series)        
@@ -230,9 +230,9 @@ class Sum(Operation):
 class Derivative(Operation):
     """Derivative operation (callable object)."""
     
-    def _compute(self, input_data, inplace=False, normalize=True, diffs=False):
+    def _compute(self, data, inplace=False, normalize=True, diffs=False):
  
-        series = input_data
+        series = data
  
         _check_series_of_points_or_slots(series)
         _check_indexed_data(series)
@@ -374,9 +374,9 @@ class Derivative(Operation):
 class Integral(Operation):
     """Integral operation (callable object)."""
     
-    def _compute(self, input_data, inplace=False, normalize=True, c=0, offset=0):
+    def _compute(self, data, inplace=False, normalize=True, c=0, offset=0):
 
-        series = input_data
+        series = data
 
         _check_series_of_points_or_slots(series)
         _check_indexed_data(series)
@@ -534,26 +534,26 @@ class Integral(Operation):
 
 class Diff(Derivative):
     """Incremental differences operation (callable object). Reduces the series leght by one (the firts element), same as Pandas."""
-    def _compute(self, input_data, inplace=False):
-        if input_data.resolution == 'variable':
+    def _compute(self, data, inplace=False):
+        if data.resolution == 'variable':
             raise ValueError('The differences cannot be computed on variable resolution time series, resample it or use the derivative operation.')
-        return super(Diff, self)._compute(input_data, inplace=inplace, normalize=False, diffs=True)
+        return super(Diff, self)._compute(data, inplace=inplace, normalize=False, diffs=True)
 
 
 class CSum(Integral):
     """Cumulative sum operation (callable object)."""
-    def _compute(self, input_data, inplace=False, offset=None):
-        if input_data.resolution == 'variable':
+    def _compute(self, data, inplace=False, offset=None):
+        if data.resolution == 'variable':
             raise ValueError('The cumulative sums cannot be computed on variable resolution time series, resample it or use the integral operation.')
-        return super(CSum, self)._compute(input_data, inplace=inplace, normalize=False, offset=offset)
+        return super(CSum, self)._compute(data, inplace=inplace, normalize=False, offset=offset)
 
 
 class Normalize(Operation):
     """Normalization operation (callable object)"""
     
-    def _compute(self, input_data, range=[0,1], inplace=False):
+    def _compute(self, data, range=[0,1], inplace=False):
 
-        series = input_data
+        series = data
 
         _check_series_of_points_or_slots(series)
         _check_indexed_data(series)
@@ -636,9 +636,9 @@ class Normalize(Operation):
 class Rescale(Operation):
     """Rescaling operation (callable object)"""
     
-    def _compute(self, input_data, value, inplace=False):
+    def _compute(self, data, value, inplace=False):
 
-        series = input_data
+        series = data
 
         _check_series_of_points_or_slots(series)
         _check_indexed_data(series)
@@ -702,9 +702,9 @@ class Rescale(Operation):
 class Offset(Operation):
     """Offsetting operation (callable object)"""
     
-    def _compute(self, input_data, value, inplace=False):
+    def _compute(self, data, value, inplace=False):
 
-        series = input_data
+        series = data
 
         _check_series_of_points_or_slots(series)
         _check_indexed_data(series)
@@ -769,9 +769,9 @@ class Offset(Operation):
 class MAvg(Operation):
     """Moving average operation (callable object). Reduces the size of the data by n (the windowd length)."""
 
-    def _compute(self, input_data, window, inplace=False):
+    def _compute(self, data, window, inplace=False):
 
-        series = input_data
+        series = data
 
         _check_series_of_points_or_slots(series)
         _check_indexed_data(series)
@@ -832,9 +832,9 @@ class MAvg(Operation):
 class Filter(Operation):
     """Filter operation (callable object)."""
 
-    def _compute(self, input_data, data_label=None, from_t=None, to_t=None, from_dt=None, to_dt=None):
+    def _compute(self, data, data_label=None, from_t=None, to_t=None, from_dt=None, to_dt=None):
 
-        series = input_data
+        series = data
 
         _check_series_of_points_or_slots(series)
         _check_indexed_data(series)
@@ -896,9 +896,9 @@ class Filter(Operation):
 class Slice(Operation):
     """Slice operation (callable object)."""
 
-    def _compute(self, input_data, from_t=None, to_t=None, from_dt=None, to_dt=None):
+    def _compute(self, data, from_t=None, to_t=None, from_dt=None, to_dt=None):
 
-        series = input_data
+        series = data
 
         if from_dt:
             if from_t is not None:
@@ -944,9 +944,9 @@ class Slice(Operation):
 class Merge(Operation):
     """Merge operation (callable object)."""
     
-    def _compute(self, *input_data):
+    def _compute(self, *data):
         
-        seriess = input_data
+        seriess = data
         
         # Support vars
         resolution = None
@@ -1073,9 +1073,9 @@ class Merge(Operation):
 class Select(Operation):
     """Select operation (callable object). Selects items given an SQL-like query."""
     
-    def _compute(self, input_data, query):
+    def _compute(self, data, query):
 
-        series = input_data
+        series = data
 
         _check_series_of_points_or_slots(series)
         _check_indexed_data(series)

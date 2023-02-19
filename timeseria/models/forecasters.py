@@ -52,33 +52,33 @@ class Forecaster(Model):
         path (str): a path from which to load a saved model. Will override all other init settings.
     """
     
-    def predict(self, input_data, steps=1, *args, **kwargs):
+    def predict(self, data, steps=1, *args, **kwargs):
         "Predict n steps-ahead forecast data values."
  
-        # Check input_data # TODO: this check here is redundant, as already performed in the parent predict(),
+        # Check data # TODO: this check here is redundant, as already performed in the parent predict(),
         # but otherwise the folloginw len checl might fail.
-        if not isinstance(input_data, TimeSeries):
-            raise NotImplementedError('Models work only with TimeSeries data for now (got "{}")'.format(input_data.__class__.__name__))
+        if not isinstance(data, TimeSeries):
+            raise NotImplementedError('Models work only with TimeSeries data for now (got "{}")'.format(data.__class__.__name__))
 
-        # Check if the input input_data is shorter than the window, if any.
+        # Check if the input data is shorter than the window, if any.
         # Note that nearly all forecasters use windows, at least of one point.
         try:
-            if len(input_data) < self.data['window']:
-                raise ValueError('The input_data length ({}) is shorter than the model window ({}), it must be at least equal.'.format(len(input_data), self.data['window']))
+            if len(data) < self.data['window']:
+                raise ValueError('The data length ({}) is shorter than the model window ({}), it must be at least equal.'.format(len(data), self.data['window']))
         except KeyError:
             pass
         
         # Call parent predict
-        return super(Forecaster, self).predict(input_data, steps, *args, **kwargs)
+        return super(Forecaster, self).predict(data, steps, *args, **kwargs)
 
-    def forecast(self, input_data, steps=1, forecast_start=None):
+    def forecast(self, data, steps=1, forecast_start=None):
         """Forecast n steps-ahead data points or slots."""
 
-        # Check input_data
-        if not isinstance(input_data, TimeSeries):
-            raise NotImplementedError('Models work only with TimeSeries data for now (got "{}")'.format(input_data.__class__.__name__))
+        # Check data
+        if not isinstance(data, TimeSeries):
+            raise NotImplementedError('Models work only with TimeSeries data for now (got "{}")'.format(data.__class__.__name__))
 
-        series = input_data
+        series = data
 
         # Set forecast starting item
         if forecast_start is not None:
@@ -129,16 +129,16 @@ class Forecaster(Model):
   
         return forecast
 
-    def apply(self, input_data, steps=1, *args, **kwargs):
-        """Apply the forecast on the input_data for n steps-ahead"""
-        return super(Forecaster, self).apply(input_data, steps, *args, **kwargs)
+    def apply(self, data, steps=1, *args, **kwargs):
+        """Apply the forecast on the data for n steps-ahead"""
+        return super(Forecaster, self).apply(data, steps, *args, **kwargs)
 
-    def _apply(self, input_data, steps=1, inplace=False):
+    def _apply(self, data, steps=1, inplace=False):
  
         if inplace:
-            series= input_data
+            series= data
         else:
-            series = input_data.duplicate()
+            series = data.duplicate()
 
         input_series_len = len(series)
         
@@ -178,17 +178,17 @@ class Forecaster(Model):
         else:
             return None
 
-    def evaluate(self, input_data, steps='auto', limit=None, plot=False, plots=False, metrics=['RMSE', 'MAE'], details=False, from_t=None, to_t=None, from_dt=None, to_dt=None, evaluation_series=False):
-        """Evaluate the forecaster on a input_data.
+    def evaluate(self, data, steps='auto', limit=None, plot=False, plots=False, metrics=['RMSE', 'MAE'], details=False, from_t=None, to_t=None, from_dt=None, to_dt=None, evaluation_series=False):
+        """Evaluate the forecaster on a data.
 
         Args:
             steps (int,list): a single value or a list of values for how many steps-ahead to forecast in the evaluation. Default to automatic detection based on the model.
-            limit(int): set a limit for the time input_data elements to use for the evaluation.
+            limit(int): set a limit for the time data elements to use for the evaluation.
             plot(bool): if to produce an overall evaluation plot, defaulted to False. If set to True, the evaluation results are not retuned.
                         To get both the evaluation results and the overall evaluation plot, set the `evaluation_series` switch to True in
                         order to add it to the evaluation results and plot it afterwards.
             plots(bool): if to produce evaluation plots, defaulted to False. Beware that setting this option to True will cause to generate 
-                         a plot for each evaluation point or slot of the time input_data: use with caution and only on small time input_data. Not
+                         a plot for each evaluation point or slot of the time data: use with caution and only on small time data. Not
                          supported with image-based plots.
             metrics(list): the error metrics to use for the evaluation.
                 Supported values are:
@@ -202,11 +202,11 @@ class Forecaster(Model):
             to_dt(datetime) : evaluation ending datetime.
             evaluation_series(bool): if to add to the results an evaluation timeseirs containing the eror metrics. Defaulted to false.
         """
-        return super(Forecaster, self).evaluate(input_data, steps, limit, plots, plot, metrics, details, from_t, to_t, from_dt, to_dt, evaluation_series)
+        return super(Forecaster, self).evaluate(data, steps, limit, plots, plot, metrics, details, from_t, to_t, from_dt, to_dt, evaluation_series)
 
-    def _evaluate(self, input_data, steps='auto', limit=None, plots=False, plot=False, metrics=['RMSE', 'MAE'], details=False, from_t=None, to_t=None, from_dt=None, to_dt=None, evaluation_series=False):
+    def _evaluate(self, data, steps='auto', limit=None, plots=False, plot=False, metrics=['RMSE', 'MAE'], details=False, from_t=None, to_t=None, from_dt=None, to_dt=None, evaluation_series=False):
 
-        series = input_data
+        series = data
 
         if len(series.data_labels()) > 1:
             raise NotImplementedError('Sorry, evaluating models built for multivariate time series is not supported yet')
@@ -526,7 +526,7 @@ class PeriodicAverageForecaster(Forecaster):
         if self.fitted:
             self.data['averages'] = {int(key):value for key, value in self.data['averages'].items()}
         
-    def fit(self, input_data, periodicity='auto', dst_affected=False, from_t=None, to_t=None, from_dt=None, to_dt=None):
+    def fit(self, data, periodicity='auto', dst_affected=False, from_t=None, to_t=None, from_dt=None, to_dt=None):
         """Fit the model.
 
         Args:
@@ -537,11 +537,11 @@ class PeriodicAverageForecaster(Forecaster):
             from_dt(datetime): fit starting datetime.
             to_dt(datetime) : fit ending datetime.
         """
-        return super(PeriodicAverageForecaster, self).fit(input_data, periodicity, dst_affected, from_t, to_t, from_dt, to_dt)
+        return super(PeriodicAverageForecaster, self).fit(data, periodicity, dst_affected, from_t, to_t, from_dt, to_dt)
 
-    def _fit(self, input_data, periodicity='auto', dst_affected=False, from_t=None, to_t=None, from_dt=None, to_dt=None):
+    def _fit(self, data, periodicity='auto', dst_affected=False, from_t=None, to_t=None, from_dt=None, to_dt=None):
     
-        series = input_data
+        series = data
 
         if len(series.data_labels()) > 1:
             raise NotImplementedError('Multivariate time series are not yet supported')
@@ -593,9 +593,9 @@ class PeriodicAverageForecaster(Forecaster):
         
         logger.debug('Processed %s items', processed)
 
-    def _predict(self, input_data, steps=1, forecast_start=None):
+    def _predict(self, data, steps=1, forecast_start=None):
             
-        series = input_data        
+        series = data        
     
         # TODO: remove the forecast_start or move it in the parent(s).
       
@@ -669,9 +669,9 @@ class ProphetForecaster(Forecaster, _ProphetModel):
         path (str): a path from which to load a saved model. Will override all other init settings.
     """
 
-    def _fit(self, input_data, from_t=None, to_t=None, from_dt=None, to_dt=None):
+    def _fit(self, data, from_t=None, to_t=None, from_dt=None, to_dt=None):
 
-        series = input_data
+        series = data
 
         if len(series.data_labels()) > 1:
             raise Exception('Multivariate time series are not yet supported')
@@ -694,9 +694,9 @@ class ProphetForecaster(Forecaster, _ProphetModel):
         # Prophet, as the ARIMA models, has no window
         self.data['window'] = 0
     
-    def _predict(self, input_data, steps=1):
+    def _predict(self, data, steps=1):
 
-        series = input_data
+        series = data
     
         key = self.data['data_labels'][0]
 
@@ -752,9 +752,9 @@ class ARIMAForecaster(Forecaster, _ARIMAModel):
         # TODO: save the above in data[]?
         super(ARIMAForecaster, self).__init__(path)
 
-    def _fit(self, input_data):
+    def _fit(self, data):
         
-        series = input_data
+        series = data
     
         import statsmodels.api as sm
 
@@ -774,9 +774,9 @@ class ARIMAForecaster(Forecaster, _ARIMAModel):
         # The ARIMA models, as Prophet, have no window
         self.data['window'] = 0
 
-    def _predict(self, input_data, steps=1):
+    def _predict(self, data, steps=1):
 
-        series = input_data
+        series = data
 
         key = self.data['data_labels'][0]
 
@@ -800,9 +800,9 @@ class AARIMAForecaster(Forecaster, _ARIMAModel):
         path (str): a path from which to load a saved model. Will override all other init settings.
     """
 
-    def _fit(self, input_data, **kwargs):
+    def _fit(self, data, **kwargs):
 
-        series = input_data
+        series = data
          
         import pmdarima as pm
 
@@ -835,9 +835,9 @@ class AARIMAForecaster(Forecaster, _ARIMAModel):
         # The ARIMA models, as Prophet, have no window
         self.data['window'] = 0
 
-    def _predict(self, input_data, steps=1):
+    def _predict(self, data, steps=1):
 
-        series = input_data
+        series = data
 
         key = self.data['data_labels'][0]
 
@@ -906,9 +906,9 @@ class LSTMForecaster(Forecaster, _KerasModel):
         # Now save the Keras model itself
         self._save_keras_model(path)
 
-    def _fit(self, input_data, from_t=None, to_t=None, from_dt=None, to_dt=None, verbose=False, epochs=30, normalize=True):
+    def _fit(self, data, from_t=None, to_t=None, from_dt=None, to_dt=None, verbose=False, epochs=30, normalize=True):
 
-        series = input_data
+        series = data
         
         # Set from and to
         from_t, to_t = _set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
@@ -977,9 +977,9 @@ class LSTMForecaster(Forecaster, _KerasModel):
         # Fit
         self.keras_model.fit(array(window_features), array(target_values_vector), epochs=epochs, verbose=verbose)
 
-    def _predict(self, input_data, steps=1, verbose=False):
+    def _predict(self, data, steps=1, verbose=False):
 
-        series = input_data
+        series = data
    
         if steps>1:
             raise NotImplementedError('This forecaster does not support multi-step predictions.')

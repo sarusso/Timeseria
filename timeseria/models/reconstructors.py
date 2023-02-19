@@ -37,16 +37,16 @@ class Reconstructor(Model):
         path (str): a path from which to load a saved model. Will override all other init settings.
     """
     
-    def predict(self, input_data, *args, **kwargs):
+    def predict(self, data, *args, **kwargs):
         """Disabled. Reconstructors can be used only with the ``apply()`` method."""
         raise NotImplementedError('Reconstructors can be used only with the apply() method') from None
  
-    def _predict(self, input_data, *args, **kwargs):
+    def _predict(self, data, *args, **kwargs):
         raise NotImplementedError('Reconstructors can be used only with the apply() method.') from None
 
-    def _apply(self, input_data, remove_data_loss=False, data_loss_threshold=1, inplace=False):
+    def _apply(self, data, remove_data_loss=False, data_loss_threshold=1, inplace=False):
 
-        series = input_data
+        series = data
 
         logger.debug('Using data_loss_threshold="%s"', data_loss_threshold)
 
@@ -108,13 +108,13 @@ class Reconstructor(Model):
         else:
             return None
 
-    def evaluate(self, input_data, steps='auto', limit=None, data_loss_threshold=1, metrics=['RMSE', 'MAE'], details=False, from_t=None, to_t=None, from_dt=None, to_dt=None):
-        """Evaluate the reconstructor on a input_data.
+    def evaluate(self, data, steps='auto', limit=None, data_loss_threshold=1, metrics=['RMSE', 'MAE'], details=False, from_t=None, to_t=None, from_dt=None, to_dt=None):
+        """Evaluate the reconstructor on a data.
 
         Args:
             steps (int, list): a single value or a list of values for how many steps (intended as missing data points or slots) 
                                to reconstruct in the evaluation. Default to automatic detection based on the model.
-            limit(int): set a limit for the time input_data elements to use for the evaluation.
+            limit(int): set a limit for the time data elements to use for the evaluation.
             data_loss_threshold(float): the data_loss index threshold required for the reconstructor to kick-in.
             metrics(list): the error metrics to use for the evaluation.
                 Supported values are:
@@ -127,11 +127,11 @@ class Reconstructor(Model):
             from_dt(datetime): evaluation starting datetime.
             to_dt(datetime) : evaluation ending datetime.
         """
-        return super(Reconstructor, self).evaluate(input_data, steps, limit, data_loss_threshold, metrics, details, from_t, to_t, from_dt, to_dt)
+        return super(Reconstructor, self).evaluate(data, steps, limit, data_loss_threshold, metrics, details, from_t, to_t, from_dt, to_dt)
 
-    def _evaluate(self, input_data, steps='auto', limit=None, data_loss_threshold=1, metrics=['RMSE', 'MAE'], details=False, from_t=None, to_t=None, from_dt=None, to_dt=None):
+    def _evaluate(self, data, steps='auto', limit=None, data_loss_threshold=1, metrics=['RMSE', 'MAE'], details=False, from_t=None, to_t=None, from_dt=None, to_dt=None):
 
-        series = input_data
+        series = data
 
         # Set evaluation_score steps if we have to
         if steps == 'auto':
@@ -322,22 +322,22 @@ class LinearInterpolationReconstructor(Reconstructor):
     when evaluating other, more sophisticated, data reconstruction models.
     """
 
-    def _reconstruct(self, input_data, key, from_index, to_index):
+    def _reconstruct(self, data, key, from_index, to_index):
         logger.debug('Reconstructing between "{}" and "{}" (excluded)'.format(from_index, to_index))
         
         try:
             self.interpolator_initialize
         except AttributeError:
             from ..interpolators import LinearInterpolator
-            self.interpolator = LinearInterpolator(input_data)
+            self.interpolator = LinearInterpolator(data)
                 
         for i in range(from_index, to_index):
 
-            logger.debug('Processing point=%s', input_data[i])
-            reconstructed_data = self.interpolator.evaluate(at=input_data[i].t, prev_i=from_index-1, next_i=to_index)
+            logger.debug('Processing point=%s', data[i])
+            reconstructed_data = self.interpolator.evaluate(at=data[i].t, prev_i=from_index-1, next_i=to_index)
 
             logger.debug('Reconstructed data=%s', reconstructed_data)
-            input_data[i]._data = reconstructed_data
+            data[i]._data = reconstructed_data
 
 
 #=====================================
@@ -351,7 +351,7 @@ class PeriodicAverageReconstructor(Reconstructor):
         path (str): a path from which to load a saved model. Will override all other init settings.
     """
 
-    def fit(self, input_data, data_loss_threshold=0.5, periodicity='auto', dst_affected=False,  offset_method='average', from_t=None, to_t=None, from_dt=None, to_dt=None):
+    def fit(self, data, data_loss_threshold=0.5, periodicity='auto', dst_affected=False,  offset_method='average', from_t=None, to_t=None, from_dt=None, to_dt=None):
         # This is a fit wrapper only to allow correct documentation
         
         # TODO: periodicity, dst_affected, offset_method -> move them in the init?
@@ -362,18 +362,18 @@ class PeriodicAverageReconstructor(Reconstructor):
             data_loss_threshold(float): the threshold of the data_loss index for discarding an element from the fit.
             periodicity(int): the periodicty of the time series. If set to ``auto`` then it will be automatically detected using a FFT.
             dst_affected(bool): if the model should take into account DST effects.
-            offset_method(str): how to offset the reconstructed input_data in order to align it to the missing input_data gaps. Valuse are ``avergae``
+            offset_method(str): how to offset the reconstructed data in order to align it to the missing data gaps. Valuse are ``avergae``
                                 to use the average gap value, or ``extrmes`` to use its extremes.
             from_t(float): fit starting epoch timestamp.
             to_t(float): fit ending epoch timestamp
             from_dt(datetime): fit starting datetime.
             to_dt(datetime) : fit ending datetime.
         """
-        return super(PeriodicAverageReconstructor, self).fit(input_data, data_loss_threshold, periodicity, dst_affected, offset_method, from_t, to_t, from_dt, to_dt)
+        return super(PeriodicAverageReconstructor, self).fit(data, data_loss_threshold, periodicity, dst_affected, offset_method, from_t, to_t, from_dt, to_dt)
 
-    def _fit(self, input_data, data_loss_threshold=0.5, periodicity='auto', dst_affected=False, offset_method='average', from_t=None, to_t=None, from_dt=None, to_dt=None):
+    def _fit(self, data, data_loss_threshold=0.5, periodicity='auto', dst_affected=False, offset_method='average', from_t=None, to_t=None, from_dt=None, to_dt=None):
 
-        series = input_data
+        series = data
 
         if not offset_method in ['average', 'extremes']:
             raise Exception('Unknown offset method "{}"'.format(offset_method))
@@ -429,9 +429,9 @@ class PeriodicAverageReconstructor(Reconstructor):
         
         logger.debug('Processed "%s" items', processed)
 
-    def _reconstruct(self, input_data, key, from_index, to_index):
+    def _reconstruct(self, data, key, from_index, to_index):
  
-        series = input_data
+        series = data
             
         logger.debug('Reconstructing between "{}" and "{}"'.format(from_index, to_index-1))
 
@@ -489,9 +489,9 @@ class ProphetReconstructor(Reconstructor, _ProphetModel):
         path (str): a path from which to load a saved model. Will override all other init settings.
     """
 
-    def _fit(self, input_data, from_t=None, to_t=None, from_dt=None, to_dt=None):
+    def _fit(self, data, from_t=None, to_t=None, from_dt=None, to_dt=None):
 
-        series = input_data
+        series = data
         
         from prophet import Prophet
 
@@ -508,9 +508,9 @@ class ProphetReconstructor(Reconstructor, _ProphetModel):
         # Fit tjhe Prophet model
         self.prophet_model.fit(data)
 
-    def _reconstruct(self, input_data, key, from_index, to_index):
+    def _reconstruct(self, data, key, from_index, to_index):
 
-        series = input_data
+        series = data
         
         logger.debug('Reconstructing between "{}" and "{}"'.format(from_index, to_index-1))
     

@@ -67,13 +67,13 @@ class TestBaseModelClasses(unittest.TestCase):
 
         # Define a fittable parametric model mock
         class FittableParametricModelMock(Model):
-            def _fit(self, input_data):
+            def _fit(self, data):
                 self.data['param1'] = 1
-            def _predict(self, input_data):
-                return input_data
-            def _apply(self, input_data):
-                return input_data
-            def _evaluate(self, input_data):
+            def _predict(self, data):
+                return data
+            def _apply(self, data):
+                return data
+            def _evaluate(self, data):
                 return {'grade': 'A'}
 
         parametric_model = FittableParametricModelMock()
@@ -393,7 +393,7 @@ class TestForecasters(unittest.TestCase):
         forecaster = PeriodicAverageForecaster()
         
         # Fit
-        forecaster.fit(input_data=self.sine_minute_time_series, periodicity=63)
+        forecaster.fit(data=self.sine_minute_time_series, periodicity=63)
 
         # Apply
         sine_minute_time_series_with_forecast = forecaster.apply(self.sine_minute_time_series, steps=3)

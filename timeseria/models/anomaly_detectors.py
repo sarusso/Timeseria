@@ -28,25 +28,25 @@ class AnomalyDetector(Model):
         path (str): a path from which to load a saved model. Will override all other init settings.
     """
 
-    def predict(self, input_data, *args, **kwargs):
+    def predict(self, data, *args, **kwargs):
         """Disabled. Anomaly detectors can be used only with the ``apply()`` method."""
         raise NotImplementedError('Anomaly detectors can be used only with the apply() method') from None
 
-    def _predict(self, input_data, *args, **kwargs):
+    def _predict(self, data, *args, **kwargs):
         raise NotImplementedError('Anomaly detectors can be used only with the apply() method') from None
 
-    def evaluate(self, input_data, *args, **kwargs):
+    def evaluate(self, data, *args, **kwargs):
         """Disabled. Anomaly detectors cannot be evaluated yet."""
         raise NotImplementedError('Anomaly detectors cannot be evaluated yet.') from None
 
-    def _evaluate(self, input_data, *args, **kwargs):
+    def _evaluate(self, data, *args, **kwargs):
         raise NotImplementedError('Anomaly detectors cannot be evaluated yet.') from None
 
     def cross_validate(self, series, *args, **kwargs):
         """Disabled. Anomaly detectors cannot be evaluated yet."""
         raise NotImplementedError('Anomaly detectors cannot be evaluated yet.') from None
 
-    def _cross_validate(self, input_data, *args, **kwargs):
+    def _cross_validate(self, data, *args, **kwargs):
         raise NotImplementedError('Anomaly detectors cannot be evaluated yet.') from None
 
 
@@ -135,7 +135,7 @@ class ForecasterAnomalyDetector(AnomalyDetector):
         
         return (actual, predicted)
 
-    def fit(self, input_data, *args, stdevs=3, **kwargs):
+    def fit(self, data, *args, stdevs=3, **kwargs):
         """Fit the anomaly detection model.
         
         All the parameters except ``stdevs`` are forwareded to the forecaster ``fit()`` method.
@@ -144,11 +144,11 @@ class ForecasterAnomalyDetector(AnomalyDetector):
             stdevs(float): how many standard deviations must there be between the actual and the predicted value
                            by the forecaster in order to mark a point or slot as anomalous.
         """
-        return super(ForecasterAnomalyDetector, self).fit(input_data, *args, stdevs=stdevs, **kwargs)
+        return super(ForecasterAnomalyDetector, self).fit(data, *args, stdevs=stdevs, **kwargs)
     
-    def _fit(self, input_data, *args, stdevs=3, **kwargs):
+    def _fit(self, data, *args, stdevs=3, **kwargs):
 
-        series = input_data
+        series = data
 
         if len(series.data_labels()) > 1:
             raise NotImplementedError('Multivariate time series are not yet supported')
@@ -181,9 +181,9 @@ class ForecasterAnomalyDetector(AnomalyDetector):
         self.data['stdevs'] = stdevs
         self.data['AE_threshold'] = stdev*stdevs
 
-    def _apply(self, input_data, inplace=False, details=False, logs=False, stdevs=None):
+    def _apply(self, data, inplace=False, details=False, logs=False, stdevs=None):
         
-        series = input_data
+        series = data
         
         if inplace:
             raise Exception('Anomaly detection cannot be run inplace')

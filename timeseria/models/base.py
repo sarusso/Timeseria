@@ -104,7 +104,7 @@ class Model():
         else:
             return False
 
-    def fit(self, input_data, *args, **kwargs):
+    def fit(self, data, *args, **kwargs):
         """Fit the model."""
 
         # Check if fit logic is implemented
@@ -113,28 +113,28 @@ class Model():
         except AttributeError:
             raise NotImplementedError('Fitting this model is not implemented')
 
-        # Check input_data
-        if not isinstance(input_data, TimeSeries):
-            raise NotImplementedError('Models work only with TimeSeries data for now (got "{}")'.format(input_data.__class__.__name__))
+        # Check data
+        if not isinstance(data, TimeSeries):
+            raise NotImplementedError('Models work only with TimeSeries data for now (got "{}")'.format(data.__class__.__name__))
 
-        # If TimeSeries input_data, check it
-        if isinstance(input_data, TimeSeries): 
-            _check_time_series(input_data)
+        # If TimeSeries data, check it
+        if isinstance(data, TimeSeries): 
+            _check_time_series(data)
 
             # Set resolution
             try:
-                self.data['resolution'] = input_data.resolution
+                self.data['resolution'] = data.resolution
             except AttributeError:
                 pass
             
             # Set data labels
             try:
-                self.data['data_labels'] = input_data.data_labels()
+                self.data['data_labels'] = data.data_labels()
             except AttributeError:
                 pass
 
         # Call fit logic
-        fit_output = self._fit(input_data, *args, **kwargs)
+        fit_output = self._fit(data, *args, **kwargs)
 
         self.data['fitted_at'] = now_s()
         self.fitted = True
@@ -142,7 +142,7 @@ class Model():
         # Return output
         return fit_output
 
-    def predict(self, input_data, *args, **kwargs):
+    def predict(self, data, *args, **kwargs):
         """Call the model predict logic."""
 
         # Check if predict logic is implemented
@@ -160,25 +160,25 @@ class Model():
             if not self.fitted:
                 raise NotFittedError()
         
-        # Check input_data
-        if not isinstance(input_data, TimeSeries):
-            raise NotImplementedError('Models work only with TimeSeries data for now (got "{}")'.format(input_data.__class__.__name__))
+        # Check data
+        if not isinstance(data, TimeSeries):
+            raise NotImplementedError('Models work only with TimeSeries data for now (got "{}")'.format(data.__class__.__name__))
 
-        # If TimeSeries input_data, check it
-        if isinstance(input_data, TimeSeries):
-            _check_time_series(input_data)
+        # If TimeSeries data, check it
+        if isinstance(data, TimeSeries):
+            _check_time_series(data)
             if self.is_parametric():
-                if isinstance(input_data.items_type, Point) and len(input_data) == 1:
-                    # Do not check if the input_data is a point time series and has only one item
+                if isinstance(data.items_type, Point) and len(data) == 1:
+                    # Do not check if the data is a point time series and has only one item
                     pass
                 else:
-                    _check_resolution(input_data, self.data['resolution'])
-                _check_data_labels(input_data, self.data['data_labels'])
+                    _check_resolution(data, self.data['resolution'])
+                _check_data_labels(data, self.data['data_labels'])
 
         # Call predict logic            
-        return self._predict(input_data, *args, **kwargs)
+        return self._predict(data, *args, **kwargs)
 
-    def apply(self, input_data, *args, **kwargs):
+    def apply(self, data, *args, **kwargs):
         """Apply the model."""
         
         # Check if apply logic is implemented
@@ -196,25 +196,25 @@ class Model():
             if not self.fitted:
                 raise NotFittedError()
                 
-        # Check input_data
-        if not isinstance(input_data, TimeSeries):
-            raise NotImplementedError('Models work only with TimeSeries data for now (got "{}")'.format(input_data.__class__.__name__))
+        # Check data
+        if not isinstance(data, TimeSeries):
+            raise NotImplementedError('Models work only with TimeSeries data for now (got "{}")'.format(data.__class__.__name__))
 
-        # If TimeSeries input_data, check it
-        if isinstance(input_data, TimeSeries):
-            _check_time_series(input_data)
+        # If TimeSeries data, check it
+        if isinstance(data, TimeSeries):
+            _check_time_series(data)
             if self.is_parametric():
-                if isinstance(input_data.items_type, Point) and len(input_data) == 1:
-                    # Do not check if the input_data is a point time series and has only one item
+                if isinstance(data.items_type, Point) and len(data) == 1:
+                    # Do not check if the data is a point time series and has only one item
                     pass
                 else:
-                    _check_resolution(input_data, self.data['resolution'])
-                _check_data_labels(input_data, self.data['data_labels'])
+                    _check_resolution(data, self.data['resolution'])
+                _check_data_labels(data, self.data['data_labels'])
 
         # Call apply logic  
-        return self._apply(input_data, *args, **kwargs)
+        return self._apply(data, *args, **kwargs)
 
-    def evaluate(self, input_data, *args, **kwargs):
+    def evaluate(self, data, *args, **kwargs):
         """Evaluate the model."""
         
         # Check if evaluate logic is implemented
@@ -232,25 +232,25 @@ class Model():
             if not self.fitted:
                 raise NotFittedError()
 
-        # Check input_data
-        if not isinstance(input_data, TimeSeries):
-            raise NotImplementedError('Models work only with TimeSeries data for now (got "{}")'.format(input_data.__class__.__name__))
+        # Check data
+        if not isinstance(data, TimeSeries):
+            raise NotImplementedError('Models work only with TimeSeries data for now (got "{}")'.format(data.__class__.__name__))
 
-        # If TimeSeries input_data, check it
-        if isinstance(input_data, TimeSeries):
-            _check_time_series(input_data)
+        # If TimeSeries data, check it
+        if isinstance(data, TimeSeries):
+            _check_time_series(data)
             if self.is_parametric():
-                if isinstance(input_data.items_type, Point) and len(input_data) == 1:
-                    # Do not check if the input_data is a point time series and has only one item
+                if isinstance(data.items_type, Point) and len(data) == 1:
+                    # Do not check if the data is a point time series and has only one item
                     pass
                 else:
-                    _check_resolution(input_data, self.data['resolution'])
-                _check_data_labels(input_data, self.data['data_labels'])
+                    _check_resolution(data, self.data['resolution'])
+                _check_data_labels(data, self.data['data_labels'])
 
         # Call evaluate logic  
-        return self._evaluate(input_data, *args, **kwargs)
+        return self._evaluate(data, *args, **kwargs)
 
-    def cross_validate(self, input_data, rounds=10, *args, **kwargs):
+    def cross_validate(self, data, rounds=10, *args, **kwargs):
         """Cross validate the model, by default with 10 fit/evaluate rounds.
         
         All the parameters starting with the ``fit_`` prefix are forwarded to the model ``fit()`` method (without the prefix), and
@@ -272,16 +272,16 @@ class Model():
         except AttributeError:
             raise NotImplementedError('Evaluating this model is not implemented, cannot cross validate')
         
-        # Check input_data
-        if not isinstance(input_data, TimeSeries):
-            raise NotImplementedError('Models work only with TimeSeries data for now (got "{}")'.format(input_data.__class__.__name__))
+        # Check data
+        if not isinstance(data, TimeSeries):
+            raise NotImplementedError('Models work only with TimeSeries data for now (got "{}")'.format(data.__class__.__name__))
 
-        # If TimeSeries input_data, check it
-        if isinstance(input_data, TimeSeries):
-            _check_time_series(input_data)
+        # If TimeSeries data, check it
+        if isinstance(data, TimeSeries):
+            _check_time_series(data)
 
         # Reassign for ease of notation
-        series = input_data
+        series = data
 
         # Decouple evaluate from fit args
         fit_kwargs = {}
