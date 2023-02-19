@@ -118,7 +118,7 @@ def detect_sampling_interval(time_series, confidence=False):
 def detect_periodicity(time_series):
     """Detect the periodicity of a time series."""
     
-    _check_timeseries(time_series)
+    _check_time_series(time_series)
     
     # TODO: fix me, data_loss must not belong as key
     data_labels = time_series.data_labels()
@@ -550,57 +550,57 @@ def _compute_data_loss(series, from_t, to_t, force=False, sampling_interval=None
     return data_loss
 
 
-def _check_timeseries(timeseries):
+def _check_time_series(series):
     """Check a time series for type, not emptiness and fixed resolution."""
 
     # Import here or you will end up with cyclic imports
     from .datastructures import TimeSeries 
     
-    if not isinstance(timeseries, TimeSeries):
-        raise TypeError('A TimeSeries object is required (got "{}")'.format(timeseries.__class__.__name__))
+    if not isinstance(series, TimeSeries):
+        raise TypeError('A TimeSeries object is required (got "{}")'.format(series.__class__.__name__))
 
-    if not timeseries:
+    if not series:
         raise ValueError('A non-empty time series is required')
         
-    if timeseries.resolution == 'variable':
+    if series.resolution == 'variable':
         raise ValueError('Time series with undefined (variable) resolutions are not supported. Resample or slot the time series first.')
 
 
-def _check_resolution(timeseries, resolution):
+def _check_resolution(series, resolution):
     
-    def __check_resolution(timeseries, resolution):
+    def __check_resolution(series, resolution):
         # TODO: Fix this mess.. Make the .resolution behavior consistent!
-        if resolution == timeseries.resolution:
+        if resolution == series.resolution:
             return True
         try:
-            if resolution.value == timeseries.resolution.as_seconds():
+            if resolution.value == series.resolution.as_seconds():
                 return True
         except:
             pass
         try:
-            if resolution.as_seconds() == timeseries.resolution.value:
+            if resolution.as_seconds() == series.resolution.value:
                 return True
         except:
             pass
         try:
-            if resolution.as_seconds() == timeseries.resolution:
+            if resolution.as_seconds() == series.resolution:
                 return True
         except:
             pass
         return False
             
-    # Check timeseries resolution
-    if not __check_resolution(timeseries, resolution):
-        raise ValueError('This model is fitted on "{}" resolution data, while your data has "{}" resolution.'.format(resolution, timeseries.resolution))
+    # Check series resolution
+    if not __check_resolution(series, resolution):
+        raise ValueError('This model is fitted on "{}" resolution data, while your data has "{}" resolution.'.format(resolution, series.resolution))
 
 
-def _check_data_labels(timeseries, keys):
-    timeseries_data_labels = timeseries.data_labels()
-    if len(timeseries_data_labels) != len(keys):
-        raise ValueError('This model is fitted on {} data keys, while your data has {} data keys.'.format(len(keys), len(timeseries_data_labels)))
-    if timeseries_data_labels != keys:
+def _check_data_labels(series, keys):
+    series_data_labels = series.data_labels()
+    if len(series_data_labels) != len(keys):
+        raise ValueError('This model is fitted on {} data keys, while your data has {} data keys.'.format(len(keys), len(series_data_labels)))
+    if series_data_labels != keys:
         # TODO: logger.warning?
-        raise ValueError('This model is fitted on "{}" data keys, while your data has "{}" data keys.'.format(keys, timeseries_data_labels))
+        raise ValueError('This model is fitted on "{}" data keys, while your data has "{}" data keys.'.format(keys, series_data_labels))
 
 def _check_series_of_points_or_slots(series):
     from .datastructures import DataPoint, DataSlot

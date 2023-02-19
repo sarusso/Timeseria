@@ -238,13 +238,10 @@ class Transformation(object):
         """Start the transformation process. If start and/or end are not set, they are set automatically
         based on first and last points of the series"""
         
-        series = input_data
+        if not isinstance(input_data, TimeSeries):
+            raise NotImplementedError('Transformations work only with TimeSeries data for now (got "{}")'.format(input_data.__class__.__name__))
         
-        if not isinstance(series, Series):
-            raise TypeError('Requires Series-like, got "{}"'.format(series.__class__.__name__))
-
-        if not isinstance(series, TimeSeries):
-            raise NotImplementedError('Transforming generic Series is not yet supported (got "{}"), only TimeSeries are'.format(series.__class__.__name__))
+        series = input_data
 
         if not (issubclass(series.items_type, Point) or issubclass(series.items_type, Slot)):
                 raise TypeError('Series items are not Points nor Slots, cannot compute any transformation')

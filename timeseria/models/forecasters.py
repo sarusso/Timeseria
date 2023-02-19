@@ -78,25 +78,25 @@ class Forecaster(Model):
         if not isinstance(input_data, TimeSeries):
             raise NotImplementedError('Models work only with TimeSeries data for now (got "{}")'.format(input_data.__class__.__name__))
 
-        timeseries = input_data
+        series = input_data
 
         # Set forecast starting item
         if forecast_start is not None:
-            forecast_start_item = timeseries[forecast_start]
+            forecast_start_item = series[forecast_start]
         else:
-            forecast_start_item = timeseries[-1]
+            forecast_start_item = series[-1]
             
         # Handle forecast start
         if forecast_start is not None:
             try:
-                predicted_data = self.predict(timeseries, steps=steps, forecast_start=forecast_start)
+                predicted_data = self.predict(series, steps=steps, forecast_start=forecast_start)
             except TypeError as e:
                 if 'unexpected keyword argument' and  'forecast_start' in str(e):
                     raise NotImplementedError('The model does not support the "forecast_start" parameter, cannot proceed')           
                 else:
                     raise
         else:
-            predicted_data = self.predict(timeseries, steps=steps)
+            predicted_data = self.predict(series, steps=steps)
                 
         # List of predictions or single prediction?
         if isinstance(predicted_data,list):
@@ -104,27 +104,27 @@ class Forecaster(Model):
             last_item = forecast_start_item
             for data in predicted_data:
 
-                if isinstance(timeseries[0], Slot):
+                if isinstance(series[0], Slot):
                     forecast.append(DataTimeSlot(start = last_item.end,
-                                                 unit  = timeseries.resolution,
+                                                 unit  = series.resolution,
                                                  data_loss = None,
-                                                 #tz = timeseries.tz,
+                                                 #tz = series.tz,
                                                  data  = data))
                 else:
-                    forecast.append(DataTimePoint(t = last_item.t + timeseries.resolution,
-                                                  tz = timeseries.tz,
+                    forecast.append(DataTimePoint(t = last_item.t + series.resolution,
+                                                  tz = series.tz,
                                                   data  = data))
                 last_item = forecast[-1]
         else:
-            if isinstance(timeseries[0], Slot):
+            if isinstance(series[0], Slot):
                 forecast = DataTimeSlot(start = forecast_start_item.end,
-                                        unit  = timeseries.resolution,
+                                        unit  = series.resolution,
                                         data_loss = None,
-                                        #tz = timeseries.tz,
+                                        #tz = series.tz,
                                         data  = predicted_data)
             else:
                 forecast = DataTimePoint(t = forecast_start_item.t + self.data['resolution'],
-                                         tz = timeseries.tz,
+                                         tz = series.tz,
                                          data  = predicted_data)
   
         return forecast
@@ -136,56 +136,56 @@ class Forecaster(Model):
     def _apply(self, input_data, steps=1, inplace=False):
  
         if inplace:
-            forecast_series= input_data
+            series= input_data
         else:
-            forecast_series = input_data.duplicate()
+            series = input_data.duplicate()
 
-        input_series_len = len(forecast_series)
+        input_series_len = len(series)
         
         # Add the forecast index
-        for item in forecast_series:
+        for item in series:
             item.data_indexes['forecast'] = 0
         
         # Call model forecasting logic
         try:
-            forecast_model_results = self.forecast(forecast_series, steps=steps)
+            forecast_model_results = self.forecast(series, steps=steps)
             if not isinstance(forecast_model_results, list):
-                forecast_series.append(forecast_model_results)
+                series.append(forecast_model_results)
             else:
                 for item in forecast_model_results:
                     item.data_indexes['forecast'] = 1
-                    forecast_series.append(item)
+                    series.append(item)
 
         except NotImplementedError:
             
             for _ in range(steps):
     
                 # Call the forecast only on the last point
-                forecast_model_results = self.forecast(forecast_series, steps=1)
+                forecast_model_results = self.forecast(series, steps=1)
 
                 # Add forecasted index
                 forecast_model_results.data_indexes['forecast'] = 1
 
                 # Add the forecast to the forecasts time series
-                forecast_series.append(forecast_model_results)
+                series.append(forecast_model_results)
     
         # Do we have missing forecasts?
-        if input_series_len + steps != len(forecast_series):
+        if input_series_len + steps != len(series):
             raise ValueError('There are missing forecasts. If your model does not support multi-step forecasting, raise a NotImplementedError if steps>1 and Timeseria will handle it for you.')
  
         if not inplace:
-            return forecast_series
+            return series
         else:
             return None
 
-    def evaluate(self, input_data, steps='auto', limit=None, plot=False, plots=False, metrics=['RMSE', 'MAE'], details=False, from_t=None, to_t=None, from_dt=None, to_dt=None, evaluation_timeseries=False):
+    def evaluate(self, input_data, steps='auto', limit=None, plot=False, plots=False, metrics=['RMSE', 'MAE'], details=False, from_t=None, to_t=None, from_dt=None, to_dt=None, evaluation_series=False):
         """Evaluate the forecaster on a input_data.
 
         Args:
             steps (int,list): a single value or a list of values for how many steps-ahead to forecast in the evaluation. Default to automatic detection based on the model.
             limit(int): set a limit for the time input_data elements to use for the evaluation.
             plot(bool): if to produce an overall evaluation plot, defaulted to False. If set to True, the evaluation results are not retuned.
-                        To get both the evaluation results and the overall evaluation plot, set the `evaluation_timeseries` switch to True in
+                        To get both the evaluation results and the overall evaluation plot, set the `evaluation_series` switch to True in
                         order to add it to the evaluation results and plot it afterwards.
             plots(bool): if to produce evaluation plots, defaulted to False. Beware that setting this option to True will cause to generate 
                          a plot for each evaluation point or slot of the time input_data: use with caution and only on small time input_data. Not
@@ -200,15 +200,15 @@ class Forecaster(Model):
             to_t(float): evaluation ending epoch timestamp
             from_dt(datetime): evaluation starting datetime.
             to_dt(datetime) : evaluation ending datetime.
-            evaluation_timeseries(bool): if to add to the results an evaluation timeseirs containing the eror metrics. Defaulted to false.
+            evaluation_series(bool): if to add to the results an evaluation timeseirs containing the eror metrics. Defaulted to false.
         """
-        return super(Forecaster, self).evaluate(input_data, steps, limit, plots, plot, metrics, details, from_t, to_t, from_dt, to_dt, evaluation_timeseries)
+        return super(Forecaster, self).evaluate(input_data, steps, limit, plots, plot, metrics, details, from_t, to_t, from_dt, to_dt, evaluation_series)
 
-    def _evaluate(self, input_data, steps='auto', limit=None, plots=False, plot=False, metrics=['RMSE', 'MAE'], details=False, from_t=None, to_t=None, from_dt=None, to_dt=None, evaluation_timeseries=False):
+    def _evaluate(self, input_data, steps='auto', limit=None, plots=False, plot=False, metrics=['RMSE', 'MAE'], details=False, from_t=None, to_t=None, from_dt=None, to_dt=None, evaluation_series=False):
 
-        timeseries = input_data
+        series = input_data
 
-        if len(timeseries.data_labels()) > 1:
+        if len(series.data_labels()) > 1:
             raise NotImplementedError('Sorry, evaluating models built for multivariate time series is not supported yet')
 
         # Set empty list if metrics were None
@@ -242,18 +242,18 @@ class Forecaster(Model):
                     raise ValueError('Evaluating a windowless model on a multi-step forecast does not make sense (got steps={})'.format(steps))
             steps = list(range(1, steps+1))
         
-        return_evaluation_timeseries = evaluation_timeseries
+        return_evaluation_series = evaluation_series
         
-        if plot or evaluation_timeseries:
+        if plot or evaluation_series:
 
             if steps != [1]:
                 raise ValueError('Plotting or getting back an evaluation time series is only supported with single step ahead forecasts (steps=[1])')
             
-            evaluation_timeseries = timeseries.duplicate()
+            evaluation_series = series.duplicate()
             if self.data['window']:
-                evaluation_timeseries = evaluation_timeseries[self.data['window']:]
+                evaluation_series = evaluation_series[self.data['window']:]
             if limit:
-                evaluation_timeseries = evaluation_timeseries[:limit]
+                evaluation_series = evaluation_series[:limit]
         
         # Support vars
         results = {}
@@ -270,7 +270,7 @@ class Forecaster(Model):
             model_values = []
             processed_samples = 0
     
-            for key in timeseries.data_labels():
+            for key in series.data_labels():
                 
                 # If the model has no window, evaluate on the entire time series
                 
@@ -289,37 +289,37 @@ class Forecaster(Model):
                     # Create a time series where to apply the forecast, with only a point "in the past",
                     # this is done in order to use the apply function as is. Since the model is not using
                     # any window, the point data will be ignored and just used for its timestamp
-                    forecast_timeseries = timeseries.__class__()
+                    forecast_series = series.__class__()
                     
                     # TODO: it should not be required to check .resolution type!
-                    if isinstance(timeseries[0], Point):
-                        if isinstance(timeseries.resolution, TimeUnit):
-                            forecast_timeseries.append(timeseries[0].__class__(dt = timeseries[0].dt - timeseries.resolution,
-                                                                               data = timeseries[0].data))                            
-                        elif isinstance(timeseries.resolution, Unit):
-                            forecast_timeseries.append(timeseries[0].__class__(dt = dt_from_s(timeseries[0].t - timeseries.resolution.value, tz=timeseries[0].tz),
-                                                                               data = timeseries[0].data))
+                    if isinstance(series[0], Point):
+                        if isinstance(series.resolution, TimeUnit):
+                            forecast_series.append(series[0].__class__(dt = series[0].dt - series.resolution,
+                                                                               data = series[0].data))                            
+                        elif isinstance(series.resolution, Unit):
+                            forecast_series.append(series[0].__class__(dt = dt_from_s(series[0].t - series.resolution.value, tz=series[0].tz),
+                                                                               data = series[0].data))
                         else:
-                            forecast_timeseries.append(timeseries[0].__class__(dt = dt_from_s(timeseries[0].t - timeseries.resolution, tz=timeseries[0].tz),
-                                                                               data = timeseries[0].data))                    
-                    elif isinstance(timeseries[0], Slot):
-                        if isinstance(timeseries.resolution, TimeUnit):
-                            forecast_timeseries.append(timeseries[0].__class__(dt = timeseries[0].dt - timeseries.resolution,
-                                                                               unit = timeseries.resolution,
-                                                                               data = timeseries[0].data))                            
-                        elif isinstance(timeseries.resolution, Unit):
-                            forecast_timeseries.append(timeseries[0].__class__(dt = dt_from_s(timeseries[0].t - timeseries.resolution.value, tz=timeseries[0].tz),
-                                                                               unit = timeseries.resolution,
-                                                                               data = timeseries[0].data))
+                            forecast_series.append(series[0].__class__(dt = dt_from_s(series[0].t - series.resolution, tz=series[0].tz),
+                                                                               data = series[0].data))                    
+                    elif isinstance(series[0], Slot):
+                        if isinstance(series.resolution, TimeUnit):
+                            forecast_series.append(series[0].__class__(dt = series[0].dt - series.resolution,
+                                                                               unit = series.resolution,
+                                                                               data = series[0].data))                            
+                        elif isinstance(series.resolution, Unit):
+                            forecast_series.append(series[0].__class__(dt = dt_from_s(series[0].t - series.resolution.value, tz=series[0].tz),
+                                                                               unit = series.resolution,
+                                                                               data = series[0].data))
                         else:
-                            forecast_timeseries.append(timeseries[0].__class__(dt = dt_from_s(timeseries[0].t - timeseries.resolution, tz=timeseries[0].tz),
-                                                                               unit = timeseries.resolution,
-                                                                               data = timeseries[0].data))
+                            forecast_series.append(series[0].__class__(dt = dt_from_s(series[0].t - series.resolution, tz=series[0].tz),
+                                                                               unit = series.resolution,
+                                                                               data = series[0].data))
                     else:
-                        raise TypeError('Unknown time series items type (got "{}"'.format(timeseries[0].__class__.__name__))
+                        raise TypeError('Unknown time series items type (got "{}"'.format(series[0].__class__.__name__))
 
                     # Set default evaluate samples
-                    evaluate_samples = len(timeseries)
+                    evaluate_samples = len(series)
                     
                     # Do we have a limit on the evaluate sample to apply?
                     if limit:
@@ -335,27 +335,27 @@ class Forecaster(Model):
                     processed_samples = evaluate_samples
              
                     # Apply the forecasting model with a length equal to the original series minus the first element
-                    self._apply(forecast_timeseries, steps=evaluate_samples, inplace=True)
+                    self._apply(forecast_series, steps=evaluate_samples, inplace=True)
 
                     # Save the model and the original value to be compared later on. Create the arrays by skipping the fist item
                     # and move through the forecast time series comparing with the input time series, shifted by one since in the
-                    # forecast timeseries we added an "artificial" first point to use the apply()
+                    # forecast series we added an "artificial" first point to use the apply()
                     for i in range(1, evaluate_samples+1):
                         
-                        model_value = forecast_timeseries[i].data[key]
+                        model_value = forecast_series[i].data[key]
                         model_values.append(model_value)
                         
-                        real_value = timeseries[i-1].data[key]
+                        real_value = series[i-1].data[key]
                         real_values.append(real_value)
 
 
-                # Else, process in streaming the timeseries, item by item, and properly take into account the window.
+                # Else, process in streaming the series, item by item, and properly take into account the window.
                 else:
-                    for i in range(len(timeseries)):
+                    for i in range(len(series)):
     
                         # Skip if needed
                         try:
-                            if not _item_is_in_range(timeseries[i], from_t, to_t):
+                            if not _item_is_in_range(series[i], from_t, to_t):
                                 continue
                         except StopIteration:
                             break  
@@ -363,50 +363,50 @@ class Forecaster(Model):
                         # Check that we can get enough data
                         if i < self.data['window']:
                             continue
-                        if i > (len(timeseries)-steps_round):
+                        if i > (len(series)-steps_round):
                             continue
                         
                         # Compute the various boundaries
-                        original_timeseries_boundaries_start = i - (self.data['window']) 
-                        original_timeseries_boundaries_end = i + steps_round
+                        original_series_boundaries_start = i - (self.data['window']) 
+                        original_series_boundaries_end = i + steps_round
                         
-                        original_forecast_timeseries_boundaries_start = original_timeseries_boundaries_start
-                        original_forecast_timeseries_boundaries_end = original_timeseries_boundaries_end-steps_round
+                        original_forecast_series_boundaries_start = original_series_boundaries_start
+                        original_forecast_series_boundaries_end = original_series_boundaries_end-steps_round
                         
                         # Create the time series where to apply the forecast
-                        forecast_timeseries = timeseries.__class__()
-                        for j in range(original_forecast_timeseries_boundaries_start, original_forecast_timeseries_boundaries_end):
+                        forecast_series = series.__class__()
+                        for j in range(original_forecast_series_boundaries_start, original_forecast_series_boundaries_end):
 
-                            if isinstance(timeseries[0], Point):
-                                forecast_timeseries.append(timeseries[0].__class__(t = timeseries[j].t,
-                                                                                   tz = timeseries[j].tz,
-                                                                                   data = timeseries[j].data))                        
-                            elif isinstance(timeseries[0], Slot):
-                                forecast_timeseries.append(timeseries[0].__class__(start = timeseries[j].start,
-                                                                                   end   = timeseries[j].end,
-                                                                                   unit  = timeseries[j].unit,
-                                                                                   data  = timeseries[j].data))                           
+                            if isinstance(series[0], Point):
+                                forecast_series.append(series[0].__class__(t = series[j].t,
+                                                                                   tz = series[j].tz,
+                                                                                   data = series[j].data))                        
+                            elif isinstance(series[0], Slot):
+                                forecast_series.append(series[0].__class__(start = series[j].start,
+                                                                                   end   = series[j].end,
+                                                                                   unit  = series[j].unit,
+                                                                                   data  = series[j].data))                           
                             
                             # This would lead to add the forecasted index to the original data (and we don't want it)
-                            #forecast_timeseries.append(timeseries[j])
+                            #forecast_series.append(series[j])
      
                         # Apply the forecasting model
-                        self._apply(forecast_timeseries, steps=steps_round, inplace=True)
+                        self._apply(forecast_series, steps=steps_round, inplace=True)
     
                         # Plot results time series?
                         if plots:
-                            forecast_timeseries.plot()
+                            forecast_series.plot()
                         
                         # Save the model and the original value to be compared later on
                         for step in range(steps_round):
-                            original_index = original_timeseries_boundaries_start + self.data['window'] + step
+                            original_index = original_series_boundaries_start + self.data['window'] + step
     
                             forecast_index = self.data['window'] + step
     
-                            model_value = forecast_timeseries[forecast_index].data[key]
+                            model_value = forecast_series[forecast_index].data[key]
                             model_values.append(model_value)
                             
-                            real_value = timeseries[original_index].data[key]
+                            real_value = series[original_index].data[key]
                             real_values.append(real_value)
      
                         processed_samples+=1
@@ -429,18 +429,18 @@ class Forecaster(Model):
                 results['RMSE_{}_steps'.format(steps_round)] = sqrt(mean_squared_error(real_values, model_values))
             if 'MAE' in metrics:
                 results['MAE_{}_steps'.format(steps_round)] = mean_absolute_error(real_values, model_values)
-                if evaluation_timeseries:
+                if evaluation_series:
                     for i in range(len(model_values)):
-                        evaluation_timeseries[i].data['{}_AE'.format(key)] = abs(real_values[i] - model_values[i])  
+                        evaluation_series[i].data['{}_AE'.format(key)] = abs(real_values[i] - model_values[i])  
             if 'MAPE' in metrics:
                 results['MAPE_{}_steps'.format(steps_round)] = mean_absolute_percentage_error(real_values, model_values)
-                if evaluation_timeseries:
+                if evaluation_series:
                     for i in range(len(model_values)):
-                        evaluation_timeseries[i].data['{}_APE'.format(key)] = abs(real_values[i] - model_values[i]) / real_values[i]
+                        evaluation_series[i].data['{}_APE'.format(key)] = abs(real_values[i] - model_values[i]) / real_values[i]
             
-            if evaluation_timeseries:
+            if evaluation_series:
                 for i in range(len(model_values)):
-                    evaluation_timeseries[i].data['{}_pred'.format(key)] = model_values[i]
+                    evaluation_series[i].data['{}_pred'.format(key)] = model_values[i]
         
         # Compute overall RMSE
         if 'RMSE' in metrics:
@@ -482,15 +482,15 @@ class Forecaster(Model):
                 simple_results['MAPE'] = results['MAPE']
             results = simple_results
         
-        # Do we have to plot the evaluation timeseries?
+        # Do we have to plot the evaluation series?
         if plot:
             if results:
                 logger.info('Plotting the evaluation time series, not returning evaluation results (which are: {})'.format(results))
-            return evaluation_timeseries.plot()
+            return evaluation_series.plot()
 
-        # Handle evaluation timeseries if required
-        if return_evaluation_timeseries:
-            results['evaluation_timeseries'] = evaluation_timeseries 
+        # Handle evaluation series if required
+        if return_evaluation_series:
+            results['evaluation_series'] = evaluation_series 
 
         # Return evaluation results if any
         if results:
@@ -541,17 +541,17 @@ class PeriodicAverageForecaster(Forecaster):
 
     def _fit(self, input_data, periodicity='auto', dst_affected=False, from_t=None, to_t=None, from_dt=None, to_dt=None):
     
-        timeseries = input_data
+        series = input_data
 
-        if len(timeseries.data_labels()) > 1:
+        if len(series.data_labels()) > 1:
             raise NotImplementedError('Multivariate time series are not yet supported')
 
         from_t, to_t = _set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
 
         # Set or detect periodicity
         if periodicity == 'auto':        
-            periodicity =  detect_periodicity(timeseries)
-            logger.info('Detected periodicity: %sx %s', periodicity, timeseries.resolution)
+            periodicity =  detect_periodicity(series)
+            logger.info('Detected periodicity: %sx %s', periodicity, series.resolution)
                 
         self.data['periodicity']  = periodicity
         self.data['dst_affected'] = dst_affected
@@ -563,11 +563,11 @@ class PeriodicAverageForecaster(Forecaster):
             logger.info('Using a window of "{}"'.format(periodicity))
             self.data['window'] = periodicity
 
-        for key in timeseries.data_labels():
+        for key in series.data_labels():
             sums   = {}
             totals = {}
             processed = 0
-            for item in timeseries:
+            for item in series:
 
                 # Skip if needed
                 try:
@@ -577,7 +577,7 @@ class PeriodicAverageForecaster(Forecaster):
                     break
                 
                 # Process
-                periodicity_index = _get_periodicity_index(item, timeseries.resolution, periodicity, dst_affected)
+                periodicity_index = _get_periodicity_index(item, series.resolution, periodicity, dst_affected)
                 if not periodicity_index in sums:
                     sums[periodicity_index] = item.data[key]
                     totals[periodicity_index] = 1
@@ -595,7 +595,7 @@ class PeriodicAverageForecaster(Forecaster):
 
     def _predict(self, input_data, steps=1, forecast_start=None):
             
-        timeseries = input_data        
+        series = input_data        
     
         # TODO: remove the forecast_start or move it in the parent(s).
       
@@ -604,10 +604,10 @@ class PeriodicAverageForecaster(Forecaster):
       
         # Set forecast starting item
         if forecast_start is None:
-            forecast_start = len(timeseries) - 1
+            forecast_start = len(series) - 1
             
         # Get forecast start item
-        forecast_start_item = timeseries[forecast_start]
+        forecast_start_item = series[forecast_start]
 
         # Support vars
         forecast_timestamps = []
@@ -617,8 +617,8 @@ class PeriodicAverageForecaster(Forecaster):
         diffs  = 0                
         for j in range(self.data['window']):
             serie_index = forecast_start - self.data['window'] + j
-            real_value = timeseries[serie_index].data[key]
-            forecast_value = self.data['averages'][_get_periodicity_index(timeseries[serie_index], timeseries.resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])]
+            real_value = series[serie_index].data[key]
+            forecast_value = self.data['averages'][_get_periodicity_index(series[serie_index], series.resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])]
             diffs += (real_value - forecast_value)            
 
         # Sum the avg diff between the real and the forecast on the window to the forecast (the offset)
@@ -629,32 +629,32 @@ class PeriodicAverageForecaster(Forecaster):
             step = i + 1
 
             # Set forecast timestamp
-            if isinstance(timeseries[0], Slot):
+            if isinstance(series[0], Slot):
                 try:
-                    forecast_timestamp = forecast_timestamps[-1] + timeseries.resolution
+                    forecast_timestamp = forecast_timestamps[-1] + series.resolution
                     forecast_timestamps.append(forecast_timestamp)
                 except IndexError:
                     forecast_timestamp = forecast_start_item.end
                     forecast_timestamps.append(forecast_timestamp)
 
             else:
-                forecast_timestamp = TimePoint(t = forecast_start_item.t + (timeseries.resolution.as_seconds()*step), tz = forecast_start_item.tz )
+                forecast_timestamp = TimePoint(t = forecast_start_item.t + (series.resolution.as_seconds()*step), tz = forecast_start_item.tz )
     
             # Compute the real forecast data
-            periodicity_index = _get_periodicity_index(forecast_timestamp, timeseries.resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])        
+            periodicity_index = _get_periodicity_index(forecast_timestamp, series.resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])        
             forecast_data.append({key: self.data['averages'][periodicity_index] + (offset*1.0)})
         
         # Return
         return forecast_data
 
-    def _plot_averages(self, timeseries, **kwargs):      
-        averages_timeseries = copy.deepcopy(timeseries)
-        for item in averages_timeseries:
-            value = self.data['averages'][_get_periodicity_index(item, averages_timeseries.resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])]
+    def _plot_averages(self, series, **kwargs):      
+        averages_series = copy.deepcopy(series)
+        for item in averages_series:
+            value = self.data['averages'][_get_periodicity_index(item, averages_series.resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])]
             if not value:
                 value = 0
             item.data['periodic_average'] =value 
-        averages_timeseries.plot(**kwargs)
+        averages_series.plot(**kwargs)
 
 
 #=========================
@@ -671,16 +671,16 @@ class ProphetForecaster(Forecaster, _ProphetModel):
 
     def _fit(self, input_data, from_t=None, to_t=None, from_dt=None, to_dt=None):
 
-        timeseries = input_data
+        series = input_data
 
-        if len(timeseries.data_labels()) > 1:
+        if len(series.data_labels()) > 1:
             raise Exception('Multivariate time series are not yet supported')
 
         from prophet import Prophet
 
         from_t, to_t = _set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
 
-        data = self._from_timeseria_to_prophet(timeseries, from_t=from_t, to_t=to_t)
+        data = self._from_timeseria_to_prophet(series, from_t=from_t, to_t=to_t)
 
         # Instantiate the Prophet model
         self.prophet_model = Prophet()
@@ -688,26 +688,26 @@ class ProphetForecaster(Forecaster, _ProphetModel):
         # Fit tjhe Prophet model
         self.prophet_model.fit(data)
 
-        # Save the timeseries we used for the fit.
-        self.fit_timeseries = timeseries
+        # Save the series we used for the fit.
+        self.fit_series = series
         
         # Prophet, as the ARIMA models, has no window
         self.data['window'] = 0
     
     def _predict(self, input_data, steps=1):
 
-        timeseries = input_data
+        series = input_data
     
         key = self.data['data_labels'][0]
 
         # Prepare a dataframe with all the timestamps to forecast
-        last_item    = timeseries[-1]
+        last_item    = series[-1]
         last_item_t  = last_item.t
         last_item_dt = last_item.dt
         data_to_forecast = []
         
         for _ in range(steps):
-            new_item_dt = last_item_dt + timeseries.resolution
+            new_item_dt = last_item_dt + series.resolution
             data_to_forecast.append(self._remove_timezone(new_item_dt))
             last_item_dt = new_item_dt
 
@@ -754,34 +754,34 @@ class ARIMAForecaster(Forecaster, _ARIMAModel):
 
     def _fit(self, input_data):
         
-        timeseries = input_data
+        series = input_data
     
         import statsmodels.api as sm
 
-        if len(timeseries.data_labels()) > 1:
+        if len(series.data_labels()) > 1:
             raise Exception('Multivariate time series require to have the key of the prediction specified')
-        key=timeseries.data_labels()[0]
+        key=series.data_labels()[0]
                             
-        data = array(timeseries.df[key])
+        data = array(series.df[key])
         
         # Save model and fit
         self.model = sm.tsa.ARIMA(data, (self.p,self.d,self.q))
         self.model_res = self.model.fit()
         
-        # Save the timeseries we used for the fit.
-        self.fit_timeseries = timeseries
+        # Save the series we used for the fit.
+        self.fit_series = series
         
         # The ARIMA models, as Prophet, have no window
         self.data['window'] = 0
 
     def _predict(self, input_data, steps=1):
 
-        timeseries = input_data
+        series = input_data
 
         key = self.data['data_labels'][0]
 
-        # Chack that we are applying on a time series ending with the same datapoint where the fit timeseries was
-        if self.fit_timeseries[-1].t != timeseries[-1].t:
+        # Chack that we are applying on a time series ending with the same data point where the fit series was
+        if self.fit_series[-1].t != series[-1].t:
             raise NonContiguityError('Sorry, this model can be applied only on a time series ending with the same timestamp as the time series used for the fit.')
 
         # Return the predicion. We need the [0] to access yhat, other indexes are erorrs etc.
@@ -802,15 +802,15 @@ class AARIMAForecaster(Forecaster, _ARIMAModel):
 
     def _fit(self, input_data, **kwargs):
 
-        timeseries = input_data
+        series = input_data
          
         import pmdarima as pm
 
-        if len(timeseries.data_labels()) > 1:
+        if len(series.data_labels()) > 1:
             raise Exception('Multivariate time series require to have the key of the prediction specified')
-        key=timeseries.data_labels()[0]
+        key=series.data_labels()[0]
                             
-        data = array(timeseries.df[key])
+        data = array(series.df[key])
 
         # Change some defaults
         trace = kwargs.pop('trace', False)
@@ -829,20 +829,20 @@ class AARIMAForecaster(Forecaster, _ARIMAModel):
 
         self.model = autoarima_model
         
-        # Save the timeseries we used for the fit.
-        self.fit_timeseries = timeseries
+        # Save the series we used for the fit.
+        self.fit_series = series
 
         # The ARIMA models, as Prophet, have no window
         self.data['window'] = 0
 
     def _predict(self, input_data, steps=1):
 
-        timeseries = input_data
+        series = input_data
 
         key = self.data['data_labels'][0]
 
-        # Chack that we are applying on a time series ending with the same datapoint where the fit timeseries was
-        if self.fit_timeseries[-1].t != timeseries[-1].t:
+        # Chack that we are applying on a time series ending with the same datapoint where the fit series was
+        if self.fit_series[-1].t != series[-1].t:
             raise NonContiguityError('Sorry, this model can be applied only on a time series ending with the same timestamp as the time series used for the fit.')
 
         # Return the predicion. We need the [0] to access yhat, other indexes are erorrs etc.
@@ -908,7 +908,7 @@ class LSTMForecaster(Forecaster, _KerasModel):
 
     def _fit(self, input_data, from_t=None, to_t=None, from_dt=None, to_dt=None, verbose=False, epochs=30, normalize=True):
 
-        timeseries = input_data
+        series = input_data
         
         # Set from and to
         from_t, to_t = _set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
@@ -920,23 +920,23 @@ class LSTMForecaster(Forecaster, _KerasModel):
             verbose=0
 
         # Data keys shortcut
-        data_labels = timeseries.data_labels()
+        data_labels = series.data_labels()
 
         if normalize:
             # Set min and max
-            min_values = timeseries.min()
-            max_values = timeseries.max()
+            min_values = series.min()
+            max_values = series.max()
             
             # Fix some debeatable behaviour (which is, that min and max return different things for univariate and multivariate data)
             # TODO: fix me!
             if not isinstance(min_values, dict):
-                min_values = {timeseries.data_labels()[0]:min_values}
+                min_values = {series.data_labels()[0]:min_values}
             if not isinstance(max_values, dict):
-                max_values = {timeseries.data_labels()[0]:max_values}
+                max_values = {series.data_labels()[0]:max_values}
             
             # Normalize data
-            timeseries_normalized = timeseries.duplicate()
-            for datapoint in timeseries_normalized:
+            series_normalized = series.duplicate()
+            for datapoint in series_normalized:
                 for data_label in datapoint.data:
                     datapoint.data[data_label] = (datapoint.data[data_label] - min_values[data_label]) / (max_values[data_label] - min_values[data_label])
         
@@ -946,12 +946,12 @@ class LSTMForecaster(Forecaster, _KerasModel):
         
         else:
             # TODO: here the name is worn,
-            timeseries_normalized = timeseries
+            series_normalized = series
 
         # Move to "matrix" of windows plus "vector" of targets data representation. Or, in other words:
         # window_datapoints is a list of lists (matrix) where each nested list (row) is a list of window datapoints.
-        window_datapoints_matrix = self._to_window_datapoints_matrix(timeseries_normalized, window=self.data['window'], steps=1)
-        target_values_vector = self._to_target_values_vector(timeseries_normalized, window=self.data['window'], steps=1)
+        window_datapoints_matrix = self._to_window_datapoints_matrix(series_normalized, window=self.data['window'], steps=1)
+        target_values_vector = self._to_target_values_vector(series_normalized, window=self.data['window'], steps=1)
 
         # Compute window features
         window_features = []
@@ -979,7 +979,7 @@ class LSTMForecaster(Forecaster, _KerasModel):
 
     def _predict(self, input_data, steps=1, verbose=False):
 
-        timeseries = input_data
+        series = input_data
    
         if steps>1:
             raise NotImplementedError('This forecaster does not support multi-step predictions.')
@@ -990,11 +990,11 @@ class LSTMForecaster(Forecaster, _KerasModel):
         else:
             verbose=0
 
-        # Get the window if we were given a longer timeseries
-        window_timeseries = timeseries[-self.data['window']:]
+        # Get the window if we were given a longer series
+        window_series = series[-self.data['window']:]
         
         # Duplicate so that we ae free to normalize in-place at the next step
-        window_timeseries = window_timeseries.duplicate()
+        window_series = window_series.duplicate()
         
         # Normalize window data if we have to do so
         try:
@@ -1003,12 +1003,12 @@ class LSTMForecaster(Forecaster, _KerasModel):
             normalize = False
         else:
             normalize = True
-            for datapoint in window_timeseries:
+            for datapoint in window_series:
                 for data_label in datapoint.data:
                     datapoint.data[data_label] = (datapoint.data[data_label] - self.data['min_values'][data_label]) / (self.data['max_values'][data_label] - self.data['min_values'][data_label])
 
         # Compute window features
-        window_features = self._compute_window_features(window_timeseries, data_labels=self.data['data_labels'], features=self.data['features'])
+        window_features = self._compute_window_features(window_series, data_labels=self.data['data_labels'], features=self.data['features'])
 
         # Perform the predict and set prediction data
         yhat = self.keras_model.predict(array([window_features]), verbose=verbose)

@@ -46,40 +46,40 @@ class Reconstructor(Model):
 
     def _apply(self, input_data, remove_data_loss=False, data_loss_threshold=1, inplace=False):
 
-        timeseries = input_data
+        series = input_data
 
         logger.debug('Using data_loss_threshold="%s"', data_loss_threshold)
 
         # TODO: understand if we want the apply from/to behavior. For now it is disabled
         # (add from_t=None, to_t=None, from_dt=None, to_dt=None in the function call above)
         # from_t, to_t = _set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
-        # Maybe also add a timeseries.mark=[from_dt, to_dt]
+        # Maybe also add a series.mark=[from_dt, to_dt]
          
         from_t = None
         to_t   = None
         
         if not inplace:
-            timeseries = timeseries.duplicate()
+            series = series.duplicate()
 
-        if len(timeseries.data_labels()) > 1:
-            raise NotImplementedError('Multivariate time timeseries are not yet supported')
+        if len(series.data_labels()) > 1:
+            raise NotImplementedError('Multivariate time series are not yet supported')
 
-        for key in timeseries.data_labels():
+        for key in series.data_labels():
             
             gap_started = None
             
-            for i, item in enumerate(timeseries):
+            for i, item in enumerate(series):
                 
                 # Skip if before from_t/dt of after to_t/dt
-                if from_t is not None and timeseries[i].t < from_t:
+                if from_t is not None and series[i].t < from_t:
                     continue
                 try:
                     # Handle slots
-                    if to_t is not None and timeseries[i].end.t > to_t:
+                    if to_t is not None and series[i].end.t > to_t:
                         break
                 except AttributeError:
                     # Handle points
-                    if to_t is not None and timeseries[i].t > to_t:
+                    if to_t is not None and series[i].t > to_t:
                         break                
 
                 if item.data_loss is not None and item.data_loss >= data_loss_threshold:
@@ -91,7 +91,7 @@ class Reconstructor(Model):
                     if gap_started is not None:
                     
                         # Reconstruct for this gap
-                        self._reconstruct(timeseries, from_index=gap_started, to_index=i, key=key)
+                        self._reconstruct(series, from_index=gap_started, to_index=i, key=key)
                         gap_started = None
                     
                     item.data_indexes['data_reconstructed'] = 0
@@ -101,10 +101,10 @@ class Reconstructor(Model):
             
             # Reconstruct the last gap as well if left "open"
             if gap_started is not None:
-                self._reconstruct(timeseries, from_index=gap_started, to_index=i+1, key=key)
+                self._reconstruct(series, from_index=gap_started, to_index=i+1, key=key)
 
         if not inplace:
-            return timeseries
+            return series
         else:
             return None
 
@@ -131,7 +131,7 @@ class Reconstructor(Model):
 
     def _evaluate(self, input_data, steps='auto', limit=None, data_loss_threshold=1, metrics=['RMSE', 'MAE'], details=False, from_t=None, to_t=None, from_dt=None, to_dt=None):
 
-        timeseries = input_data
+        series = input_data
 
         # Set evaluation_score steps if we have to
         if steps == 'auto':
@@ -154,7 +154,7 @@ class Reconstructor(Model):
         logger.info('Will evaluate model for %s steps with metrics %s', steps, metrics)
         
         # Find areas where to evaluate the model
-        for key in timeseries.data_labels():
+        for key in series.data_labels():
              
             for steps_round in steps:
                 
@@ -166,70 +166,70 @@ class Reconstructor(Model):
                 # Here we will have steps=1, steps=2 .. steps=n          
                 logger.debug('Evaluating model for %s steps', steps_round)
                 
-                for i in range(len(timeseries)):
+                for i in range(len(series)):
 
                     # Skip if needed
                     try:
-                        if not _item_is_in_range(timeseries[i], from_t, to_t):
+                        if not _item_is_in_range(series[i], from_t, to_t):
                             continue
                     except StopIteration:
                         break                  
                 
                     # Skip the first and the last ones, otherwise reconstruct the ones in the middle
-                    if (i == 0) or (i >= len(timeseries)-steps_round):
+                    if (i == 0) or (i >= len(series)-steps_round):
                         continue
 
                     # Is this a "good area" where to test or do we have to stop?
                     stop = False
-                    if timeseries[i-1].data_loss is not None and timeseries[i-1].data_loss >= data_loss_threshold:
+                    if series[i-1].data_loss is not None and series[i-1].data_loss >= data_loss_threshold:
                         stop = True
                     for j in range(steps_round):
-                        if timeseries[i+j].data_loss is not None and timeseries[i+j].data_loss >= data_loss_threshold:
+                        if series[i+j].data_loss is not None and series[i+j].data_loss >= data_loss_threshold:
                             stop = True
                             break
-                    if timeseries[i+steps_round].data_loss is not None and timeseries[i+steps_round].data_loss >= data_loss_threshold:
+                    if series[i+steps_round].data_loss is not None and series[i+steps_round].data_loss >= data_loss_threshold:
                         stop = True
                     if stop:
                         continue
                             
                     # Set prev and next
-                    prev_value = timeseries[i-1].data[key]
-                    next_value = timeseries[i+steps_round].data[key]
+                    prev_value = series[i-1].data[key]
+                    next_value = series[i+steps_round].data[key]
                     
                     # Compute average value
                     average_value = (prev_value+next_value)/2
                     
                     # Data to be reconstructed
-                    timeseries_to_reconstruct = timeseries.__class__()
+                    series_to_reconstruct = series.__class__()
                     
                     # Append prev
-                    #timeseries_to_reconstruct.append(copy.deepcopy(timeseries[i-1]))
+                    #series_to_reconstruct.append(copy.deepcopy(series[i-1]))
                     
                     # Append in the middle and store real values
                     for j in range(steps_round):
-                        item = copy.deepcopy(timeseries[i+j])
+                        item = copy.deepcopy(series[i+j])
                         # Set the data_loss to one so the item will be reconstructed
                         item.data_indexes['data_loss'] = 1
                         item.data[key] = average_value
-                        timeseries_to_reconstruct.append(item)
+                        series_to_reconstruct.append(item)
                         
-                        real_values.append(timeseries[i+j].data[key])
+                        real_values.append(series[i+j].data[key])
               
                     # Append next
-                    #timeseries_to_reconstruct.append(copy.deepcopy(timeseries[i+steps_round]))
+                    #series_to_reconstruct.append(copy.deepcopy(series[i+steps_round]))
                     
-                    # Do we have a 1-point only timeseries? If so, manually set the resolution
+                    # Do we have a 1-point only series? If so, manually set the resolution
                     # as otherwise it would be not defined. # TODO: does it make sense?
-                    if len(timeseries_to_reconstruct) == 1:
-                        timeseries_to_reconstruct._resolution = timeseries.resolution
+                    if len(series_to_reconstruct) == 1:
+                        series_to_reconstruct._resolution = series.resolution
 
                     # Apply model inplace
-                    self._apply(timeseries_to_reconstruct, inplace=True)
+                    self._apply(series_to_reconstruct, inplace=True)
                     processed_samples += 1
 
                     # Store reconstructed values
                     for j in range(steps_round):
-                        reconstructed_values.append(timeseries_to_reconstruct[j].data[key])
+                        reconstructed_values.append(series_to_reconstruct[j].data[key])
                     
                     # Break if we have to
                     if limit is not None and processed_samples >= limit:
@@ -373,36 +373,36 @@ class PeriodicAverageReconstructor(Reconstructor):
 
     def _fit(self, input_data, data_loss_threshold=0.5, periodicity='auto', dst_affected=False, offset_method='average', from_t=None, to_t=None, from_dt=None, to_dt=None):
 
-        timeseries = input_data
+        series = input_data
 
         if not offset_method in ['average', 'extremes']:
             raise Exception('Unknown offset method "{}"'.format(offset_method))
         self.offset_method = offset_method
     
-        if len(timeseries.data_labels()) > 1:
+        if len(series.data_labels()) > 1:
             raise NotImplementedError('Multivariate time series are not yet supported')
 
         from_t, to_t = _set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
         
         # Set or detect periodicity
         if periodicity == 'auto':
-            periodicity =  detect_periodicity(timeseries)
+            periodicity =  detect_periodicity(series)
             try:
-                if isinstance(timeseries.resolution, TimeUnit):
-                    logger.info('Detected periodicity: %sx %s', periodicity, timeseries.resolution)
+                if isinstance(series.resolution, TimeUnit):
+                    logger.info('Detected periodicity: %sx %s', periodicity, series.resolution)
                 else:
-                    logger.info('Detected periodicity: %sx %ss', periodicity, timeseries.resolution)
+                    logger.info('Detected periodicity: %sx %ss', periodicity, series.resolution)
             except AttributeError:
-                logger.info('Detected periodicity: %sx %ss', periodicity, timeseries.resolution)
+                logger.info('Detected periodicity: %sx %ss', periodicity, series.resolution)
                 
         self.data['periodicity']  = periodicity
         self.data['dst_affected'] = dst_affected 
                 
-        for key in timeseries.data_labels():
+        for key in series.data_labels():
             sums   = {}
             totals = {}
             processed = 0
-            for item in timeseries:
+            for item in series:
                 
                 # Skip if needed
                 try:
@@ -413,7 +413,7 @@ class PeriodicAverageReconstructor(Reconstructor):
                 
                 # Process. Note: we do fit on data losses = None!
                 if item.data_loss is None or item.data_loss < data_loss_threshold:
-                    periodicity_index = _get_periodicity_index(item, timeseries.resolution, periodicity, dst_affected=dst_affected)
+                    periodicity_index = _get_periodicity_index(item, series.resolution, periodicity, dst_affected=dst_affected)
                     if not periodicity_index in sums:
                         sums[periodicity_index] = item.data[key]
                         totals[periodicity_index] = 1
@@ -431,7 +431,7 @@ class PeriodicAverageReconstructor(Reconstructor):
 
     def _reconstruct(self, input_data, key, from_index, to_index):
  
-        timeseries = input_data
+        series = input_data
             
         logger.debug('Reconstructing between "{}" and "{}"'.format(from_index, to_index-1))
 
@@ -439,8 +439,8 @@ class PeriodicAverageReconstructor(Reconstructor):
         if self.offset_method == 'average':
             diffs=0
             for j in range(from_index, to_index):
-                real_value = timeseries[j].data[key]
-                periodicity_index = _get_periodicity_index(timeseries[j], timeseries.resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])
+                real_value = series[j].data[key]
+                periodicity_index = _get_periodicity_index(series[j], series.resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])
                 reconstructed_value = self.data['averages'][periodicity_index]
                 diffs += (real_value - reconstructed_value)
             offset = diffs/(to_index-from_index)
@@ -450,8 +450,8 @@ class PeriodicAverageReconstructor(Reconstructor):
             diffs=0
             try:
                 for j in [from_index-1, to_index+1]:
-                    real_value = timeseries[j].data[key]
-                    periodicity_index = _get_periodicity_index(timeseries[j], timeseries.resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])
+                    real_value = series[j].data[key]
+                    periodicity_index = _get_periodicity_index(series[j], series.resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])
                     reconstructed_value = self.data['averages'][periodicity_index]
                     diffs += (real_value - reconstructed_value)
                 offset = diffs/2
@@ -462,19 +462,19 @@ class PeriodicAverageReconstructor(Reconstructor):
 
         # Actually reconstruct
         for j in range(from_index, to_index):
-            item_to_reconstruct = timeseries[j]
-            periodicity_index = _get_periodicity_index(item_to_reconstruct, timeseries.resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])
+            item_to_reconstruct = series[j]
+            periodicity_index = _get_periodicity_index(item_to_reconstruct, series.resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])
             item_to_reconstruct.data[key] = self.data['averages'][periodicity_index] + offset
             item_to_reconstruct.data_indexes['data_reconstructed'] = 1
 
-    def _plot_averages(self, timeseries, **kwargs):   
-        averages_timeseries = copy.deepcopy(timeseries)
-        for item in averages_timeseries:
-            value = self.data['averages'][_get_periodicity_index(item, averages_timeseries.resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])]
+    def _plot_averages(self, series, **kwargs):   
+        averages_series = copy.deepcopy(series)
+        for item in averages_series:
+            value = self.data['averages'][_get_periodicity_index(item, averages_series.resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])]
             if not value:
                 value = 0
             item.data['periodic_average'] = value 
-        averages_timeseries.plot(**kwargs)
+        averages_series.plot(**kwargs)
 
 
 #=====================================
@@ -491,16 +491,16 @@ class ProphetReconstructor(Reconstructor, _ProphetModel):
 
     def _fit(self, input_data, from_t=None, to_t=None, from_dt=None, to_dt=None):
 
-        timeseries = input_data
+        series = input_data
         
         from prophet import Prophet
 
         from_t, to_t = _set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
 
-        if len(timeseries.data_labels()) > 1:
+        if len(series.data_labels()) > 1:
             raise NotImplementedError('Multivariate time series are not yet supported')
 
-        data = self._from_timeseria_to_prophet(timeseries, from_t, to_t)
+        data = self._from_timeseria_to_prophet(series, from_t, to_t)
 
         # Instantiate the Prophet model
         self.prophet_model = Prophet()
@@ -510,14 +510,14 @@ class ProphetReconstructor(Reconstructor, _ProphetModel):
 
     def _reconstruct(self, input_data, key, from_index, to_index):
 
-        timeseries = input_data
+        series = input_data
         
         logger.debug('Reconstructing between "{}" and "{}"'.format(from_index, to_index-1))
     
         # Get and prepare data to reconstruct
         items_to_reconstruct = []
         for j in range(from_index, to_index):
-            items_to_reconstruct.append(timeseries[j])
+            items_to_reconstruct.append(series[j])
         data_to_reconstruct = [self._remove_timezone(dt_from_s(item.t)) for item in items_to_reconstruct]
         dataframe_to_reconstruct = DataFrame(data_to_reconstruct, columns = ['ds'])
 
@@ -528,7 +528,7 @@ class ProphetReconstructor(Reconstructor, _ProphetModel):
         # Ok, replace the values with the reconsturcted ones
         for i, j in enumerate(range(from_index, to_index)):
             #logger.debug('Reconstructing item #{} with reconstucted item #{}'.format(j,i))
-            item_to_reconstruct = timeseries[j]
+            item_to_reconstruct = series[j]
             item_to_reconstruct.data[key] = forecast['yhat'][i]
             item_to_reconstruct.data_indexes['data_reconstructed'] = 1
 

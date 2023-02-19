@@ -1437,10 +1437,10 @@ class TimeSeries(Series):
             file_name = args[0]
             from .storages import CSVFileStorage
             storage = CSVFileStorage(file_name, **kwargs)
-            loaded_timeseries = storage.get()
+            loaded_series = storage.get()
             
             # TODO: the following might not perform well..
-            series_items = loaded_timeseries.contents()
+            series_items = loaded_series.contents()
             super(TimeSeries, self).__init__(*series_items)
 
         # Create from list of TimePoints or TimeSlots (just call parent init)
@@ -1708,13 +1708,13 @@ class TimeSeries(Series):
             return detected_tz
     
     def change_timezone(self, tz):
-        """Change the timezone of the timeseries, in-place."""
+        """Change the timezone of the time series, in-place."""
         for time_point in self:
             time_point.change_timezone(tz)
         self._tz = time_point.tz
 
     def as_timezone(self, tz):
-        """Get a copy of the time series on a new timezone.""" 
+        """Get a copy of the time series on a new time zone.""" 
         new_series = self.duplicate() 
         new_series.change_timezone(tz)
         return new_series

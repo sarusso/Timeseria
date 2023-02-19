@@ -277,7 +277,7 @@ class Derivative(Operation):
 
         try:
             # Try to access by label, if data was non key-value this raise, as labels
-            # are always generated as strings even for in-based indexed data (as lists)
+            # are always generated as strings even for indexed data (as lists)
             series[0].data[series.data_labels()[0]]
             data_is_keyvalue = True
         except TypeError:
@@ -412,7 +412,7 @@ class Integral(Operation):
 
         try:
             # Try to access by label, if data was non key-value this raise, as labels
-            # are always generated as strings even for in-based indexed data (as lists)
+            # are always generated as strings even for indexed data (as lists)
             series[0].data[series.data_labels()[0]]
             data_is_keyvalue = True
         except TypeError:

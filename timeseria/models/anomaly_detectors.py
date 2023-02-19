@@ -148,26 +148,26 @@ class ForecasterAnomalyDetector(AnomalyDetector):
     
     def _fit(self, input_data, *args, stdevs=3, **kwargs):
 
-        timeseries = input_data
+        series = input_data
 
-        if len(timeseries.data_labels()) > 1:
+        if len(series.data_labels()) > 1:
             raise NotImplementedError('Multivariate time series are not yet supported')
 
         # Fit the forecaster
-        self.forecaster.fit(timeseries, *args, **kwargs)
+        self.forecaster.fit(series, *args, **kwargs)
         
         # Evaluate the forecaster for one step ahead and get AEs
         AEs = []
-        for key in timeseries.data_labels():
+        for key in series.data_labels():
             
-            for i, _ in enumerate(timeseries):
+            for i, _ in enumerate(series):
                 
                 forecaster_window = self.forecaster.data['window']
                 
                 if i <=  forecaster_window:    
                     continue
                 
-                actual, predicted = self.__get_actual_and_predicted(timeseries, i, key, forecaster_window)
+                actual, predicted = self.__get_actual_and_predicted(series, i, key, forecaster_window)
                 
                 AEs.append(abs(actual-predicted))
 
@@ -183,26 +183,26 @@ class ForecasterAnomalyDetector(AnomalyDetector):
 
     def _apply(self, input_data, inplace=False, details=False, logs=False, stdevs=None):
         
-        timeseries = input_data
+        series = input_data
         
         if inplace:
             raise Exception('Anomaly detection cannot be run inplace')
 
-        if len(timeseries.data_labels()) > 1:
-            raise NotImplementedError('Multivariate time timeseries are not yet supported')
+        if len(series.data_labels()) > 1:
+            raise NotImplementedError('Multivariate time series are not yet supported')
         
-        result_series = timeseries.__class__()
+        result_series = series.__class__()
 
-        for key in timeseries.data_labels():
+        for key in series.data_labels():
             
-            for i, item in enumerate(timeseries):
+            for i, item in enumerate(series):
                 forecaster_window = self.forecaster.data['window']
                 if i <=  forecaster_window:    
                     continue
                 
-                actual, predicted = self.__get_actual_and_predicted(timeseries, i, key, forecaster_window)
+                actual, predicted = self.__get_actual_and_predicted(series, i, key, forecaster_window)
                 #if logs:
-                #    logger.info('{}: {} vs {}'.format(timeseries[i].dt, actual, predicted))
+                #    logger.info('{}: {} vs {}'.format(series[i].dt, actual, predicted))
 
                 AE = abs(actual-predicted)
                 

@@ -6,7 +6,7 @@ import json
 import uuid
 import statistics
 from ..exceptions import NotFittedError
-from ..utilities import _check_timeseries, _check_resolution, _check_data_labels, _item_is_in_range
+from ..utilities import _check_time_series, _check_resolution, _check_data_labels, _item_is_in_range
 from ..time import now_s, dt_from_s
 from ..units import TimeUnit
 from ..datastructures import Point, Series, TimeSeries
@@ -119,7 +119,7 @@ class Model():
 
         # If TimeSeries input_data, check it
         if isinstance(input_data, TimeSeries): 
-            _check_timeseries(input_data)
+            _check_time_series(input_data)
 
             # Set resolution
             try:
@@ -166,7 +166,7 @@ class Model():
 
         # If TimeSeries input_data, check it
         if isinstance(input_data, TimeSeries):
-            _check_timeseries(input_data)
+            _check_time_series(input_data)
             if self.is_parametric():
                 if isinstance(input_data.items_type, Point) and len(input_data) == 1:
                     # Do not check if the input_data is a point time series and has only one item
@@ -202,7 +202,7 @@ class Model():
 
         # If TimeSeries input_data, check it
         if isinstance(input_data, TimeSeries):
-            _check_timeseries(input_data)
+            _check_time_series(input_data)
             if self.is_parametric():
                 if isinstance(input_data.items_type, Point) and len(input_data) == 1:
                     # Do not check if the input_data is a point time series and has only one item
@@ -238,7 +238,7 @@ class Model():
 
         # If TimeSeries input_data, check it
         if isinstance(input_data, TimeSeries):
-            _check_timeseries(input_data)
+            _check_time_series(input_data)
             if self.is_parametric():
                 if isinstance(input_data.items_type, Point) and len(input_data) == 1:
                     # Do not check if the input_data is a point time series and has only one item
@@ -278,10 +278,10 @@ class Model():
 
         # If TimeSeries input_data, check it
         if isinstance(input_data, TimeSeries):
-            _check_timeseries(input_data)
+            _check_time_series(input_data)
 
         # Reassign for ease of notation
-        timeseries = input_data
+        series = input_data
 
         # Decouple evaluate from fit args
         fit_kwargs = {}
@@ -302,17 +302,17 @@ class Model():
             raise Exception('Got some unknown args: {}'.format(kwargs))
             
         # How many items per round?
-        round_items = int(len(timeseries) / rounds)
+        round_items = int(len(series) / rounds)
         logger.debug('Items per round: {}'.format(round_items))
         
         # Start the fit / evaluate loop
         evaluations = []        
         for i in range(rounds):
-            from_t = timeseries[(round_items*i)].t
+            from_t = series[(round_items*i)].t
             try:
-                to_t = timeseries[(round_items*i) + round_items].t
+                to_t = series[(round_items*i) + round_items].t
             except IndexError:
-                to_t = timeseries[(round_items*i) + round_items - 1].t
+                to_t = series[(round_items*i) + round_items - 1].t
             from_dt = dt_from_s(from_t)
             to_dt   = dt_from_s(to_t)
             logger.info('Cross validation round #{} of {}: validate from {} ({}) to {} ({}), fit on the rest.'.format(i+1, rounds, from_t, from_dt, to_t, to_dt))
@@ -320,13 +320,13 @@ class Model():
             # Fit
             if i == 0:            
                 logger.debug('Fitting from {} ({})'.format(to_t, to_dt))
-                self.fit(timeseries, from_t=to_t, **fit_kwargs)
+                self.fit(series, from_t=to_t, **fit_kwargs)
             else:
                 logger.debug('Fitting until {} ({}) and then from {} ({}).'.format(to_t, to_dt, from_t, from_dt))
-                self.fit(timeseries, from_t=to_t, to_t=from_t, **fit_kwargs)                
+                self.fit(series, from_t=to_t, to_t=from_t, **fit_kwargs)                
             
             # Evaluate & append
-            evaluations.append(self.evaluate(timeseries, from_t=from_t, to_t=to_t, **evaluate_kwargs))
+            evaluations.append(self.evaluate(series, from_t=from_t, to_t=to_t, **evaluate_kwargs))
         
         # Regroup evaluations
         evaluation_metrics = list(evaluations[0].keys())
@@ -404,18 +404,18 @@ class _ProphetModel(Model):
         return dt.replace(tzinfo=None)
 
     @classmethod
-    def _from_timeseria_to_prophet(cls, timeseries, from_t=None, to_t=None):
+    def _from_timeseria_to_prophet(cls, series, from_t=None, to_t=None):
 
         # Create Python lists with data
         try:
-            timeseries[0].data[0]
+            series[0].data[0]
             data_labels_are_indexes = True
         except KeyError:
-            timeseries[0].data.keys()
+            series[0].data.keys()
             data_labels_are_indexes = False
         
         data_as_list=[]
-        for item in timeseries:
+        for item in series:
             
             # Skip if needed
             try:
@@ -442,35 +442,35 @@ class _ProphetModel(Model):
 class _ARIMAModel(Model):
     '''A model using statsmodel's ARIMA as underlying engine, and providing some extra internal functions for common operations.'''
     
-    def _get_start_end_indexes(self, timeseries, n):
+    def _get_start_end_indexes(self, series, n):
 
         # Do the math to get the right indexes for the prediction, both out-of-sample and in-sample
         # Not used at the moment as there seems to be bugs in the statsmodel package.
         # See https://www.statsmodels.org/devel/generated/statsmodels.tsa.arima_model.ARIMAResults.predict.html
         
-        # The default start_index for an arima prediction id the inxed after the fit timeseries
-        # I.e. if the fit timeseries had 101 lements, the start index is the 101
-        # So we need to compute the start and end indexes according to the fit timeseries,
+        # The default start_index for an ARIMA prediction is the index after the fit series
+        # I.e. if the fit series had 101 elments, the start index is the 101
+        # So we need to compute the start and end indexes according to the fit series,
         # we will use the "resolution" for this.
         
         # Save the requested prediction "from"
-        requested_predicting_from_dt = timeseries[-1].dt + timeseries.resolution
+        requested_predicting_from_dt = series[-1].dt + series.resolution
 
         # Search for the index number TODO: try first with "pure" math which would work for UTC
-        slider_dt = self.fit_timeseries[0].dt
+        slider_dt = self.fit_series[0].dt
         count = 0
         while True:
             if slider_dt  == requested_predicting_from_dt:
                 break
              
             # To next item index
-            if requested_predicting_from_dt < self.fit_timeseries[0].dt:
-                slider_dt = slider_dt - self.fit_timeseries.resolution
+            if requested_predicting_from_dt < self.fit_series[0].dt:
+                slider_dt = slider_dt - self.fit_series.resolution
                 if slider_dt < requested_predicting_from_dt:
                     raise Exception('Miss!')
  
             else:
-                slider_dt = slider_dt + self.fit_timeseries.resolution
+                slider_dt = slider_dt + self.fit_series.resolution
                 if slider_dt > requested_predicting_from_dt:
                     raise Exception('Miss!')
             
@@ -512,43 +512,43 @@ class _KerasModel(Model):
     # ARIMA and Prophet above also. Consider moving them in a "utility" package or directly in the models.
     
     @staticmethod
-    def _to_window_datapoints_matrix(timeseries, window, steps, encoder=None):
+    def _to_window_datapoints_matrix(series, window, steps, encoder=None):
         '''Compute window datapoints matrix from a time series.'''
         # steps to be intended as steps ahead (for the forecaster)
         window_datapoints = []
-        for i, _ in enumerate(timeseries):
+        for i, _ in enumerate(series):
             if i <  window:
                 continue
-            if i == len(timeseries) + 1 - steps:
+            if i == len(series) + 1 - steps:
                 break
                     
             # Add window values
             row = []
             for j in range(window):
-                row.append(timeseries[i-window+j])
+                row.append(series[i-window+j])
             window_datapoints.append(row)
                 
         return window_datapoints
 
     @staticmethod
-    def _to_target_values_vector(timeseries, window, steps):
+    def _to_target_values_vector(series, window, steps):
         '''Compute target values vector from a time series.'''
         # steps to be intended as steps ahead (for the forecaster)
     
-        data_labels = timeseries.data_labels()
+        data_labels = series.data_labels()
     
         targets = []
-        for i, _ in enumerate(timeseries):
+        for i, _ in enumerate(series):
             if i <  window:
                 continue
-            if i == len(timeseries) + 1 - steps:
+            if i == len(series) + 1 - steps:
                 break
             
             # Add forecast target value(s)
             row = []
             for j in range(steps):
                 for data_label in data_labels:
-                    row.append(timeseries[i+j].data[data_label])
+                    row.append(series[i+j].data[data_label])
             targets.append(row)
 
         return targets
