@@ -6,7 +6,7 @@ import json
 import uuid
 import statistics
 from ..exceptions import NotFittedError
-from ..utilities import _check_timeseries, _check_resolution, _check_data_labels, _item_is_in_range
+from ..utilities import _check_time_series, _check_resolution, _check_data_labels, _item_is_in_range
 from ..time import now_s, dt_from_s
 from ..units import TimeUnit
 from ..datastructures import Point, Series, TimeSeries
@@ -36,6 +36,8 @@ class Model():
     All models expose a ``predict()``, ``apply()`` and ``evaluate()`` methods, while parametric models also provide a ``save()`` method to
     store the parameters of the model, and an optional ``fit()`` method if the parameters are to be learnt form data. In this case also a
     ``cross_validate()`` method is available.
+    
+    If the model is used on a series, it also enforces resolution and data labels consistency between methods and save/load operations
         
     Args:
         path (optional, str): a path from which to load a saved model. Will override all other init settings. Only for parametric models.
@@ -67,8 +69,15 @@ class Model():
             if path:
                 with open(path+'/data.json', 'r') as f:
                     self.data = json.loads(f.read())
+                
                 # TODO: the "fitted" does not apply for models with parameters but with no fit.. fix me.  
                 self.fitted = True   
+                
+                # Convert resolution to TimeUnit if any. TODO: right now only TimeSeries have the resolution,
+                # but might change in case of adding the resolution attribute also to generic series.
+                if 'resolution' in self.data:
+                    self.data['resolution'] = TimeUnit(self.data['resolution'])
+                
             else:
                 id = str(uuid.uuid4())
                 self.fitted = False
@@ -95,29 +104,54 @@ class Model():
         else:
             return False
 
-    def fit(self, *args, **kwargs):
+    def fit(self, data, *args, **kwargs):
         """Fit the model."""
 
+        # Check if fit logic is implemented
         try:
             self._fit
         except AttributeError:
             raise NotImplementedError('Fitting this model is not implemented')
 
-        fit_output = self._fit(*args, **kwargs)
+        # Check data
+        if not isinstance(data, TimeSeries):
+            raise NotImplementedError('Models work only with TimeSeries data for now (got "{}")'.format(data.__class__.__name__))
+
+        # If TimeSeries data, check it
+        if isinstance(data, TimeSeries): 
+            _check_time_series(data)
+
+            # Set resolution
+            try:
+                self.data['resolution'] = data.resolution
+            except AttributeError:
+                pass
+            
+            # Set data labels
+            try:
+                self.data['data_labels'] = data.data_labels()
+            except AttributeError:
+                pass
+
+        # Call fit logic
+        fit_output = self._fit(data, *args, **kwargs)
 
         self.data['fitted_at'] = now_s()
         self.fitted = True
 
+        # Return output
         return fit_output
 
-    def predict(self, *args, **kwargs):
+    def predict(self, data, *args, **kwargs):
         """Call the model predict logic."""
+
+        # Check if predict logic is implemented
         try:
             self._predict
         except AttributeError:
             raise NotImplementedError('Predicting from this model is not implemented')
-        
-        # Ensure the model is fitted if it has to
+
+        # Ensure the model is fitted if it has to.
         try:
             self._fit
         except AttributeError:
@@ -125,11 +159,29 @@ class Model():
         else:
             if not self.fitted:
                 raise NotFittedError()
+        
+        # Check data
+        if not isinstance(data, TimeSeries):
+            raise NotImplementedError('Models work only with TimeSeries data for now (got "{}")'.format(data.__class__.__name__))
 
-        return self._predict(*args, **kwargs)
+        # If TimeSeries data, check it
+        if isinstance(data, TimeSeries):
+            _check_time_series(data)
+            if self.is_parametric():
+                if isinstance(data.items_type, Point) and len(data) == 1:
+                    # Do not check if the data is a point time series and has only one item
+                    pass
+                else:
+                    _check_resolution(data, self.data['resolution'])
+                _check_data_labels(data, self.data['data_labels'])
 
-    def apply(self, *args, **kwargs):
+        # Call predict logic            
+        return self._predict(data, *args, **kwargs)
+
+    def apply(self, data, *args, **kwargs):
         """Apply the model."""
+        
+        # Check if apply logic is implemented
         try:
             self._apply
         except AttributeError:
@@ -143,11 +195,29 @@ class Model():
         else:
             if not self.fitted:
                 raise NotFittedError()
+                
+        # Check data
+        if not isinstance(data, TimeSeries):
+            raise NotImplementedError('Models work only with TimeSeries data for now (got "{}")'.format(data.__class__.__name__))
 
-        return self._apply(*args, **kwargs)
+        # If TimeSeries data, check it
+        if isinstance(data, TimeSeries):
+            _check_time_series(data)
+            if self.is_parametric():
+                if isinstance(data.items_type, Point) and len(data) == 1:
+                    # Do not check if the data is a point time series and has only one item
+                    pass
+                else:
+                    _check_resolution(data, self.data['resolution'])
+                _check_data_labels(data, self.data['data_labels'])
 
-    def evaluate(self, *args, **kwargs):
+        # Call apply logic  
+        return self._apply(data, *args, **kwargs)
+
+    def evaluate(self, data, *args, **kwargs):
         """Evaluate the model."""
+        
+        # Check if evaluate logic is implemented
         try:
             self._evaluate
         except AttributeError:
@@ -162,9 +232,25 @@ class Model():
             if not self.fitted:
                 raise NotFittedError()
 
-        return self._evaluate(*args, **kwargs)
+        # Check data
+        if not isinstance(data, TimeSeries):
+            raise NotImplementedError('Models work only with TimeSeries data for now (got "{}")'.format(data.__class__.__name__))
 
-    def cross_validate(self, *args, rounds=10, **kwargs):
+        # If TimeSeries data, check it
+        if isinstance(data, TimeSeries):
+            _check_time_series(data)
+            if self.is_parametric():
+                if isinstance(data.items_type, Point) and len(data) == 1:
+                    # Do not check if the data is a point time series and has only one item
+                    pass
+                else:
+                    _check_resolution(data, self.data['resolution'])
+                _check_data_labels(data, self.data['data_labels'])
+
+        # Call evaluate logic  
+        return self._evaluate(data, *args, **kwargs)
+
+    def cross_validate(self, data, rounds=10, *args, **kwargs):
         """Cross validate the model, by default with 10 fit/evaluate rounds.
         
         All the parameters starting with the ``fit_`` prefix are forwarded to the model ``fit()`` method (without the prefix), and
@@ -173,12 +259,95 @@ class Model():
         Args:
             rounds(int): how many rounds of cross validation to run.
         """
-        try:
-            self._cross_validate
-        except AttributeError:
-            raise NotImplementedError('Cross validating this model is not yet implemented')
-        return self._cross_validate(*args, rounds=rounds, **kwargs)
 
+        # Check if fit logic is implemented
+        try:
+            self._evaluate
+        except AttributeError:
+            raise NotImplementedError('Fitting this model is not implemented, cannot cross validate')
+
+        # Check if evaluate logic is implemented
+        try:
+            self._evaluate
+        except AttributeError:
+            raise NotImplementedError('Evaluating this model is not implemented, cannot cross validate')
+        
+        # Check data
+        if not isinstance(data, TimeSeries):
+            raise NotImplementedError('Models work only with TimeSeries data for now (got "{}")'.format(data.__class__.__name__))
+
+        # If TimeSeries data, check it
+        if isinstance(data, TimeSeries):
+            _check_time_series(data)
+
+        # Reassign for ease of notation
+        series = data
+
+        # Decouple evaluate from fit args
+        fit_kwargs = {}
+        evaluate_kwargs = {}
+        consumed_kwargs = []
+        for kwarg in kwargs:
+            if kwarg.startswith('fit_'):
+                consumed_kwargs.append(kwarg)
+                fit_kwargs[kwarg.replace('fit_', '')] = kwargs[kwarg]
+            if kwarg.startswith('evaluate_'):
+                consumed_kwargs.append(kwarg)
+                evaluate_kwargs[kwarg.replace('evaluate_', '')] = kwargs[kwarg]
+        for consumed_kwarg in consumed_kwargs:
+            kwargs.pop(consumed_kwarg)
+
+        # Do we still have some kwargs?
+        if kwargs:
+            raise Exception('Got some unknown args: {}'.format(kwargs))
+            
+        # How many items per round?
+        round_items = int(len(series) / rounds)
+        logger.debug('Items per round: {}'.format(round_items))
+        
+        # Start the fit / evaluate loop
+        evaluations = []        
+        for i in range(rounds):
+            from_t = series[(round_items*i)].t
+            try:
+                to_t = series[(round_items*i) + round_items].t
+            except IndexError:
+                to_t = series[(round_items*i) + round_items - 1].t
+            from_dt = dt_from_s(from_t)
+            to_dt   = dt_from_s(to_t)
+            logger.info('Cross validation round #{} of {}: validate from {} ({}) to {} ({}), fit on the rest.'.format(i+1, rounds, from_t, from_dt, to_t, to_dt))
+            
+            # Fit
+            if i == 0:            
+                logger.debug('Fitting from {} ({})'.format(to_t, to_dt))
+                self.fit(series, from_t=to_t, **fit_kwargs)
+            else:
+                logger.debug('Fitting until {} ({}) and then from {} ({}).'.format(to_t, to_dt, from_t, from_dt))
+                self.fit(series, from_t=to_t, to_t=from_t, **fit_kwargs)                
+            
+            # Evaluate & append
+            evaluations.append(self.evaluate(series, from_t=from_t, to_t=to_t, **evaluate_kwargs))
+        
+        # Regroup evaluations
+        evaluation_metrics = list(evaluations[0].keys())
+        scores_by_evaluation_metric = {}
+        for evaluation in evaluations:
+            for evaluation_metric in evaluation_metrics:
+                try:
+                    scores_by_evaluation_metric[evaluation_metric].append(evaluation[evaluation_metric])
+                except KeyError:
+                    try:
+                        scores_by_evaluation_metric[evaluation_metric] = [evaluation[evaluation_metric]]
+                    except KeyError:
+                        raise Exception('Error, the model generated different evaluation metrics over the rounds, cannot compute cross validation.') from None
+        
+        # Prepare and return results
+        results = {}
+        for evaluation_metric in scores_by_evaluation_metric:
+            results[evaluation_metric+'_avg'] = statistics.mean(scores_by_evaluation_metric[evaluation_metric])
+            results[evaluation_metric+'_stdev'] = statistics.stdev(scores_by_evaluation_metric[evaluation_metric])         
+        return results
+    
     def save(self, path):
         """Save the model in the given path. The model is saved in "directory format", 
          meaning that a new directory will be created containing the data for the model."""
@@ -205,270 +374,22 @@ class Model():
         # Prepare model dir and dump data as json
         os.makedirs(path)
         model_data_file = '{}/data.json'.format(path)
-        
-        with open(model_data_file, 'w') as f:
-            f.write(json.dumps(self.data))
-        
-        logger.info('Saved model with id "%s" in "%s"', self.data['id'], path)
-
-
-#======================
-#  Base Series Model
-#======================
-
-class SeriesModel(Model):
-    """A model specifically designed to work with series data. In particular, it enforces
-    resolution and data labels consistency between methods and save/load operations.
-
-    Args:
-        path (optional, str): a path from which to load a saved model. Will override all other init settings. Only for parametric models.
-    """ 
-    
-    def __init__(self, path=None):
-
-        # Call parent init
-        super(SeriesModel, self).__init__(path)
-
-        # If the model has been loaded, convert resolution as TimeUnit
-        try:
-            self.fitted
-        except AttributeError:
-            pass
-        else:
-            if self.fitted:
-                # Convert resolution to TimeUnit. TODO: right now only TimeSeries have the resolution, but might change if added to the Series as well.
-                if 'resolution' in self.data:
-                    self.data['resolution'] = TimeUnit(self.data['resolution'])
-
-    def fit(self, series, *args, **kwargs):
-        """Fit the model on a series."""
-
-        if not isinstance(series, Series):
-            raise TypeError('A Series-like object is required, got "{}"'.format(series.__class__.__name__))
-
-        # If TimeSeries data, check the timeseries
-        if isinstance(series, TimeSeries): 
-            _check_timeseries(series)
-
-        # Call parent fit
-        fit_output = super(SeriesModel, self).fit(series, *args, **kwargs)
-        
-        # Set resolution
-        try:
-            self.data['resolution'] = series.resolution
-        except AttributeError:
-            pass
-        
-        # Set data labels
-        try:
-            self.data['data_labels'] = series.data_labels()
-        except AttributeError:
-            pass
-
-        # Return output
-        return fit_output
-
-    def predict(self, series, *args, **kwargs):
-        """Call the model predict logic on a series."""
-        
-        if not isinstance(series, Series):
-            raise TypeError('A Series-like object is required, got "{}"'.format(series.__class__.__name__))
-
-        # If fitted, check resolution and keys. If not fitted, the parent init will raise.
-        try:
-            self.fitted
-        except AttributeError:
-            pass
-        else:
-            if self.fitted:
-                # If TimeSeries data, check resolution and data labels consistency
-                if self.is_parametric():
-                    if isinstance(series.items_type, Point) and len(series) == 1:
-                        # Do not check if the series is a point series and has only one item
-                        pass
-                    else:
-                        _check_resolution(series, self.data['resolution'])
-                    _check_data_labels(series, self.data['data_labels'])
-        finally:
-            # Check time series in any case
-            if isinstance(series, TimeSeries):
-                _check_timeseries(series)
-                        
-        # Call parent predict and return output
-        return super(SeriesModel, self).predict(series, *args, **kwargs)
- 
-    def apply(self, series, *args, **kwargs):
-        """Apply the model on a series."""
-        
-        if not isinstance(series, Series):
-            raise TypeError('A Series-like object is required, got "{}"'.format(series.__class__.__name__))
-
-        # If fitted, check resolution and keys. If not fitted, the parent init will raise.
-        try:
-            self.fitted
-        except AttributeError:
-            pass
-        else:
-            if self.fitted:
-                # If TimeSeries data, check resolution and data labels consistency
-                if isinstance(series, TimeSeries): 
-                    if isinstance(series.items_type, Point) and len(series) == 1:
-                        # Do not check if the series is a point series and has only one item
-                        pass
-                    else:
-                        _check_resolution(series, self.data['resolution'])
-                    _check_data_labels(series, self.data['data_labels'])
-        finally:
-            # Check time series in any case
-            if isinstance(series, TimeSeries):
-                _check_timeseries(series)
-            
-        # Call parent apply and return output
-        return super(SeriesModel, self).apply(series, *args, **kwargs)
-
-    def evaluate(self, series, *args, **kwargs):
-        """Evaluate the model on a series."""
-        
-        if not isinstance(series, Series):
-            raise TypeError('A Series-like object is required, got "{}"'.format(series.__class__.__name__))
-
-        # If fitted, check resolution and keys. If not fitted, the parent init will raise.
-        try:
-            self.fitted
-        except AttributeError:
-            pass
-        else:
-            if self.fitted:
-                # If TimeSeries data, check resolution and data labels consistency
-                if isinstance(series, TimeSeries): 
-                    if isinstance(series.items_type, Point) and len(series) == 1:
-                        # Do not check if the series is a point series and has only one item
-                        pass
-                    else:
-                        _check_resolution(series, self.data['resolution'])
-                    _check_data_labels(series, self.data['data_labels'])
-        finally:
-            # Check time series in any case
-            if isinstance(series, TimeSeries):
-                _check_timeseries(series)
-
-        # Call parent evaluate and return output
-        return super(SeriesModel, self).evaluate(series, *args, **kwargs)
-
-    def cross_validate(self, series, *args, **kwargs):
-        return super(SeriesModel, self).cross_validate(series, *args, **kwargs)
-
-    def _cross_validate(self, series, rounds, *args, **kwargs):
-        """The cross validate logic for series models."""
-        
-        if not isinstance(series, Series):
-            raise TypeError('A Series-like object is required, got "{}"'.format(series.__class__.__name__))
-
-        if isinstance(series, TimeSeries):
-            timeseries = series  
-
-            # If fitted, check resolution. If not fitted, the parent init will raise.
-            try:
-                self.fitted
-            except AttributeError:
-                pass
-            else:
-                if self.fitted:
-                    # If TimeSeries data, check resolution and data labels consistency
-                    if isinstance(series, TimeSeries): 
-                        if isinstance(series.items_type, Point) and len(series) == 1:
-                            # Do not check if the series is a point series and has only one item
-                            pass
-                        else:
-                            _check_resolution(series, self.data['resolution'])
-                        _check_data_labels(series, self.data['data_labels'])
-            finally:
-                # Check time series in any case
-                if isinstance(series, TimeSeries):
-                    _check_timeseries(series)
-                    
-            # Decouple fit from validate args
-            fit_kwargs = {}
-            evaluate_kwargs = {}
-            consumed_kwargs = []
-            for kwarg in kwargs:
-                if kwarg.startswith('fit_'):
-                    consumed_kwargs.append(kwarg)
-                    fit_kwargs[kwarg.replace('fit_', '')] = kwargs[kwarg]
-                if kwarg.startswith('evaluate_'):
-                    consumed_kwargs.append(kwarg)
-                    evaluate_kwargs[kwarg.replace('evaluate_', '')] = kwargs[kwarg]
-            for consumed_kwarg in consumed_kwargs:
-                kwargs.pop(consumed_kwarg)
-    
-            # Do we still have some kwargs?
-            if kwargs:
-                raise Exception('Got some unknown args: {}'.format(kwargs))
-                
-            # How many items per round?
-            round_items = int(len(timeseries) / rounds)
-            logger.debug('Items per round: {}'.format(round_items))
-            
-            # Start the fit / evaluate loop
-            evaluations = []        
-            for i in range(rounds):
-                from_t = timeseries[(round_items*i)].t
-                try:
-                    to_t = timeseries[(round_items*i) + round_items].t
-                except IndexError:
-                    to_t = timeseries[(round_items*i) + round_items - 1].t
-                from_dt = dt_from_s(from_t)
-                to_dt   = dt_from_s(to_t)
-                logger.info('Cross validation round #{} of {}: validate from {} ({}) to {} ({}), fit on the rest.'.format(i+1, rounds, from_t, from_dt, to_t, to_dt))
-                
-                # Fit
-                if i == 0:            
-                    logger.debug('Fitting from {} ({})'.format(to_t, to_dt))
-                    self.fit(timeseries, from_t=to_t, **fit_kwargs)
-                else:
-                    logger.debug('Fitting until {} ({}) and then from {} ({}).'.format(to_t, to_dt, from_t, from_dt))
-                    self.fit(timeseries, from_t=to_t, to_t=from_t, **fit_kwargs)                
-                
-                # Evaluate & append
-                evaluations.append(self.evaluate(timeseries, from_t=from_t, to_t=to_t, **evaluate_kwargs))
-            
-            # Regroup evaluations
-            evaluation_metrics = list(evaluations[0].keys())
-            scores_by_evaluation_metric = {}
-            for evaluation in evaluations:
-                for evaluation_metric in evaluation_metrics:
-                    try:
-                        scores_by_evaluation_metric[evaluation_metric].append(evaluation[evaluation_metric])
-                    except KeyError:
-                        try:
-                            scores_by_evaluation_metric[evaluation_metric] = [evaluation[evaluation_metric]]
-                        except KeyError:
-                            raise Exception('Error, the model generated different evaluation metrics over the rounds, cannot compute cross validation.') from None
-            
-            # Prepare and return results
-            results = {}
-            for evaluation_metric in scores_by_evaluation_metric:
-                results[evaluation_metric+'_avg'] = statistics.mean(scores_by_evaluation_metric[evaluation_metric])
-                results[evaluation_metric+'_stdev'] = statistics.stdev(scores_by_evaluation_metric[evaluation_metric])         
-            return results
-        
-        else:
-            raise NotImplementedError('Cross validating on data types other than TimeSeries in not yet implemented')
-
-    def save(self, path):
 
         # Temporary change the resolution to its string representation (if any)
         if 'resolution' in self.data:
             resolution_obj = self.data['resolution']
             self.data['resolution'] = str(resolution_obj)
         
-        # Call parent save
+        # Write the data
         try:
-            super(SeriesModel, self).save(path)
+            with open(model_data_file, 'w') as f:
+                f.write(json.dumps(self.data))
         finally:
             # In any case revert resolution back to object (if any)
             if 'resolution' in self.data:  
-                self.data['resolution'] = resolution_obj
+                self.data['resolution'] = resolution_obj        
+                
+        logger.info('Saved model with id "%s" in "%s"', self.data['id'], path)
 
 
 #=========================
@@ -483,18 +404,18 @@ class _ProphetModel(Model):
         return dt.replace(tzinfo=None)
 
     @classmethod
-    def _from_timeseria_to_prophet(cls, timeseries, from_t=None, to_t=None):
+    def _from_timeseria_to_prophet(cls, series, from_t=None, to_t=None):
 
         # Create Python lists with data
         try:
-            timeseries[0].data[0]
+            series[0].data[0]
             data_labels_are_indexes = True
         except KeyError:
-            timeseries[0].data.keys()
+            series[0].data.keys()
             data_labels_are_indexes = False
         
         data_as_list=[]
-        for item in timeseries:
+        for item in series:
             
             # Skip if needed
             try:
@@ -521,35 +442,35 @@ class _ProphetModel(Model):
 class _ARIMAModel(Model):
     '''A model using statsmodel's ARIMA as underlying engine, and providing some extra internal functions for common operations.'''
     
-    def _get_start_end_indexes(self, timeseries, n):
+    def _get_start_end_indexes(self, series, n):
 
         # Do the math to get the right indexes for the prediction, both out-of-sample and in-sample
         # Not used at the moment as there seems to be bugs in the statsmodel package.
         # See https://www.statsmodels.org/devel/generated/statsmodels.tsa.arima_model.ARIMAResults.predict.html
         
-        # The default start_index for an arima prediction id the inxed after the fit timeseries
-        # I.e. if the fit timeseries had 101 lements, the start index is the 101
-        # So we need to compute the start and end indexes according to the fit timeseries,
+        # The default start_index for an ARIMA prediction is the index after the fit series
+        # I.e. if the fit series had 101 elments, the start index is the 101
+        # So we need to compute the start and end indexes according to the fit series,
         # we will use the "resolution" for this.
         
         # Save the requested prediction "from"
-        requested_predicting_from_dt = timeseries[-1].dt + timeseries.resolution
+        requested_predicting_from_dt = series[-1].dt + series.resolution
 
         # Search for the index number TODO: try first with "pure" math which would work for UTC
-        slider_dt = self.fit_timeseries[0].dt
+        slider_dt = self.fit_series[0].dt
         count = 0
         while True:
             if slider_dt  == requested_predicting_from_dt:
                 break
              
             # To next item index
-            if requested_predicting_from_dt < self.fit_timeseries[0].dt:
-                slider_dt = slider_dt - self.fit_timeseries.resolution
+            if requested_predicting_from_dt < self.fit_series[0].dt:
+                slider_dt = slider_dt - self.fit_series.resolution
                 if slider_dt < requested_predicting_from_dt:
                     raise Exception('Miss!')
  
             else:
-                slider_dt = slider_dt + self.fit_timeseries.resolution
+                slider_dt = slider_dt + self.fit_series.resolution
                 if slider_dt > requested_predicting_from_dt:
                     raise Exception('Miss!')
             
@@ -591,43 +512,43 @@ class _KerasModel(Model):
     # ARIMA and Prophet above also. Consider moving them in a "utility" package or directly in the models.
     
     @staticmethod
-    def _to_window_datapoints_matrix(timeseries, window, steps, encoder=None):
+    def _to_window_datapoints_matrix(series, window, steps, encoder=None):
         '''Compute window datapoints matrix from a time series.'''
         # steps to be intended as steps ahead (for the forecaster)
         window_datapoints = []
-        for i, _ in enumerate(timeseries):
+        for i, _ in enumerate(series):
             if i <  window:
                 continue
-            if i == len(timeseries) + 1 - steps:
+            if i == len(series) + 1 - steps:
                 break
                     
             # Add window values
             row = []
             for j in range(window):
-                row.append(timeseries[i-window+j])
+                row.append(series[i-window+j])
             window_datapoints.append(row)
                 
         return window_datapoints
 
     @staticmethod
-    def _to_target_values_vector(timeseries, window, steps):
+    def _to_target_values_vector(series, window, steps):
         '''Compute target values vector from a time series.'''
         # steps to be intended as steps ahead (for the forecaster)
     
-        data_labels = timeseries.data_labels()
+        data_labels = series.data_labels()
     
         targets = []
-        for i, _ in enumerate(timeseries):
+        for i, _ in enumerate(series):
             if i <  window:
                 continue
-            if i == len(timeseries) + 1 - steps:
+            if i == len(series) + 1 - steps:
                 break
             
             # Add forecast target value(s)
             row = []
             for j in range(steps):
                 for data_label in data_labels:
-                    row.append(timeseries[i+j].data[data_label])
+                    row.append(series[i+j].data[data_label])
             targets.append(row)
 
         return targets
