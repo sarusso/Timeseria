@@ -1099,14 +1099,14 @@ class Series(list):
     
     def aggregate(self, unit, *args, **kwargs):
         """Aggregate the series in slots of length set by the ``unit`` parameter. A series of DataPoints or DataSlots is required.""" 
-        from .transformations import SeriesAggregator
-        aggregator = SeriesAggregator(unit, *args, **kwargs)
+        from .transformations import Aggregator
+        aggregator = Aggregator(unit, *args, **kwargs)
         return aggregator.process(self)  
 
     def resample(self, unit, *args, **kwargs):
         """Resample the series using a sampling interval of length set by the ``unit`` parameter. A series of DataPoints or DataSlots is required."""
-        from .transformations import SeriesResampler
-        resampler = SeriesResampler(unit, *args, **kwargs)
+        from .transformations import Resampler
+        resampler = Resampler(unit, *args, **kwargs)
         return resampler.process(self) 
 
 

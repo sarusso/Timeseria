@@ -228,28 +228,17 @@ def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_poi
 
 class Transformation(object):
     """A generic transformation."""
-    
+
     @classmethod
     def __str__(cls):
-        if cls.__name__ == 'Transformation':
-            return 'Generic transformation'
-        else:
-            return '{} transformation'.format(cls.__name__.replace('Transformation',''))
+        return '{} transformation'.format(cls.__name__.replace('Transformation',''))
 
-    def process(self, *args, **kwargs):
-        raise NotImplementedError('This transformation is not implemented.')
-
-
-#==========================
-#  Series Transformation
-#==========================
-class SeriesTransformation(Transformation):
-    """A transformation specifically designed to work with series data."""
-
-    def process(self, series, target, from_t=None, to_t=None, from_dt=None, to_dt=None, validity=None,
+    def process(self, input_data, target, from_t=None, to_t=None, from_dt=None, to_dt=None, validity=None,
                 include_extremes=False, fill_with=None, force_data_loss=None, fill_gaps=True, force=False):
         """Start the transformation process. If start and/or end are not set, they are set automatically
         based on first and last points of the series"""
+        
+        series = input_data
         
         if not isinstance(series, Series):
             raise TypeError('Requires Series-like, got "{}"'.format(series.__class__.__name__))
@@ -542,18 +531,11 @@ class SeriesTransformation(Transformation):
 
 
 #==========================
-#  Resamplers
+#  Resampler
 #==========================
 
 class Resampler(Transformation):
-    """A generic resampler."""
-    
-    def __init__(self, unit, interpolator_class=LinearInterpolator):
-        raise NotImplementedError('This Resampler is not yet implemented')
-
-
-class SeriesResampler(Resampler, SeriesTransformation):
-    """A resampler specifically designed to work with series data."""
+    """Resampling transformation."""
 
     def __init__(self, unit, interpolator_class=LinearInterpolator):
 
@@ -570,21 +552,15 @@ class SeriesResampler(Resampler, SeriesTransformation):
 
     def process(self, *args, **kwargs):
         kwargs['target'] = 'points'
-        return super(SeriesResampler, self).process(*args, **kwargs) 
+        return super(Resampler, self).process(*args, **kwargs) 
 
 
 #==========================
-#   Aggregators
+#   Aggregator
 #==========================
 
 class Aggregator(Transformation):
-    """A generic aggregator."""
-    
-    def __init__(self, unit, interpolator_class=LinearInterpolator):
-        raise NotImplementedError('This Aggregator is not yet implemented')
-
-class SeriesAggregator(Aggregator, SeriesTransformation):
-    """An aggregator specifically designed to work with series data"""
+    """Aggregation transformation."""
 
     def __init__(self, unit, operations=[avg], interpolator_class=LinearInterpolator):
         
@@ -614,5 +590,5 @@ class SeriesAggregator(Aggregator, SeriesTransformation):
 
     def process(self, *args, **kwargs):
         kwargs['target'] = 'slots'
-        return super(SeriesAggregator, self).process(*args, **kwargs) 
+        return super(Aggregator, self).process(*args, **kwargs) 
 

@@ -18,7 +18,10 @@ logger = logging.getLogger(__name__)
 #=================================
 
 class Operation():
-    """A generic operation (callable object)."""
+    """A generic operation (callable object). Can return any valid data type,
+    as a series, a scalar, a list of items, etc."""
+    
+    _supports_weights = False
 
     @classmethod
     def __str__(cls):
@@ -28,29 +31,7 @@ class Operation():
     def __repr__(cls):
         return '{}'.format(cls.__name__.lower())
     
-    def __call__(self, *args, **kwargs):
-        """Call self as a function.
-        
-        :meta private:
-        """
-        try:
-            self._compute
-        except AttributeError:
-            raise NotImplementedError('No operation logic implemented.')
-        else:
-            return self._compute(args, kwargs)
-
-    @property
-    def __name__(self):
-        return self.__class__.__name__.lower()
-
-
-class SeriesOperation(Operation):
-    """An operation operating on one or more series (callable object). Can return
-    another series, a scalar, a list of items, or any other valid data type."""    
-    _supports_weights = False
-
-    def __call__(self, series, *args, **kwargs):
+    def __call__(self, input_data, *args, **kwargs):
         """Call self as a function.
         
         :meta private:
@@ -62,41 +43,46 @@ class SeriesOperation(Operation):
             raise NotImplementedError('No operation logic implemented.')
         else:
             checked = False
-            if isinstance(series, Series):
-                # Checked single series OK
-                if not series:
-                    raise ValueError('Cannot operate on an empty series')
+            if isinstance(input_data, Series):
+                # Checked single input_data OK
+                if not input_data:
+                    raise ValueError('Cannot operate on an empty input_data')
                 checked = True
             else:
                 # Assume list and check
                 try:
-                    for a_series in series:
-                        if not isinstance(a_series, Series):
-                            raise TypeError('A series operation can work only on a Series or a list of Series, got a list of "{}"'.format(a_series.__class__.__name__))
-                        if not a_series:
-                            raise ValueError('Cannot operate on an empty series')
+                    for item in input_data:
+                        if not isinstance(item, Series):
+                            raise TypeError('Operations can work only on a Series or a list of Series for now, got a list of "{}"'.format(item.__class__.__name__))
+                        if not item:
+                            raise ValueError('Cannot operate on an empty input_data')
                     checked=True
                 except TypeError:
                     # It was not iterable
                     pass
             
             if not checked:
-                raise TypeError('A series operation  can work only on a Series or a list of Series, got "{}"'.format(series.__class__.__name__))
+                raise TypeError('Operations can work only on a Series or a list of Series for now, got "{}"'.format(input_data.__class__.__name__))
             
             # Call compute logic
-            return self._compute(series, *args, **kwargs)
-        
+            return self._compute(input_data, *args, **kwargs)
+
+    @property
+    def __name__(self):
+        return self.__class__.__name__.lower()
 
 
 #=================================
 #  Operations returning scalars
 #=================================
 
-class Max(SeriesOperation):
+class Max(Operation):
     """Maximum operation (callable object). Comes also pre-instantiated as the ``max()``
     function in the same module (accessible as ``timeseria.operations.max``)."""
 
-    def _compute(self, series, data_label=None):
+    def _compute(self, input_data, data_label=None):
+
+        series = input_data
 
         _check_series_of_points_or_slots(series)
         _check_indexed_data(series)
@@ -119,11 +105,13 @@ class Max(SeriesOperation):
             return maxs
 
 
-class Min(SeriesOperation):
+class Min(Operation):
     """Minimum operation (callable object). Comes also pre-instantiated as the ``min()``
     function in the same module (accessible as ``timeseria.operations.min``)."""
     
-    def _compute(self, series, data_label=None):
+    def _compute(self, input_data, data_label=None):
+
+        series = input_data
 
         _check_series_of_points_or_slots(series)
         _check_indexed_data(series)
@@ -145,12 +133,14 @@ class Min(SeriesOperation):
             return mins
 
 
-class Avg(SeriesOperation):
+class Avg(Operation):
     """Weighted average operation (callable object)."""
     
     _supports_weights = True
 
-    def _compute(self, series, data_label=None):
+    def _compute(self, input_data, data_label=None):
+
+        series = input_data
 
         _check_series_of_points_or_slots(series)
         _check_indexed_data(series)
@@ -211,10 +201,12 @@ class Avg(SeriesOperation):
             return avgs
 
 
-class Sum(SeriesOperation):
+class Sum(Operation):
     """Sum operation (callable object)."""
 
-    def _compute(self, series, data_label=None):
+    def _compute(self, input_data, data_label=None):
+
+        series = input_data
 
         _check_series_of_points_or_slots(series)
         _check_indexed_data(series)        
@@ -235,10 +227,12 @@ class Sum(SeriesOperation):
 #  Operations returning series 
 #=================================
 
-class Derivative(SeriesOperation):
+class Derivative(Operation):
     """Derivative operation (callable object)."""
     
-    def _compute(self, series, inplace=False, normalize=True, diffs=False):
+    def _compute(self, input_data, inplace=False, normalize=True, diffs=False):
+ 
+        series = input_data
  
         _check_series_of_points_or_slots(series)
         _check_indexed_data(series)
@@ -377,10 +371,12 @@ class Derivative(SeriesOperation):
             return der_series
 
 
-class Integral(SeriesOperation):
+class Integral(Operation):
     """Integral operation (callable object)."""
     
-    def _compute(self, series, inplace=False, normalize=True, c=0, offset=0):
+    def _compute(self, input_data, inplace=False, normalize=True, c=0, offset=0):
+
+        series = input_data
 
         _check_series_of_points_or_slots(series)
         _check_indexed_data(series)
@@ -538,24 +534,26 @@ class Integral(SeriesOperation):
 
 class Diff(Derivative):
     """Incremental differences operation (callable object). Reduces the series leght by one (the firts element), same as Pandas."""
-    def _compute(self, series, inplace=False):
-        if series.resolution == 'variable':
+    def _compute(self, input_data, inplace=False):
+        if input_data.resolution == 'variable':
             raise ValueError('The differences cannot be computed on variable resolution time series, resample it or use the derivative operation.')
-        return super(Diff, self)._compute(series, inplace=inplace, normalize=False, diffs=True)
+        return super(Diff, self)._compute(input_data, inplace=inplace, normalize=False, diffs=True)
 
 
 class CSum(Integral):
     """Cumulative sum operation (callable object)."""
-    def _compute(self, series, inplace=False, offset=None):
-        if series.resolution == 'variable':
+    def _compute(self, input_data, inplace=False, offset=None):
+        if input_data.resolution == 'variable':
             raise ValueError('The cumulative sums cannot be computed on variable resolution time series, resample it or use the integral operation.')
-        return super(CSum, self)._compute(series, inplace=inplace, normalize=False, offset=offset)
+        return super(CSum, self)._compute(input_data, inplace=inplace, normalize=False, offset=offset)
 
 
-class Normalize(SeriesOperation):
+class Normalize(Operation):
     """Normalization operation (callable object)"""
     
-    def _compute(self, series, range=[0,1], inplace=False):
+    def _compute(self, input_data, range=[0,1], inplace=False):
+
+        series = input_data
 
         _check_series_of_points_or_slots(series)
         _check_indexed_data(series)
@@ -635,10 +633,12 @@ class Normalize(SeriesOperation):
             return normalized_series
 
 
-class Rescale(SeriesOperation):
+class Rescale(Operation):
     """Rescaling operation (callable object)"""
     
-    def _compute(self, series, value, inplace=False):
+    def _compute(self, input_data, value, inplace=False):
+
+        series = input_data
 
         _check_series_of_points_or_slots(series)
         _check_indexed_data(series)
@@ -699,10 +699,12 @@ class Rescale(SeriesOperation):
             return rescaled_series
 
 
-class Offset(SeriesOperation):
+class Offset(Operation):
     """Offsetting operation (callable object)"""
     
-    def _compute(self, series, value, inplace=False):
+    def _compute(self, input_data, value, inplace=False):
+
+        series = input_data
 
         _check_series_of_points_or_slots(series)
         _check_indexed_data(series)
@@ -764,10 +766,12 @@ class Offset(SeriesOperation):
             return rescaled_series
 
 
-class MAvg(SeriesOperation):
-    """Moving average operation (callable object). Reduces the series lenght by n (the windowd length)."""
+class MAvg(Operation):
+    """Moving average operation (callable object). Reduces the size of the data by n (the windowd length)."""
 
-    def _compute(self, series, window, inplace=False):
+    def _compute(self, input_data, window, inplace=False):
+
+        series = input_data
 
         _check_series_of_points_or_slots(series)
         _check_indexed_data(series)
@@ -825,10 +829,12 @@ class MAvg(SeriesOperation):
         return mavg_series
 
 
-class Filter(SeriesOperation):
-    """Filter a series (callable object)."""
+class Filter(Operation):
+    """Filter operation (callable object)."""
 
-    def _compute(self, series, data_label=None, from_t=None, to_t=None, from_dt=None, to_dt=None):
+    def _compute(self, input_data, data_label=None, from_t=None, to_t=None, from_dt=None, to_dt=None):
+
+        series = input_data
 
         _check_series_of_points_or_slots(series)
         _check_indexed_data(series)
@@ -887,10 +893,12 @@ class Filter(SeriesOperation):
         return filtered_series 
 
 
-class Slice(SeriesOperation):
-    """Slice a series (callable object)."""
+class Slice(Operation):
+    """Slice operation (callable object)."""
 
-    def _compute(self, series, from_t=None, to_t=None, from_dt=None, to_dt=None):
+    def _compute(self, input_data, from_t=None, to_t=None, from_dt=None, to_dt=None):
+
+        series = input_data
 
         if from_dt:
             if from_t is not None:
@@ -933,12 +941,12 @@ class Slice(SeriesOperation):
         return filtered_series
 
 
-class Merge(SeriesOperation):
-    """Merge two or more series (callable object)."""
+class Merge(Operation):
+    """Merge operation (callable object)."""
     
-    def _compute(self, *series):
+    def _compute(self, *input_data):
         
-        seriess = series
+        seriess = input_data
         
         # Support vars
         resolution = None
@@ -1062,10 +1070,12 @@ class Merge(SeriesOperation):
 # Operations returning lists
 #=================================
 
-class Select(SeriesOperation):
-    """Select operation (callable object). Selects items of the series given SQL-like queries."""
+class Select(Operation):
+    """Select operation (callable object). Selects items given an SQL-like query."""
     
-    def _compute(self, series, query):
+    def _compute(self, input_data, query):
+
+        series = input_data
 
         _check_series_of_points_or_slots(series)
         _check_indexed_data(series)
