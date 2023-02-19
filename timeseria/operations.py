@@ -99,8 +99,6 @@ class Max(Operation):
         
         if data_label is not None:
             return maxs[data_label]
-        if len(maxs) == 1:
-            return maxs[series.data_labels()[0]]
         else:
             return maxs
 
@@ -127,8 +125,6 @@ class Min(Operation):
         
         if data_label is not None:
             return mins[data_label]
-        if len(mins) == 1:
-            return mins[series.data_labels()[0]]
         else:
             return mins
 
@@ -195,8 +191,6 @@ class Avg(Operation):
         # FInalize and return
         if data_label is not None:
             return avgs[data_label]
-        if len(avgs) == 1:
-            return avgs[series.data_labels()[0]]
         else:
             return avgs
 
@@ -217,8 +211,6 @@ class Sum(Operation):
                 sums[_data_label] += item._data_by_label(_data_label)
         if data_label is not None:
             return sums[data_label]
-        if len(sums) == 1:
-            return sums[series.data_labels()[0]]
         else:
             return sums
 

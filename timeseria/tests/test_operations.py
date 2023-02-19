@@ -382,14 +382,14 @@ class TestOpertions(unittest.TestCase):
         series.append(DataTimeSlot(start=TimePoint(180), end=TimePoint(240), data={'value':16}))
         
         # Test standalone
-        self.assertEqual(min(series), 6)
-        self.assertEqual(max(series), 16)
-        self.assertEqual(avg(series), 11)
+        self.assertEqual(min(series), {'value':6})
+        self.assertEqual(max(series), {'value':16})
+        self.assertEqual(avg(series), {'value':11})
         
         # Test from the series
-        self.assertEqual(series.min(), 6)
-        self.assertEqual(series.max(), 16)
-        self.assertEqual(series.avg(), 11)
+        self.assertEqual(series.min(), {'value':6})
+        self.assertEqual(series.max(), {'value':16})
+        self.assertEqual(series.avg(), {'value':11})
 
         # Multi-key Test data
         series = TimeSeries()
@@ -458,8 +458,8 @@ class TestOpertions(unittest.TestCase):
         # [DEBUG] timeseria.operations: Point @ 1970-01-01 00:00:01+00:00, weight: 0.25
         # [DEBUG] timeseria.operations: Point @ 1970-01-01 00:00:02+00:00, weight: 0.125
         
-        self.assertEqual(avg(series1), 1)
-        self.assertEqual(avg(series2), 0.8571428571428571)
+        self.assertEqual(avg(series1), {'value':1})
+        self.assertEqual(avg(series2), {'value':0.8571428571428571})
 
     
     def test_filter(self):

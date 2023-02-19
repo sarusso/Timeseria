@@ -927,13 +927,6 @@ class LSTMForecaster(Forecaster, _KerasModel):
             min_values = series.min()
             max_values = series.max()
             
-            # Fix some debeatable behaviour (which is, that min and max return different things for univariate and multivariate data)
-            # TODO: fix me!
-            if not isinstance(min_values, dict):
-                min_values = {series.data_labels()[0]:min_values}
-            if not isinstance(max_values, dict):
-                max_values = {series.data_labels()[0]:max_values}
-            
             # Normalize data
             series_normalized = series.duplicate()
             for datapoint in series_normalized:
@@ -945,7 +938,7 @@ class LSTMForecaster(Forecaster, _KerasModel):
             self.data['max_values'] = max_values
         
         else:
-            # TODO: here the name is worn,
+            # TODO: here the name is wrong,
             series_normalized = series
 
         # Move to "matrix" of windows plus "vector" of targets data representation. Or, in other words:
