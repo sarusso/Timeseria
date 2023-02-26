@@ -42,27 +42,20 @@ class Operation():
         except AttributeError:
             raise NotImplementedError('No operation logic implemented.')
         else:
-            checked = False
             if isinstance(data, Series):
-                # Checked single data OK
+                # Checked single series OK
                 if not data:
-                    raise ValueError('Cannot operate on an empty data')
-                checked = True
+                    raise ValueError('Operations cannot work on empty series')
             else:
-                # Assume list and check
+                # Assume list and check multiple series OK
                 try:
                     for item in data:
-                        if not isinstance(item, Series):
-                            raise TypeError('Operations can work only on a Series or a list of Series for now, got a list of "{}"'.format(item.__class__.__name__))
-                        if not item:
-                            raise ValueError('Cannot operate on an empty data')
-                    checked=True
+                        if isinstance(item, Series):
+                            if not item:
+                                raise ValueError('Operations cannot work on empty series')
                 except TypeError:
                     # It was not iterable
                     pass
-            
-            if not checked:
-                raise TypeError('Operations can work only on a Series or a list of Series for now, got "{}"'.format(data.__class__.__name__))
             
             # Call compute logic
             return self._compute(data, *args, **kwargs)
@@ -79,52 +72,66 @@ class Operation():
 class Max(Operation):
     """Maximum operation (callable object)."""
 
+    def __init__(self):
+        self.built_in_max = max
+
     def _compute(self, data, data_label=None):
 
-        series = data
-
-        _check_series_of_points_or_slots(series)
-        _check_indexed_data(series)
-        
-        maxs = {data_label: None for data_label in series.data_labels()}
-        for item in series:
-            for _data_label in maxs:
-                
-                if maxs[_data_label] is None:
-                    maxs[_data_label] = item._data_by_label(_data_label)
-                else:
-                    if item._data_by_label(_data_label) > maxs[_data_label]:
-                        maxs[_data_label] = item._data_by_label(_data_label)
-        
-        if data_label is not None:
-            return maxs[data_label]
+        if not isinstance(data, Series):
+            return self.built_in_max(data)
         else:
-            return maxs
+
+            series = data
+    
+            _check_series_of_points_or_slots(series)
+            _check_indexed_data(series)
+            
+            maxs = {data_label: None for data_label in series.data_labels()}
+            for item in series:
+                for _data_label in maxs:
+                    
+                    if maxs[_data_label] is None:
+                        maxs[_data_label] = item._data_by_label(_data_label)
+                    else:
+                        if item._data_by_label(_data_label) > maxs[_data_label]:
+                            maxs[_data_label] = item._data_by_label(_data_label)
+            
+            if data_label is not None:
+                return maxs[data_label]
+            else:
+                return maxs
+
 
 
 class Min(Operation):
     """Minimum operation (callable object)."""
-    
+
+    def __init__(self):
+        self.built_in_min = min
+
     def _compute(self, data, data_label=None):
 
-        series = data
-
-        _check_series_of_points_or_slots(series)
-        _check_indexed_data(series)
-        
-        mins = {data_label: None for data_label in series.data_labels()}
-        for item in series:
-            for _data_label in mins:
-                if mins[_data_label] is None:
-                    mins[_data_label] = item._data_by_label(_data_label)
-                else:
-                    if item._data_by_label(_data_label) < mins[_data_label]:
-                        mins[_data_label] = item._data_by_label(_data_label)
-        
-        if data_label is not None:
-            return mins[data_label]
+        if not isinstance(data, Series):
+            return self.built_in_min(data)
         else:
-            return mins
+            series = data
+    
+            _check_series_of_points_or_slots(series)
+            _check_indexed_data(series)
+            
+            mins = {data_label: None for data_label in series.data_labels()}
+            for item in series:
+                for _data_label in mins:
+                    if mins[_data_label] is None:
+                        mins[_data_label] = item._data_by_label(_data_label)
+                    else:
+                        if item._data_by_label(_data_label) < mins[_data_label]:
+                            mins[_data_label] = item._data_by_label(_data_label)
+            
+            if data_label is not None:
+                return mins[data_label]
+            else:
+                return mins
 
 
 class Avg(Operation):
@@ -1100,6 +1107,8 @@ class Select(Operation):
 #========================
 # Instantiate operations
 #========================
+
+# TODO: just abandon the callable object thing and convert them to functions?
 
 # Scalar operations
 min = Min()

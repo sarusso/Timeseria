@@ -991,102 +991,107 @@ class Series(list):
     #  Operations
     #=========================
 
-    def min(self, *args, **kwargs):
+    def min(self, data_label=None):
         """Get the minimum data value(s) of a series. Supports an optional ``data_label`` argument.
         A series of DataPoints or DataSlots is required."""
         from .operations import min as min_operation
-        return min_operation(self, *args, **kwargs)
+        return min_operation(self, data_label=data_label)
 
-    def max(self, *args, **kwargs):
+    def max(self, data_label=None):
         """Get the maximum data value(s) of a series. Supports an optional ``data_label`` argument.
         A series of DataPoints or DataSlots is required."""
         from .operations import max as max_operation
-        return max_operation(self, *args, **kwargs)    
+        return max_operation(self, data_label=data_label)    
 
-    def avg(self, *args, **kwargs):
+    def avg(self, data_label=None):
         """Get the average data value(s) of a series. Supports an optional ``data_label`` argument.
         A series of DataPoints or DataSlots is required."""
         from .operations import avg as avg_operation
-        return avg_operation(self, *args, **kwargs)   
+        return avg_operation(self, data_label=data_label)   
 
-    def sum(self, *args, **kwargs):
+    def sum(self, data_label=None):
         """Sum every data value(s) of a series. Supports an optional ``data_label`` argument.
         A series of DataPoints or DataSlots is required."""
         from .operations import sum as sum_operation
-        return sum_operation(self, *args, **kwargs)  
+        return sum_operation(self, data_label=data_label)  
 
-    def derivative(self, *args, **kwargs):
+    def derivative(self, inplace=False, normalize=True, diffs=False):
         """Compute the derivative of the series. Extra parameters: ``inplace`` (defaulted to false),
-        ``normalize`` (defaulted to true), ``diffs`` (defaulted to false) to compute differences
+        ``normalize`` (defaulted to true) and ``diffs`` (defaulted to false) to compute differences
         instead of the derivative. A series of DataTimePoints or DataTimeSlots is required."""
         from .operations import derivative as derivative_operation
-        return derivative_operation(self, *args, **kwargs)   
+        return derivative_operation(self, inplace=inplace, normalize=normalize, diffs=diffs)   
 
-    def integral(self, *args, **kwargs):
+    def integral(self, inplace=False, normalize=True, c=0, offset=0):
         """Compute the integral of the series. Extra parameters: ``inplace`` (defaulted to false),
-        ``normalize`` (defaulted to true), ``c`` (defaulted to zero) for the integration constant.
+        ``normalize`` (defaulted to true), ``c`` (defaulted to zero) for the integration constant
+        and ``offset`` (defaulted to zero) to start the integration from an offset.
         A series of DataTimePoints or DataTimeSlots is required."""
         from .operations import integral as integral_operation
-        return integral_operation(self, *args, **kwargs)   
+        return integral_operation(self, inplace=inplace, normalize=normalize, c=c, offset=offset)   
 
-    def diff(self, *args, **kwargs):
-        """Compute the incremental differences. Reduces the series length by one (the first element), same as Pandas.
+    def diff(self, inplace=False):
+        """Compute the incremental differences. Reduces the series length by one (the first element).
         Extra parameters: ``inplace`` (defaulted to false). A series of DataPoints or DataSlots is required."""
         from .operations import diff as diff_operation
-        return diff_operation(self, *args, **kwargs)   
+        return diff_operation(self, inplace=inplace)   
 
-    def csum(self, *args, **kwargs):
+    def csum(self, inplace=False, offset=None):
         """Compute the incremental sum. Extra parameters: ``inplace`` (defaulted to false),
         ``offset`` (defaulted to zero) to set the starting value where to apply the sums on.
         A series of DataPoints or DataSlots is required."""
         from .operations import csum as csum_operation
-        return csum_operation(self, *args, **kwargs)
+        return csum_operation(self, inplace=inplace, offset=offset)
 
-    def normalize(self, *args, **kwargs):
-        """Normalize the series data values. Extra parameters: ``inplace`` (defaulted to false).
-        A series of DataPoints or DataSlots is required."""
+    def normalize(self, range=[0,1], inplace=False):
+        """Normalize the series data values. Extra parameters: ``range`` (defaulted to [0,1]) to set the normalization
+        range and ``inplace`` (defaulted to false). A series of DataPoints or DataSlots is required."""
         from .operations import normalize as normalize_operation
-        return normalize_operation(self, *args, **kwargs)   
+        return normalize_operation(self, inplace=inplace, range=range)   
 
-    def rescale(self, *args, **kwargs):
-        """Rescale the series data values. Extra parameters: ``inplace`` (defaulted to false).
+    def rescale(self, value, inplace=False):
+        """Rescale the series data values by a ``value``. This can be either a single number or a dictionary
+        where to set rescaling factors on a per-data label basis. Extra parameters: ``inplace`` (defaulted to false)
         A series of DataPoints or DataSlots is required."""
         from .operations import rescale as rescale_operation
-        return rescale_operation(self, *args, **kwargs)
+        return rescale_operation(self, value=value, inplace=inplace)
 
-    def offset(self, *args, **kwargs):
-        """Offset the series data values. Extra parameters: ``inplace`` (defaulted to false).
+    def offset(self, value, inplace=False):
+        """Offset the series data values by a ``value``. This can be either a single number or a dictionary
+        where to set offsetting factors on a per-data label basis. Extra parameters: ``inplace`` (defaulted to false).
         A series of DataPoints or DataSlots is required."""
         from .operations import offset as offset_operation
-        return offset_operation(self, *args, **kwargs)  
+        return offset_operation(self, value=value, inplace=inplace)  
 
-    def mavg(self, *args, **kwargs):
+    def mavg(self,  window, inplace=False):
         """Compute the moving average. Reduces the series length by n (the window size). Extra
         parameters: ``inplace`` (defaulted to false) and ``window``, a required parameter, for
         the size of the moving average window. A series of DataPoints or DataSlots is required."""
         from .operations import mavg as mavg_operation
-        return mavg_operation(self, *args, **kwargs)
+        return mavg_operation(self, window=window, inplace=inplace)
 
     def merge(self, *args, **kwargs):
         """Merge the series with one or more other series."""
         from .operations import merge as merge_operation
         return merge_operation(self, *args, **kwargs)
 
-    def filter(self, *args, **kwargs):
+    def filter(self, data_label=None, from_t=None, to_t=None, from_dt=None, to_dt=None):
         # TODO: refactor this to allow generic item properties?
-        """Filter a series data, e.g. by ``data_label``. A series of DataPoints or DataSlots is required."""
+        """Filter a series data either by ``data_label`` of by a "from" (``from_t``, ``from_t``) and a "to" 
+        (``to_t``, ``to_t``). A series of DataPoints or DataSlots is required."""
         from .operations import filter as filter_operation
-        return filter_operation(self, *args, **kwargs) 
+        return filter_operation(self, data_label=data_label, from_t=from_t, to_t=to_t, from_dt=from_dt, to_dt=to_dt) 
 
-    def slice(self, *args, **kwargs):
-        """Slice a series."""
+    def slice(self, from_t=None, to_t=None, from_dt=None, to_dt=None):
+        """Slice a series data by a "from" (``from_t``, ``from_t``) and a "to" (``to_t``, ``to_t``).
+        A series of DataPoints or DataSlots is required."""
         from .operations import slice as slice_operation
-        return slice_operation(self, *args, **kwargs) 
+        return slice_operation(self, from_t=from_t, to_t=to_t, from_dt=from_dt, to_dt=to_dt) 
 
-    def select(self, *args, **kwargs):
+    def select(self, query):
         """Select one or more items of the series given an SQL-like query. A series of DataPoints or DataSlots is required."""
         from .operations import select as select_operation
-        return select_operation(self, *args, **kwargs)
+        return select_operation(self, query=query)
 
 
     #=========================
