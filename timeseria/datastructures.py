@@ -1014,8 +1014,8 @@ class Series(list):
         return integral_operation(self, *args, **kwargs)   
 
     def diff(self, *args, **kwargs):
-        """Compute the incremental differences. Extra parameters: ``inplace`` (defaulted to false).
-        A series of DataPoints or DataSlots is required."""
+        """Compute the incremental differences. Reduces the series length by one (the first element), same as Pandas.
+        Extra parameters: ``inplace`` (defaulted to false). A series of DataPoints or DataSlots is required."""
         from .operations import diff as diff_operation
         return diff_operation(self, *args, **kwargs)   
 
@@ -1045,9 +1045,9 @@ class Series(list):
         return offset_operation(self, *args, **kwargs)  
 
     def mavg(self, *args, **kwargs):
-        """Compute the moving average. Extra parameters: ``inplace`` (defaulted to false)
-        and ``window``, a required parameter, for the length of the moving average window.
-        A series of DataPoints or DataSlots is required."""
+        """Compute the moving average. Reduces the series length by n (the window size). Extra
+        parameters: ``inplace`` (defaulted to false) and ``window``, a required parameter, for
+        the size of the moving average window. A series of DataPoints or DataSlots is required."""
         from .operations import mavg as mavg_operation
         return mavg_operation(self, *args, **kwargs)
 
@@ -1817,7 +1817,7 @@ class TimeSeries(Series):
         """Plot the time series. The default plotting engine is Dygraphs (``engine=\'dg\'``),
            limited support for Matplotplib (``engine=\'mp\'``) is also available.
            For plotting options for Dygraphs, see :func:`~.plots.dygraphs_plot`, while for
-           plotting options for Matplotlib, see :func:`~.plots.matplotlib_plot`.""" 
+           plotting options for Matplotlib, see :func:`~.plots.matplotlib_plot`."""
         if engine=='mp':
             from .plots import matplotlib_plot
             matplotlib_plot(self, *args, **kwargs)

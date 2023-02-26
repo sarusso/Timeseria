@@ -77,8 +77,7 @@ class Operation():
 #=================================
 
 class Max(Operation):
-    """Maximum operation (callable object). Comes also pre-instantiated as the ``max()``
-    function in the same module (accessible as ``timeseria.operations.max``)."""
+    """Maximum operation (callable object)."""
 
     def _compute(self, data, data_label=None):
 
@@ -104,8 +103,7 @@ class Max(Operation):
 
 
 class Min(Operation):
-    """Minimum operation (callable object). Comes also pre-instantiated as the ``min()``
-    function in the same module (accessible as ``timeseria.operations.min``)."""
+    """Minimum operation (callable object)."""
     
     def _compute(self, data, data_label=None):
 
@@ -525,7 +523,7 @@ class Integral(Operation):
 
 
 class Diff(Derivative):
-    """Incremental differences operation (callable object). Reduces the series leght by one (the firts element), same as Pandas."""
+    """Incremental differences operation (callable object)."""
     def _compute(self, data, inplace=False):
         if data.resolution == 'variable':
             raise ValueError('The differences cannot be computed on variable resolution time series, resample it or use the derivative operation.')
@@ -759,7 +757,7 @@ class Offset(Operation):
 
 
 class MAvg(Operation):
-    """Moving average operation (callable object). Reduces the size of the data by n (the windowd length)."""
+    """Moving average operation (callable object)."""
 
     def _compute(self, data, window, inplace=False):
 
@@ -1063,7 +1061,7 @@ class Merge(Operation):
 #=================================
 
 class Select(Operation):
-    """Select operation (callable object). Selects items given an SQL-like query."""
+    """Select operation (callable object)."""
     
     def _compute(self, data, query):
 
