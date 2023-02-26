@@ -474,7 +474,7 @@ class TestTimeSeries(unittest.TestCase):
         time_series = TimeSeries()
         time_series.append(TimePoint(t=5))
         time_series.append(TimePoint(t=10))
-        time_series.change_timezone('Europe/Rome')
+        time_series.change_tz('Europe/Rome')
         self.assertEqual(str(time_series.tz), 'Europe/Rome')
         self.assertEqual(str(type(time_series.tz)), "<class 'pytz.tzfile.Europe/Rome'>")
         self.assertEqual(str(time_series[0].tz), 'Europe/Rome')
@@ -498,7 +498,7 @@ class TestTimeSeries(unittest.TestCase):
         time_series.append(TimePoint(t=1569897920))
         self.assertEqual(time_series.tz, UTC)
         self.assertEqual(type(time_series.tz), type(UTC))
-        time_series.change_timezone('Europe/Rome')
+        time_series.change_tz('Europe/Rome')
         self.assertEqual(str(time_series.tz), 'Europe/Rome')
         self.assertEqual(str(type(time_series.tz)), "<class 'pytz.tzfile.Europe/Rome'>")  
 
@@ -837,7 +837,7 @@ class TestTimeSeries(unittest.TestCase):
                                       DataTimeSlot(start=TimePoint(t=120), end=TimePoint(t=180), data=24.1),
                                       DataTimeSlot(start=TimePoint(t=180), end=TimePoint(t=240), data=23.1))
 
-        time_series_UTC.change_timezone('Europe/Rome')
+        time_series_UTC.change_tz('Europe/Rome')
         self.assertEqual(time_series_UTC.tz, timezonize('Europe/Rome'))
         self.assertEqual(time_series_UTC[0].tz, timezonize('Europe/Rome'))
         self.assertEqual(time_series_UTC[0].start.tz, timezonize('Europe/Rome'))

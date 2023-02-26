@@ -266,7 +266,7 @@ class TestCSVFileStorage(unittest.TestCase):
                                                 DataTimePoint(t=120, data=[24.1,4], data_loss=0.2),
                                                 DataTimePoint(t=240, data=[23.1,5], data_loss=0.3),
                                                 DataTimePoint(t=300, data=[22.7,6], data_loss=0.4))
-            data_time_point_series.change_timezone('Europe/Rome')
+            data_time_point_series.change_tz('Europe/Rome')
        
             storage = CSVFileStorage('/{}/file_1.csv'.format(temp_dir))
             storage.put(data_time_point_series)
@@ -291,7 +291,7 @@ class TestCSVFileStorage(unittest.TestCase):
                                                 DataTimeSlot(t=120, unit=TimeUnit('1m'), data=[24.1,4], data_loss=0.2),
                                                 DataTimeSlot(t=180, unit=TimeUnit('1m'), data=[23.1,5], data_loss=0.3),
                                                 DataTimeSlot(t=240, unit=TimeUnit('1m'), data=[22.7,6], data_loss=0.4))
-            data_time_point_series.change_timezone('Europe/Rome')
+            data_time_point_series.change_tz('Europe/Rome')
             
             storage = CSVFileStorage('/{}/file_2.csv'.format(temp_dir))
             storage.put(data_time_point_series)
