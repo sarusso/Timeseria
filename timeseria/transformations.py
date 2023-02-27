@@ -234,7 +234,7 @@ class Transformation(object):
         return '{} transformation'.format(cls.__name__.replace('Transformation',''))
 
     def process(self, data, target, from_t=None, to_t=None, from_dt=None, to_dt=None, validity=None,
-                include_extremes=False, fill_with=None, force_data_loss=None, fill_gaps=True, force=False):
+                include_extremes=False, fill_with=None, force_data_loss=None, fill_gaps=True):
         """Start the transformation process. If start and/or end are not set, they are set automatically
         based on first and last points of the series"""
         
