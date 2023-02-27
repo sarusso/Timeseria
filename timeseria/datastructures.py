@@ -283,11 +283,11 @@ class DataPoint(Point):
 
 class DataTimePoint(DataPoint, TimePoint):
     """A point that carries some data in the time dimension. Can be initialized using the special `t` and `dt` arguments,
-    for epoch seconds and datetime objects, respectively. Data is attached using the respective data arguments.
+       for epoch seconds and datetime objects, respectively. Data is attached using the respective data arguments.
     
        Args:
-           t (float): epoch timestamp, decimals for sub-second precision.
-           dt (datetime): a datetime object timestamp.
+           t(float): epoch timestamp, decimals for sub-second precision.
+           dt(datetime): a datetime object timestamp.
            data: the data.
            data_indexes(dict): data indexes.
            data_loss(float): the data loss index, if any.
@@ -637,9 +637,9 @@ class Series(list):
        
            * ``series[3]`` will access the item in position #3;
 
-           * ``series[3:5]`` will slice the time series from item in position #3 to item in position #5 (excluded);
+           * ``series[3:5]`` will slice the series from item in position #3 to item in position #5 (excluded);
            
-           * ``series['temperature']`` will filter the time series keeping only the temperature data, assuming that
+           * ``series['temperature']`` will filter the series keeping only the temperature data, assuming that
              in the original series there were also other data labels (e.g. humidity).
 
        Args:
@@ -1068,10 +1068,10 @@ class Series(list):
         from .operations import mavg as mavg_operation
         return mavg_operation(self, window=window, inplace=inplace)
 
-    def merge(self, *args, **kwargs):
+    def merge(self, series):
         """Merge the series with one or more other series."""
         from .operations import merge as merge_operation
-        return merge_operation(self, *args, **kwargs)
+        return merge_operation(self, series)
 
     def filter(self, data_label=None, from_t=None, to_t=None, from_dt=None, to_dt=None):
         # TODO: refactor this to allow generic item properties?
@@ -1767,8 +1767,8 @@ class TimeSeries(Series):
         
         Returns a :obj:`timeseria.units.TimeUnit` object, unless:
         
-            * the resolution is not defined (returns :obj:`None`), either because the time series is empty or because it is a point time series and has only one point; or
-            * the resolution is variable (returns the string ``variable``), only possible for point time series, if its points are not equally spaced for example because of
+            * the resolution is not defined (returns :obj:`None`), either because the time series is empty or because it is a point time series with only one point; or
+            * the resolution is variable (returns the string ``variable``), only possible for point time series, if its points are not equally spaced, for example because of
               data losses or uneven observations.
         
         If the time series has a variable resolution, the `guess_resolution()` method can provide an estimate. If the time series is a slot time series, then the resolutions is just
@@ -1781,6 +1781,12 @@ class TimeSeries(Series):
             return None
     
     def guess_resolution(self, confidence=False):
+        """Guess the (temporal) resolution of the time series.
+        
+           Args:
+               confidence (bool): if to return, together with the guessed resolution, also its confidence (in a 0-1 range).
+        
+        """
         if not issubclass(self.items_type, TimePoint):
             raise NotImplementedError('Guessing the resolution is implemented only for point series')
         if not self:
