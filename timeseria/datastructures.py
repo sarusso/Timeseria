@@ -657,8 +657,6 @@ class Series(list):
 
         for arg in args:
             self.append(arg)
-            
-        self._title = None
 
     @property
     def items_type(self):
@@ -728,10 +726,10 @@ class Series(list):
 
     @property
     def title(self):
-        """A title for the series, to be used for plotting etc.""" 
-        if self._title:
+        """A title for the series, to be used for the plots."""
+        try: 
             return self._title
-        else:
+        except AttributeError:
             return None
 
     @title.setter
@@ -770,7 +768,7 @@ class Series(list):
 
     @property
     def mark(self):
-        """A mark for the series, useful for highlighting a portion of a plot.
+        """A mark for the series, used for highlighting a portion of a plot.
            Required to be formatted as a list or tuple with two elements, the
            first from where the mark has to start and the second where it has
            to end.

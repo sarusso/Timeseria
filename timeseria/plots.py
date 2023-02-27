@@ -106,8 +106,8 @@ def _to_dg_data(serie, data_labels_to_plot, data_indexes_to_plot, full_precision
     global_max = None
     
     if serie.mark:
-        serie_mark_start_t = s_from_dt(serie.mark[0])
-        serie_mark_end_t = s_from_dt(serie.mark[1])
+        series_mark_start_t = s_from_dt(serie.mark[0])
+        series_mark_end_t = s_from_dt(serie.mark[1])
 
     for i, item in enumerate(serie):
         
@@ -221,7 +221,7 @@ def _to_dg_data(serie, data_labels_to_plot, data_indexes_to_plot, full_precision
 
                 # Do we have a mark?
                 if serie.mark and RENDER_MARK_AS_INDEX:
-                    if item.start.t >= serie_mark_start_t and item.end.t < serie_mark_end_t:                                    
+                    if item.start.t >= series_mark_start_t and item.end.t < series_mark_end_t:                                    
                         # Add the (active) mark
                         data_part+='[0,1,1],'
                     else:
@@ -289,7 +289,7 @@ def _to_dg_data(serie, data_labels_to_plot, data_indexes_to_plot, full_precision
 
             # Do we have a mark?
             if serie.mark and RENDER_MARK_AS_INDEX:
-                if item.t >= serie_mark_start_t and item.t < serie_mark_end_t:
+                if item.t >= series_mark_start_t and item.t < series_mark_end_t:
                     # Add the (active) mark
                     data_part+='1,'
                 else:
@@ -313,7 +313,7 @@ def _to_dg_data(serie, data_labels_to_plot, data_indexes_to_plot, full_precision
 #=================
 
 def dygraphs_plot(series, data_labels='all', data_indexes='all', aggregate=None, aggregate_by=None, full_precision=False,
-                  color=None, height=None, image=DEFAULT_PLOT_AS_IMAGE, image_resolution='1280x380', html=False, save_to=None):
+                  color=None, height=None, image=DEFAULT_PLOT_AS_IMAGE, image_resolution='auto', html=False, save_to=None):
     """Plot a time series using Dygraphs interactive plots.
     
        Args:
@@ -333,7 +333,9 @@ def dygraphs_plot(series, data_labels='all', data_indexes='all', aggregate=None,
            image(bool): if to generate an image rendering of the plot instead of the default interactive one.
                         To generate the image rendering, a headless Chromium web browser is downloaded on the
                         fly in order to render the plot as a PNG image.
-           image_resolution(str): the image resolution, if generating an image rendering of the plot.
+           image_resolution(str): the image resolution, if generating an image rendering of the plot. Defaults to
+                                  "auto", which sets the resolution between "1280x380" and "1024x400", depending on
+                                  the time series legend and title.
            html(bool): if to return the HTML code for the plot instead of generating an interactive or image one.
                        Useful for embedding it in a website or for generating multi-plot HTML pages.
            save_to(str): a file name (including its path) where to save the plot. If the plot is generated as 
@@ -424,42 +426,39 @@ def dygraphs_plot(series, data_labels='all', data_indexes='all', aggregate=None,
             legend_pre = 'Point at '
     elif issubclass(series.items_type, DataTimeSlot):
         if isinstance(series.resolution, TimeUnit):
-            serie_unit_string = str(series.resolution)
+            series_unit_string = str(series.resolution)
         else:
-            serie_unit_string = str(series.resolution) #.split('.')[0]+'s'
+            series_unit_string = str(series.resolution) #.split('.')[0]+'s'
         #if aggregate_by: 
         #    raise NotImplementedError('Plotting slots with a plot-level aggregation is not yet supported')
         stepPlot_value   = 'true'
         drawPoints_value = 'false'
         if aggregate_by:
             # TODO: "Slot of {} unit" ?
-            legend_pre = 'Slot of {}x{} (aggregated) starting at '.format(aggregate_by, serie_unit_string)
+            legend_pre = 'Slot of {}x{} (aggregated) starting at '.format(aggregate_by, series_unit_string)
         else:
-            legend_pre = 'Slot of {} starting at '.format(serie_unit_string)
+            legend_pre = 'Slot of {} starting at '.format(series_unit_string)
 
     else:
         raise Exception('Don\'t know how to plot an object of type "{}"'.format(series.__class__.__name__))
 
-    # Set title
-    if series.title:
-        title = series.title
-    else:
-        if issubclass(series.items_type, DataTimePoint):
-            if aggregate_by:
-                title = 'Time series of #{} points at {}, aggregated by {}'.format(len(series), series._resolution_string, aggregate_by)
-            else:
-                title = 'Time series of #{} points at {}'.format(len(series), series._resolution_string)
-             
-        elif issubclass(series.items_type, DataTimeSlot):
-            if aggregate_by:
-                # TODO: "slots of unit" ?
-                title = 'Time series of #{} slots of {}, aggregated by {}'.format(len(series), serie_unit_string, aggregate_by)
-            else:
-                # TODO: "slots of unit" ?
-                title = 'Time series of #{} slots of {}'.format(len(series), serie_unit_string)
-                
+    # Set series description
+    if issubclass(series.items_type, DataTimePoint):
+        if aggregate_by:
+            series_desc = 'Time series of #{} points at {}, aggregated by {}'.format(len(series), series._resolution_string, aggregate_by)
         else:
-            title = series.__class__.__name__
+            series_desc = 'Time series of #{} points at {}'.format(len(series), series._resolution_string)
+         
+    elif issubclass(series.items_type, DataTimeSlot):
+        if aggregate_by:
+            # TODO: "slots of unit" ?
+            series_desc = 'Time series of #{} slots of {}, aggregated by {}'.format(len(series), series_unit_string, aggregate_by)
+        else:
+            # TODO: "slots of unit" ?
+            series_desc = 'Time series of #{} slots of {}'.format(len(series), series_unit_string)
+            
+    else:
+        series_desc = series.__class__.__name__
 
     if aggregate_by:
         logger.info('Aggregating by "{}" for improved plotting'.format(aggregate_by))
@@ -471,16 +470,16 @@ def dygraphs_plot(series, data_labels='all', data_indexes='all', aggregate=None,
 
     # Do we have to show a series mark?
     if series.mark:
-        logger.info('Found series mark and showing it')
+        #logger.info('Found series mark and showing it')
         if series.mark_title:
             mark_title = series.mark_title
         else:
             mark_title = 'mark'
-        serie_mark_html = '<span style="background:rgba(255, 255, 102, .6);">&nbsp;{}&nbsp;</span>'.format(mark_title)
-        serie_mark_html_off = '<span style="background:rgba(255, 255, 102, .2);">&nbsp;{}&nbsp;</span>'.format(mark_title)
+        series_mark_html = '<span style="background:rgba(255, 255, 102, .6);">&nbsp;{}&nbsp;</span>'.format(mark_title)
+        series_mark_html_off = '<span style="background:rgba(255, 255, 102, .2);">&nbsp;{}&nbsp;</span>'.format(mark_title)
     else:
-        serie_mark_html=''
-        serie_mark_html_off = ''
+        series_mark_html=''
+        series_mark_html_off = ''
 
     # Dygraphs Javascript
     dygraphs_javascript = """
@@ -500,7 +499,7 @@ function legendFormatter(data) {
           return '';
         }
         // We are here when there's no selection and {legend: 'always'} is set.
-        html = '"""+title+""": ';
+        html = '"""+series_desc+""": ';
         for (var i = 0; i < data.series.length; i++) {
           var series = data.series[i];
           // Skip not visible series
@@ -527,7 +526,7 @@ function legendFormatter(data) {
           // Remove last comma and space
           html = html.substring(0, html.length - 2);
         }
-        html += ' &nbsp;&nbsp; """+serie_mark_html +"""'
+        html += ' &nbsp;&nbsp; """+series_mark_html +"""'
         return html;
       }
 
@@ -592,10 +591,10 @@ function legendFormatter(data) {
       html = html.substring(0, html.length - 2);
       
       if (mark_active) {
-          html += ' &nbsp;"""+ serie_mark_html +"""'
+          html += ' &nbsp;"""+ series_mark_html +"""'
       }
       //else {
-      //    html += ' &nbsp;"""+ serie_mark_html_off +"""'
+      //    html += ' &nbsp;"""+ series_mark_html_off +"""'
       //}
       return html;
     };
@@ -868,13 +867,18 @@ define('"""+graph_id+"""', ['dgenv'], function (Dygraph) {
         # Start building HTML content
         html_content = ''
         if not html:
-            html_content += '<html><head>'
+            html_content += '<html><head><meta charset="UTF-8">'
             with open(STATIC_DATA_PATH+'/js/dygraph-2.1.0.min.js') as dg_js_file:
                 html_content += '<script type="text/javascript">'+dg_js_file.read()+'</script>\n'
             with open(STATIC_DATA_PATH+'css/dygraph-2.1.0.css') as dg_css_file:
                 html_content += '<style>'+dg_css_file.read()+'</style>\n'
             html_content += '</head><body style="font-family:\'Helvetica Neue\', Helvetica, Arial, sans-serif; font-size:1.0em">\n'
+            if series.title:
+                html_content += '<div style="text-align: center; margin-top:15px; margin-bottom:15px; font-size:1.2em"><h3>{}</h3></div>'.format(series.title)
             html_content += '<div style="height:36px; padding:0; margin-left:0px; margin-top:10px">\n'
+        else:
+            if series.title:
+                html_content += '<div style="text-align: center; margin-top:15px; margin-bottom:15px; font-size:1.2em"><h3>{}</h3></div>'.format(series.title)
         html_content += '<div id="{}" style="width:100%"></div></div>\n'.format(legend_div_id)
         html_content += '<div id="{}" style="width:100%; margin-right:0px"></div>\n'.format(graph_div_id)
         if not html:
@@ -915,6 +919,11 @@ define('"""+graph_id+"""', ['dgenv'], function (Dygraph) {
                 _chromium_executable = chromium_executable()
 
             # Render HTML to image
+            if image_resolution == 'auto':
+                if series.title:
+                    image_resolution='1280x430'
+                else:    
+                    image_resolution='1280x380'
             resolution = image_resolution.replace('x', ',')
             command = '{} --no-sandbox --headless --disable-gpu --window-size={} --screenshot={} {}'.format(_chromium_executable, resolution, png_dest, html_dest)
             logger.debug('Executing "{}"'.format(command))
@@ -951,10 +960,15 @@ define('"""+graph_id+"""', ['dgenv'], function (Dygraph) {
                 display(HTML('<style>'+dg_css_file.read()+'</style>'))
             
             # Load Dygraphs Javascript and html code    
-            display(Javascript(rendering_javascript))
-            display(HTML('''<div style="height:36px; padding:0; margin-left:0px; margin-top:10px">
-                            <div id="'''+legend_div_id+'''" style="width:100%"></div></div>
-                            <div id="'''+graph_div_id+'''" style="width:100%; margin-right:0px"></div>'''))
+            display_html = ''
+            if series.title:
+                display_html += '<div style="text-align: center; margin-bottom:20px; font-size:0.95em"><h3>{}</h3></div>'.format(series.title)
+            display_html += '<div style="height:36px; padding:0; margin-left:0px; margin-top:10px">'
+            display_html += '''<div id="'''+legend_div_id+'''" style="width:100%"></div></div>
+                            <div id="'''+graph_div_id+'''" style="width:100%; margin-right:0px"></div>'''
+
+            display(Javascript(rendering_javascript))                        
+            display(HTML(display_html))
         
             # Render the graph (this is the "entrypoint")
             display(Javascript("""
