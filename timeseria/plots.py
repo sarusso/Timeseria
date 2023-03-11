@@ -313,7 +313,8 @@ def _to_dg_data(serie, data_labels_to_plot, data_indexes_to_plot, full_precision
 #=================
 
 def dygraphs_plot(series, data_labels='all', data_indexes='all', aggregate=None, aggregate_by=None, full_precision=False,
-                  color=None, height=None, image=DEFAULT_PLOT_AS_IMAGE, image_resolution='auto', html=False, save_to=None):
+                  color=None, height=None, image=DEFAULT_PLOT_AS_IMAGE, image_resolution='auto', html=False, save_to=None,
+                  mini_plot='auto', value_range='auto', minimal_legend=False):
     """Plot a time series using Dygraphs interactive plots.
     
        Args:
@@ -333,18 +334,24 @@ def dygraphs_plot(series, data_labels='all', data_indexes='all', aggregate=None,
            image(bool): if to generate an image rendering of the plot instead of the default interactive one.
                         To generate the image rendering, a headless Chromium web browser is downloaded on the
                         fly in order to render the plot as a PNG image.
-           image_resolution(str): the image resolution, if generating an image rendering of the plot. Defaults to
-                                  "auto", which sets the resolution between "1280x380" and "1024x400", depending on
-                                  the time series legend and title.
+           image_resolution(str): the image resolution, if generating an image rendering of the plot. Automatically
+                                  set between ``1280x380`` and ``1024x400``, depending on the time series legend and title.
            html(bool): if to return the HTML code for the plot instead of generating an interactive or image one.
                        Useful for embedding it in a website or for generating multi-plot HTML pages.
            save_to(str): a file name (including its path) where to save the plot. If the plot is generated as 
                          interactive, then it is saved as a self-consistent HTML page which can be opened in a 
                          web browser. If the plot is generated as an image, then it is saved in PNG format.
+           mini_plot(bool): if to include the range selector mini plot. Always automatically included unless
+                            saving the plot in image format.
+           value_range(list): a value range for the y axes to force the plot to stick with, in the form ``[min, max]``.
+           minimal_legend(bool): if to strip down the information in the legend to the very minimum.
     """
     # Credits: the interactive plot is based on the work here: https://www.stefaanlippens.net/jupyter-custom-d3-visualization.html.
 
-    from IPython.display import display, Javascript, HTML, Image
+    try:
+        from IPython.display import display, Javascript, HTML, Image
+    except ModuleNotFoundError:
+        pass
     
     if html and image:
         raise ValueError('Setting both image and html to True is not supported.')
@@ -375,6 +382,12 @@ def dygraphs_plot(series, data_labels='all', data_indexes='all', aggregate=None,
 
         if not aggregate:
             aggregate_by = None
+            
+    if mini_plot=='auto':
+        if image:
+            mini_plot=False
+        else:
+            mini_plot=True
 
     #if show_data_reconstructed:
     #    show_data_loss=False
@@ -442,6 +455,13 @@ def dygraphs_plot(series, data_labels='all', data_indexes='all', aggregate=None,
     else:
         raise Exception('Don\'t know how to plot an object of type "{}"'.format(series.__class__.__name__))
 
+    # Set legend points/slots time zone
+    legend_tz = ' ({})'.format(series.tz)
+
+    if minimal_legend:
+        legend_pre=''
+        legend_tz=''
+
     # Set series description
     if issubclass(series.items_type, DataTimePoint):
         if aggregate_by:
@@ -459,6 +479,9 @@ def dygraphs_plot(series, data_labels='all', data_indexes='all', aggregate=None,
             
     else:
         series_desc = series.__class__.__name__
+
+    if minimal_legend:
+        series_desc = 'Legend'
 
     if aggregate_by:
         logger.info('Aggregating by "{}" for improved plotting'.format(aggregate_by))
@@ -483,7 +506,17 @@ def dygraphs_plot(series, data_labels='all', data_indexes='all', aggregate=None,
 
     # Dygraphs Javascript
     dygraphs_javascript = """
-// Taken and adapted from dygraph.js
+    
+// Clone the interaction model so we don't mess up with the original dblclick mehtod that might cause a recursive call
+var touchFriendlyInteractionModel = Object.assign({}, Dygraph.defaultInteractionModel);
+
+// Disable touch interaction (moves by default, we don't want that)
+function nullfunction(){}
+touchFriendlyInteractionModel.touchstart=nullfunction
+touchFriendlyInteractionModel.touchend=nullfunction
+touchFriendlyInteractionModel.touchmove=nullfunction
+
+// Legend formatter taken and adapted from dygraph.js
 function legendFormatter(data) {
       var g = data.dygraph;
 
@@ -539,7 +572,7 @@ function legendFormatter(data) {
       }
 
 
-      html = '""" + legend_pre + """' + data.xHTML + ' (""" + str(series.tz)+ """):';
+      html = '""" + legend_pre + """' + data.xHTML + '""" + legend_tz + """:';
       for (var i = 0; i < data.series.length; i++) {
         
         var mark_active = false;
@@ -644,6 +677,11 @@ function legendFormatter(data) {
         plot_min = str(global_min*0.99)
         plot_max = str(global_max*1.01)
 
+    # Overwrite plot min and max?
+    if value_range != 'auto':
+        plot_min = str(value_range[0]*0.99)
+        plot_max = str(value_range[1]*1.01)
+
     #dygraphs_javascript += '"Timestamp,{}\\n{}",'.format(labels, dg_data)
     dygraphs_javascript += '{},'.format(dg_data)
 
@@ -660,10 +698,10 @@ stepPlot: """+stepPlot_value+""",
 fillGraph: false,
 fillAlpha: 0.5,
 colorValue: 0.5,
-showRangeSelector: """+('true' if not image else 'false')+""",
+showRangeSelector: """+('true' if mini_plot else 'false')+""",
 //rangeSelectorHeight: 30,
 hideOverlayOnMouseOut: true,
-interactionModel: Dygraph.defaultInteractionModel,
+interactionModel: touchFriendlyInteractionModel,
 includeZero: false,
 digitsAfterDecimal:2,
 sigFigs: """ + ('6' if full_precision else 'null') + """,  
@@ -865,24 +903,26 @@ define('"""+graph_id+"""', ['dgenv'], function (Dygraph) {
                 pass
 
         # Start building HTML content
+        # TODO: here "html" has to be read as "return_html_code"
+        return_html_code = html
         html_content = ''
-        if not html:
-            html_content += '<html><head><meta charset="UTF-8">'
+        if not return_html_code:
+            html_content += '<html>\n<head>\n<meta charset="UTF-8">'
             with open(STATIC_DATA_PATH+'/js/dygraph-2.1.0.min.js') as dg_js_file:
-                html_content += '<script type="text/javascript">'+dg_js_file.read()+'</script>\n'
+                html_content += '\n<script type="text/javascript">'+dg_js_file.read()+'</script>\n'
             with open(STATIC_DATA_PATH+'css/dygraph-2.1.0.css') as dg_css_file:
-                html_content += '<style>'+dg_css_file.read()+'</style>\n'
-            html_content += '</head><body style="font-family:\'Helvetica Neue\', Helvetica, Arial, sans-serif; font-size:1.0em">\n'
+                html_content += '\n<style>'+dg_css_file.read()+'</style>\n'
+            html_content += '</head>\n<body style="font-family:\'Helvetica Neue\', Helvetica, Arial, sans-serif; font-size:1.0em">\n'
             if series.title:
                 html_content += '<div style="text-align: center; margin-top:15px; margin-bottom:15px; font-size:1.2em"><h3>{}</h3></div>'.format(series.title)
             html_content += '<div style="height:36px; padding:0; margin-left:0px; margin-top:10px">\n'
         else:
             if series.title:
                 html_content += '<div style="text-align: center; margin-top:15px; margin-bottom:15px; font-size:1.2em"><h3>{}</h3></div>'.format(series.title)
-        html_content += '<div id="{}" style="width:100%"></div></div>\n'.format(legend_div_id)
+        html_content += '<div id="{}" style="width:100%"></div>\n'.format(legend_div_id)
         html_content += '<div id="{}" style="width:100%; margin-right:0px"></div>\n'.format(graph_div_id)
-        if not html:
-            html_content += '</body></html>\n'
+        if not return_html_code:
+            html_content += '</body>\n</html>\n'
         html_content += '<script>{}</script>\n'.format(dygraphs_javascript)
         
         # Dump html to file
