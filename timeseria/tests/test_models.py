@@ -393,7 +393,7 @@ class TestForecasters(unittest.TestCase):
         forecaster = PeriodicAverageForecaster()
         
         # Fit
-        forecaster.fit(data=self.sine_minute_time_series, periodicity=63)
+        forecaster.fit(self.sine_minute_time_series, periodicity=63)
 
         # Apply
         sine_minute_time_series_with_forecast = forecaster.apply(self.sine_minute_time_series, steps=3)

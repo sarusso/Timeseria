@@ -21,7 +21,7 @@
       SeriesAnomalyDetector
       
       ForecasterAnomalyDetector
-      PeriodicAverageForecasterAnomalyDetector
+      PeriodicAverageAnomalyDetector
 
       
    
