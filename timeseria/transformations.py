@@ -227,21 +227,19 @@ def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_poi
 #==========================
 
 class Transformation(object):
-    """A generic transformation."""
+    """A generic series transformation."""
 
     @classmethod
     def __str__(cls):
         return '{} transformation'.format(cls.__name__.replace('Transformation',''))
 
-    def process(self, data, target, from_t=None, to_t=None, from_dt=None, to_dt=None, validity=None,
+    def process(self, series, target, from_t=None, to_t=None, from_dt=None, to_dt=None, validity=None,
                 include_extremes=False, fill_with=None, force_data_loss=None, fill_gaps=True):
         """Start the transformation process. If start and/or end are not set, they are set automatically
         based on first and last points of the series"""
         
-        if not isinstance(data, TimeSeries):
-            raise NotImplementedError('Transformations work only with TimeSeries data for now (got "{}")'.format(data.__class__.__name__))
-        
-        series = data
+        if not isinstance(series, TimeSeries):
+            raise NotImplementedError('Transformations work only with TimeSeries data for now (got "{}")'.format(series.__class__.__name__))
 
         if not (issubclass(series.items_type, Point) or issubclass(series.items_type, Slot)):
                 raise TypeError('Series items are not Points nor Slots, cannot compute any transformation')
@@ -547,9 +545,9 @@ class Resampler(Transformation):
         # Set interpolator
         self.interpolator_class=interpolator_class
 
-    def process(self, *args, **kwargs):
+    def process(self, series, *args, **kwargs):
         kwargs['target'] = 'points'
-        return super(Resampler, self).process(*args, **kwargs) 
+        return super(Resampler, self).process(series, *args, **kwargs) 
 
 
 #==========================
@@ -585,7 +583,7 @@ class Aggregator(Transformation):
         # Set interpolator
         self.interpolator_class=interpolator_class
 
-    def process(self, *args, **kwargs):
+    def process(self, series, *args, **kwargs):
         kwargs['target'] = 'slots'
-        return super(Aggregator, self).process(*args, **kwargs) 
+        return super(Aggregator, self).process(series, *args, **kwargs) 
 

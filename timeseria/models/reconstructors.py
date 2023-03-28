@@ -29,7 +29,7 @@ except (ImportError,AttributeError):
 #=====================================
 
 class Reconstructor(Model):
-    """A generic reconstruction model. This class of models work on reconstructing missing data,
+    """A generic series reconstruction model. This class of models work on reconstructing missing data,
     or in other words to fill gaps. Gaps need a “next” element after their end to be defined, which
     can bring much more information to the model with respect to a forecasting task.
     
@@ -37,16 +37,14 @@ class Reconstructor(Model):
         path (str): a path from which to load a saved model. Will override all other init settings.
     """
     
-    def predict(self, data, *args, **kwargs):
+    def predict(self, series, *args, **kwargs):
         """Disabled. Reconstructors can be used only with the ``apply()`` method."""
         raise NotImplementedError('Reconstructors can be used only with the apply() method') from None
  
-    def _predict(self, data, *args, **kwargs):
+    def _predict(self, series, *args, **kwargs):
         raise NotImplementedError('Reconstructors can be used only with the apply() method.') from None
 
-    def _apply(self, data, remove_data_loss=False, data_loss_threshold=1, inplace=False):
-
-        series = data
+    def _apply(self, series, remove_data_loss=False, data_loss_threshold=1, inplace=False):
 
         logger.debug('Using data_loss_threshold="%s"', data_loss_threshold)
 
@@ -108,8 +106,8 @@ class Reconstructor(Model):
         else:
             return None
 
-    def evaluate(self, data, steps='auto', limit=None, data_loss_threshold=1, metrics=['RMSE', 'MAE'], details=False, from_t=None, to_t=None, from_dt=None, to_dt=None):
-        """Evaluate the reconstructor on some data.
+    def evaluate(self, series, steps='auto', limit=None, data_loss_threshold=1, metrics=['RMSE', 'MAE'], details=False, from_t=None, to_t=None, from_dt=None, to_dt=None):
+        """Evaluate the reconstructor on a series.
 
         Args:
             steps (int, list): a single value or a list of values for how many steps (intended as missing data points or slots) 
@@ -127,11 +125,9 @@ class Reconstructor(Model):
             from_dt(datetime): evaluation starting datetime.
             to_dt(datetime) : evaluation ending datetime.
         """
-        return super(Reconstructor, self).evaluate(data, steps, limit, data_loss_threshold, metrics, details, from_t, to_t, from_dt, to_dt)
+        return super(Reconstructor, self).evaluate(series, steps, limit, data_loss_threshold, metrics, details, from_t, to_t, from_dt, to_dt)
 
-    def _evaluate(self, data, steps='auto', limit=None, data_loss_threshold=1, metrics=['RMSE', 'MAE'], details=False, from_t=None, to_t=None, from_dt=None, to_dt=None):
-
-        series = data
+    def _evaluate(self, series, steps='auto', limit=None, data_loss_threshold=1, metrics=['RMSE', 'MAE'], details=False, from_t=None, to_t=None, from_dt=None, to_dt=None):
 
         # Set evaluation_score steps if we have to
         if steps == 'auto':
@@ -305,7 +301,7 @@ class Reconstructor(Model):
 #=====================================
 
 class LinearInterpolationReconstructor(Reconstructor):
-    """A reconstruction model based on linear interpolation.
+    """A series reconstruction model based on linear interpolation.
     
     The main difference between an intepolator and a reconstructor is that interpolators are used in the transformations, *before*
     resampling or aggregating and thus must support variable-resolution time series, while reconstructors are applied *after* resampling
@@ -322,22 +318,22 @@ class LinearInterpolationReconstructor(Reconstructor):
     when evaluating other, more sophisticated, data reconstruction models.
     """
 
-    def _reconstruct(self, data, data_label, from_index, to_index):
+    def _reconstruct(self, series, data_label, from_index, to_index):
         logger.debug('Reconstructing between "{}" and "{}" (excluded)'.format(from_index, to_index))
         
         try:
             self.interpolator_initialize
         except AttributeError:
             from ..interpolators import LinearInterpolator
-            self.interpolator = LinearInterpolator(data)
+            self.interpolator = LinearInterpolator(series)
                 
         for i in range(from_index, to_index):
 
-            logger.debug('Processing point=%s', data[i])
-            reconstructed_data = self.interpolator.evaluate(at=data[i].t, prev_i=from_index-1, next_i=to_index)
+            logger.debug('Processing point=%s', series[i])
+            reconstructed_data = self.interpolator.evaluate(at=series[i].t, prev_i=from_index-1, next_i=to_index)
 
             logger.debug('Reconstructed data=%s', reconstructed_data)
-            data[i]._data = reconstructed_data
+            series[i]._data = reconstructed_data
 
 
 #=====================================
@@ -345,7 +341,7 @@ class LinearInterpolationReconstructor(Reconstructor):
 #=====================================
 
 class PeriodicAverageReconstructor(Reconstructor):
-    """A reconstruction model based on periodic averages.
+    """A series reconstruction model based on periodic averages.
     
     Args:
         path (str): a path from which to load a saved model. Will override all other init settings.
@@ -371,9 +367,7 @@ class PeriodicAverageReconstructor(Reconstructor):
         """
         return super(PeriodicAverageReconstructor, self).fit(data, data_loss_threshold, periodicity, dst_affected, offset_method, from_t, to_t, from_dt, to_dt)
 
-    def _fit(self, data, data_loss_threshold=0.5, periodicity='auto', dst_affected=False, offset_method='average', from_t=None, to_t=None, from_dt=None, to_dt=None):
-
-        series = data
+    def _fit(self, series, data_loss_threshold=0.5, periodicity='auto', dst_affected=False, offset_method='average', from_t=None, to_t=None, from_dt=None, to_dt=None):
 
         if not offset_method in ['average', 'extremes']:
             raise Exception('Unknown offset method "{}"'.format(offset_method))
@@ -429,10 +423,8 @@ class PeriodicAverageReconstructor(Reconstructor):
         
         logger.debug('Processed "%s" items', processed)
 
-    def _reconstruct(self, data, data_label, from_index, to_index):
- 
-        series = data
-            
+    def _reconstruct(self, series, data_label, from_index, to_index):
+             
         logger.debug('Reconstructing between "{}" and "{}"'.format(from_index, to_index-1))
 
         # Compute offset (old approach)
@@ -482,16 +474,14 @@ class PeriodicAverageReconstructor(Reconstructor):
 #=====================================
 
 class ProphetReconstructor(Reconstructor, _ProphetModel):
-    """A reconstructor based on Prophet. Prophet (from Facebook) implements a procedure for forecasting time series data based
+    """A series reconstruction model based on Prophet. Prophet (from Facebook) implements a procedure for forecasting time series data based
     on an additive model where non-linear trends are fit with yearly, weekly, and daily seasonality, plus holiday effects. 
     
     Args:
         path (str): a path from which to load a saved model. Will override all other init settings.
     """
 
-    def _fit(self, data, from_t=None, to_t=None, from_dt=None, to_dt=None):
-
-        series = data
+    def _fit(self, series, from_t=None, to_t=None, from_dt=None, to_dt=None):
         
         from prophet import Prophet
 
@@ -508,9 +498,7 @@ class ProphetReconstructor(Reconstructor, _ProphetModel):
         # Fit tjhe Prophet model
         self.prophet_model.fit(data)
 
-    def _reconstruct(self, data, data_label, from_index, to_index):
-
-        series = data
+    def _reconstruct(self, series, data_label, from_index, to_index):
         
         logger.debug('Reconstructing between "{}" and "{}"'.format(from_index, to_index-1))
     

@@ -374,10 +374,6 @@ class TestOpertions(unittest.TestCase):
 
     def test_min_max_avg(self):
         
-        # Test (overrode) built-in behavior
-        self.assertEqual(min([1,2,3]),1)
-        self.assertEqual(max([1,2,3]),3)
-        
         # Test data
         series = TimeSeries()
         series.append(DataTimeSlot(start=TimePoint(0), end=TimePoint(60), data={'value':10}))
