@@ -1225,7 +1225,7 @@ class TimeSeries(Series):
              forwarded to the storage object.
        
        The square brackets notation can be used for accessing series items, slicing the series
-       or to filter it on a specific data label, if its elements support it.
+       or to filter it on a specific data label (if its elements support it), as outlined below.
        
        Accessing time series items can be done by position, using a string with special ``t`` or ``dt``
        keywords, or using a dictionary with ``t`` or ``dt`` keys:
@@ -1237,25 +1237,17 @@ class TimeSeries(Series):
              
            * ``series['dt=2015-10-25 06:19:00+01:00']`` and ``series[{'dt': dt(2015,10,25,6,19,0,0)}]`` will both
              access the item for the corresponding datetime timestamp. In the string notation, this can be both an
-             ISO8601 timestamp and the string representation of the datetime object.
+             ISO8601 timestamp or a string representation of the datetime object.
 
-       Similarly, also slicing time series can be done by position, using a string with special ``t`` or ``dt`` keywords,
-       or using a dictionary with ``t`` or ``dt`` keys:
-       
-           * ``series[3:5]`` will slice the time series from item in position #3 to item in position #5 (excluded);
-           
-           * ``series['t=1446073200.7':'t=1446073600.9']`` and ``series[{'t': 1446073200.7}:{'t': 1446073200.7}]`` will both
-             slice the time series according to the respective epoch timestamps (right excluded);
-             
-           * ``series['dt=2015-10-25 06:19:00+01:00':'dt=2015-10-25 06:23:00+01:00']`` and
-             ``series[{'dt': dt(2015,10,25,6,19,0,0)}:{'dt': dt(2015,10,25,6,19,0,0)}]`` will both
-             slice the time series according to the respective datetime timestamps (right excluded).
+       Slicing a series works in a similar fashion, and accepts in the coulmn-separated square bracket notation ``series[start:end]``
+       item positions, strings with special ``t`` or ``dt`` keywords, or dictionaries with ``t`` or ``dt`` keys, as above.
 
-        Filtering a series on a data label  requires just to pass the data label in the square brackets notation:
-        
-           * ``series['temperature']`` will filter the time series keeping only the temperature data, assuming that
-             in the original series there were also other data labels (e.g. humidity).
+       Filtering a series on a data label can also be achieved using the square bracket notation, by providing the
+       data label on which to filter the series: ``series['temperature']`` will filter the time series keeping only
+       temperature data, assuming that in the original series there were also other data labels (e.g. humidity).
 
+       For more options for accessing and selecting series items and for slicing or filtering series, see the corresponding
+       methods: :func:`select()`, :func:`slice()` and :func:`filter()`.
 
        Args:
            *args: the time series items, or the right object for an alternative init method as described above.
