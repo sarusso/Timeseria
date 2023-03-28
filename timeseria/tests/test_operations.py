@@ -494,14 +494,17 @@ class TestOpertions(unittest.TestCase):
 
         series = TimeSeries(TimePoint(t=60),TimePoint(t=120),TimePoint(t=130))
 
-        # Test from/to filtering
-        self.assertEqual(len(slice(series, from_t=1, to_t=140)),3)
+        # Test start/end slicing
+        self.assertEqual(len(slice(series, start=1, end=140)),3)
 
-        # Test from/to filtering from the series
-        self.assertEqual(len(series.slice(from_t=1, to_t=140)),3)
-        self.assertEqual(len(series.slice(from_t=61, to_t=140)),2)
-        self.assertEqual(len(series.slice(from_t=61)),2)
-        self.assertEqual(len(series.slice(to_t=61)),1)
+        # Test start/end slicing from the series
+        self.assertEqual(len(series.slice(start=1, end=140)),3)
+        self.assertEqual(len(series.slice(start=61, end=140)),2)
+        self.assertEqual(len(series.slice(start=61)),2)
+        self.assertEqual(len(series.slice(end=61)),1)
+        
+        # Test no keyword arguments
+        self.assertEqual(len(series.slice(61,140)),2)
 
 
     def test_select(self):

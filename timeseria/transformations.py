@@ -2,6 +2,7 @@
 """Series transformations as resampling and aggregation."""
 
 from .time import dt_from_s, s_from_dt, as_tz
+from datetime import datetime
 from .datastructures import Point, Slot, DataTimeSlot, TimePoint, DataTimePoint, Series, TimeSeries, _TimeSeriesView
 from .utilities import _compute_data_loss, _compute_validity_regions
 from .operations import avg
@@ -233,8 +234,8 @@ class Transformation(object):
     def __str__(cls):
         return '{} transformation'.format(cls.__name__.replace('Transformation',''))
 
-    def process(self, series, target, from_t=None, to_t=None, from_dt=None, to_dt=None, validity=None,
-                include_extremes=False, fill_with=None, force_data_loss=None, fill_gaps=True):
+    def process(self, series, target, start=None, end=None, validity=None, include_extremes=False,
+                fill_with=None,  force_data_loss=None, fill_gaps=True, **kwargs):
         """Start the transformation process. If start and/or end are not set, they are set automatically
         based on first and last points of the series"""
         
@@ -259,6 +260,32 @@ class Transformation(object):
 
         # Set from and to. If creating points, we will move the start back of half unit
         # and the end forward of half unit as well, as the point will be in the center
+
+        from_t = kwargs.get('from_t', None)
+        to_t = kwargs.get('to_t', None)
+        from_dt = kwargs.get('from_dt', None)
+        to_dt = kwargs.get('to_dt', None)   
+
+        if from_t or to_t or from_dt or to_dt:
+            logger.warning('The from_t, to_t, from_dt and to_d arguments are deprecated, please use the start/end end instead.')
+
+        # Handle start/end
+        if start is not None:       
+            if isinstance(start, datetime):
+                from_dt = start
+            else:
+                try:
+                    from_t = float(start)
+                except:
+                    raise ValueError('Cannot use "{}" as start value, not a datetime nor an epoch timestamp'.format(start))
+        if end is not None:       
+            if isinstance(end, datetime):
+                to_dt = end
+            else:
+                try:
+                    to_t = float(end)
+                except:
+                    raise ValueError('Cannot use "{}" as end value, not a datetime nor an epoch timestamp'.format(end))
 
         # Set "from". TODO: check given from_t/from_dt against shifted rounding if points?
         if from_t:

@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """Operations on the series."""
 
+from datetime import datetime
 from copy import copy, deepcopy
 from .time import s_from_dt
 from .datastructures import Series, Slot, Point
@@ -864,7 +865,28 @@ class Filter(Operation):
 class Slice(Operation):
     """Slice operation (callable object)."""
 
-    def _compute(self, series, from_t=None, to_t=None, from_dt=None, to_dt=None):
+    def _compute(self, series, start=None, end=None, from_t=None, to_t=None, from_dt=None, to_dt=None):
+
+        if from_t or to_t or from_dt or to_dt:
+            logger.warning('The from_t, to_t, from_dt and to_d arguments are deprecated, please use the start/end end instead.')
+
+        # Handle start/end
+        if start is not None:       
+            if isinstance(start, datetime):
+                from_dt = start
+            else:
+                try:
+                    from_t = float(start)
+                except:
+                    raise ValueError('Cannot use "{}" as start value, not a datetime nor an epoch timestamp'.format(start))
+        if end is not None:       
+            if isinstance(end, datetime):
+                to_dt = end
+            else:
+                try:
+                    to_t = float(end)
+                except:
+                    raise ValueError('Cannot use "{}" as end value, not a datetime nor an epoch timestamp'.format(end))
 
         if from_dt:
             if from_t is not None:
@@ -878,7 +900,7 @@ class Slice(Operation):
         if from_t is not None and to_t is not None:
             if from_t >= to_t:
                 raise Exception('Got from >= to')
-        
+                
         # Instantiate the filtered series
         filtered_series = series.__class__()
         
