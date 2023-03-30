@@ -317,13 +317,13 @@ class Model():
             # Fit
             if i == 0:            
                 logger.debug('Fitting from {} ({})'.format(to_t, to_dt))
-                self.fit(series, from_t=to_t, **fit_kwargs)
+                self.fit(series, start=to_t, **fit_kwargs)
             else:
                 logger.debug('Fitting until {} ({}) and then from {} ({}).'.format(to_t, to_dt, from_t, from_dt))
-                self.fit(series, from_t=to_t, to_t=from_t, **fit_kwargs)                
+                self.fit(series, start=to_t, end=from_t, **fit_kwargs)                
             
             # Evaluate & append
-            evaluations.append(self.evaluate(series, from_t=from_t, to_t=to_t, **evaluate_kwargs))
+            evaluations.append(self.evaluate(series, start=from_t, end=to_t, **evaluate_kwargs))
         
         # Regroup evaluations
         evaluation_metrics = list(evaluations[0].keys())

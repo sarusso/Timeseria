@@ -423,12 +423,12 @@ class TestForecasters(unittest.TestCase):
         self.assertAlmostEqual(evaluation['MAE_3_steps'], 0.06567523200748912)     
 
         # Fit from/to
-        forecaster.fit(self.sine_minute_time_series, from_t=20000, to_t=40000)
+        forecaster.fit(self.sine_minute_time_series, start=20000, end=40000)
         evaluation = forecaster.evaluate(self.sine_minute_time_series, steps=[1,3], limit=100, details=True)
         self.assertAlmostEqual(evaluation['RMSE_1_steps'], 0.37831442005531923)
 
         # Fit to/from
-        forecaster.fit(self.sine_minute_time_series, to_t=20000, from_t=40000)
+        forecaster.fit(self.sine_minute_time_series, end=20000, start=40000)
         evaluation = forecaster.evaluate(self.sine_minute_time_series, steps=[1,3], limit=100, details=True)
         self.assertAlmostEqual(evaluation['RMSE_1_steps'], 0.36033834603736264)
 

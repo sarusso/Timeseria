@@ -1073,18 +1073,24 @@ class Series(list):
         from .operations import merge as merge_operation
         return merge_operation(self, series)
 
-    def filter(self, data_label=None, from_t=None, to_t=None, from_dt=None, to_dt=None):
-        # TODO: refactor this to allow generic item properties?
-        """Filter a series data either by ``data_label`` of by a "from" (``from_t``, ``from_t``) and a "to" 
-        (``to_t``, ``to_t``). A series of DataPoints or DataSlots is required."""
+    def filter(self, data_label, **kwargs):
+        """Filter a series by a ``data_label``. A series of DataPoints or DataSlots is required."""
+        # TODO: refactor this to allow generic item properties?     
+        from_t = kwargs.get('from_t', None)
+        to_t = kwargs.get('to_t', None)
+        from_dt = kwargs.get('from_dt', None)
+        to_dt = kwargs.get('to_dt', None)
         from .operations import filter as filter_operation
         return filter_operation(self, data_label=data_label, from_t=from_t, to_t=to_t, from_dt=from_dt, to_dt=to_dt) 
 
-    def slice(self, from_t=None, to_t=None, from_dt=None, to_dt=None):
-        """Slice a series data by a "from" (``from_t``, ``from_t``) and a "to" (``to_t``, ``to_t``).
-        A series of DataPoints or DataSlots is required."""
+    def slice(self, start=None, end=None, **kwargs):
+        """Slice a series from a "start" to an "end". A series of DataPoints or DataSlots is required."""
+        from_t = kwargs.get('from_t', None)
+        to_t = kwargs.get('to_t', None)
+        from_dt = kwargs.get('from_dt', None)
+        to_dt = kwargs.get('to_dt', None)
         from .operations import slice as slice_operation
-        return slice_operation(self, from_t=from_t, to_t=to_t, from_dt=from_dt, to_dt=to_dt) 
+        return slice_operation(self, start=start, end=end, from_t=from_t, to_t=to_t, from_dt=from_dt, to_dt=to_dt) 
 
     def select(self, query):
         """Select one or more items of the series given an SQL-like query. A series of DataPoints or DataSlots is required."""
