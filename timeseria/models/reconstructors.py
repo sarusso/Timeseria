@@ -11,6 +11,7 @@ from pandas import DataFrame
 from math import sqrt
 from ..datastructures import TimeSeries
 from .base import Model, _ProphetModel
+from datetime import datetime
 
 # Setup logging
 import logging
@@ -106,7 +107,7 @@ class Reconstructor(Model):
         else:
             return None
 
-    def evaluate(self, series, steps='auto', limit=None, data_loss_threshold=1, metrics=['RMSE', 'MAE'], details=False, from_t=None, to_t=None, from_dt=None, to_dt=None):
+    def evaluate(self, series, steps='auto', limit=None, data_loss_threshold=1, metrics=['RMSE', 'MAE'], details=False, start=None, end=None, **kwargs):
         """Evaluate the reconstructor on a series.
 
         Args:
@@ -120,14 +121,12 @@ class Reconstructor(Model):
                 ``MAE``  (Mean Absolute Error), and 
                 ``MAPE``  (Mean Absolute percentage Error).
             details(bool): if to add intermediate steps details to the evaluation results.
-            from_t(float): evaluation starting epoch timestamp.
-            to_t(float): evaluation ending epoch timestamp
-            from_dt(datetime): evaluation starting datetime.
-            to_dt(datetime) : evaluation ending datetime.
+            start(float, datetime): evaluation start (epoch timestamp or datetime).
+            end(float, datetim): evaluation end (epoch timestamp or datetime).
         """
-        return super(Reconstructor, self).evaluate(series, steps, limit, data_loss_threshold, metrics, details, from_t, to_t, from_dt, to_dt)
+        return super(Reconstructor, self).evaluate(series, steps, limit, data_loss_threshold, metrics, details, start, end, **kwargs)
 
-    def _evaluate(self, series, steps='auto', limit=None, data_loss_threshold=1, metrics=['RMSE', 'MAE'], details=False, from_t=None, to_t=None, from_dt=None, to_dt=None):
+    def _evaluate(self, series, steps='auto', limit=None, data_loss_threshold=1, metrics=['RMSE', 'MAE'], details=False, start=None, end=None, **kwargs):
 
         # Set evaluation_score steps if we have to
         if steps == 'auto':
@@ -140,10 +139,35 @@ class Reconstructor(Model):
             pass
         else:
             steps = list(range(1, steps+1))
-     
+
+        # Handle start/end
+        from_t = kwargs.get('from_t', None)
+        to_t = kwargs.get('to_t', None)
+        from_dt = kwargs.get('from_dt', None)
+        to_dt = kwargs.get('to_dt', None)        
+        if from_t or to_t or from_dt or to_dt:
+            logger.warning('The from_t, to_t, from_dt and to_d arguments are deprecated, please use start and end instead')
+        from_t, to_t = _set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
+
+        if start is not None:       
+            if isinstance(start, datetime):
+                from_dt = start
+            else:
+                try:
+                    from_t = float(start)
+                except:
+                    raise ValueError('Cannot use "{}" as start value, not a datetime nor an epoch timestamp'.format(start))
+        if end is not None:       
+            if isinstance(end, datetime):
+                to_dt = end
+            else:
+                try:
+                    to_t = float(end)
+                except:
+                    raise ValueError('Cannot use "{}" as end value, not a datetime nor an epoch timestamp'.format(end))
+
         # Support vars
         evaluation_score = {}
-        from_t, to_t = _set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
         warned = False
         
         # Log
@@ -347,7 +371,7 @@ class PeriodicAverageReconstructor(Reconstructor):
         path (str): a path from which to load a saved model. Will override all other init settings.
     """
 
-    def fit(self, data, data_loss_threshold=0.5, periodicity='auto', dst_affected=False,  offset_method='average', from_t=None, to_t=None, from_dt=None, to_dt=None):
+    def fit(self, data, data_loss_threshold=0.5, periodicity='auto', dst_affected=False,  offset_method='average', start=None, end=None, **kwargs):
         # This is a fit wrapper only to allow correct documentation
         
         # TODO: periodicity, dst_affected, offset_method -> move them in the init?
@@ -360,14 +384,12 @@ class PeriodicAverageReconstructor(Reconstructor):
             dst_affected(bool): if the model should take into account DST effects.
             offset_method(str): how to offset the reconstructed data in order to align it to the missing data gaps. Valuse are ``avergae``
                                 to use the average gap value, or ``extrmes`` to use its extremes.
-            from_t(float): fit starting epoch timestamp.
-            to_t(float): fit ending epoch timestamp
-            from_dt(datetime): fit starting datetime.
-            to_dt(datetime) : fit ending datetime.
+            start(float, datetime): fit start (epoch timestamp or datetime).
+            end(float, datetim): fit end (epoch timestamp or datetime).
         """
-        return super(PeriodicAverageReconstructor, self).fit(data, data_loss_threshold, periodicity, dst_affected, offset_method, from_t, to_t, from_dt, to_dt)
+        return super(PeriodicAverageReconstructor, self).fit(data, data_loss_threshold, periodicity, dst_affected, offset_method, start, end, **kwargs)
 
-    def _fit(self, series, data_loss_threshold=0.5, periodicity='auto', dst_affected=False, offset_method='average', from_t=None, to_t=None, from_dt=None, to_dt=None):
+    def _fit(self, series, data_loss_threshold=0.5, periodicity='auto', dst_affected=False, offset_method='average', start=None, end=None, **kwargs):
 
         if not offset_method in ['average', 'extremes']:
             raise Exception('Unknown offset method "{}"'.format(offset_method))
@@ -376,8 +398,32 @@ class PeriodicAverageReconstructor(Reconstructor):
         if len(series.data_labels()) > 1:
             raise NotImplementedError('Multivariate time series are not yet supported')
 
+        # Handle start/end
+        from_t = kwargs.get('from_t', None)
+        to_t = kwargs.get('to_t', None)
+        from_dt = kwargs.get('from_dt', None)
+        to_dt = kwargs.get('to_dt', None)        
+        if from_t or to_t or from_dt or to_dt:
+            logger.warning('The from_t, to_t, from_dt and to_d arguments are deprecated, please use the slice() operation instead or the square brackets notation.')
         from_t, to_t = _set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
-        
+
+        if start is not None:       
+            if isinstance(start, datetime):
+                from_dt = start
+            else:
+                try:
+                    from_t = float(start)
+                except:
+                    raise ValueError('Cannot use "{}" as start value, not a datetime nor an epoch timestamp'.format(start))
+        if end is not None:       
+            if isinstance(end, datetime):
+                to_dt = end
+            else:
+                try:
+                    to_t = float(end)
+                except:
+                    raise ValueError('Cannot use "{}" as end value, not a datetime nor an epoch timestamp'.format(end))
+                
         # Set or detect periodicity
         if periodicity == 'auto':
             periodicity =  detect_periodicity(series)
@@ -481,12 +527,36 @@ class ProphetReconstructor(Reconstructor, _ProphetModel):
         path (str): a path from which to load a saved model. Will override all other init settings.
     """
 
-    def _fit(self, series, from_t=None, to_t=None, from_dt=None, to_dt=None):
+    def _fit(self, series, start=None, end=None, **kwargs):
         
         from prophet import Prophet
 
+        # Handle start/end
+        from_t = kwargs.get('from_t', None)
+        to_t = kwargs.get('to_t', None)
+        from_dt = kwargs.get('from_dt', None)
+        to_dt = kwargs.get('to_dt', None)        
+        if from_t or to_t or from_dt or to_dt:
+            logger.warning('The from_t, to_t, from_dt and to_d arguments are deprecated, please use the slice() operation instead or the square brackets notation.')
         from_t, to_t = _set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
 
+        if start is not None:       
+            if isinstance(start, datetime):
+                from_dt = start
+            else:
+                try:
+                    from_t = float(start)
+                except:
+                    raise ValueError('Cannot use "{}" as start value, not a datetime nor an epoch timestamp'.format(start))
+        if end is not None:       
+            if isinstance(end, datetime):
+                to_dt = end
+            else:
+                try:
+                    to_t = float(end)
+                except:
+                    raise ValueError('Cannot use "{}" as end value, not a datetime nor an epoch timestamp'.format(end))
+        
         if len(series.data_labels()) > 1:
             raise NotImplementedError('Multivariate time series are not yet supported')
 

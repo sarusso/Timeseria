@@ -11,6 +11,7 @@ from pandas import DataFrame
 from numpy import array
 from math import sqrt
 from .base import Model, _ProphetModel, _ARIMAModel, _KerasModel
+from datetime import datetime
 
 # Sklearn
 from sklearn.metrics import mean_squared_error, mean_absolute_error
@@ -174,7 +175,7 @@ class Forecaster(Model):
         else:
             return None
 
-    def evaluate(self, series, steps='auto', limit=None, plot=False, plots=False, metrics=['RMSE', 'MAE'], details=False, from_t=None, to_t=None, from_dt=None, to_dt=None, evaluation_series=False):
+    def evaluate(self, series, steps='auto', limit=None, plot=False, plots=False, metrics=['RMSE', 'MAE'], details=False, start=None, end=None, evaluation_series=False, **kwargs):
         """Evaluate the forecaster on a series.
 
         Args:
@@ -192,15 +193,13 @@ class Forecaster(Model):
                 ``MAE``  (Mean Absolute Error), and 
                 ``MAPE``  (Mean Absolute percentage Error).
             details(bool): if to add intermediate steps details to the evaluation results.
-            from_t(float): evaluation starting epoch timestamp.
-            to_t(float): evaluation ending epoch timestamp
-            from_dt(datetime): evaluation starting datetime.
-            to_dt(datetime) : evaluation ending datetime.
+            start(float, datetime): evaluation start (epoch timestamp or datetime).
+            end(float, datetime): evaluation end (epoch timestamp or datetime).
             evaluation_series(bool): if to add to the results an evaluation timeseirs containing the eror metrics. Defaulted to false.
         """
-        return super(Forecaster, self).evaluate(series, steps, limit, plots, plot, metrics, details, from_t, to_t, from_dt, to_dt, evaluation_series)
+        return super(Forecaster, self).evaluate(series, steps, limit, plots, plot, metrics, details, start, end, evaluation_series, **kwargs)
 
-    def _evaluate(self, series, steps='auto', limit=None, plots=False, plot=False, metrics=['RMSE', 'MAE'], details=False, from_t=None, to_t=None, from_dt=None, to_dt=None, evaluation_series=False):
+    def _evaluate(self, series, steps='auto', limit=None, plots=False, plot=False, metrics=['RMSE', 'MAE'], details=False, start=None, end=None, evaluation_series=False, **kwargs):
 
         if len(series.data_labels()) > 1:
             raise NotImplementedError('Sorry, evaluating models built for multivariate time series is not supported yet')
@@ -249,9 +248,34 @@ class Forecaster(Model):
             if limit:
                 evaluation_series = evaluation_series[:limit]
         
-        # Support vars
-        results = {}
+        # Handle start/end
+        from_t = kwargs.get('from_t', None)
+        to_t = kwargs.get('to_t', None)
+        from_dt = kwargs.get('from_dt', None)
+        to_dt = kwargs.get('to_dt', None)        
+        if from_t or to_t or from_dt or to_dt:
+            logger.warning('The from_t, to_t, from_dt and to_d arguments are deprecated, please use start and end instead')
         from_t, to_t = _set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
+
+        if start is not None:       
+            if isinstance(start, datetime):
+                from_dt = start
+            else:
+                try:
+                    from_t = float(start)
+                except:
+                    raise ValueError('Cannot use "{}" as start value, not a datetime nor an epoch timestamp'.format(start))
+        if end is not None:       
+            if isinstance(end, datetime):
+                to_dt = end
+            else:
+                try:
+                    to_t = float(end)
+                except:
+                    raise ValueError('Cannot use "{}" as end value, not a datetime nor an epoch timestamp'.format(end))
+        
+        # Support vars
+        results = {}        
         warned = False
 
         # Log
@@ -520,26 +544,48 @@ class PeriodicAverageForecaster(Forecaster):
         if self.fitted:
             self.data['averages'] = {int(key):value for key, value in self.data['averages'].items()}
         
-    def fit(self, series, periodicity='auto', dst_affected=False, from_t=None, to_t=None, from_dt=None, to_dt=None):
+    def fit(self, series, periodicity='auto', dst_affected=False, start=None, end=None, **kwargs):
         """Fit the model on a series.
 
         Args:
             periodicity(int): the periodicty of the series. If set to ``auto`` then it will be automatically detected using a FFT.
             dst_affected(bool): if the model should take into account DST effects.
-            from_t(float): fit starting epoch timestamp.
-            to_t(float): fit ending epoch timestamp
-            from_dt(datetime): fit starting datetime.
-            to_dt(datetime) : fit ending datetime.
+            start(float, datetime): fit start (epoch timestamp or datetime).
+            end(float, datetime): fit end (epoch timestamp or datetime).
         """
-        return super(PeriodicAverageForecaster, self).fit(series, periodicity, dst_affected, from_t, to_t, from_dt, to_dt)
+        return super(PeriodicAverageForecaster, self).fit(series, periodicity, dst_affected, start, end, **kwargs)
 
-    def _fit(self, series, periodicity='auto', dst_affected=False, from_t=None, to_t=None, from_dt=None, to_dt=None):
+    def _fit(self, series, periodicity='auto', dst_affected=False, start=None, end=None, **kwargs):
 
         if len(series.data_labels()) > 1:
             raise NotImplementedError('Multivariate time series are not yet supported')
 
+        # Handle start/end
+        from_t = kwargs.get('from_t', None)
+        to_t = kwargs.get('to_t', None)
+        from_dt = kwargs.get('from_dt', None)
+        to_dt = kwargs.get('to_dt', None)        
+        if from_t or to_t or from_dt or to_dt:
+            logger.warning('The from_t, to_t, from_dt and to_d arguments are deprecated, please use start and end instead')
         from_t, to_t = _set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
 
+        if start is not None:       
+            if isinstance(start, datetime):
+                from_dt = start
+            else:
+                try:
+                    from_t = float(start)
+                except:
+                    raise ValueError('Cannot use "{}" as start value, not a datetime nor an epoch timestamp'.format(start))
+        if end is not None:       
+            if isinstance(end, datetime):
+                to_dt = end
+            else:
+                try:
+                    to_t = float(end)
+                except:
+                    raise ValueError('Cannot use "{}" as end value, not a datetime nor an epoch timestamp'.format(end))
+        
         # Set or detect periodicity
         if periodicity == 'auto':        
             periodicity =  detect_periodicity(series)
@@ -659,15 +705,39 @@ class ProphetForecaster(Forecaster, _ProphetModel):
         path (str): a path from which to load a saved model. Will override all other init settings.
     """
 
-    def _fit(self, series, from_t=None, to_t=None, from_dt=None, to_dt=None):
+    def _fit(self, series, start=None, end=None, **kwargs):
 
         if len(series.data_labels()) > 1:
             raise Exception('Multivariate time series are not yet supported')
 
         from prophet import Prophet
 
+        # Handle start/end
+        from_t = kwargs.get('from_t', None)
+        to_t = kwargs.get('to_t', None)
+        from_dt = kwargs.get('from_dt', None)
+        to_dt = kwargs.get('to_dt', None)        
+        if from_t or to_t or from_dt or to_dt:
+            logger.warning('The from_t, to_t, from_dt and to_d arguments are deprecated, please use start and end instead')
         from_t, to_t = _set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
 
+        if start is not None:       
+            if isinstance(start, datetime):
+                from_dt = start
+            else:
+                try:
+                    from_t = float(start)
+                except:
+                    raise ValueError('Cannot use "{}" as start value, not a datetime nor an epoch timestamp'.format(start))
+        if end is not None:       
+            if isinstance(end, datetime):
+                to_dt = end
+            else:
+                try:
+                    to_t = float(end)
+                except:
+                    raise ValueError('Cannot use "{}" as end value, not a datetime nor an epoch timestamp'.format(end))
+        
         data = self._from_timeseria_to_prophet(series, from_t=from_t, to_t=to_t)
 
         # Instantiate the Prophet model
@@ -888,10 +958,33 @@ class LSTMForecaster(Forecaster, _KerasModel):
         # Now save the Keras model itself
         self._save_keras_model(path)
 
-    def _fit(self, series, from_t=None, to_t=None, from_dt=None, to_dt=None, verbose=False, epochs=30, normalize=True):
+    def _fit(self, series, start=None, end=None, verbose=False, epochs=30, normalize=True, **kwargs):
         
-        # Set from and to
+        # Handle start/end
+        from_t = kwargs.get('from_t', None)
+        to_t = kwargs.get('to_t', None)
+        from_dt = kwargs.get('from_dt', None)
+        to_dt = kwargs.get('to_dt', None)        
+        if from_t or to_t or from_dt or to_dt:
+            logger.warning('The from_t, to_t, from_dt and to_d arguments are deprecated, please use start and end instead')
         from_t, to_t = _set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
+
+        if start is not None:       
+            if isinstance(start, datetime):
+                from_dt = start
+            else:
+                try:
+                    from_t = float(start)
+                except:
+                    raise ValueError('Cannot use "{}" as start value, not a datetime nor an epoch timestamp'.format(start))
+        if end is not None:       
+            if isinstance(end, datetime):
+                to_dt = end
+            else:
+                try:
+                    to_t = float(end)
+                except:
+                    raise ValueError('Cannot use "{}" as end value, not a datetime nor an epoch timestamp'.format(end))
 
         # Set verbose switch
         if verbose:
