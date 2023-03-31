@@ -25,13 +25,13 @@ DEFAULT_SLOT_DATA_LOSS = None
 #======================
 
 class Storage(object):
-    """The base storage class. Can be implemented to store one or more time serieses. If storing more than
-    one, then the id of which serises to load must be provided in the ``get()`` and ``put()`` methods."""
+    """The base storage class. Can be implemented to store one or more series. If storing more than one,
+    then the id of which series to load or store must be provided in the ``get()`` and ``put()`` methods."""
     
-    def get(self, *args, **kwargs):
+    def get(self, id=None, start=None, end=None, *args, **kwargs):
         raise NotImplementedError()
     
-    def put(self, *args, **kwargs):
+    def put(self, series, id=None, *args, **kwargs):
         raise NotImplementedError()
 
 
@@ -40,15 +40,15 @@ class Storage(object):
 #======================
 
 class CSVFileStorage(Storage):
-    """A CSV file storage. Supports both point and slot time series.
+    """A CSV file storage for time series. Supports both point and slot time series.
     
-    The file encoding, the series type and the tiemstamp columns are all auto-detect with an heuristic approach
-    by defaaul, and asked to be set by ony if the euristic fails. In particular, wether to create point or solot
+    The file encoding, the series type and the timestamp columns are all auto-detect with an heuristic approach
+    by default, and asked to be set manually only if the heuristics fails. In particular, whether to create point or slot
     series is based on the sampling interval automatically detected: if this is above 24 hours, then slots are used.
     
     The header with the column labels is optional, and if not present the column numbers are used as labels.
-    Comments in the CSV file are supported Comments in the CSV file only as full-line coments, where the line starts
-    with one of the charatchers listed as comment characheter (``#`` and ``;`` by default).
+    Comments in the CSV file are supported Comments in the CSV file only as full-line comments, where the line starts
+    with one of the characters listed as comment character (``#`` and ``;`` by default).
     
     The ``timestamp_format``, ``date_format`` and ``time_format`` arguments can be set using Python strptime format codes
     (https://docs.python.org/3/library/datetime.html#strftime-and-strptime-format-codes), but the ``timestamp_format``
@@ -75,8 +75,8 @@ class CSVFileStorage(Storage):
         series_type: the default type of the series, if ``points`` or ``slots``. Automatically set by default.
         sort: if to sort the data file before creating the series.
         separator: the separator for the records (fields), ``,`` by default.
-        newline: the newline charachter, ``\\n`` by default.
-        comment_chars: the charachters used to mark a comment line. Defaulted to ``#`` and ``;``. 
+        newline: the newline character, ``\\n`` by default.
+        comment_chars: the characters used to mark a comment line. Defaulted to ``#`` and ``;``. 
         encoding: the encoding of the file, automatically detected by default.
         skip_errors: if to skip errors or raise an exception.
         silence_errors: if to completely silence errors when skipping them or not.     
@@ -159,10 +159,13 @@ class CSVFileStorage(Storage):
         self.series_type = series_type
 
 
-    def get(self, limit=None, as_tz=None, as_points=None, as_slots=None, data_labels='all', data_label=None):
-        """Get the data out from the CSV file.
+    def get(self, id=None, start=None, end=None, limit=None, as_tz=None, as_points=None, as_slots=None, data_labels='all', data_label=None):
+        """Load the time series from the CSV file.
 
         Args:
+            id: Not implemented for this storage.
+            start: Not implemented for this storage.
+            end: Not implemented for this storage.
             limit: a row number limit.  
             as_tz: force a specific timezone.
             as_points: force generating points.
@@ -171,7 +174,11 @@ class CSVFileStorage(Storage):
             data_label: get only a specific data label.
         """
         
-        # TODO: add from_dt /to_dt /from_t /to_t. Cfr series.filter()
+        if id:
+            raise NotImplementedError('This storage does not support multiple time series, so the id argument cannot be used')
+        
+        if start or end:
+            raise NotImplementedError('This storage does not support loading only a portion of the time time series, so the start and end arguments cannot be used')
 
         # Sanity checks
         if as_points and as_slots:
@@ -636,10 +643,10 @@ class CSVFileStorage(Storage):
         else:
             tz = timezonize(self.tz)
 
+        series = TimeSeries()
+
         # Create point or slot series
         if series_type == DataTimePoint:
-            
-            timeseries = TimeSeries()
             
             for item in items:
                 try:
@@ -658,7 +665,7 @@ class CSVFileStorage(Storage):
                     data_time_point = DataTimePoint(t=item[0], data=item[1], data_indexes=data_indexes, tz=tz)
 
                     # Append
-                    timeseries.append(data_time_point)
+                    series.append(data_time_point)
 
                 except Exception as e:
                     if self.skip_errors:
@@ -667,9 +674,7 @@ class CSVFileStorage(Storage):
                     else:
                         raise e from None
         else:
-            
-            timeseries = TimeSeries()
-            
+                        
             for i, item in enumerate(items):
                 try:
                     # Handle data_indexes (including the data_loss)
@@ -690,7 +695,7 @@ class CSVFileStorage(Storage):
                     data_time_slot = DataTimeSlot(t=item[0], unit=unit, data=item[1], data_indexes=data_indexes, tz=tz)
                     
                     # Append
-                    timeseries.append(data_time_slot)
+                    series.append(data_time_slot)
                     
                 except ValueError as e:
                     # The only ValueError that could (should) arise here is a "Not in succession" error.
@@ -704,43 +709,51 @@ class CSVFileStorage(Storage):
                             for j, missing_timestamp in enumerate(missing_timestamps):
                                 # Set data by interpolation
                                 interpolated_data = {data_label: (((items[i][1][data_label]-items[i-1][1][data_label])/(len(missing_timestamps)+1)) * (j+1)) + items[i-1][1][data_label]  for data_label in  items[-1][1] }
-                                timeseries.append(DataTimeSlot(t=missing_timestamp, unit=unit, data=interpolated_data, data_loss=1, tz=tz))
-                            timeseries.append(DataTimeSlot(t=item[0], unit=unit, data=item[1], data_loss=DEFAULT_SLOT_DATA_LOSS, tz=tz))
+                                series.append(DataTimeSlot(t=missing_timestamp, unit=unit, data=interpolated_data, data_loss=1, tz=tz))
+                            series.append(DataTimeSlot(t=item[0], unit=unit, data=item[1], data_loss=DEFAULT_SLOT_DATA_LOSS, tz=tz))
                             break
                         
                         else:
                             missing_timestamps.append(s_from_dt(dt))
                         prev_dt = dt
 
-        return timeseries
+        return series
 
 
-    def put(self, timeseries, overwrite=False):
-        
+    def put(self, series, id=None, overwrite=False):
+        """Store the time series in the CSV file.
+
+        Args:
+            id: Not implemented for this storage.
+            overwrite: if the destination file can be overwritten.
+        """    
+        if id:
+            raise NotImplementedError('This storage does not support multiple time series, so the id argument cannot be used')
+                
         if os.path.isfile(self.filename) and not overwrite:
             raise Exception('File already exists. use overwrite=True to overwrite.')
 
-        # Set data_indexes here once for all or thre will be a slowndowd afterwards
-        data_indexes = timeseries._all_data_indexes()
+        # Set data_indexes here once for all or there will be a slowdown afterwards
+        data_indexes = series._all_data_indexes()
 
         with open(self.filename, 'w') as csv_file:
        
             # 0) Dump CSV-storage specific metadata & chck type     
-            if issubclass(timeseries.items_type, DataTimePoint):
+            if issubclass(series.items_type, DataTimePoint):
                 csv_file.write('# Generated by Timeseria CSVFileStorage at {}\n'.format(now_dt()))
-                csv_file.write('# {}\n'.format(timeseries))
-                csv_file.write('# Extra parameters: {{"type": "points", "tz": "{}", "resolution": "{}"}}\n'.format(timeseries.tz, timeseries.resolution))
+                csv_file.write('# {}\n'.format(series))
+                csv_file.write('# Extra parameters: {{"type": "points", "tz": "{}", "resolution": "{}"}}\n'.format(series.tz, series.resolution))
  
-            elif issubclass(timeseries.items_type, DataTimeSlot):                
+            elif issubclass(series.items_type, DataTimeSlot):                
                 csv_file.write('# Generated by Timeseria CSVFileStorage at {}\n'.format(now_dt()))
-                csv_file.write('# {}\n'.format(timeseries))
-                csv_file.write('# Extra parameters: {{"type": "slots", "tz": "{}", "resolution": "{}"}}\n'.format(timeseries.tz, timeseries.resolution))
+                csv_file.write('# {}\n'.format(series))
+                csv_file.write('# Extra parameters: {{"type": "slots", "tz": "{}", "resolution": "{}"}}\n'.format(series.tz, series.resolution))
 
             else:
                 raise TypeError('Can store only time series of DataTimePoints or DataTimeSlots')
 
             # 1) Dump headers
-            data_labels_part = ','.join([str(data_label) for data_label in timeseries.data_labels()])
+            data_labels_part = ','.join([str(data_label) for data_label in series.data_labels()])
             data_indexes_part = ','.join(['__'+index for index in data_indexes])
             if data_indexes_part:
                 csv_file.write('epoch,{},{}\n'.format(data_labels_part,data_indexes_part))
@@ -748,11 +761,11 @@ class CSVFileStorage(Storage):
                 csv_file.write('epoch,{}\n'.format(data_labels_part))
             
             # 2) Dump data (and data_indexes)
-            for item in timeseries:
-                if isinstance (timeseries[0].data, list) or isinstance (timeseries[0].data, tuple):
-                    data_part = ','.join([str(item.data[int(data_label)]) for data_label in timeseries.data_labels()])
+            for item in series:
+                if isinstance (series[0].data, list) or isinstance (series[0].data, tuple):
+                    data_part = ','.join([str(item.data[int(data_label)]) for data_label in series.data_labels()])
                 else:
-                    data_part = ','.join([str(item.data[data_label]) for data_label in timeseries.data_labels()])
+                    data_part = ','.join([str(item.data[data_label]) for data_label in series.data_labels()])
                 data_indexes_part = ','.join([str(getattr(item, index)) for index in data_indexes])
                 if data_indexes_part:
                     csv_file.write('{},{},{}\n'.format(item.t, data_part, data_indexes_part))
