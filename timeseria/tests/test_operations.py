@@ -492,7 +492,7 @@ class TestOpertions(unittest.TestCase):
 
     def test_slice(self):
 
-        series = TimeSeries(TimePoint(t=60),TimePoint(t=120),TimePoint(t=130))
+        series = TimeSeries(TimePoint(t=60),TimePoint(t=120),TimePoint(t=130),TimePoint(t=140),TimePoint(t=150),TimePoint(t=160))
 
         # Test start/end slicing
         self.assertEqual(len(slice(series, start=1, end=140)),3)
@@ -500,11 +500,25 @@ class TestOpertions(unittest.TestCase):
         # Test start/end slicing from the series
         self.assertEqual(len(series.slice(start=1, end=140)),3)
         self.assertEqual(len(series.slice(start=61, end=140)),2)
-        self.assertEqual(len(series.slice(start=61)),2)
+        self.assertEqual(len(series.slice(start=61)),5)
         self.assertEqual(len(series.slice(end=61)),1)
         
         # Test no keyword arguments
         self.assertEqual(len(series.slice(61,140)),2)
+        
+        # Test with slots
+        slot_series = TimeSeries(DataTimeSlot(start=TimePoint(t=60), end=TimePoint(t=120),data=1),
+                                 DataTimeSlot(start=TimePoint(t=120), end=TimePoint(t=180),data=1),
+                                 DataTimeSlot(start=TimePoint(t=180), end=TimePoint(t=240),data=1),
+                                 DataTimeSlot(start=TimePoint(t=240), end=TimePoint(t=300),data=1))
+        self.assertEqual(len(slice(slot_series,60,120)),1)
+        self.assertEqual(len(slice(slot_series,60,121)),1)
+        self.assertEqual(len(slice(slot_series,60,180)),2)        
+
+        # Check also time zone
+        slot_series.change_tz('Europe/Rome')
+        self.assertEqual(slot_series.slice(60,60).tz, None)
+        self.assertEqual(str(slot_series.slice(60,120).tz), 'Europe/Rome')
 
 
     def test_select(self):

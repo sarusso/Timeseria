@@ -781,7 +781,10 @@ class Series(list):
     @mark.setter
     def mark(self, value):
         if not value:
-            del self._mark
+            try:
+                del self._mark
+            except:
+                pass
         else:
             # Check valid mark
             if not isinstance(value, (list, tuple)):
@@ -1568,6 +1571,8 @@ class TimeSeries(Series):
             # Handle time-based slicing
             requested_start_t = None
             requested_stop_t = None
+            requested_start_i = None
+            requested_stop_i = None
             if isinstance(arg.start, str):
                 if arg.start.startswith('t='):
                     requested_start_t = float(arg.start.split('=')[1])
@@ -1581,7 +1586,9 @@ class TimeSeries(Series):
                 elif 'dt' in arg.start:
                     requested_start_t = s_from_dt(arg.start['dt'])
                 else:
-                    raise ValueError('Getting items by dict requires a "t" or a "dt" dict key, found none (Got dict={})'.format(arg))  
+                    raise ValueError('Getting items by dict requires a "t" or a "dt" dict key, found none (Got dict={})'.format(arg))
+            else:
+                requested_start_i = arg.start 
             
             if isinstance(arg.stop, str):
                 if arg.start.startswith('t='):
@@ -1597,41 +1604,28 @@ class TimeSeries(Series):
                     requested_stop_t = s_from_dt(arg.stop['dt'])
                 else:
                     raise ValueError('Getting items by dict requires a "t" or a "dt" dict key, found none (Got dict={})'.format(arg))  
-
-            # Set slice indexes
-            if requested_start_t is not None or requested_stop_t is not None:
-                if requested_start_t is not None and requested_stop_t is not None:
-                    if requested_start_t >= requested_stop_t:
-                        return self.__class__()
-                indices = []
-                if requested_start_t is None:
-                    requested_start_t = 0
-                if requested_stop_t is None:
-                    requested_stop_t = super(Series, self).__getitem__(-1).t+1 # +1 to avoid excluding the last point
-                started = False
-                for i, item in enumerate(self):
-                    if started:
-                        # Right is always excluded
-                        if item.t >= requested_stop_t:
-                            break
-                    # Left is always included
-                    if item.t >= requested_start_t:
-                        indices.append(i)
-                        if not started:
-                            started = True
             else:
-                indices = range(*arg.indices(len(self)))
+                requested_stop_i = arg.stop 
 
-            # Prepare the new series and return it
-            series = self.__class__()
-            for i in indices:
-                series.append(super(Series, self).__getitem__(i))
-            try:
-                # Preserve mark if any
-                series.mark = self.mark
-            except:
-                pass
-            return series
+            if requested_start_t is not None or requested_stop_t is not None:
+                # Slice on timestamps with the slice operations
+                return self.slice(start=requested_start_t, end=requested_stop_t)
+            else:
+                # Slice on indexes
+                # TODO: maybe use the parent list slicing somehow?
+                if requested_start_i is None:
+                    requested_start_i = 0
+                if requested_stop_i is None:
+                    requested_stop_i = len(self)
+                if requested_start_i < 0:
+                    requested_start_i = len(self) + requested_start_i
+                if requested_stop_i < 0:
+                    requested_stop_i = len(self) + requested_stop_i         
+                sliced_series = self.__class__()
+                sliced_series.mark = self.mark
+                for i in range(requested_start_i, requested_stop_i):
+                    sliced_series.append(self[i])
+                return sliced_series
         
         elif isinstance(arg, str):
             

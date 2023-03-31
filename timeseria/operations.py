@@ -899,26 +899,44 @@ class Slice(Operation):
             
         if from_t is not None and to_t is not None:
             if from_t >= to_t:
-                raise Exception('Got from >= to')
+                return series.__class__()
                 
         # Instantiate the filtered series
         filtered_series = series.__class__()
         
-        # Filter based on time if from/to are set
+        # Preserve mark if any TODO: Check if mark still in the sliced series?
+        filtered_series.mark = series.mark
+        
+        # Select new series items based on time if from/to are set
         for item in series:
             if from_t is not None and to_t is not None:
-                if item.t >= from_t and item.t <to_t:
-                    filtered_series.append(item)
+                if item.t >= from_t:
+                    try:
+                        # Slot?
+                        if item.end.t <= to_t:
+                            filtered_series.append(item)
+                    except AttributeError:
+                        # point?
+                        if item.t < to_t:
+                            filtered_series.append(item)
             else:
                 if from_t is not None:
+                    # Point or slot, they both have a "t"
                     if item.t >= from_t:
                         filtered_series.append(item) 
                 if to_t is not None:
-                    if item.t < to_t:
-                        filtered_series.append(item)
+                    try:
+                        # Slot?
+                        print(item.end.t, to_t)
+                        if item.end.t <= to_t:
+                            filtered_series.append(item)
+                    except AttributeError:
+                        # point?
+                        if item.t < to_t:
+                            filtered_series.append(item)
                 if from_t is None and to_t is None:
-                    # Append everything 
-                    filtered_series.append(item)
+                    # Just duplicate
+                    filtered_series = series.duplicate()
 
         # Re-set reference data as well
         try:

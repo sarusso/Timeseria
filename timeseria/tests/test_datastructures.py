@@ -552,6 +552,33 @@ class TestTimeSeries(unittest.TestCase):
         self.assertEqual(time_series.duplicate().resolution, 60)
         self.assertEqual(time_series[0:2].resolution, 60)
         
+        # Test also that the slicing with the indexes is not messed up (slicing on timestamps in tested in the SLice operation) 
+        time_series = TimeSeries(TimePoint(t=60),TimePoint(t=120),TimePoint(t=130),TimePoint(t=140),TimePoint(t=150),TimePoint(t=160))
+        time_series_as_list = [point for point in time_series]        
+        self.assertEqual(len(time_series[1:3]), len(time_series_as_list[1:3]))
+        self.assertEqual(time_series[1:3][0], time_series_as_list[1:3][0])
+        self.assertEqual(time_series[1:3][-1], time_series_as_list[1:3][-1])
+
+        self.assertEqual(len(time_series[:3]), len(time_series_as_list[:3]))
+        self.assertEqual(time_series[:3][0], time_series_as_list[:3][0])
+        self.assertEqual(time_series[:3][-1], time_series_as_list[:3][-1])
+
+        self.assertEqual(len(time_series[3:]), len(time_series_as_list[3:]))
+        self.assertEqual(time_series[3:][0], time_series_as_list[3:][0])
+        self.assertEqual(time_series[3:][-1], time_series_as_list[3:][-1])
+
+        self.assertEqual(len(time_series[3:-1]), len(time_series_as_list[3:-1]))
+        self.assertEqual(time_series[3:-1][0], time_series_as_list[3:-1][0])
+        self.assertEqual(time_series[3:-1][-1], time_series_as_list[3:-1][-1])   
+
+        self.assertEqual(len(time_series[-1:]), len(time_series_as_list[-1:]))
+        self.assertEqual(time_series[-1:][0], time_series_as_list[-1:][0])
+        self.assertEqual(time_series[-1:][-1], time_series_as_list[-1:][-1])
+
+        self.assertEqual(len(time_series[-3:-1]), len(time_series_as_list[-3:-1]))
+        self.assertEqual(time_series[-3:-1][0], time_series_as_list[-3:-1][0])
+        self.assertEqual(time_series[-3:-1][-1], time_series_as_list[-3:-1][-1])   
+
 
     def test_TimeSeries_with_DataTimePoints(self):
 
