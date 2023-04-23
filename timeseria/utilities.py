@@ -12,6 +12,8 @@ from .time import s_from_dt
 from .exceptions import FloatConversionError
 import subprocess
 from collections import namedtuple
+import numpy as np 
+from scipy import stats, optimize
 
 # Setup logging
 import logging
@@ -264,6 +266,55 @@ def os_shell(command, capture=False, verbose=False, interactive=False, silent=Fa
             return True
         else:
             return True
+
+
+class _Gaussian():
+    
+    def __init__(self, mu, sigma, data=None):
+        self.mu = mu
+        self.sigma = sigma
+        self.data = data
+
+    def __call__(self, x):
+        return np.exp(-np.power(x - self.mu, 2.) / (2 * np.power(self.sigma, 2.)))
+
+    @classmethod
+    def from_data(cls, data):
+        mu, sigma = stats.norm.fit(data) 
+        return cls(mu,sigma,data)
+
+    def plot(self):
+        
+        import matplotlib.pyplot as plt
+        
+        # Plot the histogram.
+        if self.data:
+            plt.hist(self.data, bins=25, density=True, alpha=0.6, color='b')
+
+        # Plot the gaussian itself
+        xmin, xmax = plt.xlim()
+        x = np.linspace(xmin, xmax, 100)
+        p = stats.norm.pdf(x, self.mu, self.sigma)
+
+        plt.plot(x, p, 'k', linewidth=2)
+        title = "Fit Values: {:.6f} and {:.6f}".format(self.mu, self.sigma)
+        plt.title(title)
+
+        # Show the plot
+        plt.show()
+
+    def find_xes(self, y, wideness=1000):
+        # "self" can be any function, we use the gaussian class as a callable object here.
+        
+        start = self.mu
+        end   = self.sigma*wideness
+
+        def scaled_gaussian(x):
+            return self(x)-y
+        
+        x = optimize.bisect(scaled_gaussian, start, end)
+
+        return [ self.mu - (x-self.mu), x]
 
 
 #===========================
