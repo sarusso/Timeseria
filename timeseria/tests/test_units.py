@@ -240,17 +240,17 @@ class TestTimeUnits(unittest.TestCase):
         datetime1 = dt(2015,10,24,0,15,0, tzinfo='Europe/Rome')
         datetime2 = dt(2015,10,25,0,15,0, tzinfo='Europe/Rome')
         datetime3 = dt(2015,10,26,0,15,0, tzinfo='Europe/Rome')
-
+        
         # Day unit
         time_unit = TimeUnit('1D')
         self.assertEqual(time_unit.shift_dt(datetime1), dt(2015,10,25,0,15,0, tzinfo='Europe/Rome')) # No DST, standard day
         self.assertEqual(time_unit.shift_dt(datetime2), dt(2015,10,26,0,15,0, tzinfo='Europe/Rome')) # DST, change
-                 
+        
         # Week unit
         time_unit = TimeUnit('1W')
         self.assertEqual(time_unit.shift_dt(datetime1), dt(2015,10,31,0,15,0, tzinfo='Europe/Rome'))
         self.assertEqual(time_unit.shift_dt(datetime3), dt(2015,11,2,0,15,0, tzinfo='Europe/Rome'))
-         
+        
         # Month Unit
         time_unit = TimeUnit('1M')
         self.assertEqual(time_unit.shift_dt(datetime1), dt(2015,11,24,0,15,0, tzinfo='Europe/Rome'))
@@ -260,11 +260,15 @@ class TestTimeUnits(unittest.TestCase):
         # Test 12%12 must give 12 edge case
         self.assertEqual(time_unit.shift_dt(dt(2015,1,1,0,0,0, tzinfo='Europe/Rome')), dt(2015,2,1,0,0,0, tzinfo='Europe/Rome'))
         self.assertEqual(time_unit.shift_dt(dt(2015,11,1,0,0,0, tzinfo='Europe/Rome')), dt(2015,12,1,0,0,0, tzinfo='Europe/Rome'))
-
+        
         # Year Unit
         time_unit = TimeUnit('1Y')
         self.assertEqual(time_unit.shift_dt(datetime1), dt(2016,10,24,0,15,0, tzinfo='Europe/Rome'))
-        
+
+        # Test on not-existent hour due to DST
+        starting_dt = dt(2023,3,25,2,15, tz='Europe/Rome')
+        with self.assertRaises(ValueError):
+            starting_dt + TimeUnit('1D')
 
     def test_TimeUnit_operations(self):
 

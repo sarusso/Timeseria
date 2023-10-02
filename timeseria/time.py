@@ -63,10 +63,10 @@ def dt(*args, **kwargs):
     if 'tz' in kwargs:
         tzinfo = kwargs.pop('tz')
     else:
-        tzinfo  = kwargs.pop('tzinfo', None)
+        tzinfo = kwargs.pop('tzinfo', None)
         
-    offset_s  = kwargs.pop('offset_s', None)   
-    trustme   = kwargs.pop('trustme', False)
+    offset_s = kwargs.pop('offset_s', None)   
+    trustme = kwargs.pop('trustme', False)
     
     if kwargs:
         raise Exception('Unhandled arg: "{}".'.format(kwargs))
@@ -91,7 +91,7 @@ def dt(*args, **kwargs):
     # Check consistency    
     if not trustme and timezone != pytz.UTC:
         if not check_dt_consistency(time_dt):
-            raise ValueError('Sorry, time {} does not exists on timezone {}'.format(time_dt, timezone))
+            raise ValueError('Sorry, time {} does not exist on timezone {}'.format(time_dt, timezone))
 
     return time_dt
 
@@ -106,7 +106,8 @@ def get_tz_offset_s(dt):
 
 
 def check_dt_consistency(dt):
-    """Check that a datetieme object is consistent with its timezone (some conditions can lead to have summertime set in winter)."""
+    """Check that a datetieme object is consistent with its timezone (some conditions can lead to
+    have summer time set in winter, or to end up in non-existent times as when changing DST)."""
 
     # https://en.wikipedia.org/wiki/Tz_database
     # https://www.iana.org/time-zones

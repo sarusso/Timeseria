@@ -578,7 +578,14 @@ class TimeUnit(Unit):
             
             # Check DST offset consistency and fix if not respected
             if not check_dt_consistency(time_shifted_dt):
-                time_shifted_dt = correct_dt_dst(time_shifted_dt)
+                try:
+                    time_shifted_dt = correct_dt_dst(time_shifted_dt)
+                except ValueError as e:
+                    # If we are here, it means that the datetime cannot be corrected.
+                    # This basically means that we are in the edge case where we ended
+                    # up in a a non-existent datetime, e.g. 2023-03-26 02:15 on Europe/Rome,
+                    # probably by adding a calendar time unit to a previous datetime
+                    raise ValueError('Cannot shift "{}" by "{}" ({})'.format(time_dt,self,e)) from None
 
         # Handle other cases (Consistency error)
         else:
