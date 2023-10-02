@@ -1577,7 +1577,7 @@ class TimeSeries(Series):
                 if arg.start.startswith('t='):
                     requested_start_t = float(arg.start.split('=')[1])
                 elif arg.start.startswith('dt='):
-                    requested_start_t = s_from_dt(dt_from_str(arg.split('=')[1].replace(' ', 'T')))
+                    requested_start_t = s_from_dt(dt_from_str(arg.start.split('=')[1].replace(' ', 'T')))
                 else:
                     raise ValueError('Don\'t know how to parse slicing start "{}"'.format(arg.start))
             elif isinstance(arg.start, dict):
@@ -1594,7 +1594,7 @@ class TimeSeries(Series):
                 if arg.start.startswith('t='):
                     requested_stop_t = float(arg.stop.split('=')[1])
                 elif arg.start.startswith('dt='):
-                    requested_stop_t = s_from_dt(dt_from_str(arg.split('=')[1].replace(' ', 'T')))
+                    requested_stop_t = s_from_dt(dt_from_str(arg.stop.split('=')[1].replace(' ', 'T')))
                 else:
                     raise ValueError('Don\'t know how to parse slicing stop "{}"'.format(arg.stop))
             elif isinstance(arg.stop, dict):
