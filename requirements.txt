@@ -6,7 +6,6 @@ pandas==1.3.4
 chardet==3.0.4
 convertdate==2.3.2
 lunarcalendar==0.0.9
-holidays==0.11.3.1
 cython==0.29.17
 requests==2.26.0
 h5py==3.6.0
@@ -15,6 +14,6 @@ pyppeteer==0.2.6
 
 # Optional
 #tensorflow==2.7.0   # TensorFlow (also -gpu, -macos or -aarch64 variants)
-#prophet==1.1.1      # Facebook's Prophet
+#prophet==1.1.4      # Facebook's Prophet
 #pmdarima==1.8       # AARIMA
 #statsmodels==0.12.1 # ARIMA, SARIMAX

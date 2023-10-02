@@ -9,7 +9,7 @@ RUN mkdir /notebooks && chown timeseria:timeseria /notebooks
 # builds to work (see https://github.com/facebook/prophet/issues/2002)
 RUN pip install statsmodels==0.12.1 pmdarima==1.8
 RUN pip install pystan==2.19.1.1
-RUN pip install prophet==1.1.1
+RUN pip install prophet==1.1.4
 RUN pip install plotly==5.11.0
 
 # Also add widgetsnbextension, required to automatically sign Notebooks
