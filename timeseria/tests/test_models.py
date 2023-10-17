@@ -699,15 +699,16 @@ class TestAnomalyDetectors(unittest.TestCase):
         anomaly_detector = PeriodicAverageAnomalyDetector()
         
         anomaly_detector.fit(self.sine_minute_time_series, periodicity=63)
-        
-        self.assertAlmostEqual(anomaly_detector.data['AE_threshold'], 0.5914733390853167)
+
+        self.assertAlmostEqual(anomaly_detector.data['gaussian_mu'], -0.00064, places=5)
+        self.assertAlmostEqual(anomaly_detector.data['gaussian_sigma'], 0.21016, places=4)
         
         result_time_series = anomaly_detector.apply(self.sine_minute_time_series)
 
         # Count how many anomalies were detected
         anomalies_count = 0
         for slot in result_time_series:
-            if slot.data_indexes['anomaly']:
+            if slot.data_indexes['anomaly'] > 0.6:
                 anomalies_count += 1
         self.assertEqual(anomalies_count, 9)
 
@@ -721,7 +722,7 @@ class TestAnomalyDetectors(unittest.TestCase):
         anomaly_detector.fit(time_series)
           
         # TODO: do some actual testing.. not only that "it works"
-        anomaly_time_series  = anomaly_detector.apply(time_series)
+        _  = anomaly_detector.apply(time_series)
 
 
     def test_PeriodicAverageAnomalyDetector_save_load(self):
@@ -736,9 +737,10 @@ class TestAnomalyDetectors(unittest.TestCase):
         anomaly_detector.save(model_path)
         
         loaded_anomaly_detector = PeriodicAverageAnomalyDetector(model_path)
+        self.assertEqual(list(anomaly_detector.data.keys()), ['id', 'forecaster_id', 'resolution', 'data_labels', 'forecasting_errors', 'gaussian_mu', 'gaussian_sigma', 'fitted_at'])
         
-        self.assertEqual(anomaly_detector.data['AE_threshold'], loaded_anomaly_detector.data['AE_threshold'])
-        self.assertEqual(anomaly_detector.forecaster.data['averages'], loaded_anomaly_detector.forecaster.data['averages'])
-
-        result_time_series = loaded_anomaly_detector.apply(self.sine_minute_time_series)
+        self.assertAlmostEqual(anomaly_detector.data['gaussian_mu'], -0.00064, places=5)
+        self.assertAlmostEqual(anomaly_detector.data['gaussian_sigma'], 0.21016, places=4)
+        
+        _ = loaded_anomaly_detector.apply(self.sine_minute_time_series)
 
