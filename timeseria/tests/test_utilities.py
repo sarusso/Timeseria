@@ -2,6 +2,7 @@ import unittest
 import os
 from ..utilities import detect_encoding, detect_periodicity, detect_sampling_interval
 from ..utilities import _compute_coverage, _compute_data_loss, _compute_validity_regions 
+from ..utilities import _Gaussian
 from ..datastructures import DataTimePoint, TimeSeries
 from ..time import dt, s_from_dt
 from ..storages import CSVFileStorage
@@ -389,4 +390,30 @@ class TestDetectEncoding(unittest.TestCase):
         
         encoding = detect_encoding('{}/csv/shampoo_sales.csv'.format(TEST_DATA_PATH), streaming=False)
         self.assertEqual(encoding, 'ascii')
+
+
+class TestGaussian(unittest.TestCase):
+
+    def test_gaussian(self):
+        
+        test_data = [1,3,7,8,8,8,9,9,9,9,9,10,10,10,10,10,10,11,11,11,11,12,12,12,13,13,15,15,18,20]
+        
+        gaussian = _Gaussian.from_data(test_data)
+
+        # Check parameters
+        self.assertAlmostEqual(gaussian.mu, 10.466, places=2)
+        self.assertAlmostEqual(gaussian.sigma, 3.639, places=2)
+        
+        # Check callable function behavior
+        self.assertAlmostEqual(gaussian(10), 0.991, places=2)
+
+        # Check solver (find xes):
+        self.assertAlmostEqual(gaussian.find_xes(y=0.5)[0], 6.181, places=2)
+        self.assertAlmostEqual(gaussian.find_xes(y=0.5)[1], 14.752, places=2)
+        self.assertAlmostEqual(gaussian(gaussian.find_xes(y=0.5)[0]), 0.5)
+        self.assertAlmostEqual(gaussian(gaussian.find_xes(y=0.5)[1]), 0.5)
+        
+        # Edge case to find back the peak
+        self.assertAlmostEqual(gaussian.find_xes(y=1)[0], 10.466, places=2)
+        self.assertAlmostEqual(gaussian.find_xes(y=1)[1], 10.466, places=2)
 
