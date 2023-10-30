@@ -21,3 +21,6 @@ class NoDataException(Exception):
 class FloatConversionError(Exception):
     """Raise to group the various exceptions that can lead to the impossibility of converting a value to a floating point."""
     pass
+
+class NotEnoughDataError(Exception):
+    """Raised in context when there is not enough data to perform the required operation"""
