@@ -449,6 +449,8 @@ class PeriodicAverageReconstructor(Reconstructor):
         path (str): a path from which to load a saved model. Will override all other init settings.
     """
 
+    window = 1
+    
     def fit(self, data, data_loss_threshold=0.5, periodicity='auto', dst_affected=False,  offset_method='average', start=None, end=None, **kwargs):
         # This is a fit wrapper only to allow correct documentation
         

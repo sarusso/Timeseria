@@ -527,6 +527,10 @@ class PeriodicAverageForecaster(Forecaster):
         window (int): the window length. If set to ``auto``, then it will be automatically handled based on the time series periodicity.
     """
     
+    @property
+    def window(self):
+        return self.data['window']
+    
     def __init__(self, path=None, window='auto'):
 
         # Set window
@@ -535,7 +539,7 @@ class PeriodicAverageForecaster(Forecaster):
                 int(window)
             except:
                 raise ValueError('Got a non-integer window ({})'.format(window)) 
-        self.window = window
+        self._window = window
 
         # Call parent init        
         super(PeriodicAverageForecaster, self).__init__(path=path)
@@ -595,8 +599,8 @@ class PeriodicAverageForecaster(Forecaster):
         self.data['dst_affected'] = dst_affected
 
         # Set window
-        if self.window != 'auto':
-            self.data['window'] = self.window
+        if self._window != 'auto':
+            self.data['window'] = self._window
         else:
             logger.info('Using a window of "{}"'.format(periodicity))
             self.data['window'] = periodicity
@@ -705,6 +709,8 @@ class ProphetForecaster(Forecaster, _ProphetModel):
         path (str): a path from which to load a saved model. Will override all other init settings.
     """
 
+    window = None
+
     def _fit(self, series, start=None, end=None, **kwargs):
 
         if len(series.data_labels()) > 1:
@@ -801,6 +807,8 @@ class ARIMAForecaster(Forecaster, _ARIMAModel):
         q(int): the order of the MA term.
     """
 
+    window = 0
+
     def __init__(self, path=None, p=1,d=1,q=0): #p=5,d=2,q=5
         if (p,d,q) == (1,1,0):
             logger.info('You are using ARIMA\'s defaults of p=1, d=1, q=0. You might want to set them to more suitable values when initializing the model.')
@@ -855,6 +863,8 @@ class AARIMAForecaster(Forecaster, _ARIMAModel):
     Args:
         path (str): a path from which to load a saved model. Will override all other init settings.
     """
+
+    window = 0
 
     def _fit(self, series, **kwargs):
          
@@ -918,7 +928,11 @@ class LSTMForecaster(Forecaster, _KerasModel):
         neurons(int): how many neaurons to use for the LSTM neural nework hidden layer.
         keras_model(keras.Model) : an optional external Keras Model architecture. Will cause the ``neurons`` argument to be discarded.
     """
-        
+     
+    @property
+    def window(self):
+        return self.data['window']
+    
     def __init__(self, path=None, window=3, features=['values'], neurons=128, keras_model=None):
 
         # TODO: move this at the end of the init.
