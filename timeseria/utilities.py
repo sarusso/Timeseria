@@ -268,6 +268,8 @@ def os_shell(command, capture=False, verbose=False, interactive=False, silent=Fa
             return True
 
 
+from statistics import NormalDist
+
 class _Gaussian():
     
     def __init__(self, mu, sigma, data=None):
@@ -276,32 +278,50 @@ class _Gaussian():
         self.data = data
 
     def __call__(self, x):
-        return np.exp(-np.power(x - self.mu, 2.) / (2 * np.power(self.sigma, 2.)))
+        return stats.norm.pdf(x, self.mu, self.sigma)
+
+    def cumulative(self,x):
+        return stats.norm.cdf(x, self.mu, self.sigma)
 
     @classmethod
     def from_data(cls, data):
         mu, sigma = stats.norm.fit(data) 
         return cls(mu,sigma,data)
-
-    def plot(self):
+     
+    def adherence(self, x):
+        return 2 * (1-stats.norm.cdf(abs(x), self.mu, self.sigma))
         
+    def plot(self, cumulative=False, adherence=False, bins=20):
+                
         import matplotlib.pyplot as plt
         
         # Plot the histogram.
         if self.data:
-            plt.hist(self.data, bins=25, density=True, alpha=0.6, color='b')
+            plt.hist(self.data, bins=bins, density=True, alpha=0.6, color='b')
 
         # Plot the gaussian itself
         xmin, xmax = plt.xlim()
         x = np.linspace(xmin, xmax, 100)
-        p = stats.norm.pdf(x, self.mu, self.sigma)
+        
+        if cumulative:            
+            title = 'Gasussian (mu={:.3f}, sigma={:.3f}) - cumulative'.format(self.mu, self.sigma)
+            p = stats.norm.cdf(x, self.mu, self.sigma)
+        elif adherence:
+            title = 'Gasussian (mu={:.3f}, sigma={:.3f}) - adherence'.format(self.mu, self.sigma)
+            p = self.adherence(x)
+        else:
+            title = 'Gasussian (mu={:.3f}, sigma={:.3f})'.format(self.mu, self.sigma)
+            p = stats.norm.pdf(x, self.mu, self.sigma)
 
         plt.plot(x, p, 'k', linewidth=2)
-        title = "Fit Values: {:.6f} and {:.6f}".format(self.mu, self.sigma)
         plt.title(title)
 
         # Show the plot
         plt.show()
+
+        # Show the plot
+        plt.show()
+
 
     def find_xes(self, y, wideness=1000):
         # "self" can be any function, we use the gaussian class as a callable object here.
@@ -769,4 +789,61 @@ def _to_time_unit_string(seconds, friendlier=True):
     else:
         seconds_str = seconds_str+'s'
     return seconds_str
+
+
+def rescale(value, source_from, source_to, target_from=0, target_to=1, how='linear'):
+
+    if value < 0:
+        raise ValueError('Cannot rescale negative value')
+    if source_from < 0:
+        raise ValueError('Cannot rescale using negative source_from')
+    if source_to < 0:
+        raise ValueError('Cannot rescale using negative source_to')
+    if target_from < 0:
+        raise ValueError('Cannot rescale using negative target_from')
+    if target_to < 0:
+        raise ValueError('Cannot rescale using negative target_to')    
+    
+    if value < source_from:
+        raise ValueError('Cannot rescale a value outside the source interval (value={}, source_from={}'.format(value, source_from))
+    if value > source_to:
+        raise ValueError('Cannot rescale a value outside the source interval (value={}, source_to={}'.format(value, source_to))
+
+    source_total = source_to - source_from
+    source_segment = value - source_from 
+    value_ratio = source_segment/source_total
+    
+    if target_from==0 and target_to==1:
+        return value_ratio
+    else:
+        target_total = target_to - target_from
+        return ((value_ratio*target_total)+target_from)
+    
+    # If how=log...log_compression /log base
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 

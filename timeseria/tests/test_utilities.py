@@ -3,6 +3,7 @@ import os
 from ..utilities import detect_encoding, detect_periodicity, detect_sampling_interval
 from ..utilities import _compute_coverage, _compute_data_loss, _compute_validity_regions 
 from ..utilities import _Gaussian
+from ..utilities import rescale
 from ..datastructures import DataTimePoint, TimeSeries
 from ..time import dt, s_from_dt
 from ..storages import CSVFileStorage
@@ -405,15 +406,40 @@ class TestGaussian(unittest.TestCase):
         self.assertAlmostEqual(gaussian.sigma, 3.639, places=2)
         
         # Check callable function behavior
-        self.assertAlmostEqual(gaussian(10), 0.991, places=2)
+        self.assertAlmostEqual(gaussian(gaussian.mu), 0.1096, places=3)
+
+        self.assertAlmostEqual(gaussian(10), 0.1087, places=4)
 
         # Check solver (find xes):
-        self.assertAlmostEqual(gaussian.find_xes(y=0.5)[0], 6.181, places=2)
-        self.assertAlmostEqual(gaussian.find_xes(y=0.5)[1], 14.752, places=2)
-        self.assertAlmostEqual(gaussian(gaussian.find_xes(y=0.5)[0]), 0.5)
-        self.assertAlmostEqual(gaussian(gaussian.find_xes(y=0.5)[1]), 0.5)
+        self.assertAlmostEqual(gaussian.find_xes(y=0.1)[0], 8.9079, places=3)
+        self.assertAlmostEqual(gaussian.find_xes(y=0.1)[1], 12.0253, places=3)
+        self.assertAlmostEqual(gaussian(gaussian.find_xes(y=0.05)[0]), 0.05, places=3)
+        self.assertAlmostEqual(gaussian(gaussian.find_xes(y=0.05)[1]), 0.05, places=3)
         
         # Edge case to find back the peak
-        self.assertAlmostEqual(gaussian.find_xes(y=1)[0], 10.466, places=2)
-        self.assertAlmostEqual(gaussian.find_xes(y=1)[1], 10.466, places=2)
+        self.assertAlmostEqual(gaussian.find_xes(y=0.1096)[0], 10.4422, places=2)
+        self.assertAlmostEqual(gaussian.find_xes(y=0.1096)[1], 10.4910, places=2)
+
+        # Test the CDF now
+        self.assertEqual(gaussian.cumulative(gaussian.mu), 0.5)
+        
+
+class TestRescale(unittest.TestCase):
+
+    def test_rescale(self):
+
+        with self.assertRaises(ValueError):
+            rescale(value=0.5, source_from=1, source_to=2, target_from=1, target_to=0)
+        with self.assertRaises(ValueError):
+            rescale(value=2.5, source_from=1, source_to=2, target_from=1, target_to=0)
+
+        self.assertEqual(rescale(value=7.5, source_from=5, source_to=10, target_from=0, target_to=1),0.5)
+        self.assertEqual(rescale(value=7.5, source_from=5, source_to=10, target_from=0, target_to=2),1)
+        self.assertEqual(rescale(value=7.5, source_from=5, source_to=10, target_from=1, target_to=2),1.5)
+        self.assertEqual(rescale(value=7.5, source_from=5, source_to=10, target_from=10, target_to=20),15)
+        self.assertEqual(rescale(value=0.5, source_from=0, source_to=1, target_from=7, target_to=8),7.5)
+
+        self.assertAlmostEqual(rescale(value=0.98, source_from=0.000016, source_to=1.0, target_from=0, target_to=1), 0.97999967)
+
+
 
