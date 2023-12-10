@@ -766,7 +766,7 @@ class CSVFileStorage(Storage):
                     data_part = ','.join([str(item.data[int(data_label)]) for data_label in series.data_labels()])
                 else:
                     data_part = ','.join([str(item.data[data_label]) for data_label in series.data_labels()])
-                data_indexes_part = ','.join([str(getattr(item, index)) for index in data_indexes])
+                data_indexes_part = ','.join([str(item.data_indexes[index]) for index in data_indexes])
                 if data_indexes_part:
                     csv_file.write('{},{},{}\n'.format(item.t, data_part, data_indexes_part))
                 else:
