@@ -356,6 +356,16 @@ class TestTimeUnits(unittest.TestCase):
         self.assertEqual(time_unit.floor_dt(datetime1), datetime1_floor)
         self.assertEqual(time_unit.ceil_dt(datetime1), datetime1_ceil)
 
+        # Week unit
+        time_unit = TimeUnit('1W')
+        
+        datetime1 = dt(2023,10,29,15,47, tz='Europe/Rome') # DST off (+01:00)
+        datetime1_floor = dt(2023,10,23,0,0, tz='Europe/Rome') # DST on (+02:00)
+        datetime1_ceil = dt(2023,10,30,0,0, tz='Europe/Rome') # DST off (+01:00)
+
+        self.assertEqual(time_unit.floor_dt(datetime1), datetime1_floor)
+        self.assertEqual(time_unit.ceil_dt(datetime1), datetime1_ceil)
+
         # Month unit
         time_unit = TimeUnit('1M')
         

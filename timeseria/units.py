@@ -8,6 +8,7 @@ from .time import s_from_dt , dt_from_s, get_tz_offset_s
 from .time import is_dt_inconsistent, correct_dt_dst
 from .utilities import is_numerical
 from .exceptions import ConsistencyException
+from datetime import timedelta
             
 # Setup logging
 import logging
@@ -487,7 +488,12 @@ class TimeUnit(Unit):
                 rounded_dt=time_dt.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
             if self.weeks:
-                raise NotImplementedError('Cannot round based on calendar TimeUnits with weeks')
+                # Get to this day midnight
+                rounded_dt = TimeUnit('1D').floor_dt(time_dt)
+                
+                # If not monday, subtract enought days to get there
+                if rounded_dt.weekday() != 0:
+                    rounded_dt = rounded_dt - timedelta(days=rounded_dt.weekday())
 
             if self.days:
                 if self.days > 1:
