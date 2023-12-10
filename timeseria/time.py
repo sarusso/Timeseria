@@ -9,7 +9,6 @@ logger = logging.getLogger(__name__)
 
 UTC = pytz.UTC
 
-
 def timezonize(tz):
     """Convert a string representation of a timezone to its pytz object,
     or do nothing if the argument is already a pytz timezone."""
@@ -28,6 +27,34 @@ def timezonize(tz):
         tz = pytz.timezone(tz)
   
     return tz
+
+
+def is_dt_inconsistent(dt):
+    """Check that a datetieme object is consistent with its timezone (some conditions can lead to
+    have summer time set in winter, or to end up in non-existent times as when changing DST)."""
+
+    # https://en.wikipedia.org/wiki/Tz_database
+    # https://www.iana.org/time-zones
+    
+    if dt.tzinfo is None:
+        return False
+    else:
+        
+        # This check is quite heavy but there is apparently no other way to do it.
+        if dt.utcoffset() != dt_from_s(s_from_dt(dt), tz=dt.tzinfo).utcoffset():
+            return True
+        else:
+            return False
+
+
+def is_dt_ambiguous_without_offset(dt):
+    """Check if a datetime object is specified in an ambigous way on a given timezone"""
+
+    dt_minus_one_hour_via_UTC = UTC.localize(datetime.datetime.utcfromtimestamp(s_from_dt(dt)-3600)).astimezone(dt.tzinfo)
+    if dt.hour == dt_minus_one_hour_via_UTC.hour:
+        return True
+    return False
+
 
 
 def now_s():
@@ -67,6 +94,7 @@ def dt(*args, **kwargs):
         
     offset_s = kwargs.pop('offset_s', None)   
     trustme = kwargs.pop('trustme', False)
+    strict = kwargs.pop('strict', False)
     
     if kwargs:
         raise Exception('Unhandled arg: "{}".'.format(kwargs))
@@ -86,13 +114,20 @@ def dt(*args, **kwargs):
         time_dt = datetime.datetime(*args, tzinfo=tzoffset(None, offset_s))
     else:
         # Standard  timezone
-        time_dt = timezone.localize(datetime.datetime(*args))
+        naive_time_dt = datetime.datetime(*args)
+        time_dt = timezone.localize(naive_time_dt)
+        if not trustme and timezone != UTC:
+            if is_dt_ambiguous_without_offset(time_dt):
+                if strict:
+                    raise ValueError('Sorry, time {} is ambiguous on timezone {} without an offset'.format(naive_time_dt, timezone))
+                else:
+                    logger.warning('Time {} is ambiguous on timezone {}, assuming {} UTC offset'.format(naive_time_dt, timezone, time_dt.utcoffset()))
 
     # Check consistency    
-    if not trustme and timezone != pytz.UTC:
-        if not check_dt_consistency(time_dt):
+    if not trustme and timezone != UTC:
+        if is_dt_inconsistent(time_dt):
             raise ValueError('Sorry, time {} does not exist on timezone {}'.format(time_dt, timezone))
-
+    
     return time_dt
 
 
@@ -102,25 +137,7 @@ def _dt(*args, **kwargs):
 
 def get_tz_offset_s(dt):
     """Get the timezone offset in seconds."""
-    return s_from_dt(dt.replace(tzinfo=pytz.UTC)) - s_from_dt(dt)
-
-
-def check_dt_consistency(dt):
-    """Check that a datetieme object is consistent with its timezone (some conditions can lead to
-    have summer time set in winter, or to end up in non-existent times as when changing DST)."""
-
-    # https://en.wikipedia.org/wiki/Tz_database
-    # https://www.iana.org/time-zones
-    
-    if dt.tzinfo is None:
-        return True
-    else:
-        
-        # This check is quite heavy but there is apparently no other way to do it.
-        if dt.utcoffset() != dt_from_s(s_from_dt(dt), tz=dt.tzinfo).utcoffset():
-            return False
-        else:
-            return True
+    return s_from_dt(dt.replace(tzinfo=UTC)) - s_from_dt(dt)
 
 
 def correct_dt_dst(dt):

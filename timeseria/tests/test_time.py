@@ -46,8 +46,12 @@ class TestTime(unittest.TestCase):
 
         # Not existent time raises
         with self.assertRaises(ValueError):
-            _ = dt(2015,3,29,2,15,0, tzinfo='Europe/Rome')
-         
+            dt(2015,3,29,2,15,0, tzinfo='Europe/Rome')
+        
+        # Ambiguous time raises (if strict, otherwise it just issues a warning) 
+        with self.assertRaises(ValueError):
+            dt(2015,10,25,2,15,0, tzinfo='Europe/Rome', strict=True)
+
         # Not existent time does not raises   
         date_time = dt(2015,3,29,2,15,0, tzinfo='Europe/Rome', trustme=True)
         self.assertEqual(date_time.year, 2015)

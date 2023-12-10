@@ -5,7 +5,7 @@ import re
 import datetime
 import math
 from .time import s_from_dt , dt_from_s, get_tz_offset_s
-from .time import check_dt_consistency, correct_dt_dst
+from .time import is_dt_inconsistent, correct_dt_dst
 from .utilities import is_numerical
 from .exceptions import ConsistencyException
             
@@ -495,7 +495,7 @@ class TimeUnit(Unit):
                 rounded_dt=time_dt.replace(hour=0, minute=0, second=0, microsecond=0)
 
             # Check DST offset consistency and fix if not respected
-            if not check_dt_consistency(rounded_dt):
+            if is_dt_inconsistent(rounded_dt):
                 rounded_dt = correct_dt_dst(rounded_dt)
             
             if how == 'ceil':
@@ -577,7 +577,7 @@ class TimeUnit(Unit):
                     raise ValueError('Error: {} for {} plus {} month(s)'.format(e, time_shifted_dt, self.months))
             
             # Check DST offset consistency and fix if not respected
-            if not check_dt_consistency(time_shifted_dt):
+            if is_dt_inconsistent(time_shifted_dt):
                 try:
                     time_shifted_dt = correct_dt_dst(time_shifted_dt)
                 except ValueError as e:
