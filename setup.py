@@ -31,7 +31,8 @@ setup(name='timeseria',
                           'requests >=2.20.0, <3.0.0',
                           'h5py >=2.10.0, <4.0.0',
                           'scipy >=1.5.4, <2.0.0',
-                          'pyppeteer>=0.2.6, <1.0.0'
+                          'pyppeteer>=0.2.6, <1.0.0',
+                          'fitter>=1.5.1, <1.6.0',
                           ],
       extras_require = {
                         'tensorflow': ['tensorflow >=1.15.2, <3.0.0'],
