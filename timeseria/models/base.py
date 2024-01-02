@@ -185,7 +185,7 @@ class Model():
         try:
             self._apply
         except AttributeError:
-            raise NotImplementedError('Applying this model is not implemented')
+            raise NotImplementedError('Applying this model is not implemented') from None
 
         # Ensure the model is fitted if it has to
         try:
