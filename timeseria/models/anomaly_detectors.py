@@ -2,11 +2,14 @@
 """Anomaly detection models."""
 
 from copy import deepcopy
-from ..utilities import _Gaussian
+from ..utilities import _Gaussian, rescale
 from .forecasters import Forecaster, PeriodicAverageForecaster
 from .reconstructors import Reconstructor, PeriodicAverageReconstructor
 from .base import Model
-from math import log
+from math import log10
+from fitter import Fitter, get_common_distributions, get_distributions
+from ..utilities import DistributionFunction
+
 
 # Setup logging
 import logging
@@ -25,31 +28,92 @@ except (ImportError,AttributeError):
 #  Utility functions
 #===================================
 
+def _compute_distribution_approximation_errors(distribution_function, prediction_errors, bins=30, details=False):
+
+    distribution_function_max_value = distribution_function(distribution_function.mu)
+
+    # Support vars
+    max_prediction_error = max(prediction_errors)
+    min_prediction_error = min(prediction_errors)
+    error_span = max_prediction_error - min_prediction_error
+
+    # Create the bins
+    error_step = error_span / bins
+    prediction_error_bins = [[] for _ in range(bins)]
+    for i, prediction_error in enumerate(prediction_errors):
+        for j in range(bins-1):
+            if ( (min_prediction_error + (error_step*j))  <= prediction_error <= (min_prediction_error + (error_step*(j+1))) ):
+                prediction_error_bins[j].append(prediction_error)
+
+    real_distribution_values = {} # x -> y
+    max_len = 0
+    for i, prediction_error_bin in enumerate(prediction_error_bins):
+        if prediction_error_bin:
+            real_distribution_values[min_prediction_error + (error_step*i) + (error_step/2)] = len(prediction_error_bin)
+            if len(prediction_error_bin) > max_len:
+                max_len = len(prediction_error_bin)
+
+    # Normalize
+    for key in real_distribution_values:
+        real_distribution_values[key] = real_distribution_values[key]/max_len
+
+    # Compute the approximation errors
+    approximation_errors = []
+    binned_distribution_values = []
+    binned_real_distribution_values = []
+    for key in real_distribution_values:
+        #logger.debug('{}: \t{}\t vs\t {}'.format(key, distribution(key),real_distribution_values[key]))
+        binned_distribution_values.append(distribution_function(key))
+        binned_real_distribution_values.append(real_distribution_values[key])
+        approximation_errors.append(abs(distribution_function(key)-real_distribution_values[key]))
+
+    if details:
+        return (approximation_errors, binned_distribution_values, binned_real_distribution_values)
+    else:
+        return approximation_errors
+
 def _inspect_error_distribution_based_anomaly_detection_model(model, plot=False):
-    print('Gaussian Mu: {}'.format(model.data['gaussian_mu']))
-    print('Gausian Sigma: {}'.format(model.data['gaussian_sigma']))
     print('Predictive model error (avg): {}'.format(sum(model.data['prediction_errors'])/len(model.data['prediction_errors'])))
     print('Predictive model error (min): {}'.format(min(model.data['prediction_errors'])))
     print('Predictive model error (max): {}'.format(max(model.data['prediction_errors'])))
 
-    if plot:        
+    print('Error distribution: {}'.format(model.data['error_distribution']))
+    print('Error distribution params: {}'.format(model.data['error_distribution_params']))
+    print('Error distribution stats: {}'.format(model.data['error_distribution_stats']))
+
+    if plot:
         import matplotlib.pyplot as plt
         import numpy as np
         import scipy.stats as stats
 
-        # Plot the histogram
-        plt.hist(model.data['prediction_errors'], bins=25, density=True, alpha=0.6, color='b')
-          
-        # Plot the PDF
-        xmin, xmax = plt.xlim()
-        x = np.linspace(xmin, xmax, 100)
-        p = stats.norm.pdf(x, model.data['gaussian_mu'], model.data['gaussian_sigma'])
-          
-        plt.plot(x, p, 'k', linewidth=2)
-        title = "Mu: {:.6f}   Sigma: {:.6f}".format(model.data['gaussian_mu'], model.data['gaussian_sigma'])
-        plt.title(title)
-          
+        x_min = min(model.data['prediction_errors'])
+        x_max = max(model.data['prediction_errors'])
+
+        # Plot the error distribution function
+        distribution_function = DistributionFunction(model.data['error_distribution'],
+                                                     model.data['error_distribution_params'])
+        plt = distribution_function.plot(show=False, x_min=x_min, x_max=x_max)
+
+        # Add the histogram to the plot
+        plt.hist(model.data['prediction_errors'], bins=30, density=True, alpha=0.6, color='b')
+
+        # Override title
+        plt.title('Error distribution: {}'.format(model.data['error_distribution']))
+
+        # Show the plot
         plt.show()
+
+        #p = stats.norm.pdf(x, model.data['gaussian_mu'], model.data['gaussian_sigma'])
+        #plt.plot(x, p, 'k', linewidth=2)
+        #title = "Mu: {:.6f}   Sigma: {:.6f}".format(model.data['gaussian_mu'], model.data['gaussian_sigma'])
+        #plt.title(title)
+        #plt.show()
+
+        # Plot both together
+        #plt.plot(binned_distribution_values, color='black')
+        #plt.plot(binned_real_distribution_values, color='blue')
+        #plt.title('Error distribution function (black) vs real error distribution (blue)')
+        #plt.show()
 
 
 def _get_actual_and_predicted_from_predictive_model(predictive_model, series, i, data_label, window):
@@ -92,6 +156,15 @@ def _fit_predictive_model_based_anomaly_detector(anomaly_detector, series, *args
         if len(series.data_labels()) > 1:
             raise NotImplementedError('Multivariate time series are not yet supported')
 
+        distribution = kwargs.pop('distribution', None)
+        if not distribution:
+            distributions = kwargs.pop('distributions', get_common_distributions() +['gennorm'])
+            #distributions = kwargs.pop('distributions', get_distributions())
+        else:
+            distributions = [distribution]
+
+        summary = kwargs.pop('summary', False)
+
         # Detect the predictive model being used
         predictive_model = None
         try:
@@ -109,21 +182,21 @@ def _fit_predictive_model_based_anomaly_detector(anomaly_detector, series, *args
 
         # Fit the predictive model
         predictive_model.fit(series, *args, **kwargs)
-        
+
         # Evaluate the predictive for one step ahead and get the forecasting errors
         prediction_errors = []
         for data_label in series.data_labels():
-            
+
             for i, _ in enumerate(series):
-                
+
                 # Before the window
-                if i <=  predictive_model.window:    
+                if i <=  predictive_model.window:
                     continue
-                
+
                 # After the window
-                if i >  len(series)-predictive_model.window-1:    
+                if i >  len(series)-predictive_model.window-1:
                     break 
-                
+
                 # Predict & append the error
                 actual, predicted = _get_actual_and_predicted_from_predictive_model(predictive_model, series, i, data_label, predictive_model.window)
                 prediction_errors.append(actual-predicted)
@@ -131,17 +204,38 @@ def _fit_predictive_model_based_anomaly_detector(anomaly_detector, series, *args
         # Store the forecasting errors internally in the model
         anomaly_detector.data['prediction_errors'] = prediction_errors
 
-        # TODO: test that the errors actually follow a normal (gaussian) distribution
+        # Fit the distributions and select the best one
+        fitter_logger = logging.getLogger('fitter')
+        fitter_logger.setLevel(level=logging.CRITICAL)
 
-        # Fit the Gaussian
-        gaussian = _Gaussian.from_data(prediction_errors)
+        fitter = Fitter(prediction_errors, distributions=distributions)
+        fitter.fit(progress=False)
 
-        anomaly_detector.data['gaussian_mu'] = gaussian.mu
-        anomaly_detector.data['gaussian_sigma'] = gaussian.sigma
+        if summary:
+            print(fitter.summary())
+
+        best_error_distribution = list(fitter.get_best().keys())[0]
+        best_error_distribution_stats = fitter.summary(plot=False).transpose().to_dict()[best_error_distribution]
+        error_distribution_params = fitter.get_best()[best_error_distribution]
+
+        if best_error_distribution_stats['ks_pvalue'] < 0.05:
+
+            logger.warning('The error distribution ({}) ks p-value is low ({}). '.format(best_error_distribution, best_error_distribution_stats['ks_pvalue']) + 
+                           'Expect issues. In case of math domain errors, try using lower index boundaries.')
+
+        if not (-0.01 <= error_distribution_params['loc'] <= 0.01):
+            logger.warning('The error distribution is not centered in (almost) zero, but in {}. Expect issues.'.format(error_distribution_params['loc']))
+
+        anomaly_detector.data['error_distribution'] = best_error_distribution
+        anomaly_detector.data['error_distribution_params'] = error_distribution_params
+        anomaly_detector.data['error_distribution_stats'] = best_error_distribution_stats
+
+        from statistics import stdev
+        anomaly_detector.data['stdev'] = stdev(prediction_errors)
 
 
-def _apply_predictive_model_based_anomaly_detector(anomaly_detector, series, stdevs_range=None, stdevs=None, emphasize=0, details=False,
-                                                   rescale_function=None, adherence_index=False, _anomaly_index_type='inv'):
+def _apply_predictive_model_based_anomaly_detector(anomaly_detector, series, index_range=None, stdevs=None, emphasize=0,
+                                                   details=False, rescale_function=None, add_adherence_index=False):
 
     #if inplace:
     #    raise Exception('Anomaly detection cannot be run inplace')
@@ -166,56 +260,55 @@ def _apply_predictive_model_based_anomaly_detector(anomaly_detector, series, std
 
     result_series = series.__class__()
 
-    gaussian = _Gaussian(anomaly_detector.data['gaussian_mu'], anomaly_detector.data['gaussian_sigma'])
+    distribution_function = DistributionFunction(anomaly_detector.data['error_distribution'],
+                                                    anomaly_detector.data['error_distribution_params'])
+
+    sigma = anomaly_detector.data['stdev'] 
+    error_distribution_center = 0
 
     for data_label in series.data_labels():
-        
-        # Compute support stuff          
+
+        # Compute support stuff
         prediction_errors = anomaly_detector.data['prediction_errors']
-        max_abs_prediction_error = max(abs(max(prediction_errors)),abs(min(prediction_errors)))
-        max_abs_prediction_error_gaussian_value = gaussian(max_abs_prediction_error)
+        abs_prediction_errors = [abs(prediction_error) for prediction_error in prediction_errors]
 
-        if stdevs_range:
-            
-            if stdevs_range[0] == max:
-                range_start_gaussian_value = max_abs_prediction_error_gaussian_value
-            else:
-                range_start_gaussian_value = gaussian((gaussian.sigma * stdevs_range[0]) + gaussian.mu)
+        if index_range:
 
-            if stdevs_range[1] == max:
-                range_end_gaussian_value = max_abs_prediction_error_gaussian_value
-            else:
-                range_end_gaussian_value = gaussian(gaussian.sigma * stdevs_range[1])
+            for i in range(2):
+                if isinstance(index_range[i], str):
+                    if index_range[i] == 'max':
+                        index_range[i] = max(abs_prediction_errors)
+
+                    elif index_range[i] == 'avg':
+                        index_range[i] = sum(abs_prediction_errors)/len(abs_prediction_errors)
+
+                    elif index_range[i].endswith('_sigma'):
+                        index_range[i] = float(index_range[i].replace('_sigma',''))*sigma
+
+                    elif index_range[i].endswith('sig'):
+                        index_range[i] = float(index_range[i].replace('sig',''))*sigma
+
+            x_start = index_range[0]
+            x_end = index_range[1]
+
+            # Compute Normal (N) probabilities for start/end
+            adherence_x_start = distribution_function.adherence(x_start)
+            adherence_x_end = distribution_function.adherence(x_end)
+
         else:
-            range_start_gaussian_value = None
-            range_end_gaussian_value = None
+            if not stdevs:
+                raise ValueError('Got no index_range nor stdevs')
 
-        if False:
-            logger.debug('max_prediction_error={}'.format(max(prediction_errors)))
-            logger.debug('max_prediction_error_gaussian_value={}'.format(gaussian(max(prediction_errors))))
-
-            logger.debug('min_prediction_error={}'.format(min(prediction_errors)))
-            logger.debug('min_prediction_error_gaussian_value={}'.format(gaussian(min(prediction_errors))))
-
-            logger.debug('max_abs_prediction_error={}'.format(max_abs_prediction_error))
-            logger.debug('max_abs_prediction_error_gaussian_value={}'.format(max_abs_prediction_error_gaussian_value))
-            
-            logger.debug('stdevs: 1={} ({})'.format(gaussian.sigma *1, gaussian(gaussian.sigma *1)))
-            logger.debug('stdevs: 2={} ({})'.format(gaussian.sigma *2, gaussian(gaussian.sigma *2)))
-            logger.debug('stdevs: 3={} ({})'.format(gaussian.sigma *3, gaussian(gaussian.sigma *3)))
-          
-            logger.debug('range_start_gaussian_value={}'.format(range_start_gaussian_value))
-            logger.debug('range_end_gaussian_value={}'.format(range_end_gaussian_value))
 
         for i, item in enumerate(series):
             forecaster_window = predictive_model.window
 
             # Before the window 
-            if i <=  predictive_model.window:    
+            if i <=  predictive_model.window:
                 continue
-            
+
             # After the window
-            if i >  len(series)-predictive_model.window-1:    
+            if i >  len(series)-predictive_model.window-1:
                 break
 
             # New item
@@ -228,74 +321,63 @@ def _apply_predictive_model_based_anomaly_detector(anomaly_detector, series, std
             #    logger.info('{}: {} vs {}'.format(series[i].dt, actual, predicted))
 
             prediction_error = actual-predicted
-            absolute_prediction_error = abs(prediction_error)
-            
+
             # Compute the model adherence probability index
-            if adherence_index:
-                item.data_indexes['adherence'] = gaussian(prediction_error)
-               
+            if add_adherence_index:
+                item.data_indexes['adherence'] = distribution_function(prediction_error)
+
             # Are threshold/cutoff stdevs defined?
             if stdevs or 'stdevs' in anomaly_detector.data:
 
                 anomaly_index = 0
-                
+
                 # TODO: performance hit, move me outside the loop
                 if prediction_error > 0:
-                    error_threshold = gaussian.mu + (gaussian.sigma * stdevs if stdevs else anomaly_detector.data['stdevs'])
+                    error_threshold = error_distribution_center + (sigma * stdevs if stdevs else anomaly_detector.data['stdevs'])
                     if prediction_error > error_threshold:
                         anomaly_index = 1
                 else:
-                    error_threshold = gaussian.mu - (gaussian.sigma * stdevs if stdevs else anomaly_detector.data['stdevs'])
+                    error_threshold = error_distribution_center - (sigma * stdevs if stdevs else anomaly_detector.data['stdevs'])
                     if prediction_error < error_threshold:
                         anomaly_index = 1
 
                 #if logs and anomaly_index == 1:
-                #    logger.info('Detected anomaly for item @ {} ({}) with AE="{:.3f}..."'.format(item.t, item.dt, absolute_prediction_error))
+                #    logger.info('Detected anomaly for item @ {} ({}) with AE="{:.3f}..."'.format(item.t, item.dt, abs_prediction_error))
 
             else:
-                
-                # Compute a continuous anomaly index
-                
-                if stdevs_range and stdevs_range != [0, max]:
-                    # The range in which the anomaly index is rescaled. Defaults to 0, max.
-                    # Below no the start it means anomaly (0), above always anomaly (1).
-                    # In the middle it follows the error Gaussian distribution and it is  
-                    # rescaled between 0 and 1.
-                    
-                    # Get this forecasting error
-                    prediction_error_gaussian_value = gaussian(prediction_error)
 
-                    # Check boundaries and if not compute 
-                    if prediction_error_gaussian_value>=range_start_gaussian_value:
-                        anomaly_index = 0
-                    elif prediction_error_gaussian_value<=range_end_gaussian_value:
-                        anomaly_index = 1
-                    else:
-                        total_gaussian_value = range_start_gaussian_value - range_end_gaussian_value
-                        portion_gaussian_value = prediction_error_gaussian_value - range_end_gaussian_value
-                        ratio_gaussian_value = portion_gaussian_value / total_gaussian_value
-                        
-                        if _anomaly_index_type=='inv':
-                            anomaly_index = 1 - (ratio_gaussian_value)
-                        elif _anomaly_index_type=='log':
-                            anomaly_index = log(ratio_gaussian_value)/log(range_end_gaussian_value)
-                        else:
-                            raise ValueError('Unknown anomaly index type "{}"'.format(_anomaly_index_type))
+                # Compute the (continuous) anomaly index in the given range (which defaults to 0, max)
+                # Below the start it means anomaly (0), above always anomaly (1). In the middle it 
+                # follows the error distribution, and it is rescaled between 0 and 1.
 
+                x = abs(prediction_error)
+
+                # Adherence (0-1)
+                adherence_x = distribution_function.adherence(x)
+
+                if x <= x_start:
+                    anomaly_index = 0
+                elif x >= x_end:
+                    anomaly_index = 1
                 else:
-                    if _anomaly_index_type=='inv':
-                        anomaly_index = 1 - gaussian(prediction_error)
-                    elif _anomaly_index_type=='log':
-                        anomaly_index = log(gaussian(prediction_error))/log(max_abs_prediction_error_gaussian_value)                           
-                    else:
-                        raise ValueError('Unknown anomaly index type "{}"'.format(_anomaly_index_type))
-                
+                    try:
+                        anomaly_index = (log10(adherence_x) - log10(adherence_x_start)) / (log10(adherence_x_end) - log10(adherence_x_start))
+                    except ValueError as e:
+                        if str(e) == 'math domain error':
+                            raise ValueError('Got a math domain error. This is likely due to an error distribution function badly approximating the real error distribution. Try changing it, or using lower index boundaries.') from None
+                        else:
+                            raise
+                        #raise ValueError('Got ')
+                        #raise ValueError('adherence_x: {}, adherence_x_start: {}, adherence_x_end: {}'.format(adherence_x, adherence_x_start, adherence_x_end))
+
+                # Do we have to apply any other rescaling?
                 if rescale_function:
                     anomaly_index = rescale_function(anomaly_index)
 
+                # Do we have to emphasize?
                 if emphasize:
                     anomaly_index = ((2**(anomaly_index*emphasize))-1)/(((2**emphasize))-1)
-                
+
             # Set the anomaly index
             item.data_indexes['anomaly'] = anomaly_index
 
@@ -303,19 +385,19 @@ def _apply_predictive_model_based_anomaly_detector(anomaly_detector, series, std
             if details:
                 if isinstance(details, list):
                     if 'abs_error' in details:
-                        item.data['{}_abs_error'.format(data_label)] = absolute_prediction_error
+                        item.data['{}_abs_error'.format(data_label)] = abs(prediction_error)
                     if 'error' in details:
                         item.data['{}_error'.format(data_label)] = prediction_error
                     if 'predicted' in details:
                         item.data['{}_predicted'.format(data_label)] = predicted
                 else:
-                    #item.data['{}_abs_error'.format(data_label)] = absolute_prediction_error
+                    #item.data['{}_abs_error'.format(data_label)] = abs_prediction_error
                     item.data['{}_error'.format(data_label)] = prediction_error
                     item.data['{}_predicted'.format(data_label)] = predicted
-                    item.data['gaussian({}_error)'.format(data_label)] = gaussian(prediction_error)
+                    item.data['distribution_function({}_error)'.format(data_label)] = distribution_function(prediction_error)
 
             result_series.append(item)
-    
+
     return result_series 
 
 
@@ -358,7 +440,7 @@ class AnomalyDetector(Model):
 
 class LiveAnomalyDetector(AnomalyDetector):
     """An generic live anomaly detection model.
- 
+
     Args:
         path (str): a path from which to load a saved model. Will override all other init settings.
     """
@@ -373,7 +455,7 @@ class PredictiveAnomalyDetector(AnomalyDetector):
     """A series anomaly detection model based on a reconstructor. The concept is simple: for each element of the series where
     the anomaly detection model is applied, the reconstructor is asked to make a prediction. If the actual value is too "far"
     from the prediction, then it is marked as anomalous. The "far" concept is expressed in terms of error standard deviations.
-    
+
     Args:
         path (str): a path from which to load a saved model. Will override all other init settings.
         reconstructor_class(Reconstructor): the reconstructor to be used for the anomaly detection model, if not already set.
@@ -387,7 +469,7 @@ class PredictiveAnomalyDetector(AnomalyDetector):
             raise NotImplementedError('No reconstructor set for this model')
 
     def __init__(self, path=None, reconstructor_class=None, *args, **kwargs):
-        
+
         # Handle the reconstructor_class
         try:
             self.reconstructor_class
@@ -398,8 +480,8 @@ class PredictiveAnomalyDetector(AnomalyDetector):
             if reconstructor_class:
                 raise ValueError('The reconstructor_class was given in the init but it is already set in the model')
             else:
-                self._reconstructor_class = reconstructor_class            
-        
+                self._reconstructor_class = reconstructor_class
+
         # Call parent init
         super(PredictiveAnomalyDetector, self).__init__(path=path)
 
@@ -430,34 +512,38 @@ class PredictiveAnomalyDetector(AnomalyDetector):
         '''Inspect the model and plot the error distribution'''        
         _inspect_error_distribution_based_anomaly_detection_model(self, plot=plot)
 
-    def apply(self, series, stdevs_range=None, stdevs=None, emphasize=0, details=False,
-              rescale_function=None, adherence_index=False, _anomaly_index_type='inv'):
+    def apply(self, series, index_range=['avg','max'], stdevs=None, emphasize=0,
+              rescale_function=None, add_adherence_index=False, details=False):
+
         """Apply the anomaly detection model on a series.
         
         Args:
-            stdevs_range(tuple): the range in which the anomaly index is computed. Defaults to (0, max).
-                                 Below it means no anomaly (0), and above always anomaly (1). In the middle
-                                 it follows the error Gaussian distribution rescaled between 0 and 1. Usually,
-                                 a good choice is (3,6).
+            index_range(tuple): the range from which the anomaly index is computed, in terms of prediction
+                                error. Below the lower bound no anomaly will be assumed, and above always
+                                anomalous (1). In the middle it follows the error Gaussian distribution.
+                                Defaults to ['avg', 'max'] as it assumes to work in unsupervised mode.
+                                Other supported values are 'x_sigma' where x is a sigma multiplier, or any
+                                numerical value. A good choice for semi-spervised mode is ['max', '5_sigma'].
             
             stdevs(float): the threshold to consider a data point as anomalous (1) or not (0). Same as setting
-                           ``stdevs_range=(x,x)`` where x is the threshold. If set, overrides the stdevs_range
-                           argument. It basically discretize the anomaly index to 0/1 values.
+                           ``index_range=('x_sigma','x_sigma')`` where x is the threshold. If set, overrides the
+                           index_range argument. It basically discretize the anomaly index to 0/1 values.
                            
             emphasize(int): by how emphasizing the anomalies. It applies an exponential transformation to the index,
                             so that the range is compressed and "bigger" anomalies stand out more with respect to
-                            "smaller" ones that are compressed in the lower part of the anomaly index range.
-            
-            details(bool): if set, adds details to the time series as the predicted value, the error etc.
-            
+                            "smaller" ones, that are compressed in the lower part of the anomaly index range.
+
             rescale_function(function): a custom anomaly index rescaling function. From [0,1] to [0,1].
-            
-            adherence_index(bool): adds an "adherence" index to the time series, to be intended as how much
-                                   each data point is compatible with the model prediction. It is basically
-                                   the error Gaussian value of each error value.             
+
+            add_adherence_index(bool): adds an "adherence" index to the time series, to be intended as how much
+                                       each data point is compatible with the model prediction. It is basically
+                                       the error Gaussian value of each error value.
+
+            details(bool): if set, adds details to the time series as the predicted value, the error etc.
         """
-        return _apply_predictive_model_based_anomaly_detector(self, series, stdevs_range=stdevs_range, stdevs=stdevs, emphasize=emphasize, details=details,
-                                                              rescale_function=rescale_function, adherence_index=adherence_index, _anomaly_index_type=_anomaly_index_type)
+        return _apply_predictive_model_based_anomaly_detector(self, series, index_range=index_range, stdevs=stdevs, emphasize=emphasize,
+                                                              rescale_function=rescale_function, add_adherence_index=add_adherence_index,
+                                                              details=details)
 
 
 
@@ -535,35 +621,38 @@ class PredictiveLiveAnomalyDetector(LiveAnomalyDetector):
         '''Inspect the model and plot the error distribution'''        
         _inspect_error_distribution_based_anomaly_detection_model(self, plot=plot)
 
-    def apply(self, series, stdevs_range=None, stdevs=None, emphasize=0, details=False,
-              rescale_function=None, adherence_index=False, _anomaly_index_type='inv'):
+    def apply(self, series, index_range=['avg','max'], stdevs=None, emphasize=0,
+              rescale_function=None, add_adherence_index=False, details=False):
+
         """Apply the anomaly detection model on a series.
         
         Args:
-            stdevs_range(tuple): the range in which the anomaly index is computed. Defaults to (0, max).
-                                 Below it means no anomaly (0), and above always anomaly (1). In the middle
-                                 it follows the error Gaussian distribution rescaled between 0 and 1. Usually,
-                                 a good choice is (3,6).
-            
+            index_range(tuple): the range from which the anomaly index is computed, in terms of prediction
+                                error. Below the lower bound no anomaly will be assumed, and above always
+                                anomalous (1). In the middle it follows the error Gaussian distribution.
+                                Defaults to ['avg', 'max'] as it assumes to work in unsupervised mode.
+                                Other supported values are 'x_sigma' where x is a sigma multiplier, or any
+                                numerical value. A good choice for semi-spervised mode is ['max', '5_sigma'].
+    
             stdevs(float): the threshold to consider a data point as anomalous (1) or not (0). Same as setting
-                           ``stdevs_range=(x,x)`` where x is the threshold. If set, overrides the stdevs_range
-                           argument. It basically discretize the anomaly index to 0/1 values.
+                           ``index_range=('x_sigma','x_sigma')`` where x is the threshold. If set, overrides the
+                           index_range argument. It basically discretize the anomaly index to 0/1 values.
                            
             emphasize(int): by how emphasizing the anomalies. It applies an exponential transformation to the index,
                             so that the range is compressed and "bigger" anomalies stand out more with respect to
-                            "smaller" ones that are compressed in the lower part of the anomaly index range.
-            
-            details(bool): if set, adds details to the time series as the predicted value, the error etc.
-            
-            rescale_function(function): a custom anomaly index rescaling function. From [0,1] to [0,1].
-            
-            adherence_index(bool): adds an "adherence" index to the time series, to be intended as how much
-                                   each data point is compatible with the model prediction. It is basically
-                                   the error Gaussian value of each error value.             
-        """
-        return _apply_predictive_model_based_anomaly_detector(self, series, stdevs_range=stdevs_range, stdevs=stdevs, emphasize=emphasize, details=details,
-                                                              rescale_function=rescale_function, adherence_index=adherence_index, _anomaly_index_type=_anomaly_index_type)
+                            "smaller" ones, that are compressed in the lower part of the anomaly index range.
 
+            rescale_function(function): a custom anomaly index rescaling function. From [0,1] to [0,1].
+
+            add_adherence_index(bool): adds an "adherence" index to the time series, to be intended as how much
+                                       each data point is compatible with the model prediction. It is basically
+                                       the error Gaussian value of each error value.
+
+            details(bool): if set, adds details to the time series as the predicted value, the error etc.
+        """
+        return _apply_predictive_model_based_anomaly_detector(self, series, index_range=index_range, stdevs=stdevs, emphasize=emphasize,
+                                                              rescale_function=rescale_function, add_adherence_index=add_adherence_index,
+                                                              details=details)
 
 
 #===================================
