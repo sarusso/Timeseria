@@ -116,19 +116,19 @@ def _inspect_error_distribution_based_anomaly_detection_model(model, plot=False)
         #plt.show()
 
 
-def _get_actual_and_predicted_from_predictive_model(predictive_model, series, i, data_label, window):
+def _get_actual_and_predicted_from_model(model, series, i, data_label, window):
 
         # Call model predict logic and compare with the actual data
         actual = series[i].data[data_label]
-        if isinstance(predictive_model, Reconstructor):    
-            prediction = predictive_model.predict(series, from_i=i,to_i=i)
-        elif isinstance(predictive_model, Forecaster):
-            prediction = predictive_model.predict(series, steps=1, forecast_start = i-1) # TOOD: why th "-1"?
+        if isinstance(model, Reconstructor):
+            prediction = model.predict(series, from_i=i,to_i=i)
+        elif isinstance(model, Forecaster):
+            prediction = model.predict(series, steps=1, forecast_start = i-1) # TOOD: why th "-1"?
         else:
-            raise TypeError('Don\'t know how to handle predictive model of type "{}"'.format(predictive_model.__class__.__name__))
+            raise TypeError('Don\'t know how to handle predictive model of type "{}"'.format(model.__class__.__name__))
 
         #except TypeError as e:
-        #    
+        #
         #    if '_predict() got an unexpected keyword argument \'forecast_start\'' in str(e):
         #        # Otherwise, create on the fly a slice of the series for the window.
         #        # so this is just a minor overhead. # TODO: series.view() ? Using an adapted _TimeSeriesView?
@@ -140,9 +140,9 @@ def _get_actual_and_predicted_from_predictive_model(predictive_model, series, i,
 
         # Handle list of dicts or dict of lists (of wich we have only one value here)
         #{'value': [0.2019341593004146, 0.29462641146884005]}
-        
+
         if isinstance(prediction, list):
-            predicted = prediction[0][data_label]        
+            predicted = prediction[0][data_label]
         elif isinstance(prediction, dict):
             predicted = prediction[data_label][0]
         else:
@@ -166,22 +166,22 @@ def _fit_predictive_model_based_anomaly_detector(anomaly_detector, series, *args
         summary = kwargs.pop('summary', False)
 
         # Detect the predictive model being used
-        predictive_model = None
+        model = None
         try:
             # Reconstructor-based?
-            predictive_model = anomaly_detector.reconstructor
+            model = anomaly_detector.reconstructor
         except AttributeError:
             pass
         try:
             # Forecaster-based?
-            predictive_model = anomaly_detector.forecaster
+            model = anomaly_detector.model
         except AttributeError:
             pass
-        if not predictive_model:
+        if not model:
             raise Exception('Unknown predictive model')
 
         # Fit the predictive model
-        predictive_model.fit(series, *args, **kwargs)
+        model.fit(series, *args, **kwargs)
 
         # Evaluate the predictive for one step ahead and get the forecasting errors
         prediction_errors = []
@@ -190,15 +190,15 @@ def _fit_predictive_model_based_anomaly_detector(anomaly_detector, series, *args
             for i, _ in enumerate(series):
 
                 # Before the window
-                if i <=  predictive_model.window:
+                if i <=  model.window:
                     continue
 
                 # After the window
-                if i >  len(series)-predictive_model.window-1:
+                if i >  len(series)-model.window-1:
                     break 
 
                 # Predict & append the error
-                actual, predicted = _get_actual_and_predicted_from_predictive_model(predictive_model, series, i, data_label, predictive_model.window)
+                actual, predicted = _get_actual_and_predicted_from_model(model, series, i, data_label, model.window)
                 prediction_errors.append(actual-predicted)
 
         # Store the forecasting errors internally in the model
@@ -235,7 +235,7 @@ def _fit_predictive_model_based_anomaly_detector(anomaly_detector, series, *args
 
 
 def _apply_predictive_model_based_anomaly_detector(anomaly_detector, series, index_range=None, stdevs=None, emphasize=0,
-                                                   details=False, rescale_function=None, add_adherence_index=False):
+                                                   details=False, rescale_function=None, adherence_index=False):
 
     #if inplace:
     #    raise Exception('Anomaly detection cannot be run inplace')
@@ -243,21 +243,8 @@ def _apply_predictive_model_based_anomaly_detector(anomaly_detector, series, ind
     if len(series.data_labels()) > 1:
         raise NotImplementedError('Multivariate time series are not yet supported')
 
-    # Detect the predictive model being used
-    predictive_model = None
-    try:
-        # Reconstructor-based?
-        predictive_model = anomaly_detector.reconstructor
-    except AttributeError:
-        pass
-    try:
-        # Forecaster-based?
-        predictive_model = anomaly_detector.forecaster
-    except AttributeError:
-        pass
-    if not predictive_model:
-        raise Exception('Unknown predictive model')
-
+    # Support vars & shortcuts
+    model = anomaly_detector.model
     result_series = series.__class__()
 
     distribution_function = DistributionFunction(anomaly_detector.data['error_distribution'],
@@ -301,21 +288,21 @@ def _apply_predictive_model_based_anomaly_detector(anomaly_detector, series, ind
 
 
         for i, item in enumerate(series):
-            forecaster_window = predictive_model.window
+            model_window = model.window
 
             # Before the window 
-            if i <=  predictive_model.window:
+            if i <=  model.window:
                 continue
 
             # After the window
-            if i >  len(series)-predictive_model.window-1:
+            if i >  len(series)-model.window-1:
                 break
 
             # New item
             item = deepcopy(item)
 
             # Compute the anomaly index or threshold
-            actual, predicted = _get_actual_and_predicted_from_predictive_model(predictive_model, series, i, data_label, forecaster_window)
+            actual, predicted = _get_actual_and_predicted_from_model(model, series, i, data_label, model_window)
 
             #if logs:
             #    logger.info('{}: {} vs {}'.format(series[i].dt, actual, predicted))
@@ -323,7 +310,7 @@ def _apply_predictive_model_based_anomaly_detector(anomaly_detector, series, ind
             prediction_error = actual-predicted
 
             # Compute the model adherence probability index
-            if add_adherence_index:
+            if adherence_index:
                 item.data_indexes['adherence'] = distribution_function(prediction_error)
 
             # Are threshold/cutoff stdevs defined?
@@ -435,88 +422,75 @@ class AnomalyDetector(Model):
 
 
 #===================================
-#  Generic LIVE Anomaly Detector
-#===================================
-
-class LiveAnomalyDetector(AnomalyDetector):
-    """An generic live anomaly detection model.
-
-    Args:
-        path (str): a path from which to load a saved model. Will override all other init settings.
-    """
-    pass
-
-
-#===================================
 #  Predictive Anomaly Detector
 #===================================
 
 class PredictiveAnomalyDetector(AnomalyDetector):
-    """A series anomaly detection model based on a reconstructor. The concept is simple: for each element of the series where
-    the anomaly detection model is applied, the reconstructor is asked to make a prediction. If the actual value is too "far"
-    from the prediction, then it is marked as anomalous. The "far" concept is expressed in terms of error standard deviations.
+    """A series anomaly detection model based on a predictive model(either a forecaster or a model). The concept is simple: 
+    for each element of the series where the anomaly detection model is applied, the model is asked to make a prediction.
+    If the actual value is too "far" from the prediction, then it is marked as anomalous.
 
     Args:
         path (str): a path from which to load a saved model. Will override all other init settings.
-        reconstructor_class(Reconstructor): the reconstructor to be used for the anomaly detection model, if not already set.
+        model_class(Forecaster,Reconstructor): the predictive model to be used for anomaly detection, if not already set.
     """
 
     @property
-    def reconstructor_class(self):
+    def model_class(self):
         try:
-            return self._reconstructor_class
-        except AttributeError:  
-            raise NotImplementedError('No reconstructor set for this model')
+            return self._model_class
+        except AttributeError:
+            raise NotImplementedError('No model class set for this anomaly detector')
 
-    def __init__(self, path=None, reconstructor_class=None, *args, **kwargs):
+    def __init__(self, path=None, model_class=None, *args, **kwargs):
 
-        # Handle the reconstructor_class
+        # Handle the model_class
         try:
-            self.reconstructor_class
+            self.model_class
         except NotImplementedError:
-            if not reconstructor_class:
-                raise ValueError('The reconstructor_class is not set in the model nor given in the init')
+            if not model_class:
+                raise ValueError('The model_class is not set in the anomaly detector nor given in the init')
         else:
-            if reconstructor_class:
-                raise ValueError('The reconstructor_class was given in the init but it is already set in the model')
+            if model_class:
+                raise ValueError('The model_class was given in the init but it is already set in the anomaly detector')
             else:
-                self._reconstructor_class = reconstructor_class
+                self._model_class = model_class
 
         # Call parent init
         super(PredictiveAnomalyDetector, self).__init__(path=path)
 
-        # Load the reconstructor as nested model if we have loaded the model
+        # Load the model as nested model if we have loaded the model
         if self.fitted:
-            # Note: the reconstructor_id is the nested folder where the reconstructor is saved
-            reconstructor_dir = path+'/'+self.data['reconstructor_id']
-            self.reconstructor = self.reconstructor_class(reconstructor_dir)
+            # Note: the model_id is the nested folder where the model is saved
+            model_dir = path+'/'+self.data['model_id']
+            self.model= self.model_class(model_dir)
         else:
-            # Initialize the reconstructor              
-            self.reconstructor = self.reconstructor_class(*args, **kwargs)
-            
-        # Finally, set the id of the reconstructor in the data
-        self.data['reconstructor_id'] = self.reconstructor.data['id']
-            
+            # Initialize the predictive model
+            self.model = self.model_class(*args, **kwargs)
+
+        # Finally, set the id of the model in the data
+        self.data['model_id'] = self.model.data['id']
+
     def save(self, path):
 
         # Save the anomaly detection model
         super(PredictiveAnomalyDetector, self).save(path)
 
-        # ..and save the reconstructor as nested model
-        self.reconstructor.save(path+'/'+str(self.reconstructor.id))
+        # ..and save the model as nested model
+        self.model.save(path+'/'+str(self.model.id))
 
     def _fit(self, series, *args, **kwargs):
         _fit_predictive_model_based_anomaly_detector(self, series, *args, **kwargs)
-        
+
     def inspect(self, plot=True):
-        '''Inspect the model and plot the error distribution'''        
+        '''Inspect the model and plot the error distribution'''
         _inspect_error_distribution_based_anomaly_detection_model(self, plot=plot)
 
     def apply(self, series, index_range=['avg','max'], stdevs=None, emphasize=0,
-              rescale_function=None, add_adherence_index=False, details=False):
+              rescale_function=None, adherence_index=False, details=False):
 
         """Apply the anomaly detection model on a series.
-        
+
         Args:
             index_range(tuple): the range from which the anomaly index is computed, in terms of prediction
                                 error. Below the lower bound no anomaly will be assumed, and above always
@@ -524,166 +498,57 @@ class PredictiveAnomalyDetector(AnomalyDetector):
                                 Defaults to ['avg', 'max'] as it assumes to work in unsupervised mode.
                                 Other supported values are 'x_sigma' where x is a sigma multiplier, or any
                                 numerical value. A good choice for semi-spervised mode is ['max', '5_sigma'].
-            
+
             stdevs(float): the threshold to consider a data point as anomalous (1) or not (0). Same as setting
                            ``index_range=('x_sigma','x_sigma')`` where x is the threshold. If set, overrides the
                            index_range argument. It basically discretize the anomaly index to 0/1 values.
-                           
+
             emphasize(int): by how emphasizing the anomalies. It applies an exponential transformation to the index,
                             so that the range is compressed and "bigger" anomalies stand out more with respect to
                             "smaller" ones, that are compressed in the lower part of the anomaly index range.
 
             rescale_function(function): a custom anomaly index rescaling function. From [0,1] to [0,1].
 
-            add_adherence_index(bool): adds an "adherence" index to the time series, to be intended as how much
-                                       each data point is compatible with the model prediction. It is basically
-                                       the error Gaussian value of each error value.
+            adherence_index(bool): adds an "adherence" index to the time series, to be intended as how much
+                                   each data point is compatible with the model prediction. It is basically
+                                   the error distribution value of each error value.
 
             details(bool): if set, adds details to the time series as the predicted value, the error etc.
         """
         return _apply_predictive_model_based_anomaly_detector(self, series, index_range=index_range, stdevs=stdevs, emphasize=emphasize,
-                                                              rescale_function=rescale_function, add_adherence_index=add_adherence_index,
-                                                              details=details)
-
+                                                              rescale_function=rescale_function, adherence_index=adherence_index, details=details)
 
 
 
 #===================================
-#  Predictive LIVE Anomaly Detector
-#===================================
-
-class PredictiveLiveAnomalyDetector(LiveAnomalyDetector):
-    """A series anomaly detection model based on a forecaster. The concept is simple: for each element of the series where
-    the anomaly detection model is applied, the forecaster is asked to make a prediction. If the actual value is too "far"
-    from the prediction, then it is marked as anomalous. The "far" concept is expressed in terms of error standard deviations.
-    
-    Args:
-        path (str): a path from which to load a saved model. Will override all other init settings.
-        forecaster_class(Forecaster): the forecaster to be used for the anomaly detection model, if not already set.
-    """
-
-    @property
-    def forecaster_class(self):
-        try:
-            return self._forecaster_class
-        except AttributeError:  
-            raise NotImplementedError('No forecaster set for this model')
-
-    def __init__(self, path=None, forecaster_class=None, *args, **kwargs):
-        
-        # Handle the forecaster_class
-        try:
-            self.forecaster_class
-        except NotImplementedError:
-            if not forecaster_class:
-                raise ValueError('The forecaster_class is not set in the model nor given in the init')
-        else:
-            if forecaster_class:
-                raise ValueError('The forecaster_class was given in the init but it is already set in the model')
-            else:
-                self._forecaster_class = forecaster_class            
-        
-        # Call parent init
-        super(PredictiveLiveAnomalyDetector, self).__init__(path=path)
-
-        # Load the forecaster as nested model if we have loaded the model
-        if self.fitted:
-            # Note: the forecaster_id is the nested folder where the forecaster is saved
-            forecaster_dir = path+'/'+self.data['forecaster_id']
-            self.forecaster = self.forecaster_class(forecaster_dir)
-        else:
-            # Initialize the forecaster              
-            self.forecaster = self.forecaster_class(*args, **kwargs)
-            
-        # Finally, set the id of the forecaster in the data
-        self.data['forecaster_id'] = self.forecaster.data['id']
-            
-    def save(self, path):
-
-        # Save the anomaly detection model
-        super(PredictiveLiveAnomalyDetector, self).save(path)
-
-        # ..and save the forecaster as nested model
-        self.forecaster.save(path+'/'+str(self.forecaster.id))
-
-    def fit(self, series, *args, **kwargs):
-        """Fit the anomaly detection model on a series.
-        
-        All the argument are forwarded to the forecaster ``fit()`` method.
-
-        """
-        return super(PredictiveLiveAnomalyDetector, self).fit(series, *args, **kwargs)
-    
-    def _fit(self, series, *args, **kwargs):
-        _fit_predictive_model_based_anomaly_detector(self, series, *args, **kwargs)
-        
-    def inspect(self, plot=True):
-        '''Inspect the model and plot the error distribution'''        
-        _inspect_error_distribution_based_anomaly_detection_model(self, plot=plot)
-
-    def apply(self, series, index_range=['avg','max'], stdevs=None, emphasize=0,
-              rescale_function=None, add_adherence_index=False, details=False):
-
-        """Apply the anomaly detection model on a series.
-        
-        Args:
-            index_range(tuple): the range from which the anomaly index is computed, in terms of prediction
-                                error. Below the lower bound no anomaly will be assumed, and above always
-                                anomalous (1). In the middle it follows the error Gaussian distribution.
-                                Defaults to ['avg', 'max'] as it assumes to work in unsupervised mode.
-                                Other supported values are 'x_sigma' where x is a sigma multiplier, or any
-                                numerical value. A good choice for semi-spervised mode is ['max', '5_sigma'].
-    
-            stdevs(float): the threshold to consider a data point as anomalous (1) or not (0). Same as setting
-                           ``index_range=('x_sigma','x_sigma')`` where x is the threshold. If set, overrides the
-                           index_range argument. It basically discretize the anomaly index to 0/1 values.
-                           
-            emphasize(int): by how emphasizing the anomalies. It applies an exponential transformation to the index,
-                            so that the range is compressed and "bigger" anomalies stand out more with respect to
-                            "smaller" ones, that are compressed in the lower part of the anomaly index range.
-
-            rescale_function(function): a custom anomaly index rescaling function. From [0,1] to [0,1].
-
-            add_adherence_index(bool): adds an "adherence" index to the time series, to be intended as how much
-                                       each data point is compatible with the model prediction. It is basically
-                                       the error Gaussian value of each error value.
-
-            details(bool): if set, adds details to the time series as the predicted value, the error etc.
-        """
-        return _apply_predictive_model_based_anomaly_detector(self, series, index_range=index_range, stdevs=stdevs, emphasize=emphasize,
-                                                              rescale_function=rescale_function, add_adherence_index=add_adherence_index,
-                                                              details=details)
-
-
-#===================================
-#        Periodic Average
+#   Periodic Average Forecaster
 #   Predictive Anomaly Detector
 #===================================
 
 class PeriodicAverageAnomalyDetector(PredictiveAnomalyDetector):
-    """An anomaly detection model based on a periodic average reconstructor.
-    
-    Args:
-        path (str): a path from which to load a saved model. Will override all other init settings.
-        forecaster_class(Forecaster): the forecaster to be used for the anomaly detection model, if not already set by extending the model class.
-    """
-    
-    reconstructor_class = PeriodicAverageReconstructor
-
-
-#===================================
-#        Periodic Average
-# Predictive LIVE Anomaly Detector
-#===================================
-
-class PeriodicAverageLiveAnomalyDetector(PredictiveLiveAnomalyDetector):
     """An anomaly detection model based on a periodic average forecaster.
-    
+
     Args:
         path (str): a path from which to load a saved model. Will override all other init settings.
-        forecaster_class(Forecaster): the forecaster to be used for the anomaly detection model, if not already set by extending the model class.
     """
-    
-    forecaster_class = PeriodicAverageForecaster
+
+    model_class = PeriodicAverageForecaster
+
+#===================================
+#  Periodic Average Reconstructor
+#   Predictive Anomaly Detector
+#===================================
+
+class PeriodicAverageReconstructorAnomalyDetector(PredictiveAnomalyDetector):
+    """An anomaly detection model based on a periodic average reconstructor.
+
+    Args:
+        path (str): a path from which to load a saved model. Will override all other init settings.
+    """
+
+    model_class = PeriodicAverageReconstructor
+
+
+
 
 
