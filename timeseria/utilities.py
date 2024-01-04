@@ -193,7 +193,7 @@ def detect_periodicity(time_series):
 
 
 def mean_absolute_percentage_error(list1, list2):
-    '''Compute the MAPE, list 1 are true values, list 2 are predicted values'''
+    """Compute the MAPE, list 1 are true values, list 2 are predicted values"""
 
     if len(list1) != len(list2):
         raise ValueError('Lists have different lengths, cannot continue')
@@ -202,10 +202,39 @@ def mean_absolute_percentage_error(list1, list2):
         p_error_sum += abs((list1[i] - list2[i])/list1[i])
     return p_error_sum/len(list1)
 
+def rescale(value, source_from, source_to, target_from=0, target_to=1, how='linear'):
+    """Rescale a value from one range to another"""
+
+    if value < 0:
+        raise ValueError('Cannot rescale negative value')
+    if source_from < 0:
+        raise ValueError('Cannot rescale using negative source_from')
+    if source_to < 0:
+        raise ValueError('Cannot rescale using negative source_to')
+    if target_from < 0:
+        raise ValueError('Cannot rescale using negative target_from')
+    if target_to < 0:
+        raise ValueError('Cannot rescale using negative target_to')
+    if value < source_from:
+        raise ValueError('Cannot rescale a value outside the source interval (value={}, source_from={}'.format(value, source_from))
+    if value > source_to:
+        raise ValueError('Cannot rescale a value outside the source interval (value={}, source_to={}'.format(value, source_to))
+
+    source_total = source_to - source_from
+    source_segment = value - source_from 
+    value_ratio = source_segment/source_total
+
+    if target_from==0 and target_to==1:
+        return value_ratio
+    else:
+        target_total = target_to - target_from
+        return ((value_ratio*target_total)+target_from)
+
+    # If how=log...log_compression /log base
 
 def os_shell(command, capture=False, verbose=False, interactive=False, silent=False):
-    '''Execute a command in the OS shell. By default prints everything. If the capture switch is set,
-    then it returns a namedtuple with stdout, stderr, and exit code.'''
+    """Execute a command in the OS shell. By default prints everything. If the capture switch is set,
+    then it returns a namedtuple with stdout, stderr, and exit code."""
 
     if capture and verbose:
         raise Exception('You cannot ask at the same time for capture and verbose, sorry')
@@ -828,32 +857,44 @@ def _to_time_unit_string(seconds, friendlier=True):
     return seconds_str
 
 
-def rescale(value, source_from, source_to, target_from=0, target_to=1, how='linear'):
+def _compute_distribution_approximation_errors(distribution_function, prediction_errors, bins=30, details=False):
 
-    if value < 0:
-        raise ValueError('Cannot rescale negative value')
-    if source_from < 0:
-        raise ValueError('Cannot rescale using negative source_from')
-    if source_to < 0:
-        raise ValueError('Cannot rescale using negative source_to')
-    if target_from < 0:
-        raise ValueError('Cannot rescale using negative target_from')
-    if target_to < 0:
-        raise ValueError('Cannot rescale using negative target_to')
-    if value < source_from:
-        raise ValueError('Cannot rescale a value outside the source interval (value={}, source_from={}'.format(value, source_from))
-    if value > source_to:
-        raise ValueError('Cannot rescale a value outside the source interval (value={}, source_to={}'.format(value, source_to))
+    # Support vars
+    max_prediction_error = max(prediction_errors)
+    min_prediction_error = min(prediction_errors)
+    error_span = max_prediction_error - min_prediction_error
 
-    source_total = source_to - source_from
-    source_segment = value - source_from 
-    value_ratio = source_segment/source_total
+    # Create the bins
+    error_step = error_span / bins
+    prediction_error_bins = [[] for _ in range(bins)]
+    for i, prediction_error in enumerate(prediction_errors):
+        for j in range(bins-1):
+            if ( (min_prediction_error + (error_step*j))  <= prediction_error <= (min_prediction_error + (error_step*(j+1))) ):
+                prediction_error_bins[j].append(prediction_error)
 
-    if target_from==0 and target_to==1:
-        return value_ratio
+    real_distribution_values = {} # x -> y
+    max_len = 0
+    for i, prediction_error_bin in enumerate(prediction_error_bins):
+        if prediction_error_bin:
+            real_distribution_values[min_prediction_error + (error_step*i) + (error_step/2)] = len(prediction_error_bin)
+            if len(prediction_error_bin) > max_len:
+                max_len = len(prediction_error_bin)
+
+    # Normalize
+    for key in real_distribution_values:
+        real_distribution_values[key] = real_distribution_values[key]/max_len
+
+    # Compute the approximation errors
+    approximation_errors = []
+    binned_distribution_values = []
+    binned_real_distribution_values = []
+    for key in real_distribution_values:
+        #logger.debug('{}: \t{}\t vs\t {}'.format(key, distribution(key),real_distribution_values[key]))
+        binned_distribution_values.append(distribution_function(key))
+        binned_real_distribution_values.append(real_distribution_values[key])
+        approximation_errors.append(abs(distribution_function(key)-real_distribution_values[key]))
+
+    if details:
+        return (approximation_errors, binned_distribution_values, binned_real_distribution_values)
     else:
-        target_total = target_to - target_from
-        return ((value_ratio*target_total)+target_from)
-
-    # If how=log...log_compression /log base
-
+        return approximation_errors
