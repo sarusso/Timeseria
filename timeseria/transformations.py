@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Series transformations as resampling and aggregation."""
 
-from .time import dt_from_s, s_from_dt, as_tz
+from propertime.utilities import dt_from_s, s_from_dt, as_tz
 from datetime import datetime
 from .datastructures import Point, Slot, DataTimeSlot, TimePoint, DataTimePoint, Series, TimeSeries, _TimeSeriesView
 from .utilities import _compute_data_loss, _compute_validity_regions
@@ -290,29 +290,29 @@ class Transformation(object):
         # Set "from". TODO: check given from_t/from_dt against shifted rounding if points?
         if from_t:
             from_dt = dt_from_s(from_t)
-            if from_dt != self.time_unit.round_dt(from_dt):
+            if from_dt != self.time_unit.round(from_dt):
                 raise ValueError('The provided from_t is not consistent with the self.time_unit of "{}" (Got "{}")'.format(self.time_unit, from_t))        
         elif from_dt:
             from_t = s_from_dt(from_dt)
-            if from_dt != self.time_unit.round_dt(from_dt):
+            if from_dt != self.time_unit.round(from_dt):
                 raise ValueError('The provided from_dt is not consistent with the self.time_unit of "{}" (Got "{}")'.format(self.time_unit, from_dt))   
         else:
             if target == 'points':
                 from_t = series[0].t  - (self.time_unit.as_seconds() /2)
                 from_dt = dt_from_s(from_t, tz=series.tz)
-                from_dt = self.time_unit.round_dt(from_dt, how='floor' if include_extremes else 'ceil')
+                from_dt = self.time_unit.round(from_dt, how='floor' if include_extremes else 'ceil')
                 from_t = s_from_dt(from_dt) + (self.time_unit.as_seconds() /2)
                 from_dt = dt_from_s(from_t)
                 
             elif target == 'slots':
                 from_t = series[0].t
                 from_dt = dt_from_s(from_t, tz=series.tz)
-                if from_dt == self.time_unit.round_dt(from_dt):
+                if from_dt == self.time_unit.round(from_dt):
                     # Only for the start, and only for the slots, if the first point is
                     # exactly equal to the first slot start, leave it as it is to include it.
                     pass
                 else:
-                    from_dt = self.time_unit.round_dt(from_dt, how='floor' if include_extremes else 'ceil')
+                    from_dt = self.time_unit.round(from_dt, how='floor' if include_extremes else 'ceil')
                 from_t = s_from_dt(from_dt)
                 from_dt = dt_from_s(from_t) 
             else:
@@ -321,23 +321,23 @@ class Transformation(object):
         # Set "to". TODO: check given to_t/to_dt against shifted rounding if points?
         if to_t:
             to_dt = dt_from_s(to_t)
-            if to_dt != self.time_unit.round_dt(to_dt):
+            if to_dt != self.time_unit.round(to_dt):
                 raise ValueError('The provided to_t is not consistent with the self.time_unit of "{}" (Got "{}")'.format(self.time_unit, to_t))        
         elif to_dt:
             to_t = s_from_dt(to_dt)
-            if to_dt != self.time_unit.round_dt(to_dt):
+            if to_dt != self.time_unit.round(to_dt):
                 raise ValueError('The provided to_dt is not consistent with the self.time_unit of "{}" (Got "{}")'.format(self.time_unit, to_dt))   
         else:
             if target == 'points':
                 to_t = series[-1].t  + (self.time_unit.as_seconds() /2)
                 to_dt = dt_from_s(to_t, tz=series.tz)
-                from_dt = self.time_unit.round_dt(from_dt, how='ceil' if include_extremes else 'floor')
+                from_dt = self.time_unit.round(from_dt, how='ceil' if include_extremes else 'floor')
                 to_t = s_from_dt(to_dt) - (self.time_unit.as_seconds() /2)
                 to_dt = dt_from_s(to_t)  
             elif target == 'slots':
                 to_t = series[-1].t
                 to_dt = dt_from_s(to_t, tz=series.tz)
-                from_dt = self.time_unit.round_dt(from_dt, how='ceil' if include_extremes else 'floor')
+                from_dt = self.time_unit.round(from_dt, how='ceil' if include_extremes else 'floor')
                 to_t = s_from_dt(to_dt)
                 to_dt = dt_from_s(to_t)            
             else:

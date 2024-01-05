@@ -30,7 +30,6 @@ Main modules and submodules
 .. autosummary::
      :toctree:
     
-     time
      units
      datastructures
      interpolators

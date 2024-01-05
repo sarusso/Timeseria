@@ -2,12 +2,14 @@ import unittest
 import datetime
 import os
 import pandas as pd
+from propertime.utilities import dt, timezonize
 
 from ..datastructures import Point, TimePoint, DataPoint, DataTimePoint
 from ..datastructures import Slot, TimeSlot, DataSlot, DataTimeSlot
 from ..datastructures import Series, TimeSeries, _TimeSeriesView
-from ..time import UTC, dt
 from ..units import Unit, TimeUnit
+
+from pytz import UTC
 
 # Setup logging
 from .. import logger
@@ -56,10 +58,9 @@ class TestPoints(unittest.TestCase):
         time_point_init_t = TimePoint(t=5)
         self.assertEqual(time_point, time_point_init_t)
         
-        # Init using naive "dt" (only in case someone uses without using timesera dt utility, i.e. from external timestamps) 
-        time_point_init_dt = TimePoint(dt=datetime.datetime(1970,1,1,0,0,5))
-        self.assertEqual(time_point_init_dt, time_point)
-        self.assertEqual(str(time_point_init_dt.tz), 'UTC')
+        # Init using naive "dt" is not supported
+        with self.assertRaises(ValueError):
+            TimePoint(dt=datetime.datetime(1970,1,1,0,0,5))
 
         # Init using "dt" with UTC timezone (timesera dt utility always add the UTC timezone)
         time_point_init_dt = TimePoint(dt=dt(1970,1,1,0,0,5))
@@ -639,22 +640,22 @@ class TestTimeSeries(unittest.TestCase):
         self.assertEqual(time_series.df.iloc[0][1],57.2)
 
         # Test resolution
-        time_series = TimeSeries(DataTimePoint(dt=dt(2015,10,24,0,0,0, tzinfo='Europe/Rome'), data=23.8),
-                                 DataTimePoint(dt=dt(2015,10,25,0,0,0, tzinfo='Europe/Rome'), data=24.1),
-                                 DataTimePoint(dt=dt(2015,10,26,0,0,0, tzinfo='Europe/Rome'), data=23.1))
+        time_series = TimeSeries(DataTimePoint(dt=dt(2015,10,24,0,0,0, tz='Europe/Rome'), data=23.8),
+                                 DataTimePoint(dt=dt(2015,10,25,0,0,0, tz='Europe/Rome'), data=24.1),
+                                 DataTimePoint(dt=dt(2015,10,26,0,0,0, tz='Europe/Rome'), data=23.1))
         self.assertEqual(time_series.resolution, 'variable') # DST occurred, resolution marked as undefined
         self.assertEqual(time_series.guess_resolution(), 86400)
 
-        time_series = TimeSeries(DataTimePoint(dt=dt(2015,10,27,0,0,0, tzinfo='Europe/Rome'), data={'a':23.8}),
-                                 DataTimePoint(dt=dt(2015,10,28,0,0,0, tzinfo='Europe/Rome'), data={'a':24.1}),
-                                 DataTimePoint(dt=dt(2015,10,29,0,0,0, tzinfo='Europe/Rome'), data={'a':23.1}))
+        time_series = TimeSeries(DataTimePoint(dt=dt(2015,10,27,0,0,0, tz='Europe/Rome'), data={'a':23.8}),
+                                 DataTimePoint(dt=dt(2015,10,28,0,0,0, tz='Europe/Rome'), data={'a':24.1}),
+                                 DataTimePoint(dt=dt(2015,10,29,0,0,0, tz='Europe/Rome'), data={'a':23.1}))
         self.assertEqual(time_series.resolution, 86400) # No DST occurred
         self.assertEqual(time_series.resolution, '86400s') # No DST occurred
 
         # Test data labels and rename a data labels
-        time_series = TimeSeries(DataTimePoint(dt=dt(2015,10,27,0,0,0, tzinfo='Europe/Rome'), data={'a':23.8, 'b':1}),
-                                 DataTimePoint(dt=dt(2015,10,28,0,0,0, tzinfo='Europe/Rome'), data={'a':24.1, 'b':2}),
-                                 DataTimePoint(dt=dt(2015,10,29,0,0,0, tzinfo='Europe/Rome'), data={'a':23.1, 'b':3}))        
+        time_series = TimeSeries(DataTimePoint(dt=dt(2015,10,27,0,0,0, tz='Europe/Rome'), data={'a':23.8, 'b':1}),
+                                 DataTimePoint(dt=dt(2015,10,28,0,0,0, tz='Europe/Rome'), data={'a':24.1, 'b':2}),
+                                 DataTimePoint(dt=dt(2015,10,29,0,0,0, tz='Europe/Rome'), data={'a':23.1, 'b':3}))        
         self.assertEqual(time_series.data_labels(), ['a','b'])
         time_series.rename_data_label('b','c')
         self.assertEqual(time_series.data_labels(), ['a','c'])
@@ -859,7 +860,6 @@ class TestTimeSeries(unittest.TestCase):
         self.assertEqual(time_series.resolution, TimeUnit('1m'))
 
         # Test change timezone
-        from ..time import timezonize
         time_series_UTC =  TimeSeries(DataTimeSlot(start=TimePoint(t=60),  end=TimePoint(t=120), data=23.8),
                                       DataTimeSlot(start=TimePoint(t=120), end=TimePoint(t=180), data=24.1),
                                       DataTimeSlot(start=TimePoint(t=180), end=TimePoint(t=240), data=23.1))

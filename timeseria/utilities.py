@@ -8,7 +8,7 @@ from numpy import fft
 from scipy.signal import find_peaks
 from .exceptions import ConsistencyException
 from datetime import datetime
-from .time import s_from_dt
+from propertime.utilities import s_from_dt
 from .exceptions import FloatConversionError
 import subprocess
 from collections import namedtuple

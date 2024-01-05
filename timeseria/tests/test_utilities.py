@@ -1,11 +1,12 @@
 import unittest
 import os
+from propertime.utilities import dt, s_from_dt
+
 from ..utilities import detect_encoding, detect_periodicity, detect_sampling_interval
 from ..utilities import _compute_coverage, _compute_data_loss, _compute_validity_regions 
 from ..utilities import _Gaussian
 from ..utilities import rescale
 from ..datastructures import DataTimePoint, TimeSeries
-from ..time import dt, s_from_dt
 from ..storages import CSVFileStorage
 from ..units import TimeUnit
 
@@ -179,8 +180,8 @@ class TestComputeCoverageAndDataLoss(unittest.TestCase):
         # The following time series has point with validity=15m
 
         # Time series from 2019,10,1,1,0,0 to 2019,10,1,6,0,0 (Europe/Rome)
-        from_dt  = dt(2019,10,1,1,0,0, tzinfo='Europe/Rome')
-        to_dt    = dt(2019,10,1,6,0,0, tzinfo='Europe/Rome')
+        from_dt  = dt(2019,10,1,1,0,0, tz='Europe/Rome')
+        to_dt    = dt(2019,10,1,6,0,0, tz='Europe/Rome')
         time_unit = TimeUnit('15m') 
         self.data_time_point_series_6 = TimeSeries()
         slider_dt = from_dt
@@ -236,8 +237,8 @@ class TestComputeCoverageAndDataLoss(unittest.TestCase):
   
  
         # F) Missing half slot before slot re-start
-        from_t = s_from_dt(dt=dt(2019,10,1,3,30,0, tzinfo='Europe/Rome'))
-        to_t   = s_from_dt(dt=dt(2019,10,1,3,45,0, tzinfo='Europe/Rome'))
+        from_t = s_from_dt(dt=dt(2019,10,1,3,30,0, tz='Europe/Rome'))
+        to_t   = s_from_dt(dt=dt(2019,10,1,3,45,0, tz='Europe/Rome'))
         coverage = _compute_coverage(series = self.data_time_point_series_6, from_t = from_t, to_t = to_t)  
      
         self.assertAlmostEqual(coverage, (0.5))
