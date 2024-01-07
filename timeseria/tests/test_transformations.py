@@ -1,8 +1,9 @@
 import unittest
 import os
+from propertime.utilities import dt, s_from_dt, dt_from_str
+
 from ..datastructures import DataTimePoint, TimeSeries
 from ..transformations import Resampler, Aggregator 
-from ..time import dt, s_from_dt, dt_from_str
 from ..units import TimeUnit
 
 # Setup logging
@@ -460,8 +461,8 @@ class TestAggregator(unittest.TestCase):
             self.series_5.append(point)
 
         # Time series at 15m resolution from 01:00 to 06:00 (Europe/Rome)
-        from_dt  = dt(2019,10,1,1,0,0, tzinfo='Europe/Rome')
-        to_dt    = dt(2019,10,1,6,0,0, tzinfo='Europe/Rome')
+        from_dt  = dt(2019,10,1,1,0,0, tz='Europe/Rome')
+        to_dt    = dt(2019,10,1,6,0,0, tz='Europe/Rome')
         time_unit = TimeUnit('15m') 
         self.series_6 = TimeSeries()
         slider_dt = from_dt
@@ -476,8 +477,8 @@ class TestAggregator(unittest.TestCase):
             count += 1
 
         # Time series at 1h resolution from 2019-10-24 00:00 to 2019-10-31 00:00:(Europe/Rome), DST off -> 2 AM repeated
-        from_dt   = dt(2019,10,24,0,0,0, tzinfo='Europe/Rome')
-        to_dt     = dt(2019,10,31,0,0,0, tzinfo='Europe/Rome')
+        from_dt = dt(2019,10,24,0,0,0, tz='Europe/Rome')
+        to_dt   = dt(2019,10,31,0,0,0, tz='Europe/Rome')
         time_unit = TimeUnit('1h') 
         self.series_7 = TimeSeries()
         slider_dt = from_dt

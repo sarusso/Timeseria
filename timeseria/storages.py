@@ -2,11 +2,12 @@
 """Data storages, as the CSV file storage."""
 
 import os
+import pytz
 import datetime
 from .utilities import detect_encoding, _sanitize_string, _is_list_of_integers, _to_float
 from .units import TimeUnit
 from .datastructures import TimePoint, DataTimePoint, DataTimeSlot, TimeSeries
-from .time import dt_from_str, dt_from_s, s_from_dt, timezonize, now_dt
+from propertime.utilities import dt_from_str, dt_from_s, s_from_dt, timezonize, now_dt
 from .exceptions import NoDataException, FloatConversionError, ConsistencyException
 
 # Setup logging
@@ -214,6 +215,8 @@ class CSVFileStorage(Storage):
         # TODO: evaluate rU vs newline='\n'
         with open(self.filename, 'r', encoding=self.encoding) as csv_file:
 
+            naive_warned = False
+
             while True:
                 
                 # TODO: replace me using a custom line separator
@@ -363,20 +366,20 @@ class CSVFileStorage(Storage):
                 logger.debug('Will process timestamp "%s"', timestamp)
                 try:
                     
+                    t = None
+                    dt = None
+                    
                     # Both time and date labels
                     if self.time_label is not None and self.date_label is not None:
                         dt = datetime.datetime.strptime(timestamp, self.date_format + '\t' + self.time_format)
-                        t = s_from_dt(dt)
                     
                     # Only date label
                     elif self.date_label is not None:
                         dt = datetime.datetime.strptime(timestamp, self.date_format)
-                        t = s_from_dt(dt)                        
 
                     # Only time label (TODO: does this make sense?)
                     elif self.time_label is not None:
                         dt = datetime.datetime.strptime(timestamp, self.time_format)
-                        t = s_from_dt(dt)    
                     
                     # Use the timestamp label and format
                     else:
@@ -393,7 +396,7 @@ class CSVFileStorage(Storage):
                             except:
                                 try:
                                     # is this an iso8601?
-                                    t = s_from_dt(dt_from_str(timestamp))
+                                    dt = dt_from_str(timestamp)
                                     logger.debug('Auto-detected timestamp format: iso8601')
                                     self.timestamp_format = 'iso8601'
                                 except:
@@ -405,12 +408,22 @@ class CSVFileStorage(Storage):
     
                         # ISO8601 fromat?
                         elif self.timestamp_format == 'iso8601':
-                            t = s_from_dt(dt_from_str(timestamp))
+                            dt = dt_from_str(timestamp)
                         
                         # Custom format?
                         else:
                             dt = datetime.datetime.strptime(timestamp, self.timestamp_format)
-                            t = s_from_dt(dt)    
+
+
+                    # Convert to t
+                    if t is None:
+                        if dt.tzinfo is None:
+                            if not naive_warned:
+                                logger.warning('Got naive timestamps, assuming UTC.')
+                                naive_warned = True
+                            dt = pytz.UTC.localize(dt)
+                        t = s_from_dt(dt)
+                        
 
                 except Exception as e:
                     if self.skip_errors:

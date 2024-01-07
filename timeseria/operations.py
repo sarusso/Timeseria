@@ -3,7 +3,7 @@
 
 from datetime import datetime
 from copy import copy, deepcopy
-from .time import s_from_dt
+from propertime.utilities import s_from_dt
 from .datastructures import Series, Slot, Point
 from .utilities import _is_close, _check_series_of_points_or_slots,_check_indexed_data
 from .units import TimeUnit, Unit

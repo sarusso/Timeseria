@@ -1,13 +1,14 @@
 # -*- coding: utf-8 -*-
 """Base data structures as Points, Slots and Series."""
 
-from .time import s_from_dt , dt_from_s, UTC, timezonize, dt_from_str
 from .units import Unit, TimeUnit
 from .utilities import _is_close, _to_time_unit_string
 from copy import deepcopy
 from pandas import DataFrame
 from datetime import datetime
 from .exceptions import ConsistencyException
+from propertime.utilities import s_from_dt , dt_from_s, timezonize, dt_from_str
+from pytz import UTC
 
 # Setup logging
 import logging
@@ -1341,6 +1342,7 @@ class TimeSeries(Series):
                 # Get data frame labels
                 labels = list(df.columns) 
     
+                naive_warned = False
                 for row in df.iterrows():
     
                     # Set the timestamp
@@ -1352,6 +1354,13 @@ class TimeSeries(Series):
                     data = {}
                     for i,label in enumerate(labels):
                         data[label] = row[1][i]
+
+                    if dt.tzinfo is None:
+                        if not naive_warned:
+                            logger.warning('Got naive datetimes as dataframe index, assuming UTC.')
+                            naive_warned = True
+                        dt = UTC.localize(dt)
+
                     data_time_slots.append(DataTimeSlot(dt=dt, unit=TimeUnit(unit_str), data=data))
     
                 # Set the list of data time points
@@ -1364,6 +1373,7 @@ class TimeSeries(Series):
                 # Get data frame labels
                 labels = list(df.columns) 
                 
+                naive_warned = False
                 for row in df.iterrows():
                     
                     # Set the timestamp
@@ -1375,6 +1385,12 @@ class TimeSeries(Series):
                     data = {}
                     for i,label in enumerate(labels):
                         data[label] = row[1][i]
+                    
+                    if dt.tzinfo is None:
+                        if not naive_warned:
+                            logger.warning('Got naive datetimes as dataframe index, assuming UTC.')
+                            naive_warned = True
+                        dt = UTC.localize(dt)
                     
                     data_time_points.append(DataTimePoint(dt=dt, data=data))
                 

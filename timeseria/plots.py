@@ -8,7 +8,7 @@
 import os
 import uuid
 import datetime
-from .time import dt_from_s, dt_to_str, dt_from_str, s_from_dt
+from propertime.utilities import dt_from_s, str_from_dt, dt_from_str, s_from_dt
 from .units import TimeUnit
 from .utilities import is_numerical, os_shell
 try:
@@ -60,7 +60,7 @@ def to_rgba_str_from_norm_rgb(rgb, a):
     return 'rgba({},{},{},{})'.format(rgb[0]*255,rgb[1]*255,rgb[2]*255,a)
 
 def _utc_fake_s_from_dt(dt):
-    dt_str = dt_to_str(dt)
+    dt_str = str_from_dt(dt)
     if '+' in dt_str:
         return s_from_dt(dt_from_str(dt_str.split('+')[0]+'+00:00'))
     elif '-' in dt_str:
@@ -319,7 +319,7 @@ def dygraphs_plot(series, data_labels='all', data_indexes='all', aggregate=None,
     
        Args:
            series(TimeSeries): the time series to plot.
-           data_indexes(list): a list of data_labels to plot. By default set to all the data labels of the series.
+           data_labels(list): a list of data_labels to plot. By default set to all the data labels of the series.
            data_indexes(list): a list of data_indexes as the ``data_loss``, ``data_reconstructed`` etc.
                                to plot. By default set to all the data indexes of the series. To disable
                                plotting data indexes entirely, use None or an empty list.

@@ -5,13 +5,14 @@ import os
 import json
 import uuid
 import statistics
-from ..exceptions import NotFittedError
-from ..utilities import _check_time_series, _check_resolution, _check_data_labels, _item_is_in_range
-from ..time import now_s, dt_from_s
-from ..units import TimeUnit
-from ..datastructures import Point, Series, TimeSeries
+from propertime.utilities import now_s, dt_from_s
 from pandas import DataFrame
 import shutil
+
+from ..exceptions import NotFittedError
+from ..utilities import _check_time_series, _check_resolution, _check_data_labels, _item_is_in_range
+from ..units import TimeUnit
+from ..datastructures import Point, Series, TimeSeries
 
 # Setup logging
 import logging
