@@ -11,7 +11,7 @@ requests==2.26.0
 h5py==3.6.0
 scipy==1.7.3
 pyppeteer==0.2.6
-fitter==1.5.1
+fitter==1.7.0
 propertime==0.2.0
 
 # Optional

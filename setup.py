@@ -32,7 +32,7 @@ setup(name='timeseria',
                           'h5py >=2.10.0, <4.0.0',
                           'scipy >=1.5.4, <2.0.0',
                           'pyppeteer>=0.2.6, <1.0.0',
-                          'fitter>=1.5.1, <1.6.0',
+                          'fitter>=1.7.0, <2.0.0',
                           'propertime==0.2.0'
                           ],
       extras_require = {

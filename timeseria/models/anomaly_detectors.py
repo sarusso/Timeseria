@@ -10,10 +10,18 @@ from math import log10
 from fitter import Fitter, get_common_distributions, get_distributions
 from ..utilities import DistributionFunction
 
+import fitter as fitter_library
+
+
 
 # Setup logging
 import logging
 logger = logging.getLogger(__name__)
+
+fitter_library.fitter.logger = logging.getLogger('fitter')
+fitter_library.fitter.logger.setLevel(level=logging.CRITICAL)
+
+
 
 # Suppress TensorFlow warnings as default behavior
 try:
@@ -147,8 +155,8 @@ class PredictiveAnomalyDetector(AnomalyDetector):
 
         distribution = kwargs.pop('distribution', None)
         if not distribution:
-            distributions = kwargs.pop('distributions', get_common_distributions() +['gennorm'])
-            #distributions = kwargs.pop('distributions', get_distributions())
+            distributions = kwargs.pop('distributions', fitter_library.fitter.get_common_distributions() +['gennorm'])
+            #distributions = kwargs.pop('distributions', fitter_library.fitter.get_distributions())
         else:
             distributions = [distribution]
 
@@ -180,10 +188,7 @@ class PredictiveAnomalyDetector(AnomalyDetector):
         self.data['prediction_errors'] = prediction_errors
 
         # Fit the distributions and select the best one
-        fitter_logger = logging.getLogger('fitter')
-        fitter_logger.setLevel(level=logging.CRITICAL)
-
-        fitter = Fitter(prediction_errors, distributions=distributions)
+        fitter = fitter_library.fitter.Fitter(prediction_errors, distributions=distributions)
         fitter.fit(progress=False)
 
         if summary:
