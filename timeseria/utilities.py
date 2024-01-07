@@ -12,7 +12,7 @@ from propertime.utilities import s_from_dt
 from .exceptions import FloatConversionError
 import subprocess
 from collections import namedtuple
-import numpy as np 
+import numpy as np
 from scipy import stats, optimize
 import scipy.stats
 import matplotlib.pyplot as plt
@@ -47,7 +47,7 @@ def detect_encoding(file_name, streaming=False):
                 if detector.done:
                     logger.debug('Detected encoding at line "%s"', i)
                     break
-        detector.close() 
+        detector.close()
         chardet_results = detector.result
 
     else:
@@ -221,7 +221,7 @@ def rescale(value, source_from, source_to, target_from=0, target_to=1, how='line
         raise ValueError('Cannot rescale a value outside the source interval (value={}, source_to={}'.format(value, source_to))
 
     source_total = source_to - source_from
-    source_segment = value - source_from 
+    source_segment = value - source_from
     value_ratio = source_segment/source_total
 
     if target_from==0 and target_to==1:
@@ -242,7 +242,7 @@ def os_shell(command, capture=False, verbose=False, interactive=False, silent=Fa
     # Log command
     logger.debug('Shell executing command: "%s"', command)
 
-    # Execute command in interactive mode    
+    # Execute command in interactive mode
     if verbose or interactive:
         exit_code = subprocess.call(command, shell=True)
         if exit_code == 0:
@@ -283,7 +283,7 @@ def os_shell(command, capture=False, verbose=False, interactive=False, silent=Fa
             string += '# End Shell output\n'
             string += '#---------------------------------\n'
             print(string)
-            return False    
+            return False
     else:
         if capture:
             return Output(stdout, stderr, exit_code)
@@ -353,7 +353,7 @@ class _Gaussian():
 
     @classmethod
     def from_data(cls, data):
-        mu, sigma = stats.norm.fit(data) 
+        mu, sigma = stats.norm.fit(data)
         return cls(mu,sigma,data)
 
     def adherence(self, x):
@@ -415,18 +415,18 @@ def _is_almost_equal(one, two):
     if 0.95 < (one / two) <= 1.05:
         return True
     else:
-        return False 
+        return False
 
 def _set_from_t_and_to_t(from_dt, to_dt, from_t, to_t):
     """Set from_t and to_t from a (valid) combination of from_dt, to_dt, from_t, to_t."""
 
     # Sanity chceks
     if from_t is not None and not is_numerical(from_t):
-        raise Exception('from_t is not numerical')        
+        raise Exception('from_t is not numerical')
     if to_t is not None and not is_numerical(to_t):
         raise Exception('to_t is not numerical')
     if from_dt is not None and not isinstance(from_dt, datetime):
-        raise Exception('from_dt is not datetime')    
+        raise Exception('from_dt is not datetime')
     if to_dt is not None and not isinstance(to_dt, datetime):
         raise Exception('to_t is not datetime')
 
@@ -444,7 +444,7 @@ def _set_from_t_and_to_t(from_dt, to_dt, from_t, to_t):
 def _item_is_in_range(item, from_t, to_t):
     """Check if an item (*TimePoint or *TimeSlot) is within the specified time range"""
 
-    # TODO: maybe use a custom iterator for looping over time series items? 
+    # TODO: maybe use a custom iterator for looping over time series items?
     # see https://stackoverflow.com/questions/6920206/sending-stopiteration-to-for-loop-from-outside-of-the-iterator
     from .datastructures import Point, Slot
     if isinstance(item, Slot):
@@ -465,12 +465,12 @@ def _item_is_in_range(item, from_t, to_t):
                 return True
             if item.t >= from_t:
                 return True
-        else:     
+        else:
             if from_t is not None and item.t < from_t:
                 return False
             if to_t is not None and item.t > to_t:
                 raise StopIteration
-            return True    
+            return True
     else:
         raise ConsistencyException('Got unknown type "{}'.format(item.__class__.__name__))
 
@@ -478,9 +478,9 @@ def _item_is_in_range(item, from_t, to_t):
 def _compute_validity_regions(series, from_t=None, to_t=None, sampling_interval=None, cut=False):
     """
     Compute the validity regions for the series points. If from_t or to_t are given, computes them within that interval only.
-    
+
     Args:
-        series: the time series.  
+        series: the time series.
         from_t: the interval start, if any.
         to_t: the interval end, if any.
         sampling_interval: the sampling interval. In not set, it will be used the series' (auto-detected) one.
@@ -493,7 +493,7 @@ def _compute_validity_regions(series, from_t=None, to_t=None, sampling_interval=
     # If single-element series, check that the sampling_interval was given
     if len(series) == 1:
         if sampling_interval is None:
-            raise ValueError('The series has only one element and no sampling_interval is provided, no idea how to compute validity') 
+            raise ValueError('The series has only one element and no sampling_interval is provided, no idea how to compute validity')
 
     # Get the series sampling interval unless it is forced to a specific value
     if not sampling_interval:
@@ -576,7 +576,7 @@ def _compute_coverage(series, from_t, to_t, sampling_interval=None):
             if point.valid_to < from_t:
                 continue
             if point.valid_from >= to_t:
-                break 
+                break
 
             # Skip if interpolated as well
             try:
@@ -628,7 +628,7 @@ def _compute_data_loss(series, from_t, to_t, force=False, sampling_interval=None
 
     # Compute the data loss from missing coverage.
     # Note: to improve performance, this could be computed only if the series is "raw" or forced,
-    # i.e. at first and last items since on the borders there still may be  data losses. 
+    # i.e. at first and last items since on the borders there still may be  data losses.
     data_loss_from_missing_coverage = 1 - _compute_coverage(series, from_t, to_t, sampling_interval=sampling_interval)
 
     logger.debug('Data loss from missing coverage: %s', data_loss_from_missing_coverage)
@@ -675,10 +675,10 @@ def _compute_data_loss(series, from_t, to_t, force=False, sampling_interval=None
 
     logger.debug('Data loss from previously computed: %s', data_loss_from_previously_computed)
 
-    # Compute total data loss    
+    # Compute total data loss
     data_loss = data_loss_from_missing_coverage + data_loss_from_previously_computed
 
-    # The next step is controversial, as it will cause to abuse the "None" data losses that 
+    # The next step is controversial, as it will cause to abuse the "None" data losses that
     # are only used for the forecasts at the moment. TODO: what do we want to do here?
     #if series_resolution != 'variable' and not data_loss:
     #    data_loss = None
@@ -691,7 +691,7 @@ def _check_time_series(series):
     """Check a time series for type, not emptiness and fixed resolution."""
 
     # Import here or you will end up with cyclic imports
-    from .datastructures import TimeSeries 
+    from .datastructures import TimeSeries
 
     if not isinstance(series, TimeSeries):
         raise TypeError('A TimeSeries object is required (got "{}")'.format(series.__class__.__name__))
@@ -754,9 +754,9 @@ def _get_periodicity_index(item, resolution, periodicity, dst_affected=False):
 
     from .units import Unit, TimeUnit
     # Handle specific cases
-    if isinstance(resolution, TimeUnit):  
+    if isinstance(resolution, TimeUnit):
         resolution_s = resolution.as_seconds(item.dt)
-    elif isinstance(resolution, Unit):  
+    elif isinstance(resolution, Unit):
         if isinstance(resolution.value, list):
             raise NotImplementedError('Sorry, periodocity in multi-dimensional spaces are not defined')
         resolution_s = resolution.value
@@ -775,7 +775,7 @@ def _get_periodicity_index(item, resolution, periodicity, dst_affected=False):
 
         # Get periodicity based on the datetime
 
-        # Do we have an active DST?  
+        # Do we have an active DST?
         dst_timedelta = item.dt.dst()
 
         if dst_timedelta.days == 0 and dst_timedelta.seconds == 0:
@@ -790,7 +790,7 @@ def _get_periodicity_index(item, resolution, periodicity, dst_affected=False):
             if resolution_s > 3600:
                 raise Exception('Sorry, this time series has not enough resolution to account for DST effects (resolution_s="{}", must be below 3600 seconds)'.format(resolution_s))
 
-            # Get DST offset in seconds 
+            # Get DST offset in seconds
             dst_offset_s = dst_timedelta.seconds # 3600 usually
 
             # Compute the periodicity index
@@ -898,3 +898,6 @@ def _compute_distribution_approximation_errors(distribution_function, prediction
         return (approximation_errors, binned_distribution_values, binned_real_distribution_values)
     else:
         return approximation_errors
+
+
+

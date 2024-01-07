@@ -16,7 +16,7 @@ from ..storages import CSVFileStorage
 from .. import logger
 logger.setup()
 
-# Test data and temp path 
+# Test data and temp path
 TEST_DATA_PATH = '/'.join(os.path.realpath(__file__).split('/')[0:-1]) + '/test_data/'
 TEMP_MODELS_DIR = tempfile.TemporaryDirectory().name
 
@@ -30,7 +30,7 @@ np.random.seed(0)
 class TestForecasters(unittest.TestCase):
 
     def setUp(self):
-        
+
         # Create a minute-resolution test DataTimeSlotSeries
         self.sine_minute_time_series = TimeSeries()
         for i in range(1000):
@@ -44,9 +44,9 @@ class TestForecasters(unittest.TestCase):
 
 
     def test_PeriodicAverageForecaster(self):
-                 
+
         forecaster = PeriodicAverageForecaster()
-        
+
         # Fit
         forecaster.fit(self.sine_minute_time_series, periodicity=63)
 
@@ -65,7 +65,7 @@ class TestForecasters(unittest.TestCase):
         self.assertAlmostEqual(evaluation['RMSE_1_steps'], 0.07318673229600292)
         self.assertAlmostEqual(evaluation['MAE_1_steps'], 0.06622794526818285)
         self.assertAlmostEqual(evaluation['RMSE_63_steps'], 0.06697755802373265)
-        self.assertAlmostEqual(evaluation['MAE_63_steps'], 0.06016205183857482)     
+        self.assertAlmostEqual(evaluation['MAE_63_steps'], 0.06016205183857482)
         self.assertAlmostEqual(evaluation['RMSE'], 0.07008214515986778)
         self.assertAlmostEqual(evaluation['MAE'], 0.06319499855337883)
 
@@ -75,7 +75,7 @@ class TestForecasters(unittest.TestCase):
         self.assertAlmostEqual(evaluation['RMSE_1_steps'], 0.07318673229600292)
         self.assertAlmostEqual(evaluation['MAE_1_steps'], 0.06622794526818285)
         self.assertAlmostEqual(evaluation['RMSE_3_steps'], 0.07253018513852955)
-        self.assertAlmostEqual(evaluation['MAE_3_steps'], 0.06567523200748912)     
+        self.assertAlmostEqual(evaluation['MAE_3_steps'], 0.06567523200748912)
 
         # Fit from/to
         forecaster.fit(self.sine_minute_time_series, start=20000, end=40000)
@@ -92,26 +92,26 @@ class TestForecasters(unittest.TestCase):
         forecaster = PeriodicAverageForecaster()
         with self.assertRaises(Exception):
             forecaster.fit(time_series)
-          
+
         time_series = time_series.resample(600)
         forecaster.fit(time_series)
-          
+
         # TODO: do some actual testing.. not only that "it works"
         forecasted_time_series  = forecaster.apply(time_series)
 
 
     def test_PeriodicAverageForecaster_save_load(self):
-        
+
         forecaster = PeriodicAverageForecaster()
-        
+
         forecaster.fit(self.sine_minute_time_series, periodicity=63)
-        
+
         model_path = TEMP_MODELS_DIR + '/test_PA_model'
-        
+
         forecaster.save(model_path)
-        
+
         loaded_forecaster = PeriodicAverageForecaster(model_path)
-        
+
         self.assertEqual(forecaster.data['averages'], loaded_forecaster.data['averages'])
 
         # TODO: do some actual testing.. not only that "it works"
@@ -125,12 +125,12 @@ class TestForecasters(unittest.TestCase):
         except ImportError:
             print('Skipping Prophet tests as no prophet module installed')
             return
-         
+
         forecaster = ProphetForecaster()
-         
+
         forecaster.fit(self.sine_day_time_series)
         self.assertEqual(len(self.sine_day_time_series), 1000)
-  
+
         sine_day_time_series_with_forecast = forecaster.apply(self.sine_day_time_series, steps=3)
         self.assertEqual(len(sine_day_time_series_with_forecast), 1003)
 
@@ -142,16 +142,16 @@ class TestForecasters(unittest.TestCase):
         evalation_results = forecaster.evaluate(self.sine_day_time_series, limit=1)
         self.assertAlmostEqual(evalation_results['RMSE'], 0.54, places=2) # For one sample they must be the same
         self.assertAlmostEqual(evalation_results['MAE'], 0.54, places=2) # For one sample they must be the same
-        
+
         # Test on Points as well
         time_series = CSVFileStorage(TEST_DATA_PATH + '/csv/temperature.csv').get(limit=200)
         forecaster = ProphetForecaster()
         with self.assertRaises(Exception):
             forecaster.fit(time_series)
-           
+
         time_series = time_series.resample(600)
         forecaster.fit(time_series)
-           
+
         # TODO: do some actual testing.. not only that "it works"
         forecasted_time_series = forecaster.apply(time_series)
 
@@ -163,17 +163,17 @@ class TestForecasters(unittest.TestCase):
         except ImportError:
             print('Skipping ARIMA tests as no statsmodels module installed')
             return
-         
-        # Basic ARIMA 
+
+        # Basic ARIMA
         forecaster = ARIMAForecaster(p=1,d=1,q=0)
-         
+
         forecaster.fit(self.sine_day_time_series)
         self.assertEqual(len(self.sine_day_time_series), 1000)
 
         # Cannot apply on a time series contiguous with the time series used for the fit
         with self.assertRaises(NonContiguityError):
             forecaster.apply(self.sine_day_time_series[:-1], steps=3)
-    
+
         # Can apply on a time series contiguous with the fit one
         sine_day_time_series_with_forecast = forecaster.apply(self.sine_day_time_series, steps=3)
         self.assertEqual(len(sine_day_time_series_with_forecast), 1003)
@@ -184,20 +184,20 @@ class TestForecasters(unittest.TestCase):
 
         # Can evaluate on a time series contiguous with the time series used for the fit
         forecaster = ARIMAForecaster(p=1,d=1,q=0)
-        forecaster.fit(self.sine_day_time_series[0:800])                 
+        forecaster.fit(self.sine_day_time_series[0:800])
         evaluation_results = forecaster.evaluate(self.sine_day_time_series[800:1000])
         self.assertAlmostEqual(evaluation_results['RMSE'], 2.71, places=2)
         self.assertAlmostEqual(evaluation_results['MAE'], 2.52, places=2 )
- 
+
         # Test on Points as well
         time_series = CSVFileStorage(TEST_DATA_PATH + '/csv/temperature.csv').get(limit=200)
         forecaster = ARIMAForecaster()
         with self.assertRaises(ValueError):
             forecaster.fit(time_series)
-           
+
         time_series = time_series.resample(600)
         forecaster.fit(time_series)
-           
+
         # TODO: do some actual testing.. not only that "it works"
         forecasted_time_series  = forecaster.apply(time_series)
 
@@ -209,17 +209,17 @@ class TestForecasters(unittest.TestCase):
         except ImportError:
             print('Skipping AARIMA tests as no statsmodels module installed')
             return
-         
-        # Automatic ARIMA 
+
+        # Automatic ARIMA
         forecaster = AARIMAForecaster()
-         
+
         forecaster.fit(self.sine_day_time_series, max_p=2, max_d=1, max_q=2)
         self.assertEqual(len(self.sine_day_time_series), 1000)
 
         # Cannot apply on a time series contiguous with the time series used for the fit
         with self.assertRaises(NonContiguityError):
             forecaster.apply(self.sine_day_time_series[:-1], steps=3)
-    
+
         # Can apply on a time series contiguous with the same item as the fit one
         sine_day_time_series_with_forecast = forecaster.apply(self.sine_day_time_series, steps=3)
         self.assertEqual(len(sine_day_time_series_with_forecast), 1003)
@@ -230,23 +230,23 @@ class TestForecasters(unittest.TestCase):
 
         # Can evaluate on a time series contiguous with the time series used for the fit
         forecaster = AARIMAForecaster()
-        forecaster.fit(self.sine_day_time_series[0:800], max_p=2, max_d=1, max_q=2)                 
+        forecaster.fit(self.sine_day_time_series[0:800], max_p=2, max_d=1, max_q=2)
         evaluation_results = forecaster.evaluate(self.sine_day_time_series[800:1000])
         self.assertTrue('RMSE' in evaluation_results)
         self.assertTrue('MAE' in evaluation_results)
         # Cannot test values, some random behavior which cannot be put under control is present somewhere
         #self.assertAlmostEqual(evaluation_results['RMSE'], 0.7179428895746799)
         #self.assertAlmostEqual(evaluation_results['MAE'], 0.6497934134525981)
- 
+
         # Test on Points as well
         time_series = CSVFileStorage(TEST_DATA_PATH + '/csv/temperature.csv').get(limit=200)
         forecaster = AARIMAForecaster()
         with self.assertRaises(ValueError):
             forecaster.fit(time_series)
-           
+
         time_series = time_series.resample(600)
         forecaster.fit(time_series, max_p=2, max_d=1, max_q=2)
-           
+
         # TODO: do some actual testing.. not only that "it works"
         forecasted_time_series  = forecaster.apply(time_series)
 
@@ -267,11 +267,11 @@ class TestForecasters(unittest.TestCase):
         forecaster = LSTMForecaster()
         forecaster.fit(sine_minute_time_series)
         predicted_value = forecaster.predict(sine_minute_time_series)['value']
-        
+
         # Give some tolerance
         self.assertTrue(predicted_value>0.5)
         self.assertTrue(predicted_value<1.1)
-        
+
         # Not-existent features
         with self.assertRaises(ValueError):
             LSTMForecaster(features=['values','not_existent_feature']).fit(sine_minute_time_series)
@@ -287,7 +287,7 @@ class TestForecasters(unittest.TestCase):
         except ImportError:
             print('Skipping LSTM forecaster tests as no tensorflow module installed')
             return
-        
+
         # Create a minute-resolution test DataTimeSlotSeries
         sine_minute_time_series = TimeSeries()
         for i in range(10):
@@ -296,7 +296,7 @@ class TestForecasters(unittest.TestCase):
         forecaster = LSTMForecaster()
         forecaster.fit(sine_minute_time_series)
         predicted_data = forecaster.predict(sine_minute_time_series)
-        
+
         self.assertTrue('sin' in predicted_data)
         self.assertTrue('cos' in predicted_data)
 
@@ -308,7 +308,7 @@ class TestForecasters(unittest.TestCase):
         except ImportError:
             print('Skipping LSTM forecaster tests as no tensorflow module installed')
             return
-        
+
         # Create a minute-resolution test DataTimeSlotSeries
         sine_minute_time_series = TimeSeries()
         for i in range(10):
@@ -316,19 +316,20 @@ class TestForecasters(unittest.TestCase):
 
         forecaster = LSTMForecaster()
         forecaster.fit(sine_minute_time_series)
-        
+
         # Set model path
         model_path = TEMP_MODELS_DIR+ '/test_LSTM_model'
-        
-        # Save        
+
+        # Save
         forecaster.save(model_path)
 
         # Load
         loaded_forecaster = LSTMForecaster(model_path)
-        
-        # Predict from the loaded model 
+
+        # Predict from the loaded model
         predicted_data = loaded_forecaster.predict(sine_minute_time_series)
-        
+
         self.assertTrue('sin' in predicted_data)
-        self.assertTrue('cos' in predicted_data)   
+        self.assertTrue('cos' in predicted_data)
+
 

@@ -42,7 +42,7 @@ class Unit(object):
                 raise NotImplementedError('Cannot sum multidimensional objects')
             return other.__class__(self.value + other.coordinates[0])
         except:
-            raise NotImplementedError('Don\'t know how to add Units with {}'.format(other.__class__.__name__)) 
+            raise NotImplementedError('Don\'t know how to add Units with {}'.format(other.__class__.__name__))
 
     def __radd__(self, other):
         return self.__add__(other)
@@ -60,10 +60,10 @@ class Unit(object):
         # Sum with an objects with coordinates (Points, Slots)
         try:
             if len(other.coordinates) > 1:
-                raise NotImplementedError('Cannot subtract multidimensional objects')             
+                raise NotImplementedError('Cannot subtract multidimensional objects')
             return other.__class__(self.value - other.coordinates[0])
         except:
-            raise NotImplementedError('Don\'t know how to subtract Units with {}'.format(other.__class__.__name__)) 
+            raise NotImplementedError('Don\'t know how to subtract Units with {}'.format(other.__class__.__name__))
 
     def __rsub__(self, other):
         return -self.__sub__(other)
@@ -133,10 +133,10 @@ class TimeUnit(PropertimeTimeUnit, Unit):
     Not all time units can be initialized using the numerical value, in particular calendar time units which can
     have variable duration: a time unit of one day, or ``TimeUnit('1d')``, can last for 23, 24 or 24 hours depending
     on DST changes. On the contrary, a ``TimeUnit('24h')`` will always last 24 hours and can be initialized as
-    ``TimeUnit(86400)`` as well. 
+    ``TimeUnit(86400)`` as well.
 
     Args:
-        value: the time unit value, either as seconds (float) or string representation according to the mapping above.  
+        value: the time unit value, either as seconds (float) or string representation according to the mapping above.
         years: the time unit years component.
         weeks: the time unit weeks component.
         months: the time unit weeks component.
@@ -167,5 +167,8 @@ class TimeUnit(PropertimeTimeUnit, Unit):
             return TimePoint(dt=self.shift(other.dt, times=-1))
         else:
             return super().__rsub__(other)
+
+
+
 
 

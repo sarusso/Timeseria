@@ -13,9 +13,9 @@ from .units import TimeUnit
 from .utilities import is_numerical, os_shell
 try:
     from pyppeteer.chromium_downloader import download_chromium,chromium_executable
-    image_plot_support=True  
+    image_plot_support=True
 except ImportError:
-    image_plot_support=False            
+    image_plot_support=False
 
 # Setup logging
 import logging
@@ -31,7 +31,7 @@ if DEFAULT_PLOT_TYPE:
         DEFAULT_PLOT_AS_IMAGE = False
     elif DEFAULT_PLOT_TYPE == 'image':
         logger.debug('Setting default plot type to "image"')
-        DEFAULT_PLOT_AS_IMAGE = True         
+        DEFAULT_PLOT_AS_IMAGE = True
     else:
         raise ValueError('Unknown plot type "{}" for DEFAULT_PLOT_TYPE'.forat(DEFAULT_PLOT_TYPE))
 else:
@@ -72,12 +72,12 @@ def _check_data_for_plot(data):
     if is_numerical(data):
         pass
     elif isinstance(data, list):
-        for _,item in enumerate(data): 
+        for _,item in enumerate(data):
             if not is_numerical(item):
                 raise Exception('Don\'t know how to plot item "{}" of type "{}"'.format(item, item.__class__.__name__))
-    
+
     elif isinstance(data, dict):
-        for _,item in data.items(): 
+        for _,item in data.items():
             if not is_numerical(item):
                 raise Exception('Don\'t know how to plot item "{}" of type "{}"'.format(item, item.__class__.__name__))
     else:
@@ -95,25 +95,25 @@ def _to_dg_time(dt):
 
 def _to_dg_data(serie, data_labels_to_plot, data_indexes_to_plot, full_precision, aggregate_by=0):
     '''{% for timestamp,value in metric_data.items %}{{timestamp}},{{value}}\n{%endfor%}}'''
-    
+
     from .datastructures import DataTimePoint, DataTimeSlot
-    
+
     dg_data=''
     first_t  = None
     last_t   = None
 
     global_min = None
     global_max = None
-    
+
     if serie.mark:
         series_mark_start_t = s_from_dt(serie.mark[0])
         series_mark_end_t = s_from_dt(serie.mark[1])
 
     for i, item in enumerate(serie):
-        
+
         # Offset
         i=i+1
-                
+
         # Prepare a dict for every piece of data
         try:
             labels
@@ -126,20 +126,20 @@ def _to_dg_data(serie, data_labels_to_plot, data_indexes_to_plot, full_precision
             data_mins = [None for label in labels]
             data_maxs = [None for label in labels]
             index_sums = [0 for index in data_indexes_to_plot]
-            
+
 
         #====================
         #  Aggregation
-        #====================        
+        #====================
         if aggregate_by:
 
             # Set first timestamp
             if first_t is None:
                 first_t = item.t
-                  
+
             # Define data
             if labels:
-                datas=[]      
+                datas=[]
                 for j, label in enumerate(labels):
                     if label is None:
                         datas.append(item.data)
@@ -147,20 +147,20 @@ def _to_dg_data(serie, data_labels_to_plot, data_indexes_to_plot, full_precision
                         datas.append(item._data_by_label(label))
             else:
                 datas = [item.data]
-                  
+
             # Loop over data labels, including the "None" label if we have no labels (float data), and add data
             for j, data in enumerate(datas):
-                
+
                 # Sum
                 data_sums[j] += data
-                
+
                 # Global min
                 if global_min is None:
                     global_min = data
                 else:
                     if data < global_min:
-                        global_min = data                
-                
+                        global_min = data
+
                 # Global max
                 if global_max is None:
                     global_max = data
@@ -174,7 +174,7 @@ def _to_dg_data(serie, data_labels_to_plot, data_indexes_to_plot, full_precision
                 else:
                     if data < data_mins[j]:
                         data_mins[j] = data
-    
+
                 # Max
                 if data_maxs[j] is None:
                     data_maxs[j] = data
@@ -199,7 +199,7 @@ def _to_dg_data(serie, data_labels_to_plot, data_indexes_to_plot, full_precision
                     last_t = item.end.t
                 aggregation_t = first_t + ((last_t-first_t) /2)
                 data_part=''
-                
+
                 # Data
                 for i, label in enumerate(labels):
                     avg = data_sums[i]/aggregate_by
@@ -207,7 +207,7 @@ def _to_dg_data(serie, data_labels_to_plot, data_indexes_to_plot, full_precision
                         data_part+='[{},{},{}],'.format(data_mins[i], avg, data_maxs[i])
                     else:
                         data_part+='[{:.2f},{:.2f},{:.2f}],'.format(data_mins[i], avg, data_maxs[i])
-                        
+
                 # data_indexes
                 for i, index in enumerate(data_indexes_to_plot):
                     if index_sums[i] is not None:
@@ -215,25 +215,25 @@ def _to_dg_data(serie, data_labels_to_plot, data_indexes_to_plot, full_precision
                         if full_precision:
                             data_part+='[0,{},{}],'.format(aggregated_index_value,aggregated_index_value)
                         else:
-                            data_part+='[0,{:.4f},{:.4f}],'.format(aggregated_index_value,aggregated_index_value)                            
+                            data_part+='[0,{:.4f},{:.4f}],'.format(aggregated_index_value,aggregated_index_value)
                     else:
                         data_part+='[null,null,null],'
 
                 # Do we have a mark?
                 if serie.mark and RENDER_MARK_AS_INDEX:
-                    if item.start.t >= series_mark_start_t and item.end.t < series_mark_end_t:                                    
+                    if item.start.t >= series_mark_start_t and item.end.t < series_mark_end_t:
                         # Add the (active) mark
                         data_part+='[0,1,1],'
                     else:
                         # Add the (inactive) mark
                         data_part+='[0,0,0],'
-                
+
                 # Remove last comma
                 data_part = data_part[0:-1]
-                
+
                 # Add to dg_data
                 dg_data += '[{},{}],'.format(_to_dg_time(dt_from_s(aggregation_t, tz=item.tz)), data_part)
-                
+
                 # Reset averages
                 data_sums = [0 for label in labels]
                 data_mins = [None for label in labels]
@@ -245,7 +245,7 @@ def _to_dg_data(serie, data_labels_to_plot, data_indexes_to_plot, full_precision
         #  No aggregation
         #====================
         else:
-                    
+
             # Loop over data labels, including the "None" label if we have no labels (float data), and add data
             data_part=''
             for label in labels:
@@ -258,21 +258,21 @@ def _to_dg_data(serie, data_labels_to_plot, data_indexes_to_plot, full_precision
                     data_part += '{},'.format(data)
                 else:
                     data_part += '{:.2f},'.format(data)
-                                    
+
                 # Global min
                 if global_min is None:
                     global_min = data
                 else:
                     if data < global_min:
-                        global_min = data                
-                
+                        global_min = data
+
                 # Global max
                 if global_max is None:
                     global_max = data
                 else:
                     if data > global_max:
                         global_max = data
-                
+
             # Loop over series data_indexes and add data
             for index in data_indexes_to_plot:
                 try:
@@ -281,7 +281,7 @@ def _to_dg_data(serie, data_labels_to_plot, data_indexes_to_plot, full_precision
                         if full_precision:
                             data_part+='{},'.format(index_value)
                         else:
-                            data_part+='{:.4f},'.format(index_value)                       
+                            data_part+='{:.4f},'.format(index_value)
                     else:
                         data_part+='null,'
                 except KeyError:
@@ -316,7 +316,7 @@ def dygraphs_plot(series, data_labels='all', data_indexes='all', aggregate=None,
                   color=None, height=None, image=DEFAULT_PLOT_AS_IMAGE, image_resolution='auto', html=False, save_to=None,
                   mini_plot='auto', value_range='auto', minimal_legend=False):
     """Plot a time series using Dygraphs interactive plots.
-    
+
        Args:
            series(TimeSeries): the time series to plot.
            data_labels(list): a list of data_labels to plot. By default set to all the data labels of the series.
@@ -325,7 +325,7 @@ def dygraphs_plot(series, data_labels='all', data_indexes='all', aggregate=None,
                                plotting data indexes entirely, use None or an empty list.
            aggregate(bool): if to aggregate the time series, in order to speed up plotting.
                             By default, above 10000 data points the time series starts to
-                            get aggregated by a factor of ten for each order of magnitude. 
+                            get aggregated by a factor of ten for each order of magnitude.
            aggregate_by(int): a custom aggregation factor.
            full_precision(bool): if to use (nearly) full precision using 6 significant figures instead of the
                                  automatic rounding. Defaulted to false.
@@ -338,8 +338,8 @@ def dygraphs_plot(series, data_labels='all', data_indexes='all', aggregate=None,
                                   set between ``1280x380`` and ``1024x400``, depending on the time series legend and title.
            html(bool): if to return the HTML code for the plot instead of generating an interactive or image one.
                        Useful for embedding it in a website or for generating multi-plot HTML pages.
-           save_to(str): a file name (including its path) where to save the plot. If the plot is generated as 
-                         interactive, then it is saved as a self-consistent HTML page which can be opened in a 
+           save_to(str): a file name (including its path) where to save the plot. If the plot is generated as
+                         interactive, then it is saved as a self-consistent HTML page which can be opened in a
                          web browser. If the plot is generated as an image, then it is saved in PNG format.
            mini_plot(bool): if to include the range selector mini plot. Always automatically included unless
                             saving the plot in image format.
@@ -352,16 +352,16 @@ def dygraphs_plot(series, data_labels='all', data_indexes='all', aggregate=None,
         from IPython.display import display, Javascript, HTML, Image
     except ModuleNotFoundError:
         pass
-    
+
     if html and image:
         raise ValueError('Setting both image and html to True is not supported.')
 
     if html and save_to:
-        raise ValueError('Setting html=True is not compatible with setting a save_to value.')    
-    
+        raise ValueError('Setting html=True is not compatible with setting a save_to value.')
+
     if len(series)==0:
         raise Exception('Cannot plot empty series')
-   
+
     if save_to:
         if image:
             if not save_to.endswith('.png'):
@@ -369,20 +369,20 @@ def dygraphs_plot(series, data_labels='all', data_indexes='all', aggregate=None,
         else:
             if not save_to.endswith('.html'):
                 logger.warning('You are saving to "{}" in interactive (HTML) format, but the file name does not end with ".html"'.format(save_to))
-   
+
     if aggregate_by is None:
         # Set default aggregate_by if not explicitly set to something
         if len(series)  > AGGREGATE_THRESHOLD:
             aggregate_by = 10**len(str(int(len(series)/float(AGGREGATE_THRESHOLD))))
         else:
             aggregate_by = None
- 
+
     if aggregate is not None:
         # Handle the case where we are required not to aggregate
 
         if not aggregate:
             aggregate_by = None
-            
+
     if mini_plot=='auto':
         if image:
             mini_plot=False
@@ -430,7 +430,7 @@ def dygraphs_plot(series, data_labels='all', data_indexes='all', aggregate=None,
 
     # Checks
     from .datastructures import DataTimePoint, DataTimeSlot
-    if issubclass(series.items_type, DataTimePoint): 
+    if issubclass(series.items_type, DataTimePoint):
         stepPlot_value   = 'false'
         drawPoints_value = 'true'
         if aggregate_by:
@@ -442,7 +442,7 @@ def dygraphs_plot(series, data_labels='all', data_indexes='all', aggregate=None,
             series_unit_string = str(series.resolution)
         else:
             series_unit_string = str(series.resolution) #.split('.')[0]+'s'
-        #if aggregate_by: 
+        #if aggregate_by:
         #    raise NotImplementedError('Plotting slots with a plot-level aggregation is not yet supported')
         stepPlot_value   = 'true'
         drawPoints_value = 'false'
@@ -468,7 +468,7 @@ def dygraphs_plot(series, data_labels='all', data_indexes='all', aggregate=None,
             series_desc = 'Time series of #{} points at {}, aggregated by {}'.format(len(series), series._resolution_string, aggregate_by)
         else:
             series_desc = 'Time series of #{} points at {}'.format(len(series), series._resolution_string)
-         
+
     elif issubclass(series.items_type, DataTimeSlot):
         if aggregate_by:
             # TODO: "slots of unit" ?
@@ -476,7 +476,7 @@ def dygraphs_plot(series, data_labels='all', data_indexes='all', aggregate=None,
         else:
             # TODO: "slots of unit" ?
             series_desc = 'Time series of #{} slots of {}'.format(len(series), series_unit_string)
-            
+
     else:
         series_desc = series.__class__.__name__
 
@@ -485,7 +485,7 @@ def dygraphs_plot(series, data_labels='all', data_indexes='all', aggregate=None,
 
     if aggregate_by:
         logger.info('Aggregating by "{}" for improved plotting'.format(aggregate_by))
-            
+
     # Define div name
     graph_id = 'graph_' + str(uuid.uuid4()).replace('-', '')
     graph_div_id  = graph_id + '_plotarea'
@@ -506,7 +506,7 @@ def dygraphs_plot(series, data_labels='all', data_indexes='all', aggregate=None,
 
     # Dygraphs Javascript
     dygraphs_javascript = """
-    
+
 // Clone the interaction model so we don't mess up with the original dblclick mehtod that might cause a recursive call
 var touchFriendlyInteractionModel = Object.assign({}, Dygraph.defaultInteractionModel);
 
@@ -521,7 +521,7 @@ function legendFormatter(data) {
       var g = data.dygraph;
 
       if (g.getOption('showLabelsOnHighlight') !== true) return '';
-      
+
       var data_indexes = """+str(series._all_data_indexes())+""";
       var sepLines = g.getOption('labelsSeparateLines');
       var first_data_index = true;
@@ -537,13 +537,13 @@ function legendFormatter(data) {
           var series = data.series[i];
           // Skip not visible series
           if (!series.isVisible) continue;
-          
+
           // Also skip Timeseria-specific series
           if (series.label=='data_mark') continue;
-          
+
           // Add some initial stuff
           if (html !== '') html += sepLines ? '<br/>' : ' ';
-          
+
           if (data_indexes.includes(series.label)){
               // The following was used to inlcude the "indexes" word in the legend
               /* if (first_data_index){
@@ -555,7 +555,7 @@ function legendFormatter(data) {
           else {
               html += "<span style='margin-left:15px; font-weight: bold; color: " + series.color + ";'>" + series.dashHTML + " " + series.labelHTML + "</span>, ";
           }
-          
+
           // Remove last comma and space
           html = html.substring(0, html.length - 2);
         }
@@ -574,25 +574,25 @@ function legendFormatter(data) {
 
       html = '""" + legend_pre + """' + data.xHTML + '""" + legend_tz + """:';
       for (var i = 0; i < data.series.length; i++) {
-        
+
         var mark_active = false;
-        
+
         if ( data.series[i].label=='data_mark' && data.series[i].y==1 )  {
            mark_active = true;
         }
-                 
+
         var series = data.series[i];
-        
+
         // Skip not visible series
         if (!series.isVisible) continue;
-        
+
         // Also skip Timeseria-specific series
         if (series.label=='data_mark') continue;
-        
+
         if (sepLines) html += '<br>';
         //var decoration = series.isHighlighted ? ' class="highlight"' : '';
         var decoration = series.isHighlighted ? ' style="background-color: #000000"' : '';
-        
+
         /*
         if (series.isHighlighted) {
             decoration = ' style="background-color: #fcf8b0"'
@@ -602,7 +602,7 @@ function legendFormatter(data) {
         }
         console.log(decoration)
         */
-        
+
         //decoration = ' style="background-color: #fcf8b0"'
         if (data_indexes.includes(series.label)){
             // The following was used to inlcude the "indexes" word in the legend
@@ -613,16 +613,16 @@ function legendFormatter(data) {
                 first_data_index=false
             }*/
             html += "<span" + decoration + "> <span style='background: " + series.color + ";'>&nbsp" + series.labelHTML + "&nbsp</span>:&#160;" + """+ ('series.yHTML*100' if full_precision else '(Math.round(series.yHTML *100 * 100) / 100)')  +""" + "%</span>, ";
-        
+
         }
         else {
             html += "<span" + decoration + "> <b><span style='color: " + series.color + ";'>" + series.labelHTML + "</span></b>:&#160;" + series.yHTML + "</span>, ";
         }
-      
+
       }
       // Remove last comma and space
       html = html.substring(0, html.length - 2);
-      
+
       if (mark_active) {
           html += ' &nbsp;"""+ series_mark_html +"""'
       }
@@ -645,7 +645,7 @@ function legendFormatter(data) {
             if isinstance(series[0].data, list) or isinstance(series[0].data, tuple):
                 if len(data_labels_to_plot) == 1:
                     labels='value,'
-                else:    
+                else:
                     labels += 'value {},'.format(data_label_to_plot)
             else:
                 labels += '{},'.format(data_label_to_plot)
@@ -653,7 +653,7 @@ function legendFormatter(data) {
         labels = labels[0:-1]
     else:
         labels='value'
-    
+
     # Set index labels
     for index in data_indexes_to_plot:
         labels+=',{}'.format(index)
@@ -661,7 +661,7 @@ function legendFormatter(data) {
     # Handle series mark (as index)
     if series.mark and RENDER_MARK_AS_INDEX:
         labels+=',data_mark'
-    
+
     # Prepare labels string list for Dygraphs
     labels_list = ['Timestamp'] + labels.split(',')
 
@@ -704,7 +704,7 @@ hideOverlayOnMouseOut: true,
 interactionModel: touchFriendlyInteractionModel,
 includeZero: false,
 digitsAfterDecimal:2,
-sigFigs: """ + ('6' if full_precision else 'null') + """,  
+sigFigs: """ + ('6' if full_precision else 'null') + """,
 showRoller: false,
 legend: 'always',
 labelsUTC: true,
@@ -737,7 +737,7 @@ animatedZooms: true,"""
 
     # Variable fill alpha in case of aggregated plot or not (for the area)
     # They have to be differentiated due different transparency policies in Dygraphs
-    if aggregate_by:        
+    if aggregate_by:
         fill_alpha_value  = 0.31
     else:
         fill_alpha_value  = 0.5
@@ -747,17 +747,17 @@ animatedZooms: true,"""
 
     # Fixed colors (alpha is for the lgend)
     rgba_value_red    = 'rgba(255,128,128,0.4)'
-    rgba_alpha_violet = 'rgba(227, 168, 237, 0.5)' 
+    rgba_alpha_violet = 'rgba(227, 168, 237, 0.5)'
     rgba_value_yellow = 'rgba(255, 255, 102, 0.6)'
     rgba_value_darkorange = 'rgba(255, 140, 0, 0.7)'
-    
+
     # Data indexes series start
     dygraphs_javascript += """
      series: {"""
-    
+
     colormap_count = 0
     for i, data_index_to_plot in enumerate(data_indexes_to_plot):
-    
+
         # Special data indexes
         if data_index_to_plot == 'data_reconstructed':
             data_index_fillalpha = fill_alpha_value_fixed
@@ -774,14 +774,14 @@ animatedZooms: true,"""
         elif data_index_to_plot ==  'anomaly':
             data_index_fillalpha = fill_alpha_value_fixed
             data_index_color = rgba_value_darkorange
-        
+
         # Standard data indexes
         else:
             data_index_fillalpha = fill_alpha_value-0.1
             data_index_color = to_rgba_str_from_norm_rgb(_tab10_colormap_norm[colormap_count%len(_tab10_colormap_norm)], fill_alpha_value+0.1 if aggregate_by else fill_alpha_value-0.1)
             colormap_count += 1
-           
-        # Now create the entry for this data index               
+
+        # Now create the entry for this data index
         dygraphs_javascript += """
         '"""+data_index_to_plot+"""': {
          //customBars: false, // Does not work?
@@ -791,8 +791,8 @@ animatedZooms: true,"""
          highlightCircleSize:0,
          fillGraph: true,
          fillAlpha: """+str(data_index_fillalpha)+""", // This alpha is used for the area
-         color: '"""+data_index_color+"""'             // Alpha here is used for the legend 
-       },"""    
+         color: '"""+data_index_color+"""'             // Alpha here is used for the legend
+       },"""
 
     # Add data mark index series
     dygraphs_javascript += """
@@ -804,7 +804,7 @@ animatedZooms: true,"""
          highlightCircleSize:0,
          fillGraph: true,
          fillAlpha: """+str(fill_alpha_value)+""",  // This alpha is used for the area
-         color: '"""+rgba_value_yellow+"""'         // Alpha here is used for the legend 
+         color: '"""+rgba_value_yellow+"""'         // Alpha here is used for the legend
        },"""
 
     # Add all non-index series to be included in the miniplot
@@ -812,32 +812,32 @@ animatedZooms: true,"""
         dygraphs_javascript += """
            '"""+str(label)+"""': {
              showInRangeSelector:true
-           },"""     
-    
+           },"""
+
     # Special series end
     dygraphs_javascript += """
      },"""
 
-    # Force "original" Dygraph color if only one data series, or use custom color:          
+    # Force "original" Dygraph color if only one data series, or use custom color:
     if len(data_labels_to_plot) <=1:
         if color:
-            dygraphs_javascript += """colors: ['"""+color+"""'],"""         
+            dygraphs_javascript += """colors: ['"""+color+"""'],"""
         else:
-            dygraphs_javascript += """colors: ['rgb(0,128,128)'],""" 
+            dygraphs_javascript += """colors: ['rgb(0,128,128)'],"""
 
     # Handle series mark (only if not handled as an index)
     if series.mark and not RENDER_MARK_AS_INDEX:
- 
+
         # Check that we know how to use this mark
         if not isinstance(series.mark[0], datetime.datetime):
             raise TypeError('Series marks must be datetime objects')
         if not isinstance(series.mark[1], datetime.datetime):
-            raise TypeError('Series marks must be datetime objects')            
-           
+            raise TypeError('Series marks must be datetime objects')
+
         # Convert the mark to fake epoch milliseconds
         mark_start = _utc_fake_s_from_dt(series.mark[0])*1000
         mark_end   = _utc_fake_s_from_dt(series.mark[1])*1000
-         
+
         # Add js code
         dygraphs_javascript += 'underlayCallback: function(canvas, area, g) {'
         dygraphs_javascript += 'var bottom_left = g.toDomCoords({}, -20);'.format(mark_start)
@@ -852,9 +852,9 @@ animatedZooms: true,"""
         # Add a cooma. Just if the previosu section kiked-in
         if dygraphs_javascript[-1] != ',':
             dygraphs_javascript += ','
-        dygraphs_javascript += 'customBars: true'        
+        dygraphs_javascript += 'customBars: true'
     dygraphs_javascript += '})'
-    
+
     #if log_js:
     #    logger.info(dygraphs_javascript)
 
@@ -878,11 +878,11 @@ define('"""+graph_id+"""', ['dgenv'], function (Dygraph) {
 
         # Generate random UUID
         rnd_uuid=str(uuid.uuid4())
-        
+
         # If a destination was set, we do not show the plot.
         if save_to:
             show_plot = False
-        
+
         # Set destination file values
         if save_to:
             if image:
@@ -924,14 +924,14 @@ define('"""+graph_id+"""', ['dgenv'], function (Dygraph) {
         if not return_html_code:
             html_content += '</body>\n</html>\n'
         html_content += '<script>{}</script>\n'.format(dygraphs_javascript)
-        
+
         # Dump html to file
         try:
             with open(html_dest, 'w') as f:
                 f.write(html_content)
         except UnboundLocalError:
             pass
-        
+
         # Also render if not interactive mode
         if image:
 
@@ -941,7 +941,7 @@ define('"""+graph_id+"""', ['dgenv'], function (Dygraph) {
             # Get OS and architecture
             _os = os.uname()[0]
             _arch = os.uname()[4]
-            
+
             # For ARM and Linux, use system system chromium, otherwise rely on Pyppeteer
 
             if (_os == 'Linux') and (_arch == 'aarch64'):
@@ -950,7 +950,7 @@ define('"""+graph_id+"""', ['dgenv'], function (Dygraph) {
                 # Disable logging for Pyppeteer
                 pyppeteer_logger = logging.getLogger('pyppeteer')
                 pyppeteer_logger.setLevel(logging.CRITICAL)
-                
+
                 # Check we have Chromium,. if not, download
                 if False:#not chromium_executable().exists():
                     logger.info('Downloading Chromium for rendering image-based plots...')
@@ -962,44 +962,44 @@ define('"""+graph_id+"""', ['dgenv'], function (Dygraph) {
             if image_resolution == 'auto':
                 if series.title:
                     image_resolution='1280x430'
-                else:    
+                else:
                     image_resolution='1280x380'
             resolution = image_resolution.replace('x', ',')
             command = '{} --no-sandbox --headless --disable-gpu --window-size={} --screenshot={} {}'.format(_chromium_executable, resolution, png_dest, html_dest)
             logger.debug('Executing "{}"'.format(command))
             out = os_shell(command, capture=True)
-            
+
             if not out.exit_code == 0:
                 raise OSError('Error: {}'.format(out.stderr))
-            
+
             if show_plot:
                 return (Image(filename=png_dest))
-        
+
         if html:
             return html_content
-        
-        # Log 
+
+        # Log
         if save_to:
             if image:
                 logger.info('Saved image plot in PNG format to "{}"'.format(png_dest))
             else:
                 logger.info('Saved interactive plot in HTML format to "{}"'.format(html_dest))
-                    
+
     else:
 
         if show_plot:
             # Require Dygraphs Javascript library
             # https://raw.githubusercontent.com/sarusso/Timeseria/develop/timeseria/static/js/dygraph-2.1.0.min
             display(Javascript("require.config({paths: {dgenv: 'https://cdnjs.cloudflare.com/ajax/libs/dygraph/2.1.0/dygraph.min'}});"))
-            # TODO: load it locally, maybe with something like:    
+            # TODO: load it locally, maybe with something like:
             #with open(STATIC_DATA_PATH+'js/dygraph-2.1.0.min.js') as dy_js_file:
             #    display(Javascript(dy_js_file.read()))
-        
+
             # Load Dygraphs CSS
             with open(STATIC_DATA_PATH+'css/dygraph-2.1.0.css') as dg_css_file:
                 display(HTML('<style>'+dg_css_file.read()+'</style>'))
-            
-            # Load Dygraphs Javascript and html code    
+
+            # Load Dygraphs Javascript and html code
             display_html = ''
             if series.title:
                 display_html += '<div style="text-align: center; margin-bottom:20px; font-size:0.95em"><h3>{}</h3></div>'.format(series.title)
@@ -1007,9 +1007,9 @@ define('"""+graph_id+"""', ['dgenv'], function (Dygraph) {
             display_html += '''<div id="'''+legend_div_id+'''" style="width:100%"></div></div>
                             <div id="'''+graph_div_id+'''" style="width:100%; margin-right:0px"></div>'''
 
-            display(Javascript(rendering_javascript))                        
+            display(Javascript(rendering_javascript))
             display(HTML(display_html))
-        
+
             # Render the graph (this is the "entrypoint")
             display(Javascript("""
                 (function(element){
@@ -1029,4 +1029,7 @@ def matplotlib_plot(timeseries):
     from matplotlib import pyplot
     pyplot.plot(timeseries.df)
     pyplot.show()
+
+
+
 

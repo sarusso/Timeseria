@@ -9,7 +9,7 @@ levels_mapping = { 50: 'CRITICAL',
                    20: 'INFO',
                    10: 'DEBUG',
                     0: 'NOTSET'}
-               
+
 
 def setup(level=LOGLEVEL, force=False):
     timeseria_logger = logging.getLogger('timeseria')
@@ -27,11 +27,14 @@ def setup(level=LOGLEVEL, force=False):
                         timeseria_logger.warning('You tried to setup the logger with level "{}" but it is already configured with level "{}". Use force=True to force reconfiguring it.'.format(level, levels_mapping[handler.level]))
     except IndexError:
         configured=False
-    
+
     if not configured:
         timeseria_handler = logging.StreamHandler()
         timeseria_handler.set_name('timeseria_handler')
-        timeseria_handler.setLevel(level=level) # Set timeseria default (and only) handler level 
+        timeseria_handler.setLevel(level=level) # Set timeseria default (and only) handler level
         timeseria_handler.setFormatter(logging.Formatter('[%(levelname)s] %(name)s: %(message)s'))
         timeseria_logger.addHandler(timeseria_handler)
         timeseria_logger.setLevel(level=level) # Set global timeseria logging level
+
+
+

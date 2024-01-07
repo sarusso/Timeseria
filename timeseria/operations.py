@@ -7,7 +7,7 @@ from propertime.utilities import s_from_dt
 from .datastructures import Series, Slot, Point
 from .utilities import _is_close, _check_series_of_points_or_slots,_check_indexed_data
 from .units import TimeUnit, Unit
-from .exceptions import ConsistencyException 
+from .exceptions import ConsistencyException
 
 # Setup logging
 import logging
@@ -21,20 +21,20 @@ logger = logging.getLogger(__name__)
 class Operation():
     """A generic series operation (callable object). Can return any valid data type,
     as a series, a scalar, a list of items, etc."""
-    
+
     _supports_weights = False
 
     @classmethod
     def __str__(cls):
         return '{} operation'.format(cls.__name__)
-    
+
     @classmethod
     def __repr__(cls):
         return '{}'.format(cls.__name__.lower())
-    
+
     def __call__(self, series, *args, **kwargs):
         """Call self as a function.
-        
+
         :meta private:
         """
 
@@ -57,7 +57,7 @@ class Operation():
                 except TypeError:
                     # It was not iterable
                     raise TypeError('Operations can only work on series or lists of series')
-            
+
             # Call compute logic
             return self._compute(series, *args, **kwargs)
 
@@ -80,17 +80,17 @@ class Max(Operation):
 
         _check_series_of_points_or_slots(series)
         _check_indexed_data(series)
-        
+
         maxs = {data_label: None for data_label in series.data_labels()}
         for item in series:
             for _data_label in maxs:
-                
+
                 if maxs[_data_label] is None:
                     maxs[_data_label] = item._data_by_label(_data_label)
                 else:
                     if item._data_by_label(_data_label) > maxs[_data_label]:
                         maxs[_data_label] = item._data_by_label(_data_label)
-        
+
         if data_label is not None:
             return maxs[data_label]
         else:
@@ -108,7 +108,7 @@ class Min(Operation):
 
         _check_series_of_points_or_slots(series)
         _check_indexed_data(series)
-        
+
         mins = {data_label: None for data_label in series.data_labels()}
         for item in series:
             for _data_label in mins:
@@ -117,7 +117,7 @@ class Min(Operation):
                 else:
                     if item._data_by_label(_data_label) < mins[_data_label]:
                         mins[_data_label] = item._data_by_label(_data_label)
-        
+
         if data_label is not None:
             return mins[data_label]
         else:
@@ -126,7 +126,7 @@ class Min(Operation):
 
 class Avg(Operation):
     """Weighted average operation (callable object)."""
-    
+
     _supports_weights = True
 
     def _compute(self, series, data_label=None):
@@ -142,18 +142,18 @@ class Avg(Operation):
                 weighted=True
         except AttributeError:
             weighted=False
-            #raise AttributeError('Trying to apply a weightd average on non-weigthed point')     
+            #raise AttributeError('Trying to apply a weightd average on non-weigthed point')
 
         # Prepare
         sums = {data_label: None for data_label in series.data_labels()}
-        
+
         # Compute
         if weighted:
             total_weights = 0
             for item in series:
-        
+
                 logger.debug('Point @ %s, weight: %s, data: %s', item.dt, item.weight, item.data)
-        
+
                 for _data_label in sums:
                     if sums[_data_label] is None:
                         sums[_data_label] = item._data_by_label(_data_label)*item.weight
@@ -161,7 +161,7 @@ class Avg(Operation):
                         sums[_data_label] += item._data_by_label(_data_label)*item.weight
                     #logger.debug('Sums: %s',sums[_data_label])
                 total_weights += item.weight
-            
+
             # The sum are already the average as weugthed
             logger.debug('Total weights: %s', total_weights)
             if total_weights == 1:
@@ -176,11 +176,11 @@ class Avg(Operation):
                     if sums[_data_label] is None:
                         sums[_data_label] = item._data_by_label(_data_label)
                     else:
-                        sums[_data_label] += item._data_by_label(_data_label)            
+                        sums[_data_label] += item._data_by_label(_data_label)
             avgs = {}
             for _data_label in sums:
                 avgs[_data_label] = sums[_data_label] / len(series)
-            
+
         # FInalize and return
         if data_label is not None:
             return avgs[data_label]
@@ -194,7 +194,7 @@ class Sum(Operation):
     def _compute(self, series, data_label=None):
 
         _check_series_of_points_or_slots(series)
-        _check_indexed_data(series)        
+        _check_indexed_data(series)
 
         sums = {data_label: 0 for data_label in series.data_labels()}
         for item in series:
@@ -207,17 +207,17 @@ class Sum(Operation):
 
 
 #=================================
-#  Operations returning series 
+#  Operations returning series
 #=================================
 
 class Derivative(Operation):
     """Derivative operation (callable object)."""
-    
+
     def _compute(self, series, inplace=False, normalize=True, diffs=False):
- 
+
         _check_series_of_points_or_slots(series)
         _check_indexed_data(series)
-        
+
         if len(series) == 0:
             if diffs:
                 raise ValueError('The differences cannot be computed on an empty series.')
@@ -227,16 +227,16 @@ class Derivative(Operation):
         if normalize:
             if not (issubclass(series.items_type, Point) or issubclass(series.items_type, Slot)):
                 raise TypeError('Series items are not Points nor Slots, cannot compute a derivative')
-        
+
         if len(series) == 1:
             if diffs:
                 raise ValueError('The differences cannot be computed on a series with only one item')
             else:
                 raise ValueError('The derivative cannot be computed on a series with only one item')
-        
+
         if diffs and inplace:
             raise NotImplementedError('Computing differences in-place is not supported as it would change the series length')
-        
+
         if normalize:
             if series.resolution == 'variable':
                 variable_resolution = True
@@ -244,11 +244,11 @@ class Derivative(Operation):
             else:
                 variable_resolution = False
                 if isinstance(series.resolution, TimeUnit):
-                    sampling_interval = series.resolution.as_seconds(series[0].dt)               
+                    sampling_interval = series.resolution.as_seconds(series[0].dt)
                 elif isinstance(series.resolution, Unit):
                     sampling_interval = series.resolution.value
                 else:
-                    sampling_interval = series.resolution           
+                    sampling_interval = series.resolution
             postfix='derivative'
         else:
             postfix='diff'
@@ -262,8 +262,8 @@ class Derivative(Operation):
             series[0].data[series.data_labels()[0]]
             data_is_keyvalue = True
         except TypeError:
-            data_is_keyvalue = False 
-        
+            data_is_keyvalue = False
+
         for i, item in enumerate(series):
 
             # Skip the first element if computing diffs
@@ -295,11 +295,11 @@ class Derivative(Operation):
                         # Both left and right increment for the items in the middle
                         diff_left = series[i]._data_by_label(data_label) - series[i-1]._data_by_label(data_label)
                         diff_right = series[i+1]._data_by_label(data_label) - series[i]._data_by_label(data_label)
-                
+
                 # Combine and normalize (if required) the increments to get the actual derivative
                 if normalize:
                     if diff is not None:
-                        diff = diff / sampling_interval 
+                        diff = diff / sampling_interval
                     elif diff_right is None:
                         diff = diff_left / sampling_interval
                     elif diff_left is None:
@@ -318,7 +318,7 @@ class Derivative(Operation):
                         diff = diff_right
                     else:
                         diff = (diff_left+diff_right)/2
-                
+
                 # Add data
                 if not inplace:
                     if data_is_keyvalue:
@@ -339,12 +339,12 @@ class Derivative(Operation):
                     der_series.append(series[0].__class__(t = item.t,
                                                           tz = item.tz,
                                                           data = der_data,
-                                                          data_loss = item.data_loss))         
+                                                          data_loss = item.data_loss))
                 elif isinstance(series[0], Slot):
                     der_series.append(series[0].__class__(start = item.start,
                                                           unit = item.unit,
                                                           data = der_data,
-                                                          data_loss = item.data_loss))                
+                                                          data_loss = item.data_loss))
                 else:
                     raise NotImplementedError('Working on series other than slots or points not yet implemented')
 
@@ -354,7 +354,7 @@ class Derivative(Operation):
 
 class Integral(Operation):
     """Integral operation (callable object)."""
-    
+
     def _compute(self, series, inplace=False, normalize=True, c=0, offset=0):
 
         _check_series_of_points_or_slots(series)
@@ -369,7 +369,7 @@ class Integral(Operation):
         if normalize:
             if not (issubclass(series.items_type, Point) or issubclass(series.items_type, Slot)):
                 raise TypeError('Series items are not Points nor Slots, cannot compute an integral')
-    
+
         if normalize:
             if series.resolution == 'variable':
                 variable_resolution = True
@@ -377,11 +377,11 @@ class Integral(Operation):
             else:
                 variable_resolution = False
                 if isinstance(series.resolution, TimeUnit):
-                    sampling_interval = series.resolution.as_seconds(series[0].dt)               
+                    sampling_interval = series.resolution.as_seconds(series[0].dt)
                 elif isinstance(series.resolution, Unit):
                     sampling_interval = series.resolution.value
                 else:
-                    sampling_interval = series.resolution     
+                    sampling_interval = series.resolution
             postfix='integral'
         else:
             postfix='csum'
@@ -395,8 +395,8 @@ class Integral(Operation):
             series[0].data[series.data_labels()[0]]
             data_is_keyvalue = True
         except TypeError:
-            data_is_keyvalue = False 
-        
+            data_is_keyvalue = False
+
         last_values={}
 
         for i, item in enumerate(series):
@@ -405,9 +405,9 @@ class Integral(Operation):
             if i==0 and offset:
                 if inplace:
                     raise ValueError('Cannot use prev_data in in-place mode, would require to add a point to the series')
-                
+
                 prev_data = series[0].data.__class__()
-                
+
                 if isinstance(offset,dict):
                     if data_is_keyvalue:
                         for data_label in series.data_labels():
@@ -422,26 +422,26 @@ class Integral(Operation):
                     else:
                         for data_label in series.data_labels():
                             prev_data.append(offset[data_label])
-                
+
                 if isinstance(item, Point):
                     int_series.append(item.__class__(t = item.t - series.resolution,
                                                      tz = item.tz,
                                                      data = prev_data,
-                                                     data_loss = 0))         
+                                                     data_loss = 0))
                 elif isinstance(item, Slot):
                     int_series.append(item.__class__(start = item.start - item.unit,
                                                      unit = item.unit,
                                                      data = prev_data,
                                                      data_loss = 0))
                 # Now set the c accordingly:
-                c = offset  
+                c = offset
 
 
             if not inplace:
                 data = series[0].data.__class__()
-            
+
             for data_label in series.data_labels():
-                
+
                 # Get the value
                 if not normalize:
                     value = series[i]._data_by_label(data_label)
@@ -452,8 +452,8 @@ class Integral(Operation):
                         prev_right_component = series[i]._data_by_label(data_label)
                     else:
                         left_component = (series[i-1]._data_by_label(data_label)*2) - prev_right_component
-                        # The "value" below is actually an increment, see below at  value = last_values[data_label] + value 
-                        value = left_component 
+                        # The "value" below is actually an increment, see below at  value = last_values[data_label] + value
+                        value = left_component
                         prev_right_component = left_component
 
                 # Normalize the cumulative to get the actual integral
@@ -474,7 +474,7 @@ class Integral(Operation):
                         # Do we have offsets as a dict?
                         value = value + c[data_label]
                     except:
-                        value = value + c               
+                        value = value + c
 
                 # Add data
                 if not inplace:
@@ -487,7 +487,7 @@ class Integral(Operation):
                         item.data['{}_{}'.format(data_label, postfix)] = value
                     else:
                         item.data[int(data_label)] = value
-                    
+
 
                 last_values[data_label] = value
 
@@ -498,12 +498,12 @@ class Integral(Operation):
                     int_series.append(series[0].__class__(t = item.t,
                                                           tz = item.tz,
                                                           data = data,
-                                                          data_loss = item.data_loss))         
+                                                          data_loss = item.data_loss))
                 elif isinstance(series[0], Slot):
                     int_series.append(series[0].__class__(start = item.start,
                                                           unit = item.unit,
                                                           data = data,
-                                                          data_loss = item.data_loss))                
+                                                          data_loss = item.data_loss))
                 else:
                     raise NotImplementedError('Working on series other than slots or points not yet implemented')
 
@@ -529,17 +529,17 @@ class CSum(Integral):
 
 class Normalize(Operation):
     """Normalization operation (callable object)"""
-    
+
     def _compute(self, series, range=[0,1], inplace=False):
 
         _check_series_of_points_or_slots(series)
         _check_indexed_data(series)
-        
+
         if range == [0,1]:
             custom_range = None
         else:
             custom_range = range
-        
+
         if not inplace:
             normalized_series = series.__class__()
 
@@ -547,30 +547,30 @@ class Normalize(Operation):
 
         # Get min and max for the data labels
         for i, item in enumerate(series):
-            
+
             if i == 0:
                 mins = {data_label: item._data_by_label(data_label) for data_label in data_labels}
-                maxs = {data_label: item._data_by_label(data_label) for data_label in data_labels}        
+                maxs = {data_label: item._data_by_label(data_label) for data_label in data_labels}
             else:
                 for data_label in data_labels:
                     if item._data_by_label(data_label) < mins[data_label]:
                         mins[data_label] = item._data_by_label(data_label)
                     if item._data_by_label(data_label) > maxs[data_label]:
-                        maxs[data_label] = item._data_by_label(data_label)                
-        
+                        maxs[data_label] = item._data_by_label(data_label)
+
         try:
             # Try to access by label, if data was non key-value this raise, as labels
             # are always generated as strings even for in-based indexed data (as lists)
             series[0].data[series.data_labels()[0]]
             data_is_keyvalue = True
         except TypeError:
-            data_is_keyvalue = False 
-        
+            data_is_keyvalue = False
+
         for i, item in enumerate(series):
- 
+
             if not inplace:
                 normalized_data = series[0].data.__class__()
-             
+
             for data_label in data_labels:
 
                 # Normalize data
@@ -589,35 +589,35 @@ class Normalize(Operation):
                         item.data[data_label] = normalized_value
                     else:
                         item.data[int(data_label)] = normalized_value
-             
+
             # Create the item
             if not inplace:
- 
+
                 if isinstance(series[0], Point):
                     normalized_series.append(series[0].__class__(t = item.t,
                                                                  tz = item.tz,
                                                                  data = normalized_data,
-                                                                 data_loss = item.data_loss))         
+                                                                 data_loss = item.data_loss))
                 elif isinstance(series[0], Slot):
                     normalized_series.append(series[0].__class__(start = item.start,
                                                                  unit = item.unit,
                                                                  data = normalized_data,
-                                                                 data_loss = item.data_loss))                
+                                                                 data_loss = item.data_loss))
                 else:
                     raise NotImplementedError('Working on series other than slots or points not yet implemented')
- 
+
         if not inplace:
             return normalized_series
 
 
 class Rescale(Operation):
     """Rescaling operation (callable object)"""
-    
+
     def _compute(self, series, value, inplace=False):
 
         _check_series_of_points_or_slots(series)
         _check_indexed_data(series)
- 
+
         if not inplace:
             rescaled_series = series.__class__()
 
@@ -627,13 +627,13 @@ class Rescale(Operation):
             series[0].data[series.data_labels()[0]]
             data_is_keyvalue = True
         except TypeError:
-            data_is_keyvalue = False 
+            data_is_keyvalue = False
 
         for item in series:
- 
+
             if not inplace:
                 rescaled_data = series[0].data.__class__()
-            
+
             # Rescale data
             for data_label in series.data_labels():
                 if isinstance(value, dict):
@@ -661,27 +661,27 @@ class Rescale(Operation):
                     rescaled_series.append(series[0].__class__(t = item.t,
                                                                tz = item.tz,
                                                                data = rescaled_data,
-                                                               data_loss = item.data_loss))         
+                                                               data_loss = item.data_loss))
                 elif isinstance(series[0], Slot):
                     rescaled_series.append(series[0].__class__(start = item.start,
                                                                unit = item.unit,
                                                                data = rescaled_data,
-                                                               data_loss = item.data_loss))                
+                                                               data_loss = item.data_loss))
                 else:
                     raise NotImplementedError('Working on series other than slots or points not yet implemented')
- 
+
         if not inplace:
             return rescaled_series
 
 
 class Offset(Operation):
     """Offsetting operation (callable object)"""
-    
+
     def _compute(self, series, value, inplace=False):
 
         _check_series_of_points_or_slots(series)
         _check_indexed_data(series)
- 
+
         if not inplace:
             rescaled_series = series.__class__()
 
@@ -691,13 +691,13 @@ class Offset(Operation):
             series[0].data[series.data_labels()[0]]
             data_is_keyvalue = True
         except TypeError:
-            data_is_keyvalue = False 
+            data_is_keyvalue = False
 
         for item in series:
- 
+
             if not inplace:
                 offsetted_data = series[0].data.__class__()
-            
+
             # Offset data
             for data_label in series.data_labels():
                 if isinstance(value, dict):
@@ -707,7 +707,7 @@ class Offset(Operation):
                         offsetted_value = item._data_by_label(data_label)
                 else:
                     offsetted_value= item._data_by_label(data_label) + value
-                    
+
                 if not inplace:
                     if data_is_keyvalue:
                         offsetted_data[data_label] = offsetted_value
@@ -718,23 +718,23 @@ class Offset(Operation):
                         item.data[data_label] = offsetted_value
                     else:
                         item.data[int(data_label)] = offsetted_value
-            
+
             # Set data or create the item
-            if not inplace: 
+            if not inplace:
 
                 if isinstance(series[0], Point):
                     rescaled_series.append(series[0].__class__(t = item.t,
                                                                tz = item.tz,
                                                                data = offsetted_data,
-                                                               data_loss = item.data_loss))         
+                                                               data_loss = item.data_loss))
                 elif isinstance(series[0], Slot):
                     rescaled_series.append(series[0].__class__(start = item.start,
                                                                unit = item.unit,
                                                                data = offsetted_data,
-                                                               data_loss = item.data_loss))                
+                                                               data_loss = item.data_loss))
                 else:
                     raise NotImplementedError('Working on series other than slots or points not yet implemented')
- 
+
         if not inplace:
             return rescaled_series
 
@@ -761,8 +761,8 @@ class MAvg(Operation):
             series[0].data[series.data_labels()[0]]
             data_is_keyvalue = True
         except TypeError:
-            data_is_keyvalue = False 
-  
+            data_is_keyvalue = False
+
         mavg_series = series.__class__()
 
         for i, item in enumerate(series):
@@ -773,13 +773,13 @@ class MAvg(Operation):
             mavg_data = series[0].data.__class__()
 
             for data_label in series.data_labels():
- 
+
                 # Compute the moving average
                 value_sum = 0
                 for j in range(i-window+1,i+1):
                     value_sum += series[j]._data_by_label(data_label)
                 mavg_value = value_sum/window
-                
+
                 if data_is_keyvalue:
                     mavg_data['{}_{}'.format(data_label, postfix)] = mavg_value
                 else:
@@ -789,11 +789,11 @@ class MAvg(Operation):
             if isinstance(series[0], Point):
                 mavg_series.append(series[0].__class__(t = item.t,
                                                        tz = item.tz,
-                                                       data = mavg_data))         
+                                                       data = mavg_data))
             elif isinstance(series[0], Slot):
                 mavg_series.append(series[0].__class__(start = item.start,
                                                        unit = item.unit,
-                                                       data = mavg_data))                
+                                                       data = mavg_data))
             else:
                 raise NotImplementedError('Working on series other than slots or points not yet implemented')
 
@@ -807,7 +807,7 @@ class Filter(Operation):
 
         _check_series_of_points_or_slots(series)
         _check_indexed_data(series)
-        
+
         if from_t or to_t or from_dt or to_dt:
             logger.warning('The from_t, to_t, from_dt and to_d arguments are deprecated, please use the slice() operation instead or the square brackets notation.')
 
@@ -819,14 +819,14 @@ class Filter(Operation):
             if to_t is not None:
                 raise Exception('Cannot set both to_t and to_dt')
             to_t = s_from_dt(to_dt)
-            
+
         if from_t is not None and to_t is not None:
             if from_t >= to_t:
                 raise Exception('Got from >= to')
-        
+
         # Instantiate the filtered series
         filtered_series = series.__class__()
-        
+
         # Filter based on time if from/to are set
         for item in series:
             if from_t is not None and to_t is not None:
@@ -835,14 +835,14 @@ class Filter(Operation):
             else:
                 if from_t is not None:
                     if item.t >= from_t:
-                        filtered_series.append(item) 
+                        filtered_series.append(item)
                 if to_t is not None:
                     if item.t < to_t:
                         filtered_series.append(item)
                 if from_t is None and to_t is None:
-                    # Append everything 
+                    # Append everything
                     filtered_series.append(item)
-        
+
         # Filter based on data label if set
         if data_label:
             try:
@@ -852,14 +852,14 @@ class Filter(Operation):
             for i, item in enumerate(filtered_series):
                 filtered_series[i] = copy(item)
                 filtered_series[i]._data = {data_label: item._data_by_label(data_label)}
-        
+
         # Re-set reference data as well
         try:
             filtered_series._item_data_reference = filtered_series[0].data
         except AttributeError:
             pass
-        
-        return filtered_series 
+
+        return filtered_series
 
 
 class Slice(Operation):
@@ -871,7 +871,7 @@ class Slice(Operation):
             logger.warning('The from_t, to_t, from_dt and to_d arguments are deprecated, please use the start/end end instead.')
 
         # Handle start/end
-        if start is not None:       
+        if start is not None:
             if isinstance(start, datetime):
                 from_dt = start
             else:
@@ -879,7 +879,7 @@ class Slice(Operation):
                     from_t = float(start)
                 except:
                     raise ValueError('Cannot use "{}" as start value, not a datetime nor an epoch timestamp'.format(start))
-        if end is not None:       
+        if end is not None:
             if isinstance(end, datetime):
                 to_dt = end
             else:
@@ -896,17 +896,17 @@ class Slice(Operation):
             if to_t is not None:
                 raise Exception('Cannot set both to_t and to_dt')
             to_t = s_from_dt(to_dt)
-            
+
         if from_t is not None and to_t is not None:
             if from_t >= to_t:
                 return series.__class__()
-                
+
         # Instantiate the filtered series
         filtered_series = series.__class__()
-        
+
         # Preserve mark if any TODO: Check if mark still in the sliced series?
         filtered_series.mark = series.mark
-        
+
         # Select new series items based on time if from/to are set
         for item in series:
             if from_t is not None and to_t is not None:
@@ -923,7 +923,7 @@ class Slice(Operation):
                 if from_t is not None:
                     # Point or slot, they both have a "t"
                     if item.t >= from_t:
-                        filtered_series.append(item) 
+                        filtered_series.append(item)
                 if to_t is not None:
                     try:
                         # Slot?
@@ -943,22 +943,22 @@ class Slice(Operation):
             filtered_series._item_data_reference = filtered_series[0].data
         except AttributeError:
             pass
-        
+
         return filtered_series
 
 
 class Merge(Operation):
     """Merge operation (callable object)."""
-    
+
     def _compute(self, *series):
-        
+
         seriess = series
-        
+
         # Support vars
         resolution = None
         seriess_starting_points_t = []
         seriess_ending_points_t   = []
-        
+
         # Checks
         for i, series in enumerate(seriess):
             #if not isinstance(arg, DataTimeSlotSeries):
@@ -969,30 +969,30 @@ class Merge(Operation):
                 if series.resolution != resolution:
                     abort = True
                     try:
-                        # Handle floating point precision issues 
+                        # Handle floating point precision issues
                         if _is_close(series.resolution, resolution):
                             abort = False
                     except (ValueError,TypeError):
                         pass
                     if abort:
                         raise ValueError('DataTimeSlotSeries have different units, cannot merge')
-        
+
             # Find min and max epoch for each series (aka start-end points)
             seriess_starting_points_t.append(series[0].t)
             seriess_ending_points_t.append(series[-1].t)
-        
+
         # Find max min and min max to set the subset where series are all deifned. e.g.:
         # ======
         #    ======
         # we are looking for the second segment (max) starting point
-        
+
         max_starting_point_t = None
         for starting_point_t in seriess_starting_points_t:
             if max_starting_point_t is None:
                 max_starting_point_t = starting_point_t
             else:
                 if starting_point_t > max_starting_point_t:
-                    max_starting_point_t = starting_point_t 
+                    max_starting_point_t = starting_point_t
 
         min_ending_point_t = None
         for ending_point_t in seriess_ending_points_t:
@@ -1007,9 +1007,9 @@ class Merge(Operation):
             if series[0].t == max_starting_point_t:
                 reference_series = series
 
-        # Create the (empty) result time series 
+        # Create the (empty) result time series
         result_series = seriess[0].__class__()
-        
+
         # Scroll the time series to get the offsets
         offsets = {}
         for series in seriess:
@@ -1020,22 +1020,22 @@ class Merge(Operation):
 
         # Loop over the reference series to create the datapoints for the merge
         for i in range(len(reference_series)):
-            
+
             # Check if we gone beyond the minimum ending point
             if reference_series[i].t > min_ending_point_t:
-                break  
-            
+                break
+
             # Support vars
             data = None
             data_loss = 0
             valid_data_losses = 0
-            
+
             tz = seriess[0][0].tz
             if isinstance(reference_series[0], Slot):
                 unit = reference_series[0].unit
             else:
-                unit = None  
-            
+                unit = None
+
             # For each time series, get data in i-th position (given the offset) and merge it
             for series in seriess:
 
@@ -1044,28 +1044,28 @@ class Merge(Operation):
                     data = deepcopy(series[i+offsets[series]].data)
                 else:
                     data.update(series[i+offsets[series]].data)
-                 
+
                 # Data loss
                 if series[i+offsets[series]].data_loss is not None:
                     valid_data_losses += 1
                     data_loss += series[i+offsets[series]].data_loss
-             
+
             # Finalize data loss if there were valid ones
             if valid_data_losses:
                 data_loss = data_loss / valid_data_losses
             else:
                 data_loss = None
- 
+
             if isinstance(reference_series[0], Point):
                 result_series.append(seriess[0][0].__class__(t = reference_series[i].t,
                                                                      tz = tz,
                                                                      data  = data,
-                                                                     data_loss = data_loss))         
+                                                                     data_loss = data_loss))
             elif isinstance(reference_series[0], Slot):
                 result_series.append(seriess[0][0].__class__(start = reference_series[i].start,
                                                                      unit  = unit,
                                                                      data  = data,
-                                                                     data_loss = data_loss))                
+                                                                     data_loss = data_loss))
             else:
                 raise NotImplementedError('Working on series other than slots or points not yet implemented')
 
@@ -1078,7 +1078,7 @@ class Merge(Operation):
 
 class Select(Operation):
     """Select operation (callable object)."""
-    
+
     def _compute(self, series, query):
 
         _check_series_of_points_or_slots(series)
@@ -1086,17 +1086,17 @@ class Select(Operation):
 
         if (' and ' or ' AND ' or ' or ' or ' OR ') in query:
             raise NotImplementedError('Multiple conditions not yet supported')
-        
+
         if '=' not in query:
             raise NotImplementedError('Clauses other than the equality are not yet supported')
-        
+
         # Get data_label
         data_label = query.split('=')[0].strip()
         if data_label.startswith('"'):
             data_label=data_label[1:]
         if data_label.endswith('"'):
             data_label=data_label[:-1]
-        
+
         # Get value
         value = float(query.split('=')[1])
 
@@ -1108,7 +1108,7 @@ class Select(Operation):
                     selected.append(item)
                 except:
                     selected = [item]
-        return selected 
+        return selected
 
 
 #========================
@@ -1139,4 +1139,7 @@ merge = Merge()
 filter = Filter()
 slice = Slice()
 select = Select()
+
+
+
 

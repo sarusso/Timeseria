@@ -33,19 +33,19 @@ except (ImportError,AttributeError):
 class Model():
     """A generic series model. This can be either a stateless model, where all the information is coded and there are no parameters, or a
     stateful (parametric) model, where there are a number of parameters which can be both set manually or learnt (fitted) from the data.
-    
+
     All models expose a ``predict()``, ``apply()`` and ``evaluate()`` methods, while parametric models also provide a ``save()`` method to
     store the parameters of the model, and an optional ``fit()`` method if the parameters are to be learnt form data. In this case also a
     ``cross_validate()`` method is available.
-        
+
     Series resolution and data labels consistency are enforced between all methods and save/load operations.
-        
+
     Args:
         path (optional, str): a path from which to load a saved model. Will override all other init settings. Only for parametric models.
     """
-    
+
     def __init__(self, path=None):
-        
+
         # Set type
         try:
             self.data
@@ -65,20 +65,20 @@ class Model():
             # the model is parametric.
             self._type = 'parametric'
 
-        # Do we have to load the model (if parametric?)    
+        # Do we have to load the model (if parametric?)
         if self.is_parametric():
             if path:
                 with open(path+'/data.json', 'r') as f:
                     self.data = json.loads(f.read())
-                
-                # TODO: the "fitted" does not apply for models with parameters but with no fit.. fix me.  
-                self.fitted = True   
-                
+
+                # TODO: the "fitted" does not apply for models with parameters but with no fit.. fix me.
+                self.fitted = True
+
                 # Convert resolution to TimeUnit if any. TODO: right now only TimeSeries have the resolution,
                 # but might change in case of adding the resolution attribute also to generic series.
                 if 'resolution' in self.data:
                     self.data['resolution'] = TimeUnit(self.data['resolution'])
-                
+
             else:
                 id = str(uuid.uuid4())
                 self.fitted = False
@@ -89,7 +89,7 @@ class Model():
         else:
             if path:
                 raise ValueError('Loading a non-parametric model from a path does not make sense')
-     
+
     @property
     def id(self):
         """A unique identifier for the model. Only for parametric models."""
@@ -119,7 +119,7 @@ class Model():
             raise NotImplementedError('Models work only with TimeSeries data for now (got "{}")'.format(series.__class__.__name__))
 
         # If TimeSeries data, check it
-        if isinstance(series, TimeSeries): 
+        if isinstance(series, TimeSeries):
             _check_time_series(series)
 
             # Set resolution
@@ -127,7 +127,7 @@ class Model():
                 self.data['resolution'] = series.resolution
             except AttributeError:
                 pass
-            
+
             # Set data labels
             try:
                 self.data['data_labels'] = series.data_labels()
@@ -160,7 +160,7 @@ class Model():
         else:
             if not self.fitted:
                 raise NotFittedError()
-        
+
         # Check data
         if not isinstance(series, TimeSeries):
             raise NotImplementedError('Models work only with TimeSeries data for now (got "{}")'.format(series.__class__.__name__))
@@ -176,12 +176,12 @@ class Model():
                     _check_resolution(series, self.data['resolution'])
                 _check_data_labels(series, self.data['data_labels'])
 
-        # Call predict logic            
+        # Call predict logic
         return self._predict(series, *args, **kwargs)
 
     def apply(self, series, *args, **kwargs):
         """Apply the model on a series."""
-        
+
         # Check if apply logic is implemented
         try:
             self._apply
@@ -196,7 +196,7 @@ class Model():
         else:
             if not self.fitted:
                 raise NotFittedError()
-                
+
         # Check data
         if not isinstance(series, TimeSeries):
             raise NotImplementedError('Models work only with TimeSeries data for now (got "{}")'.format(series.__class__.__name__))
@@ -212,12 +212,12 @@ class Model():
                     _check_resolution(series, self.data['resolution'])
                 _check_data_labels(series, self.data['data_labels'])
 
-        # Call apply logic  
+        # Call apply logic
         return self._apply(series, *args, **kwargs)
 
     def evaluate(self, series, *args, **kwargs):
         """Evaluate the model on a series."""
-        
+
         # Check if evaluate logic is implemented
         try:
             self._evaluate
@@ -248,15 +248,15 @@ class Model():
                     _check_resolution(series, self.data['resolution'])
                 _check_data_labels(series, self.data['data_labels'])
 
-        # Call evaluate logic  
+        # Call evaluate logic
         return self._evaluate(series, *args, **kwargs)
 
     def cross_validate(self, series, rounds=10, *args, **kwargs):
         """Cross validate the model on a series, by default with 10 fit/evaluate rounds.
-        
+
         All the parameters starting with the ``fit_`` prefix are forwarded to the model ``fit()`` method (without the prefix), and
         all the parameters starting with the ``evaluate_`` prefix are forwarded to the model ``evaluate()`` method (without the prefix).
-        
+
         Args:
             rounds(int): how many rounds of cross validation to run.
         """
@@ -272,7 +272,7 @@ class Model():
             self._evaluate
         except AttributeError:
             raise NotImplementedError('Evaluating this model is not implemented, cannot cross validate')
-        
+
         # Check data
         if not isinstance(series, TimeSeries):
             raise NotImplementedError('Models work only with TimeSeries data for now (got "{}")'.format(series.__class__.__name__))
@@ -298,13 +298,13 @@ class Model():
         # Do we still have some kwargs?
         if kwargs:
             raise Exception('Got some unknown args: {}'.format(kwargs))
-            
+
         # How many items per round?
         round_items = int(len(series) / rounds)
         logger.debug('Items per round: {}'.format(round_items))
-        
+
         # Start the fit / evaluate loop
-        evaluations = []        
+        evaluations = []
         for i in range(rounds):
             from_t = series[(round_items*i)].t
             try:
@@ -314,18 +314,18 @@ class Model():
             from_dt = dt_from_s(from_t)
             to_dt   = dt_from_s(to_t)
             logger.info('Cross validation round #{} of {}: validate from {} ({}) to {} ({}), fit on the rest.'.format(i+1, rounds, from_t, from_dt, to_t, to_dt))
-            
+
             # Fit
-            if i == 0:            
+            if i == 0:
                 logger.debug('Fitting from {} ({})'.format(to_t, to_dt))
                 self.fit(series, start=to_t, **fit_kwargs)
             else:
                 logger.debug('Fitting until {} ({}) and then from {} ({}).'.format(to_t, to_dt, from_t, from_dt))
-                self.fit(series, start=to_t, end=from_t, **fit_kwargs)                
-            
+                self.fit(series, start=to_t, end=from_t, **fit_kwargs)
+
             # Evaluate & append
             evaluations.append(self.evaluate(series, start=from_t, end=to_t, **evaluate_kwargs))
-        
+
         # Regroup evaluations
         evaluation_metrics = list(evaluations[0].keys())
         scores_by_evaluation_metric = {}
@@ -338,16 +338,16 @@ class Model():
                         scores_by_evaluation_metric[evaluation_metric] = [evaluation[evaluation_metric]]
                     except KeyError:
                         raise Exception('Error, the model generated different evaluation metrics over the rounds, cannot compute cross validation.') from None
-        
+
         # Prepare and return results
         results = {}
         for evaluation_metric in scores_by_evaluation_metric:
             results[evaluation_metric+'_avg'] = statistics.mean(scores_by_evaluation_metric[evaluation_metric])
-            results[evaluation_metric+'_stdev'] = statistics.stdev(scores_by_evaluation_metric[evaluation_metric])         
+            results[evaluation_metric+'_stdev'] = statistics.stdev(scores_by_evaluation_metric[evaluation_metric])
         return results
-    
+
     def save(self, path):
-        """Save the model in the given path. The model is saved in "directory format", 
+        """Save the model in the given path. The model is saved in "directory format",
          meaning that a new directory will be created containing the data for the model."""
 
         # Is this model parametric?
@@ -367,7 +367,7 @@ class Model():
             raise ValueError('Got empty path, cannot save')
 
         if os.path.exists(path):
-            raise ValueError('The path "{}" already exists'.format(path)) 
+            raise ValueError('The path "{}" already exists'.format(path))
 
         # Prepare model dir and dump data as json
         os.makedirs(path)
@@ -377,16 +377,16 @@ class Model():
         if 'resolution' in self.data:
             resolution_obj = self.data['resolution']
             self.data['resolution'] = str(resolution_obj)
-        
+
         # Write the data
         try:
             with open(model_data_file, 'w') as f:
                 f.write(json.dumps(self.data))
         finally:
             # In any case revert resolution back to object (if any)
-            if 'resolution' in self.data:  
-                self.data['resolution'] = resolution_obj        
-                
+            if 'resolution' in self.data:
+                self.data['resolution'] = resolution_obj
+
         logger.info('Saved model with id "%s" in "%s"', self.data['id'], path)
 
 
@@ -411,18 +411,18 @@ class _ProphetModel(Model):
         except KeyError:
             series[0].data.keys()
             data_labels_are_indexes = False
-        
+
         data_as_list=[]
         for item in series:
-            
+
             # Skip if needed
             try:
                 if not _item_is_in_range(item, from_t, to_t):
                     continue
             except StopIteration:
-                break                
+                break
 
-            if data_labels_are_indexes:     
+            if data_labels_are_indexes:
                 data_as_list.append([cls._remove_timezone(item.dt), item.data[0]])
             else:
                 data_as_list.append([cls._remove_timezone(item.dt), item.data[list(item.data.keys())[0]]])
@@ -439,18 +439,18 @@ class _ProphetModel(Model):
 
 class _ARIMAModel(Model):
     '''A model using statsmodel's ARIMA as underlying engine, and providing some extra internal functions for common operations.'''
-    
+
     def _get_start_end_indexes(self, series, n):
 
         # Do the math to get the right indexes for the prediction, both out-of-sample and in-sample
         # Not used at the moment as there seems to be bugs in the statsmodel package.
         # See https://www.statsmodels.org/devel/generated/statsmodels.tsa.arima_model.ARIMAResults.predict.html
-        
+
         # The default start_index for an ARIMA prediction is the index after the fit series
         # I.e. if the fit series had 101 elments, the start index is the 101
         # So we need to compute the start and end indexes according to the fit series,
         # we will use the "resolution" for this.
-        
+
         # Save the requested prediction "from"
         requested_predicting_from_dt = series[-1].dt + series.resolution
 
@@ -460,23 +460,23 @@ class _ARIMAModel(Model):
         while True:
             if slider_dt  == requested_predicting_from_dt:
                 break
-             
+
             # To next item index
             if requested_predicting_from_dt < self.fit_series[0].dt:
                 slider_dt = slider_dt - self.fit_series.resolution
                 if slider_dt < requested_predicting_from_dt:
                     raise Exception('Miss!')
- 
+
             else:
                 slider_dt = slider_dt + self.fit_series.resolution
                 if slider_dt > requested_predicting_from_dt:
                     raise Exception('Miss!')
-            
+
             count += 1
-        
+
         # TODO: better understand the indexes in statsmodels (and potentially their bugs), as sometimes
         # setting the same start and end gave two predictions which is just nonsense in any scenario.
-        start_index = count  
+        start_index = count
         end_index = count + n
 
         return (start_index, end_index)
@@ -490,7 +490,7 @@ class _KerasModel(Model):
     '''A model using Keras as underlying engine, and providing some extra internal functions for common operations.'''
 
     def _load_keras_model(self, path):
-        
+
         # Load the Keras model
         if path:
             from keras.models import load_model as load_keras_model
@@ -504,11 +504,11 @@ class _KerasModel(Model):
         except Exception as e:
             shutil.rmtree(path)
             raise e
-    
+
     # TODO: since we are extending a generic ParametricModel, the following methods should not be here.
     # Maybe only if extending a TimeSeriesParametricModel, and still it is probably the wrong place, as for the
     # ARIMA and Prophet above also. Consider moving them in a "utility" package or directly in the models.
-    
+
     @staticmethod
     def _to_window_datapoints_matrix(series, window, steps, encoder=None):
         '''Compute window datapoints matrix from a time series.'''
@@ -519,29 +519,29 @@ class _KerasModel(Model):
                 continue
             if i == len(series) + 1 - steps:
                 break
-                    
+
             # Add window values
             row = []
             for j in range(window):
                 row.append(series[i-window+j])
             window_datapoints.append(row)
-                
+
         return window_datapoints
 
     @staticmethod
     def _to_target_values_vector(series, window, steps):
         '''Compute target values vector from a time series.'''
         # steps to be intended as steps ahead (for the forecaster)
-    
+
         data_labels = series.data_labels()
-    
+
         targets = []
         for i, _ in enumerate(series):
             if i <  window:
                 continue
             if i == len(series) + 1 - steps:
                 break
-            
+
             # Add forecast target value(s)
             row = []
             for j in range(steps):
@@ -554,14 +554,14 @@ class _KerasModel(Model):
     @staticmethod
     def _compute_window_features(window_datapoints, data_labels, features):
         """Compute features from a list of window data points (or slots).
-        
+
         Args:
             window_datapoints (list): The list with the data points (or slots)
             data_labels(dict): the labels of the point (or slot) data.
             features(list): the list of the features to compute.
                 Supported values are:
-                ``values`` (use the data values), 
-                ``diffs``  (use the diffs between the values), and 
+                ``values`` (use the data values),
+                ``diffs``  (use the diffs between the values), and
                 ``hours``  (use the hours of the timestamp).
         """
 
@@ -569,18 +569,18 @@ class _KerasModel(Model):
         for feature in features:
             if feature not in available_features:
                 raise ValueError('Unknown feature "{}"'.format(feature))
-        
+
         window_features=[]
 
         for i in range(len(window_datapoints)):
-            
+
             datapoint_features = []
-            
+
             # 1) Data point/slot values (for all data labels)
             if 'values' in features:
                 for data_label in data_labels:
                     datapoint_features.append(window_datapoints[i].data[data_label])
-                            
+
             # 2) Compute diffs on normalized datapoints
             if 'diffs' in features:
                 for data_label in data_labels:
@@ -597,9 +597,10 @@ class _KerasModel(Model):
             # 3) Hour (normlized)
             if 'hours' in features:
                 datapoint_features.append(window_datapoints[i].dt.hour/24)
-                
+
             # Now append to the window features
             window_features.append(datapoint_features)
 
         return window_features
+
 

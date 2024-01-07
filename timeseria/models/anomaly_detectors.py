@@ -37,7 +37,7 @@ except (ImportError,AttributeError):
 
 class AnomalyDetector(Model):
     """A generic anomaly detection model.
- 
+
     Args:
         path (str): a path from which to load a saved model. Will override all other init settings.
     """
@@ -71,7 +71,7 @@ class AnomalyDetector(Model):
 class PredictiveAnomalyDetector(AnomalyDetector):
     """A series anomaly detection model based on a predictive model (either a forecaster or a reconstructor).
     For each element of the series where the anomaly detection model is applied, the model is asked to make a prediction.
-    The predicted and actual values are then compared, and accordingly to the model error distribution, an anomaly index 
+    The predicted and actual values are then compared, and accordingly to the model error distribution, an anomaly index
     in the range 0-1 is computed.
 
     Args:
@@ -178,7 +178,7 @@ class PredictiveAnomalyDetector(AnomalyDetector):
                 # After the window (if using a reconstructor)
                 if isinstance(self.model, Reconstructor):
                     if i > len(series)-self.model.window-1:
-                        break 
+                        break
 
                 # Predict & append the error
                 actual, predicted = self._get_actual_and_predicted(series, i, data_label, self.model.window)
@@ -200,7 +200,7 @@ class PredictiveAnomalyDetector(AnomalyDetector):
 
         if best_error_distribution_stats['ks_pvalue'] < 0.05:
 
-            logger.warning('The error distribution ({}) ks p-value is low ({}). '.format(best_error_distribution, best_error_distribution_stats['ks_pvalue']) + 
+            logger.warning('The error distribution ({}) ks p-value is low ({}). '.format(best_error_distribution, best_error_distribution_stats['ks_pvalue']) +
                            'Expect issues. In case of math domain errors, try using lower index boundaries.')
 
         if not (-0.01 <= error_distribution_params['loc'] <= 0.01):
@@ -290,7 +290,7 @@ class PredictiveAnomalyDetector(AnomalyDetector):
         if len(series.data_labels()) > 1:
             raise NotImplementedError('Multivariate time series are not yet supported')
 
-        # Support vars 
+        # Support vars
         result_series = series.__class__()
         sigma = self.data['stdev']
 
@@ -336,7 +336,7 @@ class PredictiveAnomalyDetector(AnomalyDetector):
             for i, item in enumerate(series):
                 model_window = self.model.window
 
-                # Before the window 
+                # Before the window
                 if i <=  self.model.window:
                     continue
 
@@ -381,7 +381,7 @@ class PredictiveAnomalyDetector(AnomalyDetector):
                 else:
 
                     # Compute the (continuous) anomaly index in the given range (which defaults to 0, max)
-                    # Below the start it means anomaly (0), above always anomaly (1). In the middle it 
+                    # Below the start it means anomaly (0), above always anomaly (1). In the middle it
                     # follows the error distribution, and it is rescaled between 0 and 1.
 
                     x = abs(prediction_error)
@@ -465,4 +465,5 @@ class PeriodicAverageReconstructorAnomalyDetector(PredictiveAnomalyDetector):
     """
 
     model_class = PeriodicAverageReconstructor
+
 

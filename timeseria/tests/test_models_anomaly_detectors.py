@@ -10,7 +10,7 @@ from ..storages import CSVFileStorage
 from .. import logger
 logger.setup()
 
-# Test data and temp path 
+# Test data and temp path
 TEST_DATA_PATH = '/'.join(os.path.realpath(__file__).split('/')[0:-1]) + '/test_data/'
 TEMP_MODELS_DIR = tempfile.TemporaryDirectory().name
 
@@ -80,7 +80,7 @@ class TestAnomalyDetectors(unittest.TestCase):
         anomaly_detector.save(model_path)
 
         loaded_anomaly_detector = PeriodicAverageAnomalyDetector(model_path)
-        self.assertEqual(set(anomaly_detector.data.keys()), set(['id', 'model_id', 'resolution', 'data_labels', 'prediction_errors', 
+        self.assertEqual(set(anomaly_detector.data.keys()), set(['id', 'model_id', 'resolution', 'data_labels', 'prediction_errors',
                                                               'error_distribution', 'error_distribution_params', 'error_distribution_stats',
                                                               'fitted_at', 'stdev']))
 
@@ -124,5 +124,6 @@ class TestAnomalyDetectors(unittest.TestCase):
 
         # TODO: do some actual testing.. not only that "it works"
         _  = anomaly_detector.apply(time_series, index_range=['avg','3_sigma'])
+
 
 

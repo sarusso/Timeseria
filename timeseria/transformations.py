@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_point_i, slot_prev_point_i, slot_next_point_i,
                  unit, point_validity, timezone, fill_with, force_data_loss, fill_gaps, series_data_indexes, series_resolution,
                  force_compute_data_loss, interpolator_class, operations=None):
-    
+
     # Log. Note: if slot_first_point_i < slot_last_point_i, this means that the prev and next are outside the slot.
     # It is not a bug, it is how the system works. perhaps we could pass here the slot_prev_i and sòlot_next_i
     # to make it more clear to avoid some confusion.
@@ -37,12 +37,12 @@ def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_poi
     if slot_prev_point_i is None:
         slot_prev_point_i = slot_first_point_i
 
-    # Create a view of the series containing the slot datapoints plus the prev and next, 
+    # Create a view of the series containing the slot datapoints plus the prev and next,
     series_dense_view_extended  = _TimeSeriesView(series, from_i=slot_prev_point_i, to_i=slot_next_point_i+1,  # Slicing exclude the right
                                                   from_t=from_t, to_t=to_t, dense=True, interpolator_class=interpolator_class)
 
     # Compute the data loss for the new element. This is forced
-    # by the resampler or slotter if first or last point     
+    # by the resampler or slotter if first or last point
     data_loss = _compute_data_loss(series_dense_view_extended,
                                   from_t = from_t,
                                   to_t = to_t,
@@ -52,7 +52,7 @@ def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_poi
 
     # For each point, attach the "weight"/"contirbution
     for point in series_dense_view_extended:
-        
+
         # Weight zero if completely outside the interval, which is required if in the operation
         # there is the need of knowing the next(or prev) value, even if it was far away
         if point.valid_to < from_t:
@@ -60,21 +60,21 @@ def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_poi
             continue
         if point.valid_from >= to_t:
             point.weight = 0
-            continue 
-        
+            continue
+
         # Set this point valid from/to accoring to the interval boundaries
         this_point_valid_from = point.valid_from if point.valid_from >= from_t else from_t
         this_point_valid_to = point.valid_to if point.valid_to < to_t else to_t
-        
+
         # Set weigth
         point.weight = (this_point_valid_to-this_point_valid_from)/interval_duration
 
         # Log
         logger.debug('Set series point @ %s weight: %s (data: %s)', point.dt, point.weight, point.data)
 
-    # If creating slots, create also the slice of the series series containing only the slot datapoints    
+    # If creating slots, create also the slice of the series series containing only the slot datapoints
     if target == 'slot':
-        
+
         if slot_first_point_i is None and slot_last_point_i is None:
             # If we have no datapoints at all in the slot, we must create one to let operations not
             # supporting weights to properly work. If we have a full data loss, this can be just the
@@ -88,7 +88,7 @@ def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_poi
                         if point._interpolated:
                             if series_dense_view:
                                 raise ConsistencyException('Found more than one reconstructed point in a fully missing slot')
-                            series_dense_view = series.__class__(point) 
+                            series_dense_view = series.__class__(point)
                     except AttributeError:
                         pass
                 if not series_dense_view:
@@ -103,10 +103,10 @@ def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_poi
                 series_dense_view = TimeSeries(DataTimePoint(t=new_point_t, data=new_point_data, tz=series.tz))
 
         else:
-            # Create a view of the original series to provide only the datapoints belonging to the slot 
+            # Create a view of the original series to provide only the datapoints belonging to the slot
             #logger.critical('Slicing dense series from {} to {}'.format(slot_first_point_i, slot_last_point_i+1))
-            series_dense_view = _TimeSeriesView(series, from_i=slot_first_point_i, to_i=slot_last_point_i+1, # Slicing exclude the right   
-                                                from_t=from_t, to_t=to_t, dense=True, interpolator_class=interpolator_class) 
+            series_dense_view = _TimeSeriesView(series, from_i=slot_first_point_i, to_i=slot_last_point_i+1, # Slicing exclude the right
+                                                from_t=from_t, to_t=to_t, dense=True, interpolator_class=interpolator_class)
 
 
 
@@ -115,23 +115,23 @@ def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_poi
 
         # Compute the (weighted) average of all point contributions
         avgs = avg(series_dense_view_extended)
-        
+
         # ...and assign them to the data value
         if isinstance(avgs, dict):
             data = {data_label:avgs[data_label] for data_label in data_labels}
         else:
             data = {data_labels[0]: avgs}
-             
+
     #  Compute slot data
     elif target=='slot':
-        
+
         if data_loss == 1 and fill_with:
             for data_label in data_labels:
                 for operation in operations:
                     data['{}_{}'.format(data_label, operation.__name__)] = fill_with
 
         else:
-            # Handle operations                
+            # Handle operations
             for operation in operations:
                 try:
                     operation_supports_weights = operation._supports_weights
@@ -139,31 +139,31 @@ def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_poi
                     # This is because user-defined operations can be even simple functions
                     # or based on custom classes without the _supports_weights attribute
                     operation_supports_weights = False
-                
+
                 if operation_supports_weights:
                     operation_data = operation(series_dense_view_extended)
                 else:
                     operation_data = operation(series_dense_view)
-                    
+
                 # ...and add to the data
                 if isinstance(operation_data, dict):
                     for result_data_label in operation_data:
                         data['{}_{}'.format(result_data_label, operation.__name__)] = operation_data[result_data_label]
                 else:
                     data['{}_{}'.format(data_labels[0], operation.__name__)] = operation_data
-    
+
         if not data:
             raise Exception('No data computed at all?')
-    
+
     else:
         raise ValueError('No idea how to compute a new "{}"'.format(target))
 
 
     # Do we have a force data_loss?
-    #TODO: do not compute data_loss if fill_with not present and force_data_loss 
+    #TODO: do not compute data_loss if fill_with not present and force_data_loss
     if force_data_loss is not None:
         data_loss = force_data_loss
-    
+
     # Create the new item
     if target=='point':
         new_element = DataTimePoint(t = (from_t+((interval_duration)/2)),
@@ -186,12 +186,12 @@ def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_poi
         # Skip the data loss as it is recomputed with different logics
         if index == 'data_loss':
             continue
-        
+
         if series_dense_view_extended:
             index_total = 0
             index_total_weights = 0
             for point in series_dense_view_extended:
-                
+
                 # Get index value
                 try:
                     index_value = point.data_indexes[index]
@@ -202,10 +202,10 @@ def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_poi
                         index_total_weights += point.weight
                         index_total += index_value * point.weight
                         #logger.critical('%s@%s: %s * %s', index, point.dt, index_value, point.weight)
-    
+
             # Compute the new index value (if there were data_indexes not None)
             if index_total_weights > 0:
-                
+
                 # Project (rescale/normalize), because we could have some points without the index at all
                 new_element_index_value = index_total/index_total_weights
                 #logger.debug('%s/%s', index_total, index_total_weights)
@@ -215,7 +215,7 @@ def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_poi
 
         else:
             new_element_index_value = None
-            
+
         # Set the index in the data indexes
         new_element.data_indexes[index] = new_element_index_value
 
@@ -238,22 +238,22 @@ class Transformation(object):
                 fill_with=None,  force_data_loss=None, fill_gaps=True, **kwargs):
         """Start the transformation process. If start and/or end are not set, they are set automatically
         based on first and last points of the series"""
-        
+
         if not isinstance(series, TimeSeries):
             raise NotImplementedError('Transformations work only with TimeSeries data for now (got "{}")'.format(series.__class__.__name__))
 
         if not (issubclass(series.items_type, Point) or issubclass(series.items_type, Slot)):
                 raise TypeError('Series items are not Points nor Slots, cannot compute any transformation')
-        
+
         # Checks
         if include_extremes:
-            raise NotImplementedError('Including the extremes is not yet implemented')        
+            raise NotImplementedError('Including the extremes is not yet implemented')
         if not issubclass(series.items_type, DataTimePoint):
             raise TypeError('Can process only time series of DataTimePoints, got time series of items type "{}"'.format(series.items_type.__name__))
         if not series:
             raise ValueError('Cannot process empty series')
         if target not in ['points', 'slots']:
-            raise ValueError('Don\'t know how to target "{}"'.format(target))           
+            raise ValueError('Don\'t know how to target "{}"'.format(target))
 
         # Log
         logger.debug('Computing from/to with include_extremes= %s', include_extremes)
@@ -264,13 +264,13 @@ class Transformation(object):
         from_t = kwargs.get('from_t', None)
         to_t = kwargs.get('to_t', None)
         from_dt = kwargs.get('from_dt', None)
-        to_dt = kwargs.get('to_dt', None)   
+        to_dt = kwargs.get('to_dt', None)
 
         if from_t or to_t or from_dt or to_dt:
             logger.warning('The from_t, to_t, from_dt and to_d arguments are deprecated, please use the start/end end instead.')
 
         # Handle start/end
-        if start is not None:       
+        if start is not None:
             if isinstance(start, datetime):
                 from_dt = start
             else:
@@ -278,7 +278,7 @@ class Transformation(object):
                     from_t = float(start)
                 except:
                     raise ValueError('Cannot use "{}" as start value, not a datetime nor an epoch timestamp'.format(start))
-        if end is not None:       
+        if end is not None:
             if isinstance(end, datetime):
                 to_dt = end
             else:
@@ -291,11 +291,11 @@ class Transformation(object):
         if from_t:
             from_dt = dt_from_s(from_t)
             if from_dt != self.time_unit.round(from_dt):
-                raise ValueError('The provided from_t is not consistent with the self.time_unit of "{}" (Got "{}")'.format(self.time_unit, from_t))        
+                raise ValueError('The provided from_t is not consistent with the self.time_unit of "{}" (Got "{}")'.format(self.time_unit, from_t))
         elif from_dt:
             from_t = s_from_dt(from_dt)
             if from_dt != self.time_unit.round(from_dt):
-                raise ValueError('The provided from_dt is not consistent with the self.time_unit of "{}" (Got "{}")'.format(self.time_unit, from_dt))   
+                raise ValueError('The provided from_dt is not consistent with the self.time_unit of "{}" (Got "{}")'.format(self.time_unit, from_dt))
         else:
             if target == 'points':
                 from_t = series[0].t  - (self.time_unit.as_seconds() /2)
@@ -303,7 +303,7 @@ class Transformation(object):
                 from_dt = self.time_unit.round(from_dt, how='floor' if include_extremes else 'ceil')
                 from_t = s_from_dt(from_dt) + (self.time_unit.as_seconds() /2)
                 from_dt = dt_from_s(from_t)
-                
+
             elif target == 'slots':
                 from_t = series[0].t
                 from_dt = dt_from_s(from_t, tz=series.tz)
@@ -314,39 +314,39 @@ class Transformation(object):
                 else:
                     from_dt = self.time_unit.round(from_dt, how='floor' if include_extremes else 'ceil')
                 from_t = s_from_dt(from_dt)
-                from_dt = dt_from_s(from_t) 
+                from_dt = dt_from_s(from_t)
             else:
-                raise ValueError('Don\'t know how to target "{}"'.format(target))           
-            
+                raise ValueError('Don\'t know how to target "{}"'.format(target))
+
         # Set "to". TODO: check given to_t/to_dt against shifted rounding if points?
         if to_t:
             to_dt = dt_from_s(to_t)
             if to_dt != self.time_unit.round(to_dt):
-                raise ValueError('The provided to_t is not consistent with the self.time_unit of "{}" (Got "{}")'.format(self.time_unit, to_t))        
+                raise ValueError('The provided to_t is not consistent with the self.time_unit of "{}" (Got "{}")'.format(self.time_unit, to_t))
         elif to_dt:
             to_t = s_from_dt(to_dt)
             if to_dt != self.time_unit.round(to_dt):
-                raise ValueError('The provided to_dt is not consistent with the self.time_unit of "{}" (Got "{}")'.format(self.time_unit, to_dt))   
+                raise ValueError('The provided to_dt is not consistent with the self.time_unit of "{}" (Got "{}")'.format(self.time_unit, to_dt))
         else:
             if target == 'points':
                 to_t = series[-1].t  + (self.time_unit.as_seconds() /2)
                 to_dt = dt_from_s(to_t, tz=series.tz)
                 from_dt = self.time_unit.round(from_dt, how='ceil' if include_extremes else 'floor')
                 to_t = s_from_dt(to_dt) - (self.time_unit.as_seconds() /2)
-                to_dt = dt_from_s(to_t)  
+                to_dt = dt_from_s(to_t)
             elif target == 'slots':
                 to_t = series[-1].t
                 to_dt = dt_from_s(to_t, tz=series.tz)
                 from_dt = self.time_unit.round(from_dt, how='ceil' if include_extremes else 'floor')
                 to_t = s_from_dt(to_dt)
-                to_dt = dt_from_s(to_t)            
+                to_dt = dt_from_s(to_t)
             else:
-                raise ValueError('Don\'t know how to target "{}"'.format(target))           
-        
+                raise ValueError('Don\'t know how to target "{}"'.format(target))
+
         # Set/fix timezone
         from_dt = as_tz(from_dt, series.tz)
         to_dt = as_tz(to_dt, series.tz)
-        
+
         # Log
         logger.debug('Computed from: %s', from_dt)
         logger.debug('Computed to: %s',to_dt)
@@ -372,13 +372,13 @@ class Transformation(object):
         slot_end_t = None
         slot_end_dt = None
         process_ended = False
-        slot_prev_point_i = None 
+        slot_prev_point_i = None
         new_series = TimeSeries()
 
         # Set timezone
         timezone  = series.tz
         logger.debug('Using timezone "%s"', timezone)
-       
+
         # Counters
         count = 0
         first = True
@@ -386,31 +386,31 @@ class Transformation(object):
         # data_indexes & resolution shortcuts
         series_data_indexes = series._all_data_indexes()
         series_resolution = series.resolution
-        
+
         # Set operations if slots
         if target == 'slots':
             operations  = self.operations
         else:
             operations = None
 
-        # Now go trough all the data in the time series        
+        # Now go trough all the data in the time series
         for i, point in enumerate(series):
 
             logger.debug('Processing i=%s: %s', i, point)
 
             # Increase counter
             count += 1
-            
+
             # Attach validity TODO: do we want a generic series method, or maybe to be always computed in the series?
             point.valid_from = validity_regions[point.t][0]
             point.valid_to = validity_regions[point.t][1]
             logger.debug('Attached validity to %s', point.t)
-            
+
             # Pretend there was a slot before if we are at the beginning. TOOD: improve me.
             if slot_end_t is None:
                 slot_end_t = from_t
 
-            # First, check if we have some points to discard at the beginning       
+            # First, check if we have some points to discard at the beginning
             if point.t < from_t:
                 # If we are here it means we are going data belonging to a previous slot
                 logger.debug('Discarding as before start')
@@ -425,79 +425,79 @@ class Transformation(object):
                     logger.debug('Discarding as after end')
                     continue
 
-            # Is the current slot outdated? (are we processing a datapoint falling outside the current slot?)            
+            # Is the current slot outdated? (are we processing a datapoint falling outside the current slot?)
             if point.t >= slot_end_t:
-                       
+
                 # This approach is to detect if the current slot is "outdated" and spin a new one if so.
                 # Works only for slots at the beginning and in the middle, but not for the last slot
                 # or the missing slots at the end which need to be closed down here
                 logger.debug('Detected outdated slot')
-                
+
                 # Keep spinning new slots until the current data point falls in one of them.
                 # NOTE: Read the following "while" more as an "if" which can also lead to spin multiple
                 # slot if there are empty slots between the one being closed and the point.dt.
                 # TODO: leave or remove the above if for code readability?
-                
+
                 while slot_end_t <= point.t:
                     logger.debug('Checking for end %s with point %s', slot_end_t, point.t)
-                    
+
                     if slot_start_t is None:
                         # If we are in the pre-first slot, just silently spin a new slot
                         pass
-                
+
                     else:
 
-                        # Set slot next point index (us, as we triggered a new slot) 
+                        # Set slot next point index (us, as we triggered a new slot)
                         slot_next_point_i = i
-                        
+
                         # The slot_prev_point_i is instead always defined in the process and correctly set.
                         slot_prev_point_i = slot_prev_point_i
-        
-                        logger.debug('Got slot_prev_point_i as %s',slot_prev_point_i) 
-                        logger.debug('Got slot_next_point_i as %s',slot_next_point_i) 
-                        
+
+                        logger.debug('Got slot_prev_point_i as %s',slot_prev_point_i)
+                        logger.debug('Got slot_next_point_i as %s',slot_next_point_i)
+
                         # Now set slot first and last point, but beware boundaries.
                         if slot_prev_point_i is not None and abs(slot_next_point_i - slot_prev_point_i) == 1:
-                        
+
                             # No points for the slot at all
                             slot_first_point_i = None
                             slot_last_point_i = None
-                        
+
                         else:
-        
+
                             # Set first
                             if slot_prev_point_i is None:
                                 # Edge case where there is no prev as the time series starts with a point
                                 # placed exactly on the slot start, and since lefts are included we take it.
                                 slot_first_point_i = 0
-                            else:          
+                            else:
                                 if series[slot_prev_point_i+1].t >= slot_start_t and series[slot_prev_point_i+1].t < slot_end_t:
                                     slot_first_point_i = slot_prev_point_i+1
                                 else:
                                     slot_first_point_i = None
-                            
+
                             # Set last
                             if series[slot_next_point_i-1].t >= slot_start_t and series[slot_next_point_i-1].t < slot_end_t:
                                 slot_last_point_i = slot_next_point_i-1
                             else:
-                                slot_last_point_i = None                    
-                                
-                                
-                        logger.debug('Set slot_first_point_i to %s',slot_first_point_i) 
-                        logger.debug('Set slot_last_point_i to %s',slot_last_point_i) 
+                                slot_last_point_i = None
+
+
+                        logger.debug('Set slot_first_point_i to %s',slot_first_point_i)
+                        logger.debug('Set slot_last_point_i to %s',slot_last_point_i)
 
 
 
                         # Log the new slot
-                        # slot_first_point_i-1 is the "prev"                        
+                        # slot_first_point_i-1 is the "prev"
                         # slot_last_point_i+1 is the "next" (and the index where we are at the moment)
                         logger.debug('This slot is closed: start=%s (%s) and end=%s (%s). Now computing it..', slot_start_t, slot_start_dt, slot_end_t, slot_end_dt)
-                        
+
                         # Compute the new item...
                         new_item = _compute_new(target = 'point' if target=='points' else 'slot',
                                                 series = series,
                                                 slot_first_point_i = slot_first_point_i,
-                                                slot_last_point_i = slot_last_point_i ,                                                     
+                                                slot_last_point_i = slot_last_point_i ,
                                                 slot_prev_point_i = slot_prev_point_i,
                                                 slot_next_point_i = slot_next_point_i,
                                                 from_t = slot_start_t,
@@ -513,11 +513,11 @@ class Transformation(object):
                                                 force_compute_data_loss = True if first else False,
                                                 interpolator_class=self.interpolator_class,
                                                 operations = operations)
-                        
+
                         # Set first to false
                         if first:
                             first = False
-                        
+
                         # .. and append results
                         if new_item:
                             logger.debug('Computed new item: %s',new_item )
@@ -540,7 +540,7 @@ class Transformation(object):
                 # If last slot mark process as completed
                 if point.dt >= to_dt:
                     process_ended = True
-        
+
         if target == 'points':
             logger.info('Resampled %s DataTimePoints in %s DataTimePoints', count, len(new_series))
         else:
@@ -548,7 +548,7 @@ class Transformation(object):
                 logger.info('Aggregated %s points in %s slots', count, len(new_series))
             else:
                 logger.info('Aggregated %s slots in %s slots', count, len(new_series))
-                
+
         return new_series
 
 
@@ -574,7 +574,7 @@ class Resampler(Transformation):
 
     def process(self, series, *args, **kwargs):
         kwargs['target'] = 'points'
-        return super(Resampler, self).process(series, *args, **kwargs) 
+        return super(Resampler, self).process(series, *args, **kwargs)
 
 
 #==========================
@@ -585,32 +585,35 @@ class Aggregator(Transformation):
     """Aggregation transformation."""
 
     def __init__(self, unit, operations=[avg], interpolator_class=LinearInterpolator):
-        
+
         # Handle unit
         if isinstance(unit, TimeUnit):
             self.time_unit = unit
         else:
             self.time_unit = TimeUnit(unit)
-        
+
         if not operations:
             raise ValueError('No operations set, cannot slot.')
-        
+
         # Handle operations
         operations_input = operations
         operations = []
-        for operation in operations_input: 
+        for operation in operations_input:
             if isinstance(operation, str):
                 try:
                     operation = getattr(operations_module, operation)
                 except:
-                    raise 
+                    raise
             operations.append(operation)
         self.operations = operations
-        
+
         # Set interpolator
         self.interpolator_class=interpolator_class
 
     def process(self, series, *args, **kwargs):
         kwargs['target'] = 'slots'
-        return super(Aggregator, self).process(series, *args, **kwargs) 
+        return super(Aggregator, self).process(series, *args, **kwargs)
+
+
+
 

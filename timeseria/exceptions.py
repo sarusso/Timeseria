@@ -24,3 +24,6 @@ class FloatConversionError(Exception):
 
 class NotEnoughDataError(Exception):
     """Raised in context when there is not enough data to perform the required operation"""
+
+
+
