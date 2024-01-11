@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Exit on any error. More complex thing could be done in future
+# Exit on any error. More advanced approaches could be implemented in future
 # (see https://stackoverflow.com/questions/4381618/exit-a-script-on-error)
 set -e
 
@@ -15,7 +15,7 @@ if [[ "x$@" == "x" ]] ; then
     export TF_CPP_MIN_LOG_LEVEL=3
     export PYTHONUNBUFFERED=on
     export PYTHONPATH=\$PYTHONPATH:/opt/Timeseria
-    
+
     # Set base port
 	if [ "x$BASE_PORT" == "x" ]; then
 	    BASE_PORT=8888
@@ -38,9 +38,8 @@ if [[ "x$@" == "x" ]] ; then
     # Start Jupyter as default entrypoint
     echo "Running Jupyter..."
     echo ""
-    
+
     cd /opt/Timeseria
-    jupyter nbextension enable --py widgetsnbextension &> /dev/null
     jupyter trust $BASE_DIR/*.ipynb
     jupyter notebook --ip=0.0.0.0 --port=$BASE_PORT --NotebookApp.token='' --NotebookApp.notebook_dir=$BASE_DIR
 

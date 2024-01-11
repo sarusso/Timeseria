@@ -10,10 +10,10 @@ if [[ "x$BUILD" != "xFalse" ]]; then
     echo -e  "|  Building the Docker container   |"
     echo -e  "====================================\n"
 
-    cd containers/timeseria
+    cd docker/
     echo "Building Timeseria Docker container. Use BUILD=False to skip."
     ./build.sh
-    cd ../../
+    cd ../
 
 fi
 
