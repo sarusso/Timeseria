@@ -900,4 +900,20 @@ def _compute_distribution_approximation_errors(distribution_function, prediction
         return approximation_errors
 
 
+def _detect_notebook_major_version():
+    stdout = subprocess.check_output(["jupyter", "--version"]).decode()
+    versions={}
+    for line in stdout.split('\n'):
+        if ':' in line:
+            line=line.strip()
+            what, version = line.split(':')
+            versions[what.strip()] = version.strip()
+    #print(versions)
+    if not versions or 'notebook' not in versions:
+        notebook_major_version = None
+    else:
+        notebook_major_version = int(versions['notebook'].split('.')[0])
+    return notebook_major_version
+
+
 

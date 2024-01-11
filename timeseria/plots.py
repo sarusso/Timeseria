@@ -2,7 +2,7 @@
 """Plotting utilities."""
 
 #================================================================#
-# WARNING: the code in this module requires a major refactoring! #
+#   WARNING: the code in this module needs a major refactoring!  #
 #================================================================#
 
 import os
@@ -314,7 +314,7 @@ def _to_dg_data(serie, data_labels_to_plot, data_indexes_to_plot, full_precision
 
 def dygraphs_plot(series, data_labels='all', data_indexes='all', aggregate=None, aggregate_by=None, full_precision=False,
                   color=None, height=None, image=DEFAULT_PLOT_AS_IMAGE, image_resolution='auto', html=False, save_to=None,
-                  mini_plot='auto', value_range='auto', minimal_legend=False):
+                  mini_plot='auto', value_range='auto', minimal_legend=False, legacy=None):
     """Plot a time series using Dygraphs interactive plots.
 
        Args:
@@ -345,6 +345,7 @@ def dygraphs_plot(series, data_labels='all', data_indexes='all', aggregate=None,
                             saving the plot in image format.
            value_range(list): a value range for the y axes to force the plot to stick with, in the form ``[min, max]``.
            minimal_legend(bool): if to strip down the information in the legend to the very minimum.
+           legacy(bool): if to enable legacy mode (required for Jupyter Notebook < 7, never required for Jupyter Lab).
     """
     # Credits: the interactive plot is based on the work here: https://www.stefaanlippens.net/jupyter-custom-d3-visualization.html.
 
@@ -871,10 +872,11 @@ define('"""+graph_id+"""', ['dgenv'], function (Dygraph) {
 
     STATIC_DATA_PATH = '/'.join(os.path.realpath(__file__).split('/')[0:-1]) + '/static/'
 
-    # By defualt we show the plot
-    show_plot = True
 
     if image or save_to or html:
+
+        # By defualt we show the plot
+        show_plot = True
 
         # Generate random UUID
         rnd_uuid=str(uuid.uuid4())
@@ -987,7 +989,25 @@ define('"""+graph_id+"""', ['dgenv'], function (Dygraph) {
 
     else:
 
-        if show_plot:
+        # Version/mode mapping:
+        # Jupyter Notebook 5: legacy mode
+        # Jupyter Notebook 6: legacy approach
+        # Jupyter Notebook 7: normal mode
+        # Jupyetr lab 3: normal mode
+        # Jupyter Lab 4: normal mode
+
+        if legacy is None:
+
+            legacy = False
+
+            from .utilities import _detect_notebook_major_version
+            if _detect_notebook_major_version() < 7:
+                logger.warning('A Jupyter Notebook < 7 installation has been detect on this system. ' +
+                               'If the plot does not show, enable the legacy plotting mode with legacy=True and restart the Kernel. ' +
+                               'This is required for Jupyter Notebook < 7, but not for older versions of Jupyer Lab. However, it is not possible to detect ' + 
+                               'if running on Jupyter Notebook or Jupyter Lab, hence this warning. To suppress it, explicitly set legacy to True or False.')
+
+        if legacy:
             # Require Dygraphs Javascript library
             # https://raw.githubusercontent.com/sarusso/Timeseria/develop/timeseria/static/js/dygraph-2.1.0.min
             display(Javascript("require.config({paths: {dgenv: 'https://cdnjs.cloudflare.com/ajax/libs/dygraph/2.1.0/dygraph.min'}});"))
@@ -1019,6 +1039,23 @@ define('"""+graph_id+"""', ['dgenv'], function (Dygraph) {
                 })(element);
             """ % (graph_div_id)))
 
+        else:
+
+            display_html = '<div style="height:360px">'
+            with open(STATIC_DATA_PATH+'/js/dygraph-2.1.0.min.js') as dg_js_file:
+                display_html += '\n<script type="text/javascript">'+dg_js_file.read()+'</script>\n'
+            with open(STATIC_DATA_PATH+'css/dygraph-2.1.0.css') as dg_css_file:
+                display_html += '\n<style>'+dg_css_file.read()+'</style>\n'
+            if series.title:
+                display_html += '<div style="text-align: center; margin-top:15px; margin-bottom:15px; font-size:1.2em"><h3>{}</h3></div>'.format(series.title)
+            display_html += '<div style="height:36px; padding:0; margin-left:0px; margin-top:10px">\n'
+            display_html += '<div id="{}" style="width:100%"></div>\n'.format(legend_div_id)
+            display_html += '<div id="{}" style="width:100%; margin-right:0px"></div>\n'.format(graph_div_id)
+            display_html += '<script>{}</script>\n'.format(dygraphs_javascript)
+            display_html += '</div>'
+            display(HTML(display_html))
+
+
 
 #=================
 # Matplotlib plot
@@ -1029,7 +1066,5 @@ def matplotlib_plot(timeseries):
     from matplotlib import pyplot
     pyplot.plot(timeseries.df)
     pyplot.show()
-
-
 
 
