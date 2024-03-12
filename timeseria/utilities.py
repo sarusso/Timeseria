@@ -8,7 +8,7 @@ from numpy import fft
 from scipy.signal import find_peaks
 from .exceptions import ConsistencyException
 from datetime import datetime
-from propertime.utilities import s_from_dt
+from propertime.utils import s_from_dt
 from .exceptions import FloatConversionError
 import subprocess
 from collections import namedtuple
@@ -710,12 +710,12 @@ def _check_resolution(series, resolution):
         if resolution == series.resolution:
             return True
         try:
-            if resolution.value == series.resolution.as_seconds():
+            if resolution == series.resolution.as_seconds():
                 return True
         except:
             pass
         try:
-            if resolution.as_seconds() == series.resolution.value:
+            if resolution.as_seconds() == series.resolution:
                 return True
         except:
             pass
@@ -757,9 +757,9 @@ def _get_periodicity_index(item, resolution, periodicity, dst_affected=False):
     if isinstance(resolution, TimeUnit):
         resolution_s = resolution.as_seconds(item.dt)
     elif isinstance(resolution, Unit):
-        if isinstance(resolution.value, list):
+        if isinstance(resolution, list):
             raise NotImplementedError('Sorry, periodocity in multi-dimensional spaces are not defined')
-        resolution_s = resolution.value
+        resolution_s = resolution
     else:
         if isinstance(resolution, list):
             raise NotImplementedError('Sorry, periodocity in multi-dimensional spaces are not defined')
@@ -862,10 +862,10 @@ def _compute_distribution_approximation_errors(distribution_function, prediction
     # Support vars
     max_prediction_error = max(prediction_errors)
     min_prediction_error = min(prediction_errors)
-    error_span = max_prediction_error - min_prediction_error
+    error_unit = max_prediction_error - min_prediction_error
 
     # Create the bins
-    error_step = error_span / bins
+    error_step = error_unit / bins
     prediction_error_bins = [[] for _ in range(bins)]
     for i, prediction_error in enumerate(prediction_errors):
         for j in range(bins-1):

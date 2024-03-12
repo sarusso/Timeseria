@@ -5,7 +5,7 @@ import os
 import json
 import uuid
 import statistics
-from propertime.utilities import now_s, dt_from_s
+from propertime.utils import now_s, dt_from_s
 from pandas import DataFrame
 import shutil
 

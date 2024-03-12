@@ -1,5 +1,5 @@
 import unittest
-from propertime.utilities import dt
+from propertime.utils import dt
 from ..units import Unit, TimeUnit
 
 # Setup logging
@@ -60,8 +60,8 @@ class TestTimeUnits(unittest.TestCase):
         time_unit_1 = TimeUnit('15m')
         self.assertEqual(str(time_unit_1), '15m')
 
-        time_unit_2 = TimeUnit('15m_30s_3u')
-        self.assertEqual(str(time_unit_2), '15m_30s_3u')
+        time_unit_2 = TimeUnit('15m_30s')
+        self.assertEqual(str(time_unit_2), '15m_30s')
 
         # Components init
         self.assertEqual(TimeUnit(days=1).days, 1)
@@ -82,29 +82,22 @@ class TestTimeUnits(unittest.TestCase):
         self.assertEqual(TimeUnit('1.234s').as_seconds(), 1.234)
         self.assertEqual(TimeUnit('1.02s').as_seconds(), 1.02)
         self.assertEqual(TimeUnit('1.000005s').as_seconds(), 1.000005)
-        self.assertEqual(TimeUnit('67.000005s').seconds, 67)
-        self.assertEqual(TimeUnit('67.000005s').microseconds, 5)
+        self.assertEqual(TimeUnit('67.000005s').seconds, 67.000005)
 
-        # Too much precision (below microseconds), gets cut
-        time_unit = TimeUnit('1.0000005s')
-        self.assertEqual(str(time_unit),'1s')
-        time_unit = TimeUnit('1.0000065s')
-        self.assertEqual(str(time_unit),'1s_6u')
+        # Test string values
+        self.assertEqual(str(TimeUnit(600)), '600s') # Int converted to string representaiton
+        self.assertEqual(str(TimeUnit(600.0)), '600s') # Float converted to string representaiton
+        self.assertEqual(str(TimeUnit(600.45)), '600.45s') # Float converted to string representaiton (using microseconds)
 
-        # Test unit values
-        self.assertEqual(TimeUnit(600).value, '600s') # Int converted to string representaiton
-        self.assertEqual(TimeUnit(600.0).value, '600s') # Float converted to string representaiton
-        self.assertEqual(TimeUnit(600.45).value, '600s_450000u') # Float converted to string representaiton (using microseconds)
+        self.assertEqual(str(TimeUnit(days=1)), '1D')
+        self.assertEqual(str(TimeUnit(years=2)), '2Y')
+        self.assertEqual(str(TimeUnit(minutes=1)), '1m')
+        self.assertEqual(str(TimeUnit(minutes=15)), '15m')
+        self.assertEqual(str(TimeUnit(hours=1)), '1h')
 
-        self.assertEqual(TimeUnit(days=1).value, '1D')
-        self.assertEqual(TimeUnit(years=2).value, '2Y')
-        self.assertEqual(TimeUnit(minutes=1).value, '1m')
-        self.assertEqual(TimeUnit(minutes=15).value, '15m')
-        self.assertEqual(TimeUnit(hours=1).value, '1h')
-
-        self.assertEqual(time_unit_1.value, '15m')
-        self.assertEqual(time_unit_2.value, '15m_30s_3u')
-        self.assertEqual(TimeUnit(days=1).value, '1D') # This is obtained using the unit's string representation
+        self.assertEqual(str(time_unit_1), '15m')
+        self.assertEqual(str(time_unit_2), '15m_30s')
+        self.assertEqual(str(TimeUnit(days=1)), '1D') # This is obtained using the unit's string representation
 
         # Test unit equalities
         self.assertTrue(TimeUnit(hours=1) == TimeUnit(hours=1))
@@ -121,11 +114,11 @@ class TestTimeUnits(unittest.TestCase):
     def test_TimeUnit_math(self):
 
         time_unit_1 = TimeUnit('15m')
-        time_unit_2 = TimeUnit('15m_30s_3u')
+        time_unit_2 = TimeUnit('15m_30s')
         time_unit_3 = TimeUnit(days=1)
 
         # Sum with other TimeUnit objects
-        self.assertEqual(str(time_unit_1+time_unit_2+time_unit_3), '1D_30m_30s_3u')
+        self.assertEqual(str(time_unit_1+time_unit_2+time_unit_3), '1D_30m_30s')
 
         # Sum with datetime (also on DST change)
         time_unit = TimeUnit('1h')
@@ -186,15 +179,6 @@ class TestTimeUnits(unittest.TestCase):
         # Test equal
         time_unit_1 = TimeUnit('15m')
         self.assertEqual(time_unit_1, 900)
-
-
-    def test_TimeUnit_types(self):
-
-        # Test type
-        self.assertEqual(TimeUnit('15m').type, TimeUnit._PHYSICAL)
-        self.assertEqual(TimeUnit('1h').type, TimeUnit._PHYSICAL)
-        self.assertEqual(TimeUnit('1D').type, TimeUnit._CALENDAR)
-        self.assertEqual(TimeUnit('1M').type, TimeUnit._CALENDAR)
 
 
     def test_TimeUnit_duration(self):

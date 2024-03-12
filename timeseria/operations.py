@@ -3,7 +3,7 @@
 
 from datetime import datetime
 from copy import copy, deepcopy
-from propertime.utilities import s_from_dt
+from propertime.utils import s_from_dt
 from .datastructures import Series, Slot, Point, TimePoint
 from .utilities import _is_close, _check_series_of_points_or_slots,_check_indexed_data
 from .units import TimeUnit, Unit
@@ -246,7 +246,7 @@ class Derivative(Operation):
                 if isinstance(series.resolution, TimeUnit):
                     sampling_interval = series.resolution.as_seconds(series[0].dt)
                 elif isinstance(series.resolution, Unit):
-                    sampling_interval = series.resolution.value
+                    sampling_interval = series.resolution
                 else:
                     sampling_interval = series.resolution
             postfix='derivative'
@@ -379,7 +379,7 @@ class Integral(Operation):
                 if isinstance(series.resolution, TimeUnit):
                     sampling_interval = series.resolution.as_seconds(series[0].dt)
                 elif isinstance(series.resolution, Unit):
-                    sampling_interval = series.resolution.value
+                    sampling_interval = series.resolution
                 else:
                     sampling_interval = series.resolution
             postfix='integral'

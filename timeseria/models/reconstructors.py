@@ -7,7 +7,7 @@ from datetime import datetime
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 from pandas import DataFrame
 from math import sqrt
-from propertime.utilities import dt_from_s
+from propertime.utils import dt_from_s
 
 from ..utilities import detect_periodicity, _get_periodicity_index, _set_from_t_and_to_t, _item_is_in_range, mean_absolute_percentage_error
 from ..units import TimeUnit
