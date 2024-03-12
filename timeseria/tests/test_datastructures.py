@@ -891,29 +891,29 @@ class TestTimeSeries(unittest.TestCase):
         self.assertEqual((time_series[0].data['C']), 21.7)
         self.assertEqual((time_series[0].data['RH']), 54.9)
 
-        # Test init from list of dicts
-        time_series = TimeSeries([{'t':60, 'data':14},
-                                 {'t':120, 'data':18},
-                                 {'t':128, 'data':20}])
+        # Test init from a dicts
+        time_series = TimeSeries({60: 14,
+                                 120: 18,
+                                 128: 20})
         self.assertEqual(len(time_series), 3)
         self.assertEqual(time_series[0].t, 60)
-        self.assertEqual(time_series[0].data, [14])
+        self.assertEqual(time_series[0].data, {'value':14})
 
-        time_series = TimeSeries([{'t':60, 'data':{'a': 14}},
-                                 {'t':120, 'data':{'a': 18}},
-                                 {'t':128, 'data':{'a': 20}}])
+        time_series = TimeSeries({60:{'a': 14},
+                                  120:{'a': 18},
+                                  128:{'a': 20}})
         self.assertEqual(len(time_series), 3)
         self.assertEqual(time_series[0].t, 60)
         self.assertEqual(time_series[0].data, {'a': 14})
 
-        time_series = TimeSeries([{'dt':dt(1970,1,1,0,1), 'data':14},
-                                 {'dt':dt(1970,1,1,0,2), 'data':18},
-                                 {'dt':dt(1970,1,1,0,3), 'data':20}],
+        time_series = TimeSeries({dt(1970,1,1,0,1):14,
+                                  dt(1970,1,1,0,2):18,
+                                  dt(1970,1,1,0,3):20},
                                  slot_unit='60s')
         self.assertEqual(len(time_series), 3)
         self.assertEqual(time_series[0].start.t, 60)
         self.assertEqual(time_series[0].end.t, 120)
-        self.assertEqual(time_series[0].data, [14])
+        self.assertEqual(time_series[0].data, {'value': 14})
 
         # Test init from CSV files
         time_series = TimeSeries(TEST_DATA_PATH + '/csv/single_value_no_labels.csv')

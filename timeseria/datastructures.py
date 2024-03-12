@@ -1217,8 +1217,8 @@ class TimeSeries(Series):
            * providing a list of dictionaries in the following forms, plus an optional ``slot_unit`` argument
              if creating a slot series (e.g. ``slot_unit='1D'``):
 
-               * ``[{'t':60, 'data':4}, {'t':120, 'data':6}, ... ]``
-               * ``[{'dt':dt(1970,1,1), 'data':4}, {'dt':dt(1970,1,2), 'data':6}, ... ]``
+               * ``{60: 4, 120: 6, ... }``
+               * ``{dt(1970,1,1): 4, dt(1970,1,2): 6, ... }``
 
            * providing a string with a path to a CSV file, which will be read and parsed using a :obj:`timeseria.storages.CSVStorage`
              storage object (in this case all the key-value arguments will be forwarded to the storage).
@@ -1226,15 +1226,12 @@ class TimeSeries(Series):
        The square brackets notation can be used for accessing series items, slicing the series
        or to filter it on a specific data label (if the elements support it), as outlined below.
 
-       Accessing time series items can be done by position, using a string with special ``t`` or ``dt``
-       keywords, or using a dictionary with ``t`` or ``dt`` keys:
-
            * ``series[3]`` will access the item in position #3;
 
            * ``series[1446073200.7]`` will access the item for the epoch timestamp corresponding to the (floating point)
              number provided in the square brackets;
 
-           * ``series[dt(2015-10-25 06:19:00+01:00)]`` will access the item for the corresponding datetime timestamp.
+           * ``series[dt(2015,10,25,6,19,0)]`` will access the item for the corresponding datetime timestamp.
 
        The same three options can be used for slicing, and filtering a series on a data label can also be achieved using
        the square bracket notation, by providing the data label on which to filter the series: ``series['temperature']`` will filter
@@ -1381,41 +1378,27 @@ class TimeSeries(Series):
                 # Set the list of data time points
                 super(TimeSeries, self).__init__(*data_time_points, **kwargs)
 
-        # Create from list of dicts
-        elif args and (isinstance(args[0], list)):
+        # Create from a dict
+        elif args and (isinstance(args[0], dict)):
 
             slot_unit = kwargs.pop('slot_unit', None)
             if slot_unit and not isinstance(slot_unit, Unit):
                 slot_unit = TimeUnit(slot_unit)
             series_items = []
+            data_dict =  args[0]
 
-            for item in args[0]:
-
-                if not isinstance(item, dict):
-                    raise TypeError('List of dicts required, got "{}"'.format(item.__class__.__name__))
-
-                item_t = item.get('t', None)
-                item_dt = item.get('dt', None)
-                if item_t is None and item_dt is None:
-                    raise ValueError('A "t" or "dt" key is required')
-
-                data = item.get('data', None)
-                if not data:
-                    raise ValueError('A "data" key is required')
-                if not (isinstance(data, list) or isinstance(data, dict) or isinstance(data, tuple)):
-                    data = [data]
-
-                # Possible alternative approach
-                # value = item.get('value', None)
-                # values = item.get('values', None)
-                # if not value and not values:
-                #     raise ValueError('A "value" or "values" key is required')
-                # if values:
-                #     if not (isinstance(values, list) or isinstance(values, dict) or isinstance(values, tuple)):
-                #         raise ValueError('For "values", data must be list, dict or tuple (got "{}")'.format(item['values'].__class__.__name__))
-                #     data = values
-                # else:
-                #     data = [value]
+            for key in data_dict:
+                item_dt = None
+                item_t = None
+                if isinstance(key, datetime):
+                    item_dt = key
+                elif isinstance(key, int) or isinstance(key,float):
+                    item_t = key
+                else:
+                    raise ValueError('Cannot handle keys other than int, float or datetime (got "{}"').format(key.__class__.__name__)
+                data = data_dict[key]
+                if not (isinstance(data, list) or isinstance(data, dict)):
+                    data = {'value': data}
 
                 # Create the item
                 if slot_unit:
