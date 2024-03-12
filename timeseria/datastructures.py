@@ -630,9 +630,6 @@ class Series(list):
     """A list of items coming one after another, where every item
        is guaranteed to be of the same type and in order or succession.
 
-       The square brackets notation can be used both for slicing the series
-       or to filter it on a specific data label, if its elements support it.
-
        The square brackets notation can be used for accessing series items, slicing the series
        or to filter it on a specific data label, if its elements support it:
 
@@ -671,17 +668,15 @@ class Series(list):
         """Append an item to the series. Accepts only items of the same
         type of the items already present in the series (unless empty)"""
 
-        # TODO: move to use the insert
-
-        # logger.debug('Checking %s', item)
+        # TODO: move to use the insert?
 
         # Check type
         if self.items_type:
             if not isinstance(item, self.items_type):
                 raise TypeError('Got incompatible type "{}", can only accept "{}"'.format(item.__class__.__name__, self.items_type.__name__))
 
-        # Check order or succession
-        try:
+        # Check order or succession if not empty
+        if self:
             try:
                 if not item.__succedes__(self[-1]):
                     raise ValueError('Not in succession ("{}" does not succeeds "{}")'.format(item,self[-1])) from None
@@ -694,23 +689,17 @@ class Series(list):
                 except TypeError:
                     raise TypeError('Object of class "{}" does not implement a "__gt__" or a "__succedes__" method, cannot append it to a Series (which is ordered)'.format(item.__class__.__name__)) from None
 
-        except IndexError:
-            pass
-
-        # Check data type if any
-        try:
-            if self._item_data_reference:
-
-                if not type(self._item_data_reference) == type(item.data):
-                    raise TypeError('Got different data: {} vs {}'.format(self._item_data_reference.__class__.__name__, item.data.__class__.__name__))
-                if isinstance(self._item_data_reference, list):
-                    if len(self._item_data_reference) != len(item.data):
-                        raise ValueError('Got different data lengths: {} vs {}'.format(len(self._item_data_reference), len(item.data)))
-                if isinstance(self._item_data_reference, dict):
-                    if set(self._item_data_reference.keys()) != set(item.data.keys()):
-                        raise ValueError('Got different data labels: {} vs {}'.format(self._item_data_reference.keys(), item.data.keys()))
-        except AttributeError:
-            # logger.debug('Setting data reference: %s', item.data)
+        # Check data type and set if not done already
+        if self and self._item_data_reference:
+            if not type(self._item_data_reference) == type(item.data):
+                raise TypeError('Got different data: {} vs {}'.format(self._item_data_reference.__class__.__name__, item.data.__class__.__name__))
+            if isinstance(self._item_data_reference, list):
+                if len(self._item_data_reference) != len(item.data):
+                    raise ValueError('Got different data lengths: {} vs {}'.format(len(self._item_data_reference), len(item.data)))
+            if isinstance(self._item_data_reference, dict):
+                if set(self._item_data_reference.keys()) != set(item.data.keys()):
+                    raise ValueError('Got different data labels: {} vs {}'.format(self._item_data_reference.keys(), item.data.keys()))
+        else:
             try:
                 self._item_data_reference = item.data
             except AttributeError:
@@ -905,6 +894,16 @@ class Series(list):
         """Return a shallow copy of the series."""
         return super(Series, self).copy()
 
+    def duplicate(self):
+        """ Return a deep copy of the series."""
+        return deepcopy(self)
+
+    def _item_by_i(self, i):
+        return super(Series, self).__getitem__(i)
+
+    def _slice_by_i(self, **args):
+        return super(Series, self).__getitem__(**args)
+
     # Inherited methods to be disabled
     def extend(self):
         """Disabled (use the `merge` instead)."""
@@ -921,10 +920,6 @@ class Series(list):
     def reverse(self):
         """Disabled (reversing is not compatible with an ordering)."""
         raise NotImplementedError('Reversing is not compatible with an ordering')
-
-    def duplicate(self):
-        """ Return a deep copy of the series."""
-        return deepcopy(self)
 
 
     #=========================
@@ -1077,24 +1072,19 @@ class Series(list):
         from .operations import merge as merge_operation
         return merge_operation(self, series)
 
-    def filter(self, data_label, **kwargs):
-        """Filter a series by a ``data_label``. A series of DataPoints or DataSlots is required."""
-        # TODO: refactor this to allow generic item properties?
-        from_t = kwargs.get('from_t', None)
-        to_t = kwargs.get('to_t', None)
-        from_dt = kwargs.get('from_dt', None)
-        to_dt = kwargs.get('to_dt', None)
-        from .operations import filter as filter_operation
-        return filter_operation(self, data_label=data_label, from_t=from_t, to_t=to_t, from_dt=from_dt, to_dt=to_dt)
+    def get(self, position):
+        from .operations import get as get_operation
+        return get_operation(self, position)
 
-    def slice(self, start=None, end=None, **kwargs):
+    def filter(self, data_label):
+        """Filter a series by a ``data_label``. A series of DataPoints or DataSlots is required."""
+        from .operations import filter as filter_operation
+        return filter_operation(self, data_label=data_label)
+
+    def slice(self, start=None, end=None):
         """Slice a series from a "start" to an "end". A series of DataPoints or DataSlots is required."""
-        from_t = kwargs.get('from_t', None)
-        to_t = kwargs.get('to_t', None)
-        from_dt = kwargs.get('from_dt', None)
-        to_dt = kwargs.get('to_dt', None)
         from .operations import slice as slice_operation
-        return slice_operation(self, start=start, end=end, from_t=from_t, to_t=to_t, from_dt=from_dt, to_dt=to_dt)
+        return slice_operation(self, start=start, end=end)
 
     def select(self, query):
         """Select one or more items of the series given an SQL-like query. A series of DataPoints or DataSlots is required."""
@@ -1219,7 +1209,7 @@ class TimeSeries(Series):
        is guaranteed to be of the same type and in order or succession.
 
        Time series accept only items of type :obj:`DataTimePoint` and :obj:`DataTimeSlot`
-       (or :obj:`TimePoint` and :obj:`TimeSlot` which are useful in some particular circumstances),
+       (or :obj:`TimePoint` and :obj:`TimeSlot` which are useful in some circumstances),
        but can be created using some shortcuts, for example:
 
            * providing a Pandas Dataframe with a time-based index;
@@ -1230,31 +1220,25 @@ class TimeSeries(Series):
                * ``[{'t':60, 'data':4}, {'t':120, 'data':6}, ... ]``
                * ``[{'dt':dt(1970,1,1), 'data':4}, {'dt':dt(1970,1,2), 'data':6}, ... ]``
 
-           * providing a string with a CSV file name, inclding its path, that will in turn use a
-             :obj:`timeseria.storages.CSVStorage`, in which case all the key-value parameters will be
-             forwarded to the storage object.
+           * providing a string with a path to a CSV file, which will be read and parsed using a :obj:`timeseria.storages.CSVStorage`
+             storage object (in this case all the key-value arguments will be forwarded to the storage).
 
        The square brackets notation can be used for accessing series items, slicing the series
-       or to filter it on a specific data label (if its elements support it), as outlined below.
+       or to filter it on a specific data label (if the elements support it), as outlined below.
 
        Accessing time series items can be done by position, using a string with special ``t`` or ``dt``
        keywords, or using a dictionary with ``t`` or ``dt`` keys:
 
            * ``series[3]`` will access the item in position #3;
 
-           * ``series['t=1446073200.7']`` and ``series[{'t': 1446073200.7}]`` will both access the item
-             for the corresponding epoch timestamp;
+           * ``series[1446073200.7]`` will access the item for the epoch timestamp corresponding to the (floating point)
+             number provided in the square brackets;
 
-           * ``series['dt=2015-10-25 06:19:00+01:00']`` and ``series[{'dt': dt(2015,10,25,6,19,0,0)}]`` will both
-             access the item for the corresponding datetime timestamp. In the string notation, this can be both an
-             ISO8601 timestamp or a string representation of the datetime object.
+           * ``series[dt(2015-10-25 06:19:00+01:00)]`` will access the item for the corresponding datetime timestamp.
 
-       Slicing a series works in a similar fashion, and accepts in the coulmn-separated square bracket notation ``series[start:end]``
-       item positions, strings with special ``t`` or ``dt`` keywords, or dictionaries with ``t`` or ``dt`` keys, as above.
-
-       Filtering a series on a data label can also be achieved using the square bracket notation, by providing the
-       data label on which to filter the series: ``series['temperature']`` will filter the time series keeping only
-       temperature data, assuming that in the original series there were also other data labels (e.g. humidity).
+       The same three options can be used for slicing, and filtering a series on a data label can also be achieved using
+       the square bracket notation, by providing the data label on which to filter the series: ``series['temperature']`` will filter
+       the time series keeping only temperature data, assuming that in the original series there were also other data labels (e.g. humidity).
 
        For more options for accessing and selecting series items and for slicing or filtering series, see the corresponding
        methods: :func:`select()`, :func:`slice()` and :func:`filter()`.
@@ -1574,7 +1558,7 @@ class TimeSeries(Series):
         for item in self:
             if item.t == t:
                 return item
-        raise ValueError('Cannot find any item for t="{}"'.format(t))
+        raise ValueError('Cannot find any item for t={}'.format(t))
 
 
     #=========================
@@ -1583,112 +1567,11 @@ class TimeSeries(Series):
 
     def __getitem__(self, arg):
         if isinstance(arg, slice):
-
-            # Handle time-based slicing
-            requested_start_t = None
-            requested_stop_t = None
-            requested_start_i = None
-            requested_stop_i = None
-            if isinstance(arg.start, str):
-                if arg.start.startswith('t='):
-                    requested_start_t = float(arg.start.split('=')[1])
-                elif arg.start.startswith('dt='):
-                    requested_start_t = s_from_dt(dt_from_str(arg.start.split('=')[1].replace(' ', 'T')))
-                else:
-                    raise ValueError('Don\'t know how to parse slicing start "{}"'.format(arg.start))
-            elif isinstance(arg.start, dict):
-                if 't' in arg.start:
-                    requested_start_t = arg.start['t']
-                elif 'dt' in arg.start:
-                    requested_start_t = s_from_dt(arg.start['dt'])
-                else:
-                    raise ValueError('Getting items by dict requires a "t" or a "dt" dict key, found none (Got dict={})'.format(arg))
-            else:
-                requested_start_i = arg.start
-
-            if isinstance(arg.stop, str):
-                if arg.start.startswith('t='):
-                    requested_stop_t = float(arg.stop.split('=')[1])
-                elif arg.start.startswith('dt='):
-                    requested_stop_t = s_from_dt(dt_from_str(arg.stop.split('=')[1].replace(' ', 'T')))
-                else:
-                    raise ValueError('Don\'t know how to parse slicing stop "{}"'.format(arg.stop))
-            elif isinstance(arg.stop, dict):
-                if 't' in arg.stop:
-                    requested_stop_t = arg.stop['t']
-                elif 'dt' in arg.stop:
-                    requested_stop_t = s_from_dt(arg.stop['dt'])
-                else:
-                    raise ValueError('Getting items by dict requires a "t" or a "dt" dict key, found none (Got dict={})'.format(arg))
-            else:
-                requested_stop_i = arg.stop
-
-            if requested_start_t is not None or requested_stop_t is not None:
-                # Slice on timestamps with the slice operations
-                return self.slice(start=requested_start_t, end=requested_stop_t)
-            else:
-                # Slice on indexes
-                # TODO: maybe use the parent list slicing somehow?
-                if requested_start_i is None:
-                    requested_start_i = 0
-                if requested_stop_i is None:
-                    requested_stop_i = len(self)
-                if requested_start_i < 0:
-                    requested_start_i = len(self) + requested_start_i
-                if requested_stop_i < 0:
-                    requested_stop_i = len(self) + requested_stop_i
-                sliced_series = self.__class__()
-                sliced_series.mark = self.mark
-                for i in range(requested_start_i, requested_stop_i):
-                    sliced_series.append(self[i])
-                return sliced_series
-
+            return self.slice(start=arg.start, end=arg.stop)
         elif isinstance(arg, str):
-
-            # Are we filtering against t or dt?
-            if arg.startswith('t='):
-                requested_t = float(arg.split('=')[1])
-                logger.debug('Will look up item for t="%s"', requested_t)
-                try:
-                    return self._item_by_t(requested_t)
-                except ValueError:
-                    raise ValueError('Cannot find any item for t="{}"'.format(requested_t))
-
-            if arg.startswith('dt='):
-                requested_dt = dt_from_str(arg.split('=')[1].replace(' ', 'T'))
-                logger.debug('Will look up item for dt="%s"', requested_dt)
-                try:
-                    return self._item_by_t(s_from_dt(requested_dt))
-                except ValueError:
-                    raise ValueError('Cannot find any item for dt="{}"'.format(requested_dt))
-
-            # Try filtering on this data label only
             return self.filter(arg)
-
-        elif isinstance(arg, dict):
-
-            if 't' in arg:
-                requested_t = arg['t']
-                logger.debug('Will look up item for t="%s"', requested_t)
-                try:
-                    return self._item_by_t(requested_t)
-                except ValueError:
-                    raise ValueError('Cannot find any item for t="{}"'.format(requested_t))
-
-            elif 'dt' in arg:
-                requested_dt = arg['dt']
-                logger.debug('Will look up item for dt="%s"', requested_dt)
-                try:
-                    return self._item_by_t(s_from_dt(requested_dt))
-                except ValueError:
-                    raise ValueError('Cannot find any item for dt="{}"'.format(requested_dt))
-
-            else:
-                raise ValueError('Getting items by dict requires a "t" or a "dt" dict key, found none (Got dict={})'.format(arg))
-
         else:
-            return super(Series, self).__getitem__(arg)
-
+            return self.get(arg)
 
     #=========================
     #  Timezone-related
@@ -2008,9 +1891,9 @@ class _TimeSeriesView(TimeSeries):
 
     def __repr__(self):
         if not self.series:
-            return 'Empty series slice'
+            return 'Empty time series view'
         else:
-            return 'Series slice'
+            return 'Time series view'
 
     @property
     def items_type(self):

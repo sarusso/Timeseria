@@ -4,7 +4,7 @@
 from datetime import datetime
 from copy import copy, deepcopy
 from propertime.utilities import s_from_dt
-from .datastructures import Series, Slot, Point
+from .datastructures import Series, Slot, Point, TimePoint
 from .utilities import _is_close, _check_series_of_points_or_slots,_check_indexed_data
 from .units import TimeUnit, Unit
 from .exceptions import ConsistencyException
@@ -800,63 +800,55 @@ class MAvg(Operation):
         return mavg_series
 
 
+class Get(Operation):
+    """Get operation (callable object)."""
+
+    def __call__(self, series, *args, **kwargs):
+        if not series:
+            raise IndexError
+        else:
+            return super(Get, self).__call__(series, *args, **kwargs)
+
+    def _compute(self, series, at):
+
+        # Detect argument type
+        if isinstance(at, int):
+            return series._item_by_i(at)
+        if isinstance(at, float):
+            return series._item_by_t(at)
+        if isinstance(at, datetime):
+            return series._item_by_t(s_from_dt(at))
+        if  isinstance(at, TimePoint):
+            return series._item_by_t(at.t)
+
+        raise TypeError('Don\'t know how to get items from a series for type "{}"'.format(at.__class__.__name__))
+
+
 class Filter(Operation):
     """Filter operation (callable object)."""
 
-    def _compute(self, series, data_label=None, from_t=None, to_t=None, from_dt=None, to_dt=None):
+    def _compute(self, series, data_label):
 
         _check_series_of_points_or_slots(series)
         _check_indexed_data(series)
 
-        if from_t or to_t or from_dt or to_dt:
-            logger.warning('The from_t, to_t, from_dt and to_d arguments are deprecated, please use the slice() operation instead or the square brackets notation.')
-
-        if from_dt:
-            if from_t is not None:
-                raise Exception('Cannot set both from_t and from_dt')
-            from_t = s_from_dt(from_dt)
-        if to_dt:
-            if to_t is not None:
-                raise Exception('Cannot set both to_t and to_dt')
-            to_t = s_from_dt(to_dt)
-
-        if from_t is not None and to_t is not None:
-            if from_t >= to_t:
-                raise Exception('Got from >= to')
-
         # Instantiate the filtered series
         filtered_series = series.__class__()
 
-        # Filter based on time if from/to are set
+        # Filter based on data label
+        try:
+            series[0].data[series.data_labels()[0]]
+        except TypeError:
+            raise TypeError('Cannot filter by data label on non key-value data (Got "{}")'.format(series[0].data.__class__.__name__))
         for item in series:
-            if from_t is not None and to_t is not None:
-                if item.t >= from_t and item.t <to_t:
-                    filtered_series.append(item)
-            else:
-                if from_t is not None:
-                    if item.t >= from_t:
-                        filtered_series.append(item)
-                if to_t is not None:
-                    if item.t < to_t:
-                        filtered_series.append(item)
-                if from_t is None and to_t is None:
-                    # Append everything
-                    filtered_series.append(item)
-
-        # Filter based on data label if set
-        if data_label:
-            try:
-                series[0].data[series.data_labels()[0]]
-            except TypeError:
-                raise TypeError('Cannot filter by data label on non key-value data (Got "{}")'.format(series[0].data.__class__.__name__))
-            for i, item in enumerate(filtered_series):
-                filtered_series[i] = copy(item)
-                filtered_series[i]._data = {data_label: item._data_by_label(data_label)}
+            filtered_item = copy(item)
+            filtered_item._data = {data_label: item._data_by_label(data_label)}
+            filtered_series.append(filtered_item)
 
         # Re-set reference data as well
         try:
             filtered_series._item_data_reference = filtered_series[0].data
-        except AttributeError:
+        except (AttributeError, IndexError):
             pass
 
         return filtered_series
@@ -865,86 +857,100 @@ class Filter(Operation):
 class Slice(Operation):
     """Slice operation (callable object)."""
 
-    def _compute(self, series, start=None, end=None, from_t=None, to_t=None, from_dt=None, to_dt=None):
+    def _compute(self, series, start=None, end=None):
 
-        if from_t or to_t or from_dt or to_dt:
-            logger.warning('The from_t, to_t, from_dt and to_d arguments are deprecated, please use the start/end end instead.')
+        # TODO: check for series type to allow time-based slicing? Same in the Get..
 
-        # Handle start/end
+        start_i = None
+        end_i = None
+        start_t = None
+        end_t = None
+
+        # Handle start
         if start is not None:
             if isinstance(start, datetime):
-                from_dt = start
+                start_t = s_from_dt(start)
+            elif isinstance(start, float):
+                start_t = start
+            elif isinstance(start, int):
+                if start < 0:
+                    start_i = len(series) - abs(start)
+                else:
+                    start_i = start
             else:
-                try:
-                    from_t = float(start)
-                except:
-                    raise ValueError('Cannot use "{}" as start value, not a datetime nor an epoch timestamp'.format(start))
+                raise ValueError('Cannot use "{}" as start value for the slice as not int, float (epoch timestamp) nor datetime'.format(start))
+
+        # Handle end
         if end is not None:
             if isinstance(end, datetime):
-                to_dt = end
+                end_t = s_from_dt(end)
+            elif isinstance(end, float):
+                end_t = end
+            elif isinstance(end, int):
+                if end < 0:
+                    end_i = len(series) - abs(end) 
+                else:
+                    end_i = end
             else:
-                try:
-                    to_t = float(end)
-                except:
-                    raise ValueError('Cannot use "{}" as end value, not a datetime nor an epoch timestamp'.format(end))
+                raise ValueError('Cannot use "{}" as end value for the slice as not int, float (epoch timestamp) nor datetime'.format(end))
 
-        if from_dt:
-            if from_t is not None:
-                raise Exception('Cannot set both from_t and from_dt')
-            from_t = s_from_dt(from_dt)
-        if to_dt:
-            if to_t is not None:
-                raise Exception('Cannot set both to_t and to_dt')
-            to_t = s_from_dt(to_dt)
+        # Check incompatibilities
+        if start_t is not None or end_t is not None:
+            if start_i is not None or end_i is not None:
+                raise ValueError('Cannot slice mixing int and float (epoch timestamp) or datetime')
 
-        if from_t is not None and to_t is not None:
-            if from_t >= to_t:
+        # Handle inverted or equal positions (slight optimization)
+        if start_t is not None and end_t is not None:
+            if start_t >= end_t:
+                return series.__class__()
+        if start_i is not None and end_i is not None:
+            if start_i >= end_i:
                 return series.__class__()
 
-        # Instantiate the filtered series
-        filtered_series = series.__class__()
+        # Instantiate the new, sliced series
+        sliced_series = series.__class__()
 
         # Preserve mark if any TODO: Check if mark still in the sliced series?
-        filtered_series.mark = series.mark
+        sliced_series.mark = series.mark
 
-        # Select new series items based on time if from/to are set
-        for item in series:
-            if from_t is not None and to_t is not None:
-                if item.t >= from_t:
+        # Select sliced series items based on start end (if set) or just duplicate it
+        if (start_t is not None or end_t is not None):
+            for item in series:
+                if start_t is not None:
+                    if item.t < start_t:
+                        continue
+                if end_t is not None:
                     try:
                         # Slot?
-                        if item.end.t <= to_t:
-                            filtered_series.append(item)
+                        if item.end.t > end_t:
+                            break
                     except AttributeError:
-                        # point?
-                        if item.t < to_t:
-                            filtered_series.append(item)
-            else:
-                if from_t is not None:
-                    # Point or slot, they both have a "t"
-                    if item.t >= from_t:
-                        filtered_series.append(item)
-                if to_t is not None:
-                    try:
-                        # Slot?
-                        print(item.end.t, to_t)
-                        if item.end.t <= to_t:
-                            filtered_series.append(item)
-                    except AttributeError:
-                        # point?
-                        if item.t < to_t:
-                            filtered_series.append(item)
-                if from_t is None and to_t is None:
-                    # Just duplicate
-                    filtered_series = series.duplicate()
+                        # Point?
+                        if item.t >= end_t:
+                            break
+                # If we are here this item has to be added to the slice
+                sliced_series.append(item)
+
+        elif (start_i is not None or end_i is not None):
+            for i, item in enumerate(series):
+                if start_i is not None:
+                    if i < start_i:
+                        continue
+                if end_i is not None:
+                    if i >= end_i:
+                        break
+                # If we are here this item has to be added to the slice
+                sliced_series.append(item)
+        else:
+            sliced_series = series.duplicate()
 
         # Re-set reference data as well
         try:
-            filtered_series._item_data_reference = filtered_series[0].data
-        except AttributeError:
+            sliced_series._item_data_reference = sliced_series[0].data
+        except (IndexError, AttributeError):
             pass
 
-        return filtered_series
+        return sliced_series
 
 
 class Merge(Operation):
@@ -1138,6 +1144,7 @@ rescale = Rescale()
 merge = Merge()
 filter = Filter()
 slice = Slice()
+get = Get()
 select = Select()
 
 

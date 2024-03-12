@@ -1,6 +1,6 @@
 import unittest
 from ..datastructures import TimePoint, DataTimePoint , DataTimeSlot, TimeSeries
-from ..operations import derivative, integral, diff, csum, min, max, avg, filter, select, mavg, normalize, merge, offset, rescale, slice
+from ..operations import derivative, integral, diff, csum, min, max, avg, filter, select, mavg, normalize, merge, offset, rescale, slice, get
 from ..operations import Operation
 
 # Setup logging
@@ -462,6 +462,30 @@ class TestOpertions(unittest.TestCase):
         self.assertEqual(avg(series2), {'value':0.8571428571428571})
 
 
+    def test_get(self):
+        series = TimeSeries()
+        series.append(DataTimePoint(t=0, data={'value':0}))
+        series.append(DataTimePoint(t=60, data={'value':60}))
+        series.append(DataTimePoint(t=120, data={'value':120}))
+        series.append(DataTimePoint(t=180, data={'value':180}))
+
+        # By int (index)
+        self.assertEqual(get(series, 0), series[0])
+        self.assertEqual(get(series, 1), series[1])
+        self.assertEqual(get(series, -1), series[3])
+
+        # By float (epoch timestamp)
+        self.assertEqual(get(series, float(0)), series[0])
+        self.assertEqual(get(series, float(60)), series[1])
+
+        # By datetime
+        self.assertEqual(get(series, series[0].dt), series[0])
+        self.assertEqual(get(series, series[1].dt), series[1])
+
+        # By TimePoint
+        self.assertEqual(get(series, TimePoint(series[0])), series[0])
+        self.assertEqual(get(series, TimePoint(series[1])), series[1])
+
     def test_filter(self):
 
         # Test  data
@@ -495,30 +519,30 @@ class TestOpertions(unittest.TestCase):
         series = TimeSeries(TimePoint(t=60),TimePoint(t=120),TimePoint(t=130),TimePoint(t=140),TimePoint(t=150),TimePoint(t=160))
 
         # Test start/end slicing
-        self.assertEqual(len(slice(series, start=1, end=140)),3)
+        self.assertEqual(len(slice(series, float(1.0), float(140))),3)
 
         # Test start/end slicing from the series
-        self.assertEqual(len(series.slice(start=1, end=140)),3)
-        self.assertEqual(len(series.slice(start=61, end=140)),2)
-        self.assertEqual(len(series.slice(start=61)),5)
-        self.assertEqual(len(series.slice(end=61)),1)
+        self.assertEqual(len(series.slice(float(1), float(140))),3)
+        self.assertEqual(len(series.slice(float(61), float(140))),2)
+        self.assertEqual(len(series.slice(start=float(61))),5)
+        self.assertEqual(len(series.slice(end=float(61))),1)
 
         # Test no keyword arguments
-        self.assertEqual(len(series.slice(61,140)),2)
+        self.assertEqual(len(series.slice(float(61),float(140))),2)
 
         # Test with slots
         slot_series = TimeSeries(DataTimeSlot(start=TimePoint(t=60), end=TimePoint(t=120),data=1),
                                  DataTimeSlot(start=TimePoint(t=120), end=TimePoint(t=180),data=1),
                                  DataTimeSlot(start=TimePoint(t=180), end=TimePoint(t=240),data=1),
                                  DataTimeSlot(start=TimePoint(t=240), end=TimePoint(t=300),data=1))
-        self.assertEqual(len(slice(slot_series,60,120)),1)
-        self.assertEqual(len(slice(slot_series,60,121)),1)
-        self.assertEqual(len(slice(slot_series,60,180)),2)
+        self.assertEqual(len(slice(slot_series,float(60),float(120))),1)
+        self.assertEqual(len(slice(slot_series,float(60),float(121))),1)
+        self.assertEqual(len(slice(slot_series,float(60),float(180))),2)
 
         # Check also time zone
         slot_series.change_tz('Europe/Rome')
-        self.assertEqual(slot_series.slice(60,60).tz, None)
-        self.assertEqual(str(slot_series.slice(60,120).tz), 'Europe/Rome')
+        self.assertEqual(slot_series.slice(float(60),float(60)).tz, None)
+        self.assertEqual(str(slot_series.slice(float(60),float(120)).tz), 'Europe/Rome')
 
 
     def test_select(self):

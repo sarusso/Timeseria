@@ -553,7 +553,7 @@ class TestTimeSeries(unittest.TestCase):
         self.assertEqual(time_series.duplicate().resolution, 60)
         self.assertEqual(time_series[0:2].resolution, 60)
 
-        # Test also that the slicing with the indexes is not messed up (slicing on timestamps in tested in the SLice operation)
+        # Test also that the slicing with the indexes is not messed up (slicing on timestamps in tested in the Slice operation)
         time_series = TimeSeries(TimePoint(t=60),TimePoint(t=120),TimePoint(t=130),TimePoint(t=140),TimePoint(t=150),TimePoint(t=160))
         time_series_as_list = [point for point in time_series]
         self.assertEqual(len(time_series[1:3]), len(time_series_as_list[1:3]))
@@ -682,56 +682,41 @@ class TestTimeSeries(unittest.TestCase):
                                  DataTimePoint(dt=dt(2015,10,25,6,21,0, tz='Europe/Rome'), data={'a':71, 'b':72, 'c':73}), # 1445750460
                                  DataTimePoint(dt=dt(2015,10,25,6,22,0, tz='Europe/Rome'), data={'a':81, 'b':82, 'c':83})) # 1445750520
 
-        # Get item by t
+        # Get item by float (time)
         with self.assertRaises(ValueError):
-            time_series['t=5']
-        self.assertEqual(time_series['t=1445750340'], time_series[4])
+            time_series[5.0]
+        self.assertEqual(time_series[1445750340.0], time_series[4])
+
+        # Get item by datetime
         with self.assertRaises(ValueError):
-            time_series[{'t':5}]
-        self.assertEqual(time_series[{'t':1445750340}], time_series[4])
+            time_series[dt(2035,10,25,0,0,0, tz='Europe/Rome')]
+        self.assertEqual(time_series[dt(2015,10,25,6,19,0, tz='Europe/Rome')], time_series[4])
 
-        # Get item by dt
-        with self.assertRaises(ValueError):
-            time_series['dt=2035-10-25 00:00:00+01:00']
-        self.assertEqual(time_series['dt=2015-10-25 06:19:00+01:00'], time_series[4])
-        self.assertEqual(time_series['dt=2015-10-25T06:19:00+01:00'], time_series[4])
-        with self.assertRaises(ValueError):
-            time_series[{'dt': dt(2035,10,25,0,0,0, tz='Europe/Rome')}]
-        self.assertEqual(time_series[{'dt': dt(2015,10,25,6,19,0, tz='Europe/Rome')}], time_series[4])
+        # Test square brackets notation for slicing (with float)
+        self.assertEqual(len(time_series[1445750340.0:1445750460.0]), 2)
+        self.assertEqual(time_series[1445750340.0:1445750460.0][0], time_series[4])
+        self.assertEqual(time_series[1445750340.0:1445750460.0][1], time_series[5])
 
-        # Test square brackets notation for slicing
-        self.assertEqual(len(time_series['t=1445750340':'t=1445750460']), 2)
-        self.assertEqual(time_series['t=1445750340':'t=1445750460'][0], time_series[4])
-        self.assertEqual(time_series['t=1445750340':'t=1445750460'][1], time_series[5])
+        self.assertEqual(len(time_series[1445750340.0:1445750461.0]), 3)
+        self.assertEqual(time_series[1445750340.0:1445750461.0][0], time_series[4])
+        self.assertEqual(time_series[1445750340.0:1445750461.0][1], time_series[5])
+        self.assertEqual(time_series[1445750340.0:1445750461.0][2], time_series[6])
 
-        self.assertEqual(len(time_series['t=1445750340':'t=1445750461']), 3)
-        self.assertEqual(time_series['t=1445750340':'t=1445750461'][0], time_series[4])
-        self.assertEqual(time_series['t=1445750340':'t=1445750461'][1], time_series[5])
-        self.assertEqual(time_series['t=1445750340':'t=1445750461'][2], time_series[6])
+        self.assertEqual(len(time_series[:1445750340.0:]), 4)
+        self.assertEqual(time_series[1445750340.0:][0], time_series[4])
+        self.assertEqual(time_series[1445750340.0:][1], time_series[5])
+        self.assertEqual(time_series[1445750340.0:][2], time_series[6])
+        self.assertEqual(time_series[1445750340.0:][3], time_series[7])
 
-        self.assertEqual(len(time_series[{'t':1445750340}:{'t':1445750460}]), 2)
-        self.assertEqual(time_series[{'t':1445750340}:{'t':1445750460}][0], time_series[4])
-        self.assertEqual(time_series[{'t':1445750340}:{'t':1445750460}][1], time_series[5])
-
-        self.assertEqual(len(time_series[{'t':1445750340}:{'t':1445750460}]), 2)
-        self.assertEqual(time_series[{'t':1445750340}:{'t':1445750460}][0], time_series[4])
-        self.assertEqual(time_series[{'t':1445750340}:{'t':1445750460}][1], time_series[5])
-
-        self.assertEqual(len(time_series[{'t':1445750340}:]), 4)
-        self.assertEqual(time_series[{'t':1445750340}:][0], time_series[4])
-        self.assertEqual(time_series[{'t':1445750340}:][1], time_series[5])
-        self.assertEqual(time_series[{'t':1445750340}:][2], time_series[6])
-        self.assertEqual(time_series[{'t':1445750340}:][3], time_series[7])
-
-        self.assertEqual(len(time_series[:{'t':1445750340}]), 4)
-        self.assertEqual(time_series[:{'t':1445750340}][0], time_series[0])
-        self.assertEqual(time_series[:{'t':1445750340}][1], time_series[1])
-        self.assertEqual(time_series[:{'t':1445750340}][2], time_series[2])
-        self.assertEqual(time_series[:{'t':1445750340}][3], time_series[3])
+        self.assertEqual(len(time_series[:1445750340.0]), 4)
+        self.assertEqual(time_series[:1445750340.0][0], time_series[0])
+        self.assertEqual(time_series[:1445750340.0][1], time_series[1])
+        self.assertEqual(time_series[:1445750340.0][2], time_series[2])
+        self.assertEqual(time_series[:1445750340.0][3], time_series[3])
 
         # Start = end and start > end
-        self.assertEqual(len(time_series[{'t':1445750340}:{'t':1445750340}]), 0)
-        self.assertEqual(len(time_series[{'t':4445750340}:{'t':1445750340}]), 0)
+        self.assertEqual(len(time_series[1445750340.0:1445750340.0]), 0)
+        self.assertEqual(len(time_series[4445750340.0:1445750340.0]), 0)
 
 
     def test_TimeSeries_with_TimeSlots(self):
