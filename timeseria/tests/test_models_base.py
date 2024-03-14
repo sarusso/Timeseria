@@ -2,7 +2,7 @@ import unittest
 import os
 import tempfile
 from math import sin, cos
-from propertime.utilities import dt
+from propertime.utils import dt
 
 from ..datastructures import TimePoint, DataTimeSlot, DataTimePoint, TimeSeries
 from ..models.base import Model, _KerasModel

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Series transformations as resampling and aggregation."""
 
-from propertime.utilities import dt_from_s, s_from_dt, as_tz
+from propertime.utils import dt_from_s, s_from_dt, as_tz
 from datetime import datetime
 from .datastructures import Point, Slot, DataTimeSlot, TimePoint, DataTimePoint, Series, TimeSeries, _TimeSeriesView
 from .utilities import _compute_data_loss, _compute_validity_regions
@@ -566,8 +566,10 @@ class Resampler(Transformation):
             self.time_unit = unit
         else:
             self.time_unit = TimeUnit(unit)
-        if self.time_unit.is_calendar():
-            raise ValueError('Sorry, calendar time units are not supported by the Resampler (got "{}"). Use the Slotter instead.'.format(self.time_unit))
+
+        unit_type = ''.join([char for char in str(self.time_unit) if not char.isdigit()])
+        if unit_type in ['Y', 'M', 'D']:
+            raise ValueError('Sorry, time units involving calendar components are not supported by the Resampler (got "{}"). Use the Slotter instead.'.format(self.time_unit))
 
         # Set interpolator
         self.interpolator_class=interpolator_class

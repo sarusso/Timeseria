@@ -2,7 +2,7 @@ import unittest
 import datetime
 import os
 import pandas as pd
-from propertime.utilities import dt, timezonize
+from propertime.utils import dt, timezonize
 
 from ..datastructures import Point, TimePoint, DataPoint, DataTimePoint
 from ..datastructures import Slot, TimeSlot, DataSlot, DataTimeSlot
@@ -201,8 +201,8 @@ class TestSlots(unittest.TestCase):
         self.assertEqual(slot.length, 3.2)
 
         # Unit
-        slot = Slot(start=Point(1.5), unit=3.2)
-        self.assertEqual(slot.end, Point(4.7))
+        with self.assertRaises(TypeError):
+            Slot(start=Point(1.5), unit=3.2)
 
         slot = Slot(start=Point(1.5), unit=Unit(3.2))
         self.assertEqual(slot.end, Point(4.7))
@@ -248,10 +248,10 @@ class TestSlots(unittest.TestCase):
         self.assertEqual(slot.t, 60)
         self.assertEqual(slot.dt, dt(1970,1,1,0,1,0)) # 1 minute past midnight Jan 1970 UTC
 
-        slot = TimeSlot(t=60, unit=60)
+        slot = TimeSlot(t=60, unit=TimeUnit('60s'))
         self.assertEqual(slot.start, TimePoint(60))
         self.assertEqual(slot.end, TimePoint(120))
-        self.assertEqual(slot.unit, 60)
+        self.assertEqual(slot.unit, TimeUnit('60s'))
 
         slot = TimeSlot(dt=dt(1970,1,1,0,1,0), unit=TimeUnit('1m'))
         self.assertEqual(slot.start, TimePoint(60))
@@ -520,14 +520,14 @@ class TestTimeSeries(unittest.TestCase):
         self.assertTrue(isinstance(time_series.resolution,TimeUnit))
         self.assertEqual(str(time_series.resolution), '61s')
         self.assertEqual(time_series.resolution, 61) # TimeUnits support math
-        self.assertEqual(time_series.resolution.value, '61s')
+        self.assertEqual(time_series.resolution, '61s')
         self.assertEqual(time_series.resolution.as_seconds(), 61)
 
         # Test resolution: defined, two points, 1 minute
         time_series = TimeSeries(TimePoint(t=60),TimePoint(t=120))
         self.assertEqual(str(time_series.resolution), '1m')
         self.assertEqual(time_series.resolution, 60) # TimeUnits support math
-        self.assertEqual(time_series.resolution.value, '1m')
+        self.assertEqual(time_series.resolution, '1m')
         self.assertEqual(time_series.resolution.as_seconds(), 60)
 
         # Test resolution: variable, three points
@@ -765,12 +765,8 @@ class TestTimeSeries(unittest.TestCase):
                        DataTimeSlot(start=TimePoint(t=180), end=TimePoint(t=240), data=None))
 
         with self.assertRaises(ValueError):
-            TimeSeries(DataTimeSlot(start=TimePoint(t=180), end=TimePoint(t=20), data=24.1),
-                       DataTimeSlot(start=TimePoint(t=60), end=TimePoint(t=120), data=23.8))
-
-        with self.assertRaises(ValueError):
             TimeSeries(DataTimeSlot(start=TimePoint(t=60), end=TimePoint(t=120), data=23.8),
-                       DataTimeSlot(start=TimePoint(t=180), end=TimePoint(t=20), data=24.1))
+                       DataTimeSlot(start=TimePoint(t=180), end=TimePoint(t=240), data=24.1))
 
         with self.assertRaises(ValueError):
             TimeSeries(DataTimeSlot(start=TimePoint(t=60), end=TimePoint(t=120), data=23.8),
@@ -860,9 +856,9 @@ class TestTimeSeries(unittest.TestCase):
         self.assertEqual(time_series['a'][0].data, {'a': 1})
 
         # Test data labels and rename a data label
-        time_series = TimeSeries(DataTimeSlot(dt=dt(2015,10,27,0,0,0), unit='1D', data={'a':23.8, 'b':1}),
-                                 DataTimeSlot(dt=dt(2015,10,28,0,0,0), unit='1D', data={'a':24.1, 'b':2}),
-                                 DataTimeSlot(dt=dt(2015,10,29,0,0,0), unit='1D', data={'a':23.1, 'b':3}))
+        time_series = TimeSeries(DataTimeSlot(dt=dt(2015,10,27,0,0,0), unit=TimeUnit('1D'), data={'a':23.8, 'b':1}),
+                                 DataTimeSlot(dt=dt(2015,10,28,0,0,0), unit=TimeUnit('1D'), data={'a':24.1, 'b':2}),
+                                 DataTimeSlot(dt=dt(2015,10,29,0,0,0), unit=TimeUnit('1D'), data={'a':23.1, 'b':3}))
 
         self.assertEqual(time_series.data_labels(), ['a','b'])
         time_series.rename_data_label('b','c')

@@ -7,7 +7,7 @@ import datetime
 from .utilities import detect_encoding, _sanitize_string, _is_list_of_integers, _to_float
 from .units import TimeUnit
 from .datastructures import TimePoint, DataTimePoint, DataTimeSlot, TimeSeries
-from propertime.utilities import dt_from_str, dt_from_s, s_from_dt, timezonize, now_dt
+from propertime.utils import dt_from_str, dt_from_s, s_from_dt, timezonize, now_dt
 from .exceptions import NoDataException, FloatConversionError, ConsistencyException
 
 # Setup logging

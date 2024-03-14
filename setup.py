@@ -33,7 +33,7 @@ setup(name='timeseria',
                           'scipy >=1.5.4, <2.0.0',
                           'pyppeteer>=0.2.6, <1.0.0',
                           'fitter>=1.7.0, <2.0.0',
-                          'propertime==0.2.0'
+                          'propertime@git+https://github.com/sarusso/Propertime@17a5c9ba3d0de73310f51ff948c4fbaef3720d1c'
                           ],
       extras_require = {
                         'tensorflow': ['tensorflow >=1.15.2, <3.0.0'],

@@ -1,6 +1,6 @@
 import unittest
 import os
-from propertime.utilities import dt, s_from_dt
+from propertime.utils import dt, s_from_dt
 
 from ..utilities import detect_encoding, detect_periodicity, detect_sampling_interval
 from ..utilities import _compute_coverage, _compute_data_loss, _compute_validity_regions

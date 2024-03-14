@@ -7,7 +7,7 @@ from copy import deepcopy
 from pandas import DataFrame
 from datetime import datetime
 from .exceptions import ConsistencyException
-from propertime.utilities import s_from_dt , dt_from_s, timezonize, dt_from_str
+from propertime.utils import s_from_dt , dt_from_s, timezonize, dt_from_str
 from pytz import UTC
 
 # Setup logging
@@ -315,31 +315,28 @@ class Slot():
            unit(Unit): the slot unit.
     """
     __POINT_TYPE__ = Point
+    __UNIT_TYPE__ = Unit
 
     def __init__(self, start, end=None, unit=None):
 
         if not isinstance(start, self.__POINT_TYPE__):
-            raise TypeError('Slot start must be a Point object (got "{}")'.format(start.__class__.__name__))
+            raise TypeError('{} start must be a {} object (got "{}")'.format(self.__class__.__name__, self.__POINT_TYPE__.__name__, start.__class__.__name__))
 
-        # Instantiate unit if not already done
-        if unit and not isinstance(unit, Unit):
-            unit = Unit(unit)
+        if end and not isinstance(end, self.__POINT_TYPE__):
+            raise TypeError('{} end must be a {} object (got "{}")'.format(self.__class__.__name__, self.__POINT_TYPE__.__name__, end.__class__.__name__))
+
+        if unit and not isinstance(unit, self.__UNIT_TYPE__):
+            raise TypeError('{} unit must be a {} object (got "{}")'.format(self.__class__.__name__, self.__UNIT_TYPE__.__name__, unit.__class__.__name__))
 
         if end is None and unit is not None:
             if len(start.coordinates)>1:
                 raise Exception('Sorry, setting a start and a unit only works in unidimensional spaces')
-
-            # Handle start + unit
             end = start + unit
-
-        if not isinstance(end, self.__POINT_TYPE__):
-            raise TypeError('Slot end must be a Point object (got "{}")'.format(end.__class__.__name__))
-
-        # TODO: remove the following check, or make it optional (i.e. not used by TimeSlots)?
-        if len(start.coordinates) != len(end.coordinates):
-            raise ValueError('Slot start and end dimensions must be the same (got "{}" vs "{}")'.format(start.coordinates, end.coordinates))
-        if start == end:
-            raise ValueError('{} start and end must not be the same (got start="{}", end="{}")'.format(self.__class__.__name__, start,end))
+        else:
+            if len(start.coordinates) != len(end.coordinates):
+                raise ValueError('{} start and end dimensions must be the same (got "{}" vs "{}")'.format(self.__class__.__name__,start.coordinates, end.coordinates))
+            if start == end:
+                raise ValueError('{} start and end must not be the same (got start="{}", end="{}")'.format(self.__class__.__name__, start,end))
 
         self.start = start
         self.end   = end
@@ -390,13 +387,13 @@ class Slot():
             return self._unit
         except AttributeError:
             if len(self.start.coordinates) == 1:
-                return Unit(self.end.coordinates[0] - self.start.coordinates[0])
+                return self.__UNIT_TYPE__(self.end.coordinates[0] - self.start.coordinates[0])
             else:
                 values = []
                 for i in range(len(self.start.coordinates)):
                     values.append(self.end.coordinates[i] - self.start.coordinates[i])
 
-                return Unit(values)
+                return self.__UNIT_TYPE__(values)
 
 
 class TimeSlot(Slot):
@@ -409,6 +406,7 @@ class TimeSlot(Slot):
            unit(TimeUnit): the slot time unit."""
 
     __POINT_TYPE__ = TimePoint
+    __UNIT_TYPE__ = TimeUnit
 
     def __init__(self, start=None, end=None, unit=None, **kwargs):
 
@@ -423,32 +421,21 @@ class TimeSlot(Slot):
         if dt:
             start=TimePoint(dt=dt, tz=tz)
 
-        if not isinstance(start, self.__POINT_TYPE__):
-            raise TypeError('Slot start must be a {} object (got "{}")'.format(self.__POINT_TYPE__.__name__, start.__class__.__name__))
-
-        try:
+        # Extra time zone checks
+        if start and end:
             if start.tz != end.tz:
                 raise ValueError('{} start and end must have the same timezone (got start.tz="{}", end.tz="{}")'.format(self.__class__.__name__, start.tz, end.tz))
-        except AttributeError:
-            if end is None:
-                # We are using the Unit, use the start
-                self.tz = start.tz
-            else:
-                # If we don't have a timezone, we don't have TimePoints, the parent will make the Slot creation fail with a TypeError
-                pass
-        else:
-            self.tz = start.tz
-
-        # Convert unit to TimeUnit
-        if unit and not isinstance(unit, TimeUnit):
-            unit = TimeUnit(unit)
 
         # Call parent init
         super(TimeSlot, self).__init__(start=start, end=end, unit=unit)
 
         # If we did not have the end, set its timezone now:
-        if end is None:
-            self.end.change_tz(self.start.tz)
+        #if end is None:
+        #    self.end.change_tz(self.start.tz)
+
+        # Store time zone
+        self.tz = start.tz
+
 
     # Overwrite parent succedes, this has better performance as it checks for only one dimension
     def __succedes__(self, other):
@@ -1301,10 +1288,10 @@ class TimeSeries(Series):
                 else:
                     unit_str = unit_str_pd
 
-                unit=TimeUnit(unit_str)
+                unit_type = ''.join([char for char in unit_str if not char.isdigit()])
 
-                if unit.is_calendar():
-                    logger.info('Assuming a slot time unit of "{}"'.format(unit_str))
+                if unit_type in ['Y', 'M', 'D']:
+                    logger.info('Assuming slots with a slot time unit of "{}"'.format(unit_str))
                     if not items_type:
                         items_type = DataTimeSlot
                     else:
@@ -1316,6 +1303,9 @@ class TimeSeries(Series):
 
             # Now create the points or the slots
             if items_type==DataTimeSlot:
+
+                # Init the unit
+                unit = TimeUnit(unit_str)
 
                 # Create data time points list
                 data_time_slots = []
@@ -1342,7 +1332,7 @@ class TimeSeries(Series):
                             naive_warned = True
                         dt = UTC.localize(dt)
 
-                    data_time_slots.append(DataTimeSlot(dt=dt, unit=TimeUnit(unit_str), data=data))
+                    data_time_slots.append(DataTimeSlot(dt=dt, unit=unit, data=data))
 
                 # Set the list of data time points
                 super(TimeSeries, self).__init__(*data_time_slots, **kwargs)
@@ -1481,8 +1471,10 @@ class TimeSeries(Series):
                         # Set the resolution as seconds for a bit of performance
                         self._resolution_as_seconds = item.t - self.prev_t
 
-                        # Set the resolution
-                        self._resolution = TimeUnit(_to_time_unit_string(item.t - self.prev_t, friendlier=True))
+                        # Set the resolution as time unit (up to the microsecond)
+                        time_diff = item.t - self.prev_t
+                        time_diff = int(time_diff*10000000)/10000000
+                        self._resolution = TimeUnit(_to_time_unit_string(time_diff, friendlier=True))
 
                     else:
                         # If the resolution is constant (not variable), check that it still is
@@ -1521,9 +1513,9 @@ class TimeSeries(Series):
                     # Try for floating point precision errors
                     abort = False
                     try:
-                        if not _is_close(self._resolution.value, item.unit.value):
+                        if not _is_close(self._resolution, item.unit):
                             abort = True
-                    except (TypeError, ValueError):
+                    except (TypeError, ValueError, NotImplementedError):
                         abort = True
                     if abort:
                         raise ValueError('Cannot add slots with a different unit than the series resolution (I have "{}" and you tried to add "{}")'.format(self._resolution, item.unit))

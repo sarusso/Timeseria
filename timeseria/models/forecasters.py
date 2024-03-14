@@ -5,7 +5,7 @@ import copy
 from pandas import DataFrame
 from numpy import array
 from math import sqrt
-from propertime.utilities import now_s, dt_from_s
+from propertime.utils import now_s, dt_from_s
 from datetime import datetime
 
 from ..datastructures import DataTimeSlot, TimePoint, DataTimePoint, Slot, Point, TimeSeries
@@ -316,7 +316,7 @@ class Forecaster(Model):
                             forecast_series.append(series[0].__class__(dt = series[0].dt - series.resolution,
                                                                                data = series[0].data))
                         elif isinstance(series.resolution, Unit):
-                            forecast_series.append(series[0].__class__(dt = dt_from_s(series[0].t - series.resolution.value, tz=series[0].tz),
+                            forecast_series.append(series[0].__class__(dt = dt_from_s(series[0].t - series.resolution, tz=series[0].tz),
                                                                                data = series[0].data))
                         else:
                             forecast_series.append(series[0].__class__(dt = dt_from_s(series[0].t - series.resolution, tz=series[0].tz),
@@ -327,7 +327,7 @@ class Forecaster(Model):
                                                                                unit = series.resolution,
                                                                                data = series[0].data))
                         elif isinstance(series.resolution, Unit):
-                            forecast_series.append(series[0].__class__(dt = dt_from_s(series[0].t - series.resolution.value, tz=series[0].tz),
+                            forecast_series.append(series[0].__class__(dt = dt_from_s(series[0].t - series.resolution, tz=series[0].tz),
                                                                                unit = series.resolution,
                                                                                data = series[0].data))
                         else:

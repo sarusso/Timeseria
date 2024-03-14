@@ -8,7 +8,7 @@
 import os
 import uuid
 import datetime
-from propertime.utilities import dt_from_s, str_from_dt, dt_from_str, s_from_dt
+from propertime.utils import dt_from_s, str_from_dt, dt_from_str, s_from_dt
 from .units import TimeUnit
 from .utilities import is_numerical, os_shell
 try:

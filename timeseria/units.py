@@ -2,7 +2,7 @@
 """Units and TimeUnits, which fully supports calendar arithmetic."""
 
 from .utilities import is_numerical
-from propertime import TimeUnit as PropertimeTimeUnit
+from propertime import TimeSpan
 
 # Setup logging
 import logging
@@ -109,14 +109,14 @@ class Unit(object):
 
 
 
-class TimeUnit(PropertimeTimeUnit, Unit):
+class TimeUnit(TimeSpan, Unit):
     """A unit that can have both fixed (physical) or variable (calendar) time length.
     It can handle precision up to the microsecond and can be added and subtracted with numerical
     values, Time and datetime objects, and other TimeUnits.
 
     Can be initialized both using a numerical value, a string representation, or by explicitly setting
-    years, months, weeks, days, hours, minutes, seconds and microseconds. In the string representation,
-    the mapping is as follows:
+    years, months, weeks, days, hours, minutes and seconds (including sub-second precision).
+    In the string representation, the mapping is as follows:
 
         * ``'Y': 'years'``
         * ``'M': 'months'``
@@ -125,7 +125,6 @@ class TimeUnit(PropertimeTimeUnit, Unit):
         * ``'h': 'hours'``
         * ``'m': 'minutes'``
         * ``'s': 'seconds'``
-        * ``'u': 'microseconds'``
 
     For example, to create a time unit of one hour, the following three are equivalent, where the
     first one uses the numerical value, the second the string representation, and the third explicitly
@@ -136,39 +135,49 @@ class TimeUnit(PropertimeTimeUnit, Unit):
     ``TimeUnit(86400)`` as well.
 
     Args:
-        value: the time unit value, either as seconds (float) or string representation according to the mapping above.
-        years: the time unit years component.
-        weeks: the time unit weeks component.
-        months: the time unit weeks component.
-        days: the time unit days component.
-        hours: the time unit hours component.
-        minutes: the time unit minutes component.
-        seconds: the time unit seconds component.
-        microseconds: the time unit microseconds component.
-        trustme: a boolean switch to skip checks.
+        value: the time unit value, either as seconds (int or float) or as string representation according to the mapping above.
+        years: the time unit years component (int).
+        weeks: the time unit weeks component (int).
+        months: the time unit weeks component (int).
+        days: the time unit days component (int).
+        hours: the time unit hours component (int).
+        minutes: the time unit minutes component (int).
+        seconds: the time unit seconds component, including sub-second precision (int, float).
     """
 
+    # Support value-based init
+    def __init__(self, *args, **kwargs):
+        if args and (isinstance(args[0], int) or isinstance(args[0], float)):
+            args = list(args)
+            args[0] = '{}s'.format(args[0])
+        if kwargs and 'value' in kwargs and (isinstance(kwargs['seconds'], int) or isinstance(kwargs['seconds'], float)) :
+            kwargs['seconds'] = kwargs.pop('value')
+        super(TimeUnit, self).__init__(*args, **kwargs)
 
-    # Support TimePoints
-    def __add__(self, other):
+    # Support for TimePoints and this TimeUnit class
+    def __radd__(self, other):
 
-        # This has to stay here or a circular import will start. TODO: maybe refactor it?
+        # This import has to stay here or a circular import will start. TODO: maybe refactor it?
         from .datastructures import TimePoint
         if isinstance(other, TimePoint):
             return TimePoint(dt=self.shift(other.dt, times=1))
+        elif isinstance(other, self.__class__):
+            return TimeUnit(years        = self.years + other.years,
+                            months       = self.months + other.months,
+                            weeks        = self.weeks + other.weeks,
+                            days         = self.days + other.days,
+                            hours        = self.hours + other.hours,
+                            minutes      = self.minutes + other.minutes,
+                            seconds      = self.seconds + other.seconds)
         else:
-            return super().__add__(other)
+            return super().__radd__(other)
 
     def __rsub__(self, other):
 
-        # This has to stay here or a circular import will start. TODO: maybe refactor it?
+        # This import has to stay here or a circular import will start. TODO: maybe refactor it?
         from .datastructures import TimePoint
         if isinstance(other, TimePoint):
             return TimePoint(dt=self.shift(other.dt, times=-1))
         else:
             return super().__rsub__(other)
-
-
-
-
 

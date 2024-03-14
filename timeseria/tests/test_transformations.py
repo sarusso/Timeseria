@@ -1,6 +1,6 @@
 import unittest
 import os
-from propertime.utilities import dt, s_from_dt, dt_from_str
+from propertime.utils import dt, s_from_dt, dt_from_str
 
 from ..datastructures import DataTimePoint, TimeSeries
 from ..transformations import Resampler, Aggregator
