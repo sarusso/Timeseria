@@ -318,10 +318,12 @@ class DistributionFunction():
         # Populate data
         X = np.linspace(x_min, x_max, 1000)
         Y = [self(x) for x in X]
-        plt.plot(X, Y, 'k', linewidth=2)
+        plt.plot(X, Y, 'k', linewidth=2, label=str(self.dist), color='orange')
 
-        # Set title
-        plt.title('Distribution function: {}'.format(self.dist))
+        # Viz
+        plt.legend(loc="upper right")
+        plt.grid()
+        #plt.title('Distribution function: {}'.format(self.dist))
 
         # Show or return
         if show:

@@ -46,7 +46,7 @@ class TestAnomalyDetectors(unittest.TestCase):
         self.assertAlmostEqual(anomaly_detector.data['error_distribution_params']['loc'], -0.000642, places=5)
         self.assertAlmostEqual(anomaly_detector.data['error_distribution_params']['scale'], 0.21016, places=4)
 
-        result_time_series = anomaly_detector.apply(self.sine_minute_time_series,  index_range=['avg','3_sigma'])
+        result_time_series = anomaly_detector.apply(self.sine_minute_time_series,  index_range=['avg_err','3_sigma'])
 
         # Count how many anomalies were detected
         anomalies_count = 0
@@ -65,7 +65,7 @@ class TestAnomalyDetectors(unittest.TestCase):
         anomaly_detector.fit(time_series, distribution='norm')
 
         # TODO: do some actual testing.. not only that "it works"
-        _  = anomaly_detector.apply(time_series, index_range=['avg','3_sigma'])
+        _  = anomaly_detector.apply(time_series, index_range=['avg_err','3_sigma'])
 
 
     def test_PeriodicAverageAnomalyDetector_save_load(self):
@@ -87,7 +87,7 @@ class TestAnomalyDetectors(unittest.TestCase):
         self.assertAlmostEqual(anomaly_detector.data['error_distribution_params']['loc'], -0.000642, places=5)
         self.assertAlmostEqual(anomaly_detector.data['error_distribution_params']['scale'], 0.21016, places=4)
 
-        _ = loaded_anomaly_detector.apply(self.sine_minute_time_series, index_range=['avg','3_sigma'])
+        _ = loaded_anomaly_detector.apply(self.sine_minute_time_series, index_range=['avg_err','3_sigma'])
 
 
     def test_PeriodicAverageReconstructorAnomalyDetector(self):
@@ -100,11 +100,7 @@ class TestAnomalyDetectors(unittest.TestCase):
         self.assertAlmostEqual(anomaly_detector.data['error_distribution_params']['loc'], -0.0000029020, places=7)
         self.assertAlmostEqual(anomaly_detector.data['error_distribution_params']['scale'], 0.23897, places=4)
 
-        # The prediction errors are not normally distributed, and the default index range of ['avg', 'max'] does not work
-        with self.assertRaises(ValueError):
-            anomaly_detector.apply(self.sine_minute_time_series)
-
-        result_time_series = anomaly_detector.apply(self.sine_minute_time_series, index_range=['avg','3_sigma'])
+        result_time_series = anomaly_detector.apply(self.sine_minute_time_series, index_range=['avg_err','3_sigma'])
 
         # Count how many anomalies were detected
         anomalies_count = 0
@@ -123,7 +119,7 @@ class TestAnomalyDetectors(unittest.TestCase):
         anomaly_detector.fit(time_series, distribution='norm')
 
         # TODO: do some actual testing.. not only that "it works"
-        _  = anomaly_detector.apply(time_series, index_range=['avg','3_sigma'])
+        _  = anomaly_detector.apply(time_series, index_range=['avg_err','3_sigma'])
 
 
 
