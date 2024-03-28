@@ -192,6 +192,7 @@ class PredictiveAnomalyDetector(AnomalyDetector):
         fitter.fit(progress=False)
 
         if summary:
+            # Warning: the summary() function will also generate a plot
             print(fitter.summary())
 
         best_error_distribution = list(fitter.get_best().keys())[0]
@@ -216,9 +217,11 @@ class PredictiveAnomalyDetector(AnomalyDetector):
     def inspect(self, plot=True):
         '''Inspect the model and plot the error distribution'''
 
-        print('Predictive model error (avg): {}'.format(sum(self.data['prediction_errors'])/len(self.data['prediction_errors'])))
-        print('Predictive model error (min): {}'.format(min(self.data['prediction_errors'])))
-        print('Predictive model error (max): {}'.format(max(self.data['prediction_errors'])))
+        abs_prediction_errors = [abs(prediction_error) for prediction_error in self.data['prediction_errors']]
+
+        print('Predictive model avg error (abs): {}'.format(sum(abs_prediction_errors)/len(abs_prediction_errors)))
+        print('Predictive model min error (abs): {}'.format(min(abs_prediction_errors)))
+        print('Predictive model max error (abs): {}'.format(max(abs_prediction_errors)))
 
         print('Error distribution: {}'.format(self.data['error_distribution']))
         print('Error distribution params: {}'.format(self.data['error_distribution_params']))
@@ -229,63 +232,50 @@ class PredictiveAnomalyDetector(AnomalyDetector):
             x_min = min(self.data['prediction_errors'])
             x_max = max(self.data['prediction_errors'])
 
-            # Plot the error distribution function
+            # Instantiate the errro distribution function
             distribution_function = DistributionFunction(self.data['error_distribution'],
                                                          self.data['error_distribution_params'])
+
+            # Get the error distribution function plot
             plt = distribution_function.plot(show=False, x_min=x_min, x_max=x_max)
 
             # Add the histogram to the plot
-            plt.hist(self.data['prediction_errors'], bins=30, density=True, alpha=0.6, color='b')
+            plt.hist(self.data['prediction_errors'], bins=100, density=True, alpha=1, color='steelblue')
 
             # Override title
-            plt.title('Error distribution: {}'.format(self.data['error_distribution']))
+            #plt.title('Error distribution: {}'.format(self.data['error_distribution']))
 
             # Show the plot
             plt.show()
 
-            #p = stats.norm.pdf(x, self.data['gaussian_mu'], self.data['gaussian_sigma'])
-            #plt.plot(x, p, 'k', linewidth=2)
-            #title = "Mu: {:.6f}   Sigma: {:.6f}".format(self.data['gaussian_mu'], self.data['gaussian_sigma'])
-            #plt.title(title)
-            #plt.show()
 
-            # Plot both together
-            #plt.plot(binned_distribution_values, color='black')
-            #plt.plot(binned_real_distribution_values, color='blue')
-            #plt.title('Error distribution function (black) vs real error distribution (blue)')
-            #plt.show()
-
-    def apply(self, series, index_range=['avg','max'], stdevs=None, emphasize=0, rescale_function=None, adherence_index=False, details=False):
+    def apply(self, series, index_range=['avg_err','max_err'], index_type='log', threshold=None, details=False):
 
         """Apply the anomaly detection model on a series.
 
         Args:
             index_range(tuple): the range from which the anomaly index is computed, in terms of prediction
                                 error. Below the lower bound no anomaly will be assumed, and above always
-                                anomalous (1). In the middle it follows the error Gaussian distribution.
-                                Defaults to ['avg', 'max'] as it assumes to work in unsupervised mode.
+                                anomalous (1). In the middle it follows the error distribution.
+                                Defaults to ['avg_err', 'max_err'] as it assumes to work in unsupervised mode.
                                 Other supported values are 'x_sigma' where x is a sigma multiplier, or any
-                                numerical value. A good choice for semi-spervised mode is ['max', '5_sigma'].
+                                numerical value. A good choice for semi-spervised mode is ['max_err', '5_sigma'].
 
-            stdevs(float): the threshold to consider a data point as anomalous (1) or not (0). Same as setting
-                           ``index_range=('x_sigma','x_sigma')`` where x is the threshold. If set, overrides the
-                           index_range argument. It basically discretize the anomaly index to 0/1 values.
+            index_type(str, callable): if to use a logarithmic anomaly index ("log", the default value) which compresses
+                                       the index range so that bigger anomalies stand out more than smaller ones, or if to
+                                       use a linear one ("lin"). Can also support a custom anomaly index as a callable,
+                                       in which case the form must be ``f(x, y, x_start, x_end, y_start, y_end)`` where x
+                                       is the model error, y its value on the distribution curve, and x_start/x_end together
+                                       with y_start/y_end the respective x and y range start and end values, based on the
+                                       range set by the ``index_range`` argument.
 
-            emphasize(int): by how emphasizing the anomalies. It applies an exponential transformation to the index,
-                            so that the range is compressed and "bigger" anomalies stand out more with respect to
-                            "smaller" ones, that are compressed in the lower part of the anomaly index range.
+            threshold(float): a threshold to make the anomaly index categorical (0-1) instead of continuous.
 
-            rescale_function(function): a custom anomaly index rescaling function. From [0,1] to [0,1].
-
-            adherence_index(bool): adds an "adherence" index to the time series, to be intended as how much
-                                   each data point is compatible with the model prediction. It is basically
-                                   the error distribution value of each error value.
-
-            details(bool): if set, adds details to the time series as the predicted value, the error etc.
+            details(bool, list): if to add details to the time series as the predicted value, the error and the
+                                 corresponding error distribution function (dist) value. If set to True, it adds
+                                 all of them, if instead using a list only selected details can be added: "pred"
+                                 for the predicted values, "err" for the error, and "dist" for the error distribution.
         """
-
-        #if inplace:
-        #    raise Exception('Anomaly detection cannot be run inplace')
 
         if len(series.data_labels()) > 1:
             raise NotImplementedError('Multivariate time series are not yet supported')
@@ -295,43 +285,35 @@ class PredictiveAnomalyDetector(AnomalyDetector):
         sigma = self.data['stdev']
 
         # Initialize the error distribution function
-        distribution_function = DistributionFunction(self.data['error_distribution'],
-                                                        self.data['error_distribution_params'])
-        error_distribution_center = 0
+        error_distribution_function = DistributionFunction(self.data['error_distribution'],
+                                                           self.data['error_distribution_params'])
 
         for data_label in series.data_labels():
 
-            # Compute support stuff
+            # Set anomaly index boundaries
             prediction_errors = self.data['prediction_errors']
             abs_prediction_errors = [abs(prediction_error) for prediction_error in prediction_errors]
+            index_range = index_range[:]
 
-            if index_range:
+            for i in range(2):
+                if isinstance(index_range[i], str):
+                    if index_range[i] == 'max_err':
+                        index_range[i] = max(abs_prediction_errors)
+                    elif index_range[i] == 'avg_err':
+                        index_range[i] = sum(abs_prediction_errors)/len(abs_prediction_errors)
+                    elif index_range[i].endswith('_sigma'):
+                        index_range[i] = float(index_range[i].replace('_sigma',''))*sigma
+                    elif index_range[i].endswith('sig'):
+                        index_range[i] = float(index_range[i].replace('sig',''))*sigma
+                    else:
+                        raise ValueError('Unknwon index start or end value "{}"'.format(index_range[i]))
 
-                for i in range(2):
-                    if isinstance(index_range[i], str):
-                        if index_range[i] == 'max':
-                            index_range[i] = max(abs_prediction_errors)
+            x_start = index_range[0]
+            x_end = index_range[1]
 
-                        elif index_range[i] == 'avg':
-                            index_range[i] = sum(abs_prediction_errors)/len(abs_prediction_errors)
-
-                        elif index_range[i].endswith('_sigma'):
-                            index_range[i] = float(index_range[i].replace('_sigma',''))*sigma
-
-                        elif index_range[i].endswith('sig'):
-                            index_range[i] = float(index_range[i].replace('sig',''))*sigma
-
-                x_start = index_range[0]
-                x_end = index_range[1]
-
-                # Compute Normal (N) probabilities for start/end
-                adherence_x_start = distribution_function.adherence(x_start)
-                adherence_x_end = distribution_function.adherence(x_end)
-
-            else:
-                if not stdevs:
-                    raise ValueError('Got no index_range nor stdevs')
-
+            # Compute error distribution function values for index start/end
+            y_start = error_distribution_function(x_start)
+            y_end = error_distribution_function(x_end)
 
             for i, item in enumerate(series):
                 model_window = self.model.window
@@ -345,72 +327,52 @@ class PredictiveAnomalyDetector(AnomalyDetector):
                     if i >  len(series)-self.model.window-1:
                         break
 
-                # New item
+                # Duplicate this sereis item
                 item = deepcopy(item)
 
-                # Compute the anomaly index or threshold
+                # Compute the prediction error index
                 actual, predicted = self._get_actual_and_predicted(series, i, data_label, model_window)
+                prediction_error = abs(actual-predicted)
 
-                #if logs:
-                #    logger.info('{}: {} vs {}'.format(series[i].dt, actual, predicted))
+                # Compute the anomaly index in the given range (which defaults to 0, max_err)
+                # Below the start it means anomaly (0), above always anomaly (1). In the middle it
+                # follows the error distribution, and it is rescaled between 0 and 1.
 
-                prediction_error = actual-predicted
+                x = prediction_error
+                y = error_distribution_function(x)
 
-                # Compute the model adherence probability index
-                if adherence_index:
-                    item.data_indexes['adherence'] = distribution_function(prediction_error)
-
-                # Are threshold/cutoff stdevs defined?
-                if stdevs or 'stdevs' in self.data:
-
+                if x <= x_start:
                     anomaly_index = 0
-
-                    # TODO: performance hit, move me outside the loop
-                    if prediction_error > 0:
-                        error_threshold = error_distribution_center + (sigma * stdevs if stdevs else self.data['stdevs'])
-                        if prediction_error > error_threshold:
-                            anomaly_index = 1
-                    else:
-                        error_threshold = error_distribution_center - (sigma * stdevs if stdevs else self.data['stdevs'])
-                        if prediction_error < error_threshold:
-                            anomaly_index = 1
-
-                    #if logs and anomaly_index == 1:
-                    #    logger.info('Detected anomaly for item @ {} ({}) with AE="{:.3f}..."'.format(item.t, item.dt, abs_prediction_error))
-
+                elif x >= x_end:
+                    anomaly_index = 1
                 else:
-
-                    # Compute the (continuous) anomaly index in the given range (which defaults to 0, max)
-                    # Below the start it means anomaly (0), above always anomaly (1). In the middle it
-                    # follows the error distribution, and it is rescaled between 0 and 1.
-
-                    x = abs(prediction_error)
-
-                    # Adherence (0-1)
-                    adherence_x = distribution_function.adherence(x)
-
-                    if x <= x_start:
-                        anomaly_index = 0
-                    elif x >= x_end:
-                        anomaly_index = 1
-                    else:
+                    if index_type=='lin':
                         try:
-                            anomaly_index = (log10(adherence_x) - log10(adherence_x_start)) / (log10(adherence_x_end) - log10(adherence_x_start))
+                            anomaly_index = 1 - ((y-y_end)/(y_start-y_end))
                         except ValueError as e:
                             if str(e) == 'math domain error':
                                 raise ValueError('Got a math domain error. This is likely due to an error distribution function badly approximating the real error distribution. Try changing it, or using lower index boundaries.') from None
                             else:
                                 raise
-                            #raise ValueError('Got ')
-                            #raise ValueError('adherence_x: {}, adherence_x_start: {}, adherence_x_end: {}'.format(adherence_x, adherence_x_start, adherence_x_end))
+                    elif  index_type=='log':
+                        try:
+                            anomaly_index = (log10(y) - log10(y_start)) / (log10(y_end) - log10(y_start))
+                        except ValueError as e:
+                            if str(e) == 'math domain error':
+                                raise ValueError('Got a math domain error. This is likely due to an error distribution function badly approximating the real error distribution. Try changing it, or using lower index boundaries.') from None
+                            else:
+                                raise
+                    else:
+                        if callable(index_type):
+                            anomaly_index = index_type(x, y, x_start, x_end, y_start, y_end)
+                        else:
+                            raise ValueError('Unknown index type "{}"'.format(index_type))
 
-                    # Do we have to apply any other rescaling?
-                    if rescale_function:
-                        anomaly_index = rescale_function(anomaly_index)
-
-                    # Do we have to emphasize?
-                    if emphasize:
-                        anomaly_index = ((2**(anomaly_index*emphasize))-1)/(((2**emphasize))-1)
+                if threshold is not None:
+                    if anomaly_index < threshold:
+                        anomaly_index = 0
+                    else:
+                        anomaly_index = 1
 
                 # Set the anomaly index
                 item.data_indexes['anomaly'] = anomaly_index
@@ -418,23 +380,27 @@ class PredictiveAnomalyDetector(AnomalyDetector):
                 # Add details?
                 if details:
                     if isinstance(details, list):
-                        if 'abs_error' in details:
-                            item.data['{}_abs_error'.format(data_label)] = abs(prediction_error)
-                        if 'error' in details:
-                            item.data['{}_error'.format(data_label)] = prediction_error
-                        if 'predicted' in details:
-                            item.data['{}_predicted'.format(data_label)] = predicted
+                        if 'pred' in details:
+                            item.data['{}_pred'.format(data_label)] = predicted
+                        if 'err' in details:
+                            item.data['{}_err'.format(data_label)] = prediction_error
+                        if 'dist' in details:
+                            item.data['dist({}_err)'.format(data_label)] = error_distribution_function(prediction_error)
                     else:
-                        #item.data['{}_abs_error'.format(data_label)] = abs_prediction_error
-                        item.data['{}_error'.format(data_label)] = prediction_error
-                        item.data['{}_predicted'.format(data_label)] = predicted
-                        item.data['distribution_function({}_error)'.format(data_label)] = distribution_function(prediction_error)
+                        item.data['{}_pred'.format(data_label)] = predicted
+                        item.data['{}_err'.format(data_label)] = prediction_error
+                        item.data['dist({}_err)'.format(data_label)] = error_distribution_function(prediction_error)
 
                 result_series.append(item)
 
         return result_series
 
 
+    @property
+    def error_distribution_function(self):
+        distribution_function = DistributionFunction(self.data['error_distribution'],
+                                                     self.data['error_distribution_params'])
+        return distribution_function
 
 #===================================
 #   Periodic Average Forecaster
