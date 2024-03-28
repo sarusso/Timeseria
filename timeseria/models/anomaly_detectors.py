@@ -65,18 +65,18 @@ class AnomalyDetector(Model):
 
 
 #===================================
-#  Predictive Anomaly Detector
+#  Model-based Anomaly Detector
 #===================================
 
-class PredictiveAnomalyDetector(AnomalyDetector):
-    """A series anomaly detection model based on a predictive model (either a forecaster or a reconstructor).
+class ModelBasedAnomalyDetector(AnomalyDetector):
+    """An anomaly detection model based on another model (either a forecaster or a reconstructor).
     For each element of the series where the anomaly detection model is applied, the model is asked to make a prediction.
     The predicted and actual values are then compared, and accordingly to the model error distribution, an anomaly index
     in the range 0-1 is computed.
 
     Args:
         path (str): a path from which to load a saved model. Will override all other init settings.
-        model_class(Forecaster,Reconstructor): the predictive model to be used for anomaly detection, if not already set.
+        model_class(Forecaster,Reconstructor): the model to be used for anomaly detection, if not already set.
     """
 
     @property
@@ -101,7 +101,7 @@ class PredictiveAnomalyDetector(AnomalyDetector):
                 self._model_class = model_class
 
         # Call parent init
-        super(PredictiveAnomalyDetector, self).__init__(path=path)
+        super(ModelBasedAnomalyDetector, self).__init__(path=path)
 
         # Load the model as nested model if we have loaded the model
         if self.fitted:
@@ -118,9 +118,9 @@ class PredictiveAnomalyDetector(AnomalyDetector):
     def save(self, path):
 
         # Save the anomaly detection model
-        super(PredictiveAnomalyDetector, self).save(path)
+        super(ModelBasedAnomalyDetector, self).save(path)
 
-        # ..and save the model as nested model
+        # ..and save the inner model as nested model
         self.model.save(path+'/'+str(self.model.id))
 
 
@@ -153,12 +153,12 @@ class PredictiveAnomalyDetector(AnomalyDetector):
         if len(series.data_labels()) > 1:
             raise NotImplementedError('Multivariate time series are not yet supported')
 
-        distribution = kwargs.pop('distribution', None)
-        if not distribution:
-            distributions = kwargs.pop('distributions', fitter_library.fitter.get_common_distributions() +['gennorm'])
+        error_distribution = kwargs.pop('error_distribution', None)
+        if not error_distribution:
+            error_distributions = kwargs.pop('error_distributions', fitter_library.fitter.get_common_distributions() +['gennorm'])
             #distributions = kwargs.pop('distributions', fitter_library.fitter.get_distributions())
         else:
-            distributions = [distribution]
+            error_distributions = [error_distribution]
 
         summary = kwargs.pop('summary', False)
 
@@ -188,7 +188,7 @@ class PredictiveAnomalyDetector(AnomalyDetector):
         self.data['prediction_errors'] = prediction_errors
 
         # Fit the distributions and select the best one
-        fitter = fitter_library.fitter.Fitter(prediction_errors, distributions=distributions)
+        fitter = fitter_library.fitter.Fitter(prediction_errors, distributions=error_distributions)
         fitter.fit(progress=False)
 
         if summary:
@@ -407,7 +407,7 @@ class PredictiveAnomalyDetector(AnomalyDetector):
 #   Predictive Anomaly Detector
 #===================================
 
-class PeriodicAverageAnomalyDetector(PredictiveAnomalyDetector):
+class PeriodicAverageAnomalyDetector(ModelBasedAnomalyDetector):
     """An anomaly detection model based on a periodic average forecaster.
 
     Args:
@@ -423,7 +423,7 @@ class PeriodicAverageAnomalyDetector(PredictiveAnomalyDetector):
 #   Predictive Anomaly Detector
 #===================================
 
-class PeriodicAverageReconstructorAnomalyDetector(PredictiveAnomalyDetector):
+class PeriodicAverageReconstructorAnomalyDetector(ModelBasedAnomalyDetector):
     """An anomaly detection model based on a periodic average reconstructor.
 
     Args:

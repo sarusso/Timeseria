@@ -41,7 +41,7 @@ class TestAnomalyDetectors(unittest.TestCase):
 
         anomaly_detector = PeriodicAverageAnomalyDetector()
 
-        anomaly_detector.fit(self.sine_minute_time_series, periodicity=63, distribution='norm')
+        anomaly_detector.fit(self.sine_minute_time_series, periodicity=63, error_distribution='norm')
 
         self.assertAlmostEqual(anomaly_detector.data['error_distribution_params']['loc'], -0.000642, places=5)
         self.assertAlmostEqual(anomaly_detector.data['error_distribution_params']['scale'], 0.21016, places=4)
@@ -59,10 +59,10 @@ class TestAnomalyDetectors(unittest.TestCase):
         time_series = CSVFileStorage(TEST_DATA_PATH + '/csv/temperature.csv').get(limit=200)
         anomaly_detector = PeriodicAverageAnomalyDetector()
         with self.assertRaises(ValueError):
-            anomaly_detector.fit(time_series, distribution='norm')
+            anomaly_detector.fit(time_series, error_distribution='norm')
 
         time_series = time_series.resample(600)
-        anomaly_detector.fit(time_series, distribution='norm')
+        anomaly_detector.fit(time_series, error_distribution='norm')
 
         # TODO: do some actual testing.. not only that "it works"
         _  = anomaly_detector.apply(time_series, index_range=['avg_err','3_sigma'])
@@ -72,7 +72,7 @@ class TestAnomalyDetectors(unittest.TestCase):
 
         anomaly_detector = PeriodicAverageAnomalyDetector()
 
-        anomaly_detector.fit(self.sine_minute_time_series, periodicity=63, distribution='norm')
+        anomaly_detector.fit(self.sine_minute_time_series, periodicity=63, error_distribution='norm')
 
         # Set model save path
         model_path = TEMP_MODELS_DIR+'/test_anomaly_model'
@@ -95,7 +95,7 @@ class TestAnomalyDetectors(unittest.TestCase):
 
         anomaly_detector = PeriodicAverageReconstructorAnomalyDetector()
 
-        anomaly_detector.fit(self.sine_minute_time_series, periodicity=63, distribution='norm')
+        anomaly_detector.fit(self.sine_minute_time_series, periodicity=63, error_distribution='norm')
 
         self.assertAlmostEqual(anomaly_detector.data['error_distribution_params']['loc'], -0.0000029020, places=7)
         self.assertAlmostEqual(anomaly_detector.data['error_distribution_params']['scale'], 0.23897, places=4)
@@ -113,10 +113,10 @@ class TestAnomalyDetectors(unittest.TestCase):
         time_series = CSVFileStorage(TEST_DATA_PATH + '/csv/temperature.csv').get(limit=200)
         anomaly_detector = PeriodicAverageReconstructorAnomalyDetector()
         with self.assertRaises(ValueError):
-            anomaly_detector.fit(time_series, distribution='norm')
+            anomaly_detector.fit(time_series, error_distribution='norm')
 
         time_series = time_series.resample(600)
-        anomaly_detector.fit(time_series, distribution='norm')
+        anomaly_detector.fit(time_series, error_distribution='norm')
 
         # TODO: do some actual testing.. not only that "it works"
         _  = anomaly_detector.apply(time_series, index_range=['avg_err','3_sigma'])
