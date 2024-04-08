@@ -827,7 +827,7 @@ class ARIMAForecaster(Forecaster, _ARIMAModel):
             raise Exception('Multivariate time series require to have the data_label of the prediction specified')
         data_label=series.data_labels()[0]
 
-        data = array(series.df[data_label])
+        data = array(series.to_df()[data_label])
 
         # Save model and fit
         self.model = sm.tsa.ARIMA(data, (self.p,self.d,self.q))
@@ -875,7 +875,7 @@ class AARIMAForecaster(Forecaster, _ARIMAModel):
             raise Exception('Multivariate time series require to have the data_label of the prediction specified')
         data_label=series.data_labels()[0]
 
-        data = array(series.df[data_label])
+        data = array(series.to_df()[data_label])
 
         # Change some defaults
         trace = kwargs.pop('trace', False)

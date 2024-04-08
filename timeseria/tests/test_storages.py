@@ -1,5 +1,6 @@
 import unittest
 import os
+import tempfile
 from ..datastructures import DataTimePoint, DataTimeSlot, TimeSeries
 from ..storages import CSVFileStorage
 from ..units import TimeUnit
@@ -258,7 +259,7 @@ class TestCSVFileStorage(unittest.TestCase):
 
 
     def test_CSVFileStorage_put(self):
-        import tempfile
+
         with tempfile.TemporaryDirectory() as temp_dir:
 
             # Test on points

@@ -7,8 +7,9 @@ from copy import deepcopy
 from pandas import DataFrame
 from datetime import datetime
 from .exceptions import ConsistencyException
-from propertime.utils import s_from_dt , dt_from_s, timezonize, dt_from_str
+from propertime.utils import s_from_dt , dt_from_s, timezonize, dt_from_str, str_from_dt
 from pytz import UTC
+import json
 
 # Setup logging
 import logging
@@ -416,9 +417,9 @@ class TimeSlot(Slot):
         tz = kwargs.get('tz', None)
 
         # Handle t and dt shortcuts
-        if t:
+        if t is not None:
             start=TimePoint(t=t, tz=tz)
-        if dt:
+        if dt is not None:
             start=TimePoint(dt=dt, tz=tz)
 
         # Extra time zone checks
@@ -666,7 +667,7 @@ class Series(list):
         if self:
             try:
                 if not item.__succedes__(self[-1]):
-                    raise ValueError('Not in succession ("{}" does not succeeds "{}")'.format(item,self[-1])) from None
+                    raise ValueError('Not in succession ("{}" does not succeedes "{}")'.format(item,self[-1])) from None
             except IndexError:
                 raise
             except AttributeError:
@@ -1249,189 +1250,14 @@ class TimeSeries(Series):
 
     def __init__(self, *args, **kwargs):
 
-        # Handle special df kwarg, mainly for back compatibility
-        df = kwargs.pop('df', None)
 
-        # Create from Data Frame
-        if df or (args and (isinstance(args[0], DataFrame))):
-            if not df:
-                df = args[0]
-            items_type = kwargs.pop('items_type', None)
+        # Handle timezone
+        tz = kwargs.pop('tz', None)
+        if tz:
+            self._tz = timezonize(tz)
 
-            # Infer if we have to create points or slots and their unit
-            unit_str_pd=df.index.inferred_freq
-
-            if not unit_str_pd:
-                if not items_type:
-                    logger.info('Cannot infer the freqency of the dataframe, will just create points')
-                    items_type = DataTimePoint
-
-            else:
-
-                # Calendar
-                unit_str_pd=unit_str_pd.replace('A', 'Y')    # Year (end) ?
-                unit_str_pd=unit_str_pd.replace('Y', 'Y')    # Year (end) )
-                unit_str_pd=unit_str_pd.replace('AS', 'Y')   # Year (start)
-                unit_str_pd=unit_str_pd.replace('YS', 'Y')   # Year (start)
-                unit_str_pd=unit_str_pd.replace('MS', 'M')   # Month (start)
-                unit_str_pd=unit_str_pd.replace('M', 'M')    # Month (end)
-                unit_str_pd=unit_str_pd.replace('D', 'D')    # Day
-
-                # Physical
-                unit_str_pd=unit_str_pd.replace('H', 'h')    # Hour
-                unit_str_pd=unit_str_pd.replace('T', 'm')    # Minute
-                unit_str_pd=unit_str_pd.replace('min', 'm')  # Minute
-                unit_str_pd=unit_str_pd.replace('S', 's')    # Second
-
-                if len(unit_str_pd) == 1:
-                    unit_str = '1'+unit_str_pd
-                else:
-                    unit_str = unit_str_pd
-
-                unit_type = ''.join([char for char in unit_str if not char.isdigit()])
-
-                if unit_type in ['Y', 'M', 'D']:
-                    logger.info('Assuming slots with a slot time unit of "{}"'.format(unit_str))
-                    if not items_type:
-                        items_type = DataTimeSlot
-                    else:
-                        if items_type==DataTimePoint:
-                            raise ValueError('Creating points with calendar time units is not supported.')
-                else:
-                    if not items_type:
-                        items_type = DataTimePoint
-
-            # Now create the points or the slots
-            if items_type==DataTimeSlot:
-
-                # Init the unit
-                unit = TimeUnit(unit_str)
-
-                # Create data time points list
-                data_time_slots = []
-
-                # Get data frame labels
-                labels = list(df.columns)
-
-                naive_warned = False
-                for row in df.iterrows():
-
-                    # Set the timestamp
-                    if not isinstance(row[0], datetime):
-                        raise TypeError('A DataFrame with a DateTime index column is required')
-                    dt = row[0]
-
-                    # Prepare data
-                    data = {}
-                    for i,label in enumerate(labels):
-                        data[label] = row[1][i]
-
-                    if dt.tzinfo is None:
-                        if not naive_warned:
-                            logger.warning('Got naive datetimes as dataframe index, assuming UTC.')
-                            naive_warned = True
-                        dt = UTC.localize(dt)
-
-                    data_time_slots.append(DataTimeSlot(dt=dt, unit=unit, data=data))
-
-                # Set the list of data time points
-                super(TimeSeries, self).__init__(*data_time_slots, **kwargs)
-
-            else:
-                # Create data time points list
-                data_time_points = []
-
-                # Get data frame labels
-                labels = list(df.columns)
-
-                naive_warned = False
-                for row in df.iterrows():
-
-                    # Set the timestamp
-                    if not isinstance(row[0], datetime):
-                        raise TypeError('A DataFrame with a DateTime index column is required')
-                    dt = row[0]
-
-                    # Prepare data
-                    data = {}
-                    for i,label in enumerate(labels):
-                        data[label] = row[1][i]
-
-                    if dt.tzinfo is None:
-                        if not naive_warned:
-                            logger.warning('Got naive datetimes as dataframe index, assuming UTC.')
-                            naive_warned = True
-                        dt = UTC.localize(dt)
-
-                    data_time_points.append(DataTimePoint(dt=dt, data=data))
-
-                # Set the list of data time points
-                super(TimeSeries, self).__init__(*data_time_points, **kwargs)
-
-        # Create from a dict
-        elif args and (isinstance(args[0], dict)):
-
-            slot_unit = kwargs.pop('slot_unit', None)
-            if slot_unit and not isinstance(slot_unit, Unit):
-                slot_unit = TimeUnit(slot_unit)
-            series_items = []
-            data_dict =  args[0]
-
-            for key in data_dict:
-                item_dt = None
-                item_t = None
-                if isinstance(key, datetime):
-                    item_dt = key
-                elif isinstance(key, int) or isinstance(key,float):
-                    item_t = key
-                else:
-                    raise ValueError('Cannot handle keys other than int, float or datetime (got "{}"').format(key.__class__.__name__)
-                data = data_dict[key]
-                if not (isinstance(data, list) or isinstance(data, dict)):
-                    data = {'value': data}
-
-                # Create the item
-                if slot_unit:
-                    if item_dt is not None:
-                        series_items.append(DataTimeSlot(dt=item_dt, unit=slot_unit, data=data))
-                    else:
-                        series_items.append(DataTimeSlot(t=item_t, unit=slot_unit, data=data))
-                else:
-                    if item_dt is not None:
-                        series_items.append((DataTimePoint(dt=item_dt, data=data)))
-                    else:
-                        series_items.append((DataTimePoint(t=item_t, data=data)))
-
-            # Set the list of data time points
-            super(TimeSeries, self).__init__(*series_items, **kwargs)
-
-        # Create from file
-        elif args and (isinstance(args[0], str)):
-            file_name = args[0]
-            from .storages import CSVFileStorage
-            storage = CSVFileStorage(file_name, **kwargs)
-            loaded_series = storage.get()
-
-            # TODO: the following might not perform well..
-            series_items = loaded_series.contents()
-            super(TimeSeries, self).__init__(*series_items)
-
-        # Create from list of TimePoints or TimeSlots (just call parent init)
-        else:
-
-            # Handle timezone
-            tz = kwargs.pop('tz', None)
-            if tz:
-                self._tz = timezonize(tz)
-
-            # Call parent init
-            super(TimeSeries, self).__init__(*args, **kwargs)
-
-    def save(self, file_name, overwrite=False, **kwargs):
-        """Save the time series as a CSV file."""
-        from .storages import CSVFileStorage
-        storage = CSVFileStorage(file_name, **kwargs)
-        storage.put(self, overwrite=overwrite)
+        # Call parent init
+        super(TimeSeries, self).__init__(*args, **kwargs)
 
 
     #=========================
@@ -1686,12 +1512,261 @@ class TimeSeries(Series):
 
 
     #=========================
-    #  Conversion-related
+    #  Load/save
     #=========================
 
-    @property
-    def df(self):
-        """The time series as a Pandas data frame object."""
+    @classmethod
+    def load(cls, file_name):
+        """Load a series from a (CSV) file, in Timeseria format."""
+
+        metadata = None
+        with open(file_name) as f:
+            for line in f:
+                if line.startswith('#'):
+                    if line.startswith('# Extra parameters:'):
+                        metadata = json.loads(line.replace('# Extra parameters:',''))
+                else:
+                    break
+        if not metadata:
+            raise ValueError('The fiel provided is not a Timeseria time series data file. Perhaps you wanted to use the from_csv() method?')
+
+        as_points = True if metadata['type'] == 'points' else False
+        as_slots = True if metadata['type'] == 'slots' else False
+        as_tz = metadata['tz']
+        if as_slots:
+            slot_unit = metadata['resolution']
+        else:
+            slot_unit = 'auto'
+
+        from .storages import CSVFileStorage
+        storage = CSVFileStorage(file_name)
+        loaded_series = storage.get(as_points=as_points, as_slots=as_slots, as_tz=as_tz, slot_unit=slot_unit)
+
+        if loaded_series.__class__ == cls:
+            return loaded_series
+        else:
+            # TODO: the following is a huge performance hit...
+            series_items = loaded_series.contents()
+            cls(*series_items)
+
+
+    def save(self, file_name, overwrite=False, **kwargs):
+        """Save the time series as a (CSV) file, in Timeseria format."""
+        from .storages import CSVFileStorage
+        storage = CSVFileStorage(file_name, **kwargs)
+        storage.put(self, overwrite=overwrite)
+
+
+    #=========================
+    #  Conversions
+    #=========================
+
+    @classmethod
+    def from_dict(cls, dictionary, slot_unit=None):
+        """Create a time series from a dictionary."""
+
+        if slot_unit and not isinstance(slot_unit, Unit):
+                slot_unit = TimeUnit(slot_unit)
+        series = cls()
+
+        for key in dictionary:
+            item_dt = None
+            item_t = None
+            if isinstance(key, datetime):
+                item_dt = key
+            elif isinstance(key, int) or isinstance(key,float):
+                item_t = key
+            elif isinstance(key, str):
+                try:
+                    item_t = float(key)
+                except ValueError:
+                    try:
+                        item_t = s_from_dt(dt_from_str(key))
+                    except Exception as e:
+                        raise e from None
+            else:
+                raise ValueError('Cannot handle keys other than int, float or datetime (got "{}"'.format(key.__class__.__name__))
+            data = dictionary[key]
+            if not (isinstance(data, list) or isinstance(data, dict)):
+                data = {'value': data}
+
+            # Create the item
+            if slot_unit:
+                if item_dt is not None:
+                    series.append(DataTimeSlot(dt=item_dt, unit=slot_unit, data=data))
+                else:
+                    series.append(DataTimeSlot(t=item_t, unit=slot_unit, data=data))
+            else:
+                if item_dt is not None:
+                    series.append((DataTimePoint(dt=item_dt, data=data)))
+                else:
+                    series.append((DataTimePoint(t=item_t, data=data)))
+
+        return series 
+
+    def to_dict(self):
+        """Convert a time series to a dictionary."""
+        timeseries_as_dict = {}
+        for item in self:
+            timeseries_as_dict[item.dt] = item.data
+        return timeseries_as_dict
+
+
+    @classmethod
+    def from_json(cls, string, slot_unit=None):
+        """Create a time series from a JSON string."""
+        json_data = json.loads(string)
+        return cls.from_dict(json_data, slot_unit=slot_unit)
+
+
+    def to_json(self):
+        """Convert a time series to a JSON string."""
+        timeseries_as_dict = {}
+        for item in self:
+            timeseries_as_dict[str_from_dt(item.dt)] = item.data
+        return json.dumps(timeseries_as_dict)
+
+
+    @classmethod
+    def from_csv(cls, file_name, *args, **kwargs):
+        """Create a a time series from a CSV file."""
+        from .storages import CSVFileStorage
+        storage = CSVFileStorage(file_name, *args, **kwargs)
+        loaded_series = storage.get()
+
+        if loaded_series.__class__ == cls:
+            return loaded_series
+        else:
+            # TODO: the following is a huge performance hit...
+            series_items = loaded_series.contents()
+            cls(*series_items)
+
+    def to_csv(self, file_name, overwrite=False, **kwargs):
+        """Store the time series as a CSV file."""
+        from .storages import CSVFileStorage
+        storage = CSVFileStorage(file_name, **kwargs)
+        storage.put(self, overwrite=overwrite)
+
+
+    @classmethod
+    def from_df(cls, df, items_type='auto'):
+        """Create a time series from a Pandas data frame."""
+
+        if items_type == 'auto':
+            items_type = None
+
+        # Infer if we have to create points or slots and their unit
+        unit_str_pd=df.index.inferred_freq
+
+        if not unit_str_pd:
+            if not items_type:
+                logger.info('Cannot infer the freqency of the dataframe, will just create points')
+                items_type = DataTimePoint
+
+        else:
+
+            # Calendar
+            unit_str_pd=unit_str_pd.replace('A', 'Y')    # Year (end) ?
+            unit_str_pd=unit_str_pd.replace('Y', 'Y')    # Year (end) )
+            unit_str_pd=unit_str_pd.replace('AS', 'Y')   # Year (start)
+            unit_str_pd=unit_str_pd.replace('YS', 'Y')   # Year (start)
+            unit_str_pd=unit_str_pd.replace('MS', 'M')   # Month (start)
+            unit_str_pd=unit_str_pd.replace('M', 'M')    # Month (end)
+            unit_str_pd=unit_str_pd.replace('D', 'D')    # Day
+
+            # Physical
+            unit_str_pd=unit_str_pd.replace('H', 'h')    # Hour
+            unit_str_pd=unit_str_pd.replace('T', 'm')    # Minute
+            unit_str_pd=unit_str_pd.replace('min', 'm')  # Minute
+            unit_str_pd=unit_str_pd.replace('S', 's')    # Second
+
+            if len(unit_str_pd) == 1:
+                unit_str = '1'+unit_str_pd
+            else:
+                unit_str = unit_str_pd
+
+            unit_type = ''.join([char for char in unit_str if not char.isdigit()])
+
+            if unit_type in ['Y', 'M', 'D']:
+                logger.info('Assuming slots with a slot time unit of "{}"'.format(unit_str))
+                if not items_type:
+                    items_type = DataTimeSlot
+                else:
+                    if items_type==DataTimePoint:
+                        raise ValueError('Creating points with calendar time units is not supported.')
+            else:
+                if not items_type:
+                    items_type = DataTimePoint
+
+        # Now create the points or the slots
+        if items_type==DataTimeSlot:
+
+            # Init the unit
+            unit = TimeUnit(unit_str)
+
+            # Create data time points list
+            data_time_slots = []
+
+            # Get data frame labels
+            labels = list(df.columns)
+
+            naive_warned = False
+            for row in df.iterrows():
+
+                # Set the timestamp
+                if not isinstance(row[0], datetime):
+                    raise TypeError('A DataFrame with a DateTime index column is required')
+                dt = row[0]
+
+                # Prepare data
+                data = {}
+                for i,label in enumerate(labels):
+                    data[label] = row[1][i]
+
+                if dt.tzinfo is None:
+                    if not naive_warned:
+                        logger.warning('Got naive datetimes as dataframe index, assuming UTC.')
+                        naive_warned = True
+                    dt = UTC.localize(dt)
+
+                data_time_slots.append(DataTimeSlot(dt=dt, unit=unit, data=data))
+
+            # Set the list of data time points
+            return cls(*data_time_slots)
+
+        else:
+            # Create data time points list
+            data_time_points = []
+
+            # Get data frame labels
+            labels = list(df.columns)
+
+            naive_warned = False
+            for row in df.iterrows():
+
+                # Set the timestamp
+                if not isinstance(row[0], datetime):
+                    raise TypeError('A DataFrame with a DateTime index column is required')
+                dt = row[0]
+
+                # Prepare data
+                data = {}
+                for i,label in enumerate(labels):
+                    data[label] = row[1][i]
+
+                if dt.tzinfo is None:
+                    if not naive_warned:
+                        logger.warning('Got naive datetimes as dataframe index, assuming UTC.')
+                        naive_warned = True
+                    dt = UTC.localize(dt)
+
+                data_time_points.append(DataTimePoint(dt=dt, data=data))
+
+            # Set the list of data time points
+            return cls(*data_time_points)
+
+    def to_df(self):
+        """Convert the time series as a Pandas data frame."""
         data_labels = self.data_labels()
 
         dump_data_loss = False
@@ -1715,6 +1790,9 @@ class TimeSeries(Series):
         df = df.set_index('Timestamp')
 
         return df
+
+
+
 
     #=========================
     #  Plot-related

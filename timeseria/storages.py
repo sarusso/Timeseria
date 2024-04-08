@@ -160,7 +160,7 @@ class CSVFileStorage(Storage):
         self.series_type = series_type
 
 
-    def get(self, id=None, start=None, end=None, limit=None, as_tz=None, as_points=None, as_slots=None, data_labels='all', data_label=None):
+    def get(self, id=None, start=None, end=None, limit=None, as_tz=None, as_points=None, as_slots=None, data_labels='all', data_label=None, slot_unit='auto'):
         """Load the time series from the CSV file.
 
         Args:
@@ -173,6 +173,7 @@ class CSVFileStorage(Storage):
             as_slots: force generating slots.
             data_labels: get only specific data labels.
             data_label: get only a specific data label.
+            slot_unit: set the unit of the slots.
         """
 
         if id:
@@ -649,6 +650,12 @@ class CSVFileStorage(Storage):
             # and use it.
             series_type = detected_series_type
             unit = detected_unit
+
+        # If we were explicitly given a slot unit, override
+        if slot_unit != 'auto':
+            if not isinstance(slot_unit, TimeUnit):
+                slot_unit = TimeUnit(slot_unit)
+            unit = slot_unit
 
         # Set and timezonize the timezone. In this way the it will be just a pointer.
         if as_tz:
