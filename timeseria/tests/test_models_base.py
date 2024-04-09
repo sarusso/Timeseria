@@ -42,10 +42,10 @@ class TestBaseModelClasses(unittest.TestCase):
 
         # Test parametric
         class ParametricModelMock(Model):
-            def __init__(self, path=None, param1=0):
+            def __init__(self, param1=0):
                 self.data = {}
                 self.data['param1'] = param1
-                super(ParametricModelMock, self).__init__(path)
+                super(ParametricModelMock, self).__init__()
 
         parametric_model = ParametricModelMock(param1=1)
         self.assertTrue(parametric_model.is_parametric())
@@ -53,7 +53,7 @@ class TestBaseModelClasses(unittest.TestCase):
         self.assertEqual(parametric_model.data['param1'], 1)
         parametric_model.save(TEMP_MODELS_DIR+'/parametric_model')
 
-        parametric_model = ParametricModelMock(TEMP_MODELS_DIR+'/parametric_model')
+        parametric_model = ParametricModelMock.load(TEMP_MODELS_DIR+'/parametric_model')
         self.assertTrue(parametric_model.is_parametric())
         self.assertEqual(parametric_model.data['param1'], 1)
 
@@ -126,7 +126,7 @@ class TestBaseModelClasses(unittest.TestCase):
 
         # Save and re-load
         parametric_model.save(TEMP_MODELS_DIR+'/fittable_parametric_model')
-        loaded_parametric_model = FittableParametricModelMock(TEMP_MODELS_DIR+'/fittable_parametric_model')
+        loaded_parametric_model = FittableParametricModelMock.load(TEMP_MODELS_DIR+'/fittable_parametric_model')
         self.assertTrue(loaded_parametric_model.is_parametric())
         self.assertEqual(loaded_parametric_model.data['param1'], 1)
         self.assertEqual(loaded_parametric_model.id, parametric_model.id)

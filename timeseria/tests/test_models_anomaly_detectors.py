@@ -99,7 +99,7 @@ class TestAnomalyDetectors(unittest.TestCase):
 
         anomaly_detector.save(model_path)
 
-        loaded_anomaly_detector = PeriodicAverageAnomalyDetector(model_path)
+        loaded_anomaly_detector = PeriodicAverageAnomalyDetector.load(model_path)
         self.assertEqual(set(anomaly_detector.data.keys()), set(['id', 'model_id', 'resolution', 'data_labels', 'prediction_errors',
                                                               'error_distribution', 'error_distribution_params', 'error_distribution_stats',
                                                               'fitted_at', 'stdev']))

@@ -110,7 +110,7 @@ class TestForecasters(unittest.TestCase):
 
         forecaster.save(model_path)
 
-        loaded_forecaster = PeriodicAverageForecaster(model_path)
+        loaded_forecaster = PeriodicAverageForecaster.load(model_path)
 
         self.assertEqual(forecaster.data['averages'], loaded_forecaster.data['averages'])
 
@@ -324,7 +324,7 @@ class TestForecasters(unittest.TestCase):
         forecaster.save(model_path)
 
         # Load
-        loaded_forecaster = LSTMForecaster(model_path)
+        loaded_forecaster = LSTMForecaster.load(model_path)
 
         # Predict from the loaded model
         predicted_data = loaded_forecaster.predict(sine_minute_time_series)

@@ -532,7 +532,7 @@ class PeriodicAverageForecaster(Forecaster):
     def window(self):
         return self.data['window']
 
-    def __init__(self, path=None, window='auto'):
+    def __init__(self, window='auto'):
 
         # Set window
         if window != 'auto':
@@ -543,11 +543,14 @@ class PeriodicAverageForecaster(Forecaster):
         self._window = window
 
         # Call parent init
-        super(PeriodicAverageForecaster, self).__init__(path=path)
+        super(PeriodicAverageForecaster, self).__init__()
 
-        # If loaded (fitted), convert the average dict keys back to integers
-        if self.fitted:
-            self.data['averages'] = {int(key):value for key, value in self.data['averages'].items()}
+    @classmethod
+    def load(cls, path):
+        model = super().load(path)
+        # Convert the average dict keys back to integers
+        model.data['averages'] = {int(key):value for key, value in model.data['averages'].items()}
+        return model
 
     def fit(self, series, periodicity='auto', dst_affected=False, start=None, end=None, **kwargs):
         """Fit the model on a series.
@@ -705,9 +708,6 @@ class PeriodicAverageForecaster(Forecaster):
 class ProphetForecaster(Forecaster, _ProphetModel):
     """A series forecasting model based on Prophet. Prophet (from Facebook) implements a procedure for forecasting time series data based
     on an additive model where non-linear trends are fit with yearly, weekly, and daily seasonality, plus holiday effects.
-
-    Args:
-        path (str): a path from which to load a saved model. Will override all other init settings.
     """
 
     window = None
@@ -802,7 +802,6 @@ class ARIMAForecaster(Forecaster, _ARIMAModel):
     indicates that the data values have been replaced with the difference between their values and the previous values.
 
     Args:
-        path (str): a path from which to load a saved model. Will override all other init settings.
         p(int): the order of the AR term.
         d(int): the number of differencing required to make the time series stationary.
         q(int): the order of the MA term.
@@ -810,14 +809,14 @@ class ARIMAForecaster(Forecaster, _ARIMAModel):
 
     window = 0
 
-    def __init__(self, path=None, p=1,d=1,q=0): #p=5,d=2,q=5
+    def __init__(self, p=1,d=1,q=0): #p=5,d=2,q=5
         if (p,d,q) == (1,1,0):
             logger.info('You are using ARIMA\'s defaults of p=1, d=1, q=0. You might want to set them to more suitable values when initializing the model.')
         self.p = p
         self.d = d
         self.q = q
         # TODO: save the above in data[]?
-        super(ARIMAForecaster, self).__init__(path)
+        super(ARIMAForecaster, self).__init__()
 
     def _fit(self, series):
 
@@ -860,9 +859,6 @@ class ARIMAForecaster(Forecaster, _ARIMAModel):
 class AARIMAForecaster(Forecaster, _ARIMAModel):
     """A series forecasting model based on Auto-ARIMA. Auto-ARIMA models set automatically the best values for the
     p, d and q parameters, trying different values and checking which ones perform better.
-
-    Args:
-        path (str): a path from which to load a saved model. Will override all other init settings.
     """
 
     window = 0
@@ -920,7 +916,6 @@ class LSTMForecaster(Forecaster, _KerasModel):
     """A series forecasting model based on a LSTM neural network. LSTMs are artificial neutral networks particularly well suited for time series forecasting tasks.
 
     Args:
-        path(str): a path from which to load a saved model. Will override all other init settings.
         window (int): the window length.
         features(list): which features to use. Supported values are:
             ``values`` (use the data values),
@@ -934,28 +929,16 @@ class LSTMForecaster(Forecaster, _KerasModel):
     def window(self):
         return self.data['window']
 
-    def __init__(self, path=None, window=3, features=['values'], neurons=128, keras_model=None):
-
-        # TODO: move this at the end of the init.
-        super(LSTMForecaster, self).__init__(path=path)
-
-        # Did the init load a model?
-        try:
-            if self.fitted:
-
-                # Load the kears model as well
-                self._load_keras_model(path)
-
-                # No need to proceed further
-                return
-        except AttributeError:
-            pass
+    def __init__(self, window=3, features=['values'], neurons=128, keras_model=None):
 
         if window == 3:
             logger.info('Using default window size of 3')
 
         if features == ['values']:
             logger.info('Using default features: values')
+
+        # Call parent init
+        super(LSTMForecaster, self).__init__()
 
         # Set window, neurons, features
         self.data['window'] = window
@@ -964,6 +947,13 @@ class LSTMForecaster(Forecaster, _KerasModel):
 
         # Set external model architecture if any
         self.keras_model = keras_model
+
+    @classmethod
+    def load(cls, path):
+        model = super().load(path)
+        # Load the Kears model as well
+        model._load_keras_model(path)
+        return model
 
     def save(self, path):
 

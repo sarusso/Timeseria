@@ -36,11 +36,7 @@ except (ImportError,AttributeError):
 #===================================
 
 class AnomalyDetector(Model):
-    """A generic anomaly detection model.
-
-    Args:
-        path (str): a path from which to load a saved model. Will override all other init settings.
-    """
+    """A generic anomaly detection model."""
 
     def predict(self, series, *args, **kwargs):
         """Disabled. Anomaly detectors can be used only with the ``apply()`` method."""
@@ -75,7 +71,6 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
     in the range 0-1 is computed.
 
     Args:
-        path (str): a path from which to load a saved model. Will override all other init settings.
         model_class(Forecaster,Reconstructor): the model to be used for anomaly detection, if not already set.
     """
 
@@ -86,7 +81,7 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
         except AttributeError:
             raise NotImplementedError('No model class set for this anomaly detector')
 
-    def __init__(self, path=None, model_class=None, *args, **kwargs):
+    def __init__(self, model_class=None, *args, **kwargs):
 
         # Handle the model_class
         try:
@@ -101,19 +96,22 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
                 raise ValueError('The model_class was given in the init but it is already set in the anomaly detector')
 
         # Call parent init
-        super(ModelBasedAnomalyDetector, self).__init__(path=path)
-
-        # Load the model as nested model if we have loaded the model
-        if self.fitted:
-            # Note: the model_id is the nested folder where the model is saved
-            model_dir = path+'/'+self.data['model_id']
-            self.model= self.model_class(model_dir)
-        else:
-            # Initialize the predictive model
-            self.model = self.model_class(*args, **kwargs)
+        super(ModelBasedAnomalyDetector, self).__init__()
+ 
+        # Initialize the internal model
+        self.model = self.model_class(*args, **kwargs)
 
         # Finally, set the id of the model in the data
         self.data['model_id'] = self.model.data['id']
+
+    @classmethod
+    def load(cls, path):
+        model = super().load(path)
+        # Load the internal model as well
+        # Note: the model_id is the nested folder where the model is saved
+        internal_model_dir = path+'/'+model.data['model_id']
+        model.model= model.model_class.load(internal_model_dir)
+        return model
 
     def save(self, path):
 

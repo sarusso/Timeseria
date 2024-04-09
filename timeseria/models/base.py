@@ -44,7 +44,7 @@ class Model():
         path (optional, str): a path from which to load a saved model. Will override all other init settings. Only for parametric models.
     """
 
-    def __init__(self, path=None):
+    def __init__(self):
 
         # Set type
         try:
@@ -65,30 +65,37 @@ class Model():
             # the model is parametric.
             self._type = 'parametric'
 
+        # Set the model ID
+        id = str(uuid.uuid4())
+        self.fitted = False
+        try:
+            self.data['id'] = id
+        except AttributeError:
+            self.data = {'id': id}
+
+    @classmethod
+    def load(cls, path):
         # Do we have to load the model (if parametric?)
-        if self.is_parametric():
-            if path:
-                with open(path+'/data.json', 'r') as f:
-                    self.data = json.loads(f.read())
+        #if not cls.is_parametric():
+        #    raise ValueError('Loading a non-parametric model from a path does not make sense')
 
-                # TODO: the "fitted" does not apply for models with parameters but with no fit.. fix me.
-                self.fitted = True
+        # Create the model
+        model = cls()
 
-                # Convert resolution to TimeUnit if any. TODO: right now only TimeSeries have the resolution,
-                # but might change in case of adding the resolution attribute also to generic series.
-                if 'resolution' in self.data:
-                    self.data['resolution'] = TimeUnit(self.data['resolution'])
+        # Set the data (replaces the model ID also)
+        with open(path+'/data.json', 'r') as f:
+            model.data = json.loads(f.read())
 
-            else:
-                id = str(uuid.uuid4())
-                self.fitted = False
-                try:
-                    self.data['id'] = id
-                except AttributeError:
-                    self.data = {'id': id}
-        else:
-            if path:
-                raise ValueError('Loading a non-parametric model from a path does not make sense')
+        # TODO: the "fitted" does not apply for models with parameters but with no fit.. fix me.
+        model.fitted = True
+
+        # Convert resolution to TimeUnit if any. TODO: right now only TimeSeries have the resolution,
+        # but might change in case of adding the resolution attribute also to generic series.
+        if 'resolution' in model.data:
+            model.data['resolution'] = TimeUnit(model.data['resolution'])
+
+        return model
+
 
     @property
     def id(self):
