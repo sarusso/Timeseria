@@ -967,8 +967,8 @@ class Merge(Operation):
 
         # Checks
         for i, series in enumerate(seriess):
-            #if not isinstance(arg, DataTimeSlotSeries):
-            #    raise TypeError('Argument #{} is not of type DataTimeSlotSeries, got "{}"'.format(i, series.__class__.__name__))
+            if series.resolution == 'variable':
+                raise ValueError('Cannot merge variable resolution series')
             if resolution is None:
                 resolution = series.resolution
             else:
@@ -978,10 +978,10 @@ class Merge(Operation):
                         # Handle floating point precision issues
                         if _is_close(series.resolution, resolution):
                             abort = False
-                    except (ValueError,TypeError):
+                    except (ValueError,TypeError, NotImplementedError):
                         pass
                     if abort:
-                        raise ValueError('DataTimeSlotSeries have different units, cannot merge')
+                        raise ValueError('Series have different resolutions ("{}" vs "{}"), cannot merge'.format(resolution, series.resolution))
 
             # Find min and max epoch for each series (aka start-end points)
             seriess_starting_points_t.append(series[0].t)
