@@ -93,12 +93,12 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
             self.model_class
         except NotImplementedError:
             if not model_class:
-                raise ValueError('The model_class is not set in the anomaly detector nor given in the init')
+                raise ValueError('The model_class is not set in the anomaly detector nor given in the init') from None
+            else:
+                self._model_class = model_class
         else:
             if model_class:
                 raise ValueError('The model_class was given in the init but it is already set in the anomaly detector')
-            else:
-                self._model_class = model_class
 
         # Call parent init
         super(ModelBasedAnomalyDetector, self).__init__(path=path)

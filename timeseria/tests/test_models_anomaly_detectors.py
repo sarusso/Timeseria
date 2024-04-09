@@ -3,7 +3,9 @@ import os
 import tempfile
 from math import sin
 from ..datastructures import TimePoint, DataTimeSlot, DataTimePoint, TimeSeries
-from ..models.anomaly_detectors import PeriodicAverageReconstructorAnomalyDetector, PeriodicAverageAnomalyDetector
+from ..models.forecasters import PeriodicAverageForecaster
+from ..models.reconstructors import PeriodicAverageReconstructor
+from ..models.anomaly_detectors import ModelBasedAnomalyDetector, PeriodicAverageReconstructorAnomalyDetector, PeriodicAverageAnomalyDetector
 from ..storages import CSVFileStorage
 
 # Setup logging
@@ -34,6 +36,24 @@ class TestAnomalyDetectors(unittest.TestCase):
                 value = sin(i/10.0)
 
             self.sine_minute_time_series.append(DataTimeSlot(start=TimePoint(i*60), end=TimePoint((i+1)*60), data={'value':value}))
+
+
+    def test_ModelBasedAnomalyDetector(self):
+
+        anomaly_detector = ModelBasedAnomalyDetector(model_class=PeriodicAverageForecaster)
+        anomaly_detector.fit(self.sine_minute_time_series, periodicity=63, error_distribution='norm')
+        result_time_series = anomaly_detector.apply(self.sine_minute_time_series,  index_range=['avg_err','3_sigma'])
+        self.assertEqual(len(result_time_series),936)
+        self.assertAlmostEqual(result_time_series[0].data_indexes['anomaly'], 0.023177634)
+        self.assertEqual(result_time_series[236].data_indexes['anomaly'], 1)
+
+        anomaly_detector = ModelBasedAnomalyDetector(model_class=PeriodicAverageReconstructor)
+        anomaly_detector.fit(self.sine_minute_time_series, periodicity=63, error_distribution='norm')
+        result_time_series = anomaly_detector.apply(self.sine_minute_time_series,  index_range=['avg_err','3_sigma'])
+        self.assertEqual(len(result_time_series),997)
+        self.assertEqual(result_time_series[0].data_indexes['anomaly'], 0)
+        self.assertAlmostEqual(result_time_series[5].data_indexes['anomaly'], 0.001868259)
+        self.assertEqual(result_time_series[298].data_indexes['anomaly'], 1)
 
 
     def test_PeriodicAverageAnomalyDetector(self):
