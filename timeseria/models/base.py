@@ -122,6 +122,7 @@ class Model():
 
     @staticmethod
     def fit_function(fit_function):
+        """:meta private:"""
         @functools.wraps(fit_function)
         def do_fit(self, series, *args, **kwargs):
 
@@ -161,6 +162,7 @@ class Model():
 
     @staticmethod
     def predict_function(predict_function):
+        """:meta private:"""
         @functools.wraps(predict_function)
         def do_predict(self, series, *args, **kwargs):
 
@@ -194,6 +196,7 @@ class Model():
 
     @staticmethod
     def apply_function(apply_function):
+        """:meta private:"""
         @functools.wraps(apply_function)
         def do_apply(self, series, *args, **kwargs):
 
@@ -227,6 +230,7 @@ class Model():
 
     @staticmethod
     def evaluate_function(evaluate_function):
+        """:meta private:"""
         @functools.wraps(evaluate_function)
         def do_evaluate(self, series, *args, **kwargs):
 
