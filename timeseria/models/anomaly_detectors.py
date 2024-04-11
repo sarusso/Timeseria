@@ -247,7 +247,7 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
             # Show the plot
             plt.show()
 
-
+    @Model.apply_function
     def apply(self, series, index_range=['avg_err','max_err'], index_type='log', threshold=None, multivariate_index_strategy='max', details=False):
 
         """Apply the anomaly detection model on a series.

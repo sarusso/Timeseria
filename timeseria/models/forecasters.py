@@ -110,12 +110,9 @@ class Forecaster(Model):
 
         return forecast
 
-    def apply(self, series, steps=1, *args, **kwargs):
+    @Model.apply_function
+    def apply(self, series, steps=1, inplace=False):
         """Apply the forecast on the series for n steps-ahead."""
-        return super(Forecaster, self).apply(series, steps, *args, **kwargs)
-
-    def _apply(self, series, steps=1, inplace=False):
-
         if not inplace:
             series = series.duplicate()
 
@@ -335,7 +332,7 @@ class Forecaster(Model):
                     processed_samples = evaluate_samples
 
                     # Apply the forecasting model with a length equal to the original series minus the first element
-                    self._apply(forecast_series, steps=evaluate_samples, inplace=True)
+                    self.apply(forecast_series, steps=evaluate_samples, inplace=True)
 
                     # Save the model and the original value to be compared later on. Create the arrays by skipping the fist item
                     # and move through the forecast time series comparing with the input time series, shifted by one since in the
@@ -391,7 +388,7 @@ class Forecaster(Model):
                             #forecast_series.append(series[j])
 
                         # Apply the forecasting model
-                        self._apply(forecast_series, steps=steps_round, inplace=True)
+                        self.apply(forecast_series, steps=steps_round, inplace=True)
 
                         # Plot results time series?
                         if plots:

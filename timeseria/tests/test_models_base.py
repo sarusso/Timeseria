@@ -74,7 +74,8 @@ class TestBaseModelClasses(unittest.TestCase):
             @Model.predict_function
             def predict(self, series):
                 return series
-            def _apply(self, series):
+            @Model.apply_function
+            def apply(self, series):
                 return series
             def _evaluate(self, series):
                 return {'grade': 'A'}

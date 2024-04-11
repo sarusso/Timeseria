@@ -192,37 +192,38 @@ class Model():
         """Call the model predict logic on a series."""
         raise NotImplementedError('Predicting with this model is not implemented')
 
+    @staticmethod
+    def apply_function(apply_function):
+        @functools.wraps(apply_function)
+        def do_apply(self, series, *args, **kwargs):
+
+            # Ensure the model is fitted if it has to.
+            if self.is_fit_implemented() and not self.fitted:
+                raise NotFittedError()
+
+            # Check data
+            if not isinstance(series, TimeSeries):
+                raise TypeError('Models work only with TimeSeries data for now (got "{}")'.format(series.__class__.__name__))
+
+            # If TimeSeries data, check it
+            if isinstance(series, TimeSeries):
+                _check_time_series(series)
+                if self.is_parametric():
+                    if isinstance(series.items_type, Point) and len(series) == 1:
+                        # Do not check if the data is a point time series and has only one item
+                        pass
+                    else:
+                        _check_resolution(series, self.data['resolution'])
+                    _check_data_labels(series, self.data['data_labels'])
+
+            # Call apply logic
+            return apply_function(self, series, *args, **kwargs)
+
+        return do_apply
 
     def apply(self, series, *args, **kwargs):
-        """Apply the model on a series."""
-
-        # Check if apply logic is implemented
-        try:
-            self._apply
-        except AttributeError:
-            raise NotImplementedError('Applying this model is not implemented') from None
-
-        # Ensure the model is fitted if it has to.
-        if self.is_fit_implemented() and not self.fitted:
-            raise NotFittedError()
-
-        # Check data
-        if not isinstance(series, TimeSeries):
-            raise TypeError('Models work only with TimeSeries data for now (got "{}")'.format(series.__class__.__name__))
-
-        # If TimeSeries data, check it
-        if isinstance(series, TimeSeries):
-            _check_time_series(series)
-            if self.is_parametric():
-                if isinstance(series.items_type, Point) and len(series) == 1:
-                    # Do not check if the data is a point time series and has only one item
-                    pass
-                else:
-                    _check_resolution(series, self.data['resolution'])
-                _check_data_labels(series, self.data['data_labels'])
-
-        # Call apply logic
-        return self._apply(series, *args, **kwargs)
+        """Call the model apply logic on a series."""
+        raise NotImplementedError('Applying this model is not implemented')
 
     def evaluate(self, series, *args, **kwargs):
         """Evaluate the model on a series."""
