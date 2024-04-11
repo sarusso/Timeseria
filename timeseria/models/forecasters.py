@@ -43,10 +43,10 @@ except ImportError:
 #======================
 
 class Forecaster(Model):
-    """A generic series forecasting model. Besides the ``predict()`` and  ``apply()`` methods, it also provides a ``forecast()``
+    """A generic series forecasting model. Besides the ``predict()`` and  ``apply()`` methods, it also has a ``forecast()``
     method which, in case of nested data structures (i.e. DataPoint or DataSlot) allows to get the full forecasted points
-    or slots instead of just the raw, inner data values returned by the ``predict()``. In case of plain data structures (e.g. a list),
-    the ``forecast()`` method is instead equivalent to the ``predict()``.
+    or slots instead of just the raw, inner data values returned by the ``predict()``. In case of plain data structures
+    (e.g. a list), the ``forecast()`` method is instead equivalent to the ``predict()``.
 
     Series resolution and data labels consistency are enforced between all methods and save/load operations.
 
@@ -54,27 +54,8 @@ class Forecaster(Model):
         path (str): a path from which to load a saved model. Will override all other init settings.
     """
 
-    def predict(self, series, steps=1, *args, **kwargs):
-        "Predict n steps-ahead forecast data values."
-
-        # Check series # TODO: this check here is redundant, as already performed in the parent predict(),
-        # but otherwise the following len check might fail.
-        if not isinstance(series, TimeSeries):
-            raise NotImplementedError('Models work only with TimeSeries data for now (got "{}")'.format(series.__class__.__name__))
-
-        # Check if the input series is shorter than the window, if any.
-        # Note that nearly all forecasters use windows, at least of one point.
-        try:
-            if len(series) < self.data['window']:
-                raise ValueError('The data length ({}) is shorter than the model window ({}), it must be at least equal.'.format(len(series), self.data['window']))
-        except KeyError:
-            pass
-
-        # Call parent predict
-        return super(Forecaster, self).predict(series, steps, *args, **kwargs)
-
     def forecast(self, series, steps=1, forecast_start=None):
-        """Forecast n steps-ahead, on some data."""
+        """Forecast n steps-ahead"""
 
         # Check series
         if not isinstance(series, TimeSeries):
@@ -129,12 +110,9 @@ class Forecaster(Model):
 
         return forecast
 
-    def apply(self, series, steps=1, *args, **kwargs):
+    @Model.apply_function
+    def apply(self, series, steps=1, inplace=False):
         """Apply the forecast on the series for n steps-ahead."""
-        return super(Forecaster, self).apply(series, steps, *args, **kwargs)
-
-    def _apply(self, series, steps=1, inplace=False):
-
         if not inplace:
             series = series.duplicate()
 
@@ -176,7 +154,8 @@ class Forecaster(Model):
         else:
             return None
 
-    def evaluate(self, series, steps='auto', limit=None, plot=False, plots=False, metrics=['RMSE', 'MAE'], details=False, start=None, end=None, evaluation_series=False, **kwargs):
+    @Model.evaluate_function
+    def evaluate(self, series, steps='auto', limit=None, plots=False, plot=False, metrics=['RMSE', 'MAE'], details=False, start=None, end=None, evaluation_series=False, **kwargs):
         """Evaluate the forecaster on a series.
 
         Args:
@@ -198,9 +177,6 @@ class Forecaster(Model):
             end(float, datetime): evaluation end (epoch timestamp or datetime).
             evaluation_series(bool): if to add to the results an evaluation timeseirs containing the eror metrics. Defaulted to false.
         """
-        return super(Forecaster, self).evaluate(series, steps, limit, plots, plot, metrics, details, start, end, evaluation_series, **kwargs)
-
-    def _evaluate(self, series, steps='auto', limit=None, plots=False, plot=False, metrics=['RMSE', 'MAE'], details=False, start=None, end=None, evaluation_series=False, **kwargs):
 
         if len(series.data_labels()) > 1:
             raise NotImplementedError('Sorry, evaluating models built for multivariate time series is not supported yet')
@@ -354,7 +330,7 @@ class Forecaster(Model):
                     processed_samples = evaluate_samples
 
                     # Apply the forecasting model with a length equal to the original series minus the first element
-                    self._apply(forecast_series, steps=evaluate_samples, inplace=True)
+                    self.apply(forecast_series, steps=evaluate_samples, inplace=True)
 
                     # Save the model and the original value to be compared later on. Create the arrays by skipping the fist item
                     # and move through the forecast time series comparing with the input time series, shifted by one since in the
@@ -410,7 +386,7 @@ class Forecaster(Model):
                             #forecast_series.append(series[j])
 
                         # Apply the forecasting model
-                        self._apply(forecast_series, steps=steps_round, inplace=True)
+                        self.apply(forecast_series, steps=steps_round, inplace=True)
 
                         # Plot results time series?
                         if plots:
@@ -552,6 +528,7 @@ class PeriodicAverageForecaster(Forecaster):
         model.data['averages'] = {int(key):value for key, value in model.data['averages'].items()}
         return model
 
+    @Forecaster.fit_function
     def fit(self, series, periodicity='auto', dst_affected=False, start=None, end=None, **kwargs):
         """Fit the model on a series.
 
@@ -561,9 +538,6 @@ class PeriodicAverageForecaster(Forecaster):
             start(float, datetime): fit start (epoch timestamp or datetime).
             end(float, datetime): fit end (epoch timestamp or datetime).
         """
-        return super(PeriodicAverageForecaster, self).fit(series, periodicity, dst_affected, start, end, **kwargs)
-
-    def _fit(self, series, periodicity='auto', dst_affected=False, start=None, end=None, **kwargs):
 
         if len(series.data_labels()) > 1:
             raise NotImplementedError('Multivariate time series are not yet supported')
@@ -639,7 +613,11 @@ class PeriodicAverageForecaster(Forecaster):
 
         logger.debug('Processed %s items', processed)
 
-    def _predict(self, series, steps=1, from_i=None):
+    @Forecaster.predict_function
+    def predict(self, series, steps=1, from_i=None):
+
+        if len(series) < self.data['window']:
+            raise ValueError('The series length ({}) is shorter than the model window ({})'.format(len(series), self.data['window']))
 
         # Univariate is enforced by the fit
         data_label = self.data['data_labels'][0]
@@ -710,7 +688,8 @@ class ProphetForecaster(Forecaster, _ProphetModel):
 
     window = None
 
-    def _fit(self, series, start=None, end=None, **kwargs):
+    @Forecaster.fit_function
+    def fit(self, series, start=None, end=None, **kwargs):
 
         if len(series.data_labels()) > 1:
             raise Exception('Multivariate time series are not yet supported')
@@ -757,7 +736,8 @@ class ProphetForecaster(Forecaster, _ProphetModel):
         # Prophet, as the ARIMA models, has no window
         self.data['window'] = 0
 
-    def _predict(self, data, steps=1):
+    @Forecaster.predict_function
+    def predict(self, data, steps=1):
 
         series = data
 
@@ -816,7 +796,8 @@ class ARIMAForecaster(Forecaster, _ARIMAModel):
         # TODO: save the above in data[]?
         super(ARIMAForecaster, self).__init__()
 
-    def _fit(self, series):
+    @Forecaster.fit_function
+    def fit(self, series):
 
         import statsmodels.api as sm
 
@@ -836,7 +817,8 @@ class ARIMAForecaster(Forecaster, _ARIMAModel):
         # The ARIMA models, as Prophet, have no window
         self.data['window'] = 0
 
-    def _predict(self, data, steps=1):
+    @Forecaster.predict_function
+    def predict(self, data, steps=1):
 
         series = data
 
@@ -861,7 +843,8 @@ class AARIMAForecaster(Forecaster, _ARIMAModel):
 
     window = 0
 
-    def _fit(self, series, **kwargs):
+    @Forecaster.fit_function
+    def fit(self, series, **kwargs):
 
         import pmdarima as pm
 
@@ -894,7 +877,8 @@ class AARIMAForecaster(Forecaster, _ARIMAModel):
         # The ARIMA models, as Prophet, have no window
         self.data['window'] = 0
 
-    def _predict(self, series, steps=1):
+    @Forecaster.predict_function
+    def predict(self, series, steps=1):
 
         data_label = self.data['data_labels'][0]
 
@@ -948,20 +932,18 @@ class LSTMForecaster(Forecaster, _KerasModel):
 
     @classmethod
     def load(cls, path):
+        # Override the load method to load the Keras model as well
         model = super().load(path)
-        # Load the Kears model as well
         model._load_keras_model(path)
         return model
 
     def save(self, path):
-
-        # Call parent save
+        # Override the save method to load the Keras model as well
         super(LSTMForecaster, self).save(path)
-
-        # Now save the Keras model itself
         self._save_keras_model(path)
 
-    def _fit(self, series, start=None, end=None, verbose=False, epochs=30, normalize=True, **kwargs):
+    @Forecaster.fit_function
+    def fit(self, series, start=None, end=None, verbose=False, epochs=30, normalize=True, **kwargs):
 
         # Handle start/end
         if start is not None:
@@ -1027,7 +1009,11 @@ class LSTMForecaster(Forecaster, _KerasModel):
         # Fit
         self.keras_model.fit(array(window_features), array(target_values_vector), epochs=epochs, verbose=verbose)
 
-    def _predict(self, series, steps=1, from_i=None, verbose=False):
+    @Forecaster.predict_function
+    def predict(self, series, steps=1, from_i=None, verbose=False):
+
+        if len(series) < self.data['window']:
+            raise ValueError('The series length ({}) is shorter than the model window ({})'.format(len(series), self.data['window']))
 
         if steps>1:
             raise NotImplementedError('This forecaster does not support multi-step predictions.')

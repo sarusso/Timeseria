@@ -196,15 +196,15 @@ class TestReconstructors(unittest.TestCase):
         reconstructor.fit(time_series)
 
         # Predict
-        predicted_data = reconstructor._predict(time_series, from_i=2, to_i=5)
+        predicted_data = reconstructor.predict(time_series, from_i=2, to_i=5)
         self.assertAlmostEqual(predicted_data['temperature_avg'][0], 23.449303446403178)
         self.assertAlmostEqual(predicted_data['temperature_avg'][1], 23.45425065662797)
         self.assertAlmostEqual(predicted_data['temperature_avg'][2], 23.460265626928496)
         self.assertAlmostEqual(predicted_data['temperature_avg'][3], 23.46643974807204)
 
         # Predict on first and last as no window
-        reconstructor._predict(time_series, from_i=0, to_i=0)
-        reconstructor._predict(time_series, from_i=len(time_series)-1, to_i=len(time_series)-1)
+        reconstructor.predict(time_series, from_i=0, to_i=0)
+        reconstructor.predict(time_series, from_i=len(time_series)-1, to_i=len(time_series)-1)
 
 
     def test_LinearInterpolationReconstructor(self):
@@ -218,11 +218,11 @@ class TestReconstructors(unittest.TestCase):
 
         reconstructor = LinearInterpolationReconstructor()
 
-        predicted_data = reconstructor._predict(time_series, from_i=1,to_i=1)
+        predicted_data = reconstructor.predict(time_series, from_i=1,to_i=1)
         self.assertEqual(predicted_data, [{'a': 2.0, 'b': 3.0}])
 
 
-        predicted_data = reconstructor._predict(time_series, from_i=1,to_i=2)
+        predicted_data = reconstructor.predict(time_series, from_i=1,to_i=2)
         self.assertEqual(predicted_data, [{'a': 2.0, 'b': 3.0}, {'a': 3.0, 'b': 2.0}])
 
         # TODO: move this test in the basic reconstructors

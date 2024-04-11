@@ -42,21 +42,12 @@ class AnomalyDetector(Model):
         """Disabled. Anomaly detectors can be used only with the ``apply()`` method."""
         raise NotImplementedError('Anomaly detectors can be used only with the apply() method') from None
 
-    def _predict(self, series, *args, **kwargs):
-        raise NotImplementedError('Anomaly detectors can be used only with the apply() method') from None
-
     def evaluate(self, series, *args, **kwargs):
         """Disabled. Anomaly detectors cannot be evaluated yet."""
         raise NotImplementedError('Anomaly detectors cannot be evaluated yet.') from None
 
-    def _evaluate(self, series, *args, **kwargs):
-        raise NotImplementedError('Anomaly detectors cannot be evaluated yet.') from None
-
     def cross_validate(self, series, *args, **kwargs):
         """Disabled. Anomaly detectors cannot be evaluated yet."""
-        raise NotImplementedError('Anomaly detectors cannot be evaluated yet.') from None
-
-    def _cross_validate(self, series, *args, **kwargs):
         raise NotImplementedError('Anomaly detectors cannot be evaluated yet.') from None
 
 
@@ -149,7 +140,8 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
             return (actual, predicted)
 
 
-    def _fit(self, series, *args, **kwargs):
+    @AnomalyDetector.fit_function
+    def fit(self, series, *args, **kwargs):
 
         error_distribution = kwargs.pop('error_distribution', None)
         if not error_distribution:
@@ -249,7 +241,7 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
             # Show the plot
             plt.show()
 
-
+    @Model.apply_function
     def apply(self, series, index_range=['avg_err','max_err'], index_type='log', threshold=None, multivariate_index_strategy='max', details=False):
 
         """Apply the anomaly detection model on a series.

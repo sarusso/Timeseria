@@ -43,6 +43,27 @@ class TestForecasters(unittest.TestCase):
             self.sine_day_time_series.append(DataTimeSlot(start=TimePoint(i*step), end=TimePoint((i+1)*step), data={'value':sin(i/10.0)}))
 
 
+    def test_BaseForecasters(self):
+
+        # This test is done using the Linear Interpolator Reconstructor
+
+        time_series = TimeSeries()
+        time_series.append(DataTimePoint(t=1,  data={'a':1}, data_loss=0))
+        time_series.append(DataTimePoint(t=2,  data={'a':-99}, data_loss=1))
+        time_series.append(DataTimePoint(t=3,  data={'a':3}, data_loss=1))
+        time_series.append(DataTimePoint(t=4,  data={'a':4}, data_loss=0))
+
+        forecaster = PeriodicAverageForecaster()
+        forecaster.fitted = True
+        forecaster.data['resolution'] = '1s'
+        forecaster.data['data_labels'] = ['a']
+        forecaster.data['window'] = 5
+
+        # Not enough widow data for the predict, will raise
+        with self.assertRaises(ValueError):
+            forecaster.predict(time_series)
+
+
     def test_PeriodicAverageForecaster(self):
 
         forecaster = PeriodicAverageForecaster()

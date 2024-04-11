@@ -42,29 +42,8 @@ class Reconstructor(Model):
         path (str): a path from which to load a saved model. Will override all other init settings.
     """
 
-    def predict(self, series, from_i, to_i, *args, **kwargs):
-        "Predict the reconstructed value(s) from/to the given indexes (included)."
-
-        # Check series # TODO: this check here is redundant, as already performed in the parent predict(),
-        # but otherwise the following len check might fail.
-        if not isinstance(series, TimeSeries):
-            raise NotImplementedError('Models work only with TimeSeries data for now (got "{}")'.format(series.__class__.__name__))
-
-        # Check if we have enough data to predict, if there is a window.
-        # Note: for reconstructors, widows are assumed to be symmetric
-        # Also note: considerationson the data loss are don in the apply, not here.
-        try:
-            if from_i - self.window < 0:
-                raise ValueError('There is not enough data before the gap to reconstruct for the required window (from_i={}, to_i={}, window_size={}, series_len={})'.format(from_i, to_i, self.window, len(series)))
-            if to_i + self.window > len(series) - 1:
-                raise ValueError('There is not enough data after the gap to reconstruct for the required window (from_i={}, to_i={}, window_size={}, series_len={})'.format(from_i, to_i, self.window, len(series)))
-        except KeyError:
-            pass
-
-        # Call parent predict
-        return super(Reconstructor, self).predict(series, from_i, to_i, *args, **kwargs)
-
-    def _apply(self, series, remove_data_loss=False, data_loss_threshold=1, inplace=False):
+    @Model.apply_function
+    def apply(self, series, remove_data_loss=False, data_loss_threshold=1, inplace=False):
 
         logger.debug('Using data_loss_threshold="%s"', data_loss_threshold)
 
@@ -167,12 +146,8 @@ class Reconstructor(Model):
         if not inplace:
             return reconstructed_data
 
-
+    @Model.evaluate_function
     def evaluate(self, series, steps='auto', limit=None, data_loss_threshold=1, metrics=['RMSE', 'MAE'], details=False, start=None, end=None, **kwargs):
-        # This method is overwritten just to change the docstring
-        # TODO: Maybe completely overwrite this kind of methods and get the automatic sanification with decorators,
-        # leaving this approach only for the _fit and _predict but maybe even there it would be better to completely
-        # overwrite and use decorators instead. Consider also fit_logic() or similar. p.s. @model_fit sounds nice.
         """Evaluate the reconstructor on a series.
 
         Args:
@@ -189,9 +164,6 @@ class Reconstructor(Model):
             start(float, datetime): evaluation start (epoch timestamp or datetime).
             end(float, datetim): evaluation end (epoch timestamp or datetime).
         """
-        return super(Reconstructor, self).evaluate(series, steps, limit, data_loss_threshold, metrics, details, start, end, **kwargs)
-
-    def _evaluate(self, series, steps='auto', limit=None, data_loss_threshold=1, metrics=['RMSE', 'MAE'], details=False, start=None, end=None, **kwargs):
 
         if len(series.data_labels()) > 1:
             raise NotImplementedError('Evaluating on multivariate time sries is not yet implemented')
@@ -415,10 +387,13 @@ class LinearInterpolationReconstructor(Reconstructor):
 
     window = 1
 
-    def _predict_to_refactor(self, series, data_label, from_index, to_index):
-        pass
+    @Reconstructor.predict_function
+    def predict(self, series, from_i, to_i):
 
-    def _predict(self, series, from_i, to_i):
+        if from_i - self.window < 0:
+            raise ValueError('There is not enough data before the gap to reconstruct for the required window (from_i={}, to_i={}, window_size={}, series_len={})'.format(from_i, to_i, self.window, len(series)))
+        if to_i + self.window > len(series) - 1:
+            raise ValueError('There is not enough data after the gap to reconstruct for the required window (from_i={}, to_i={}, window_size={}, series_len={})'.format(from_i, to_i, self.window, len(series)))
 
         logger.debug('Linear Interpolator reconstructing from #%s to #%s (included)', from_i, to_i)
 
@@ -453,9 +428,8 @@ class PeriodicAverageReconstructor(Reconstructor):
 
     window = 1
 
-    def fit(self, data, data_loss_threshold=0.5, periodicity='auto', dst_affected=False,  offset_method='average', start=None, end=None, **kwargs):
-        # This is a fit wrapper only to allow correct documentation
-
+    @Reconstructor.fit_function
+    def fit(self, series, data_loss_threshold=0.5, periodicity='auto', dst_affected=False, offset_method='average', start=None, end=None, **kwargs):
         # TODO: periodicity, dst_affected, offset_method -> move them in the init?
         """
         Fit the reconstructor on some data.
@@ -469,9 +443,6 @@ class PeriodicAverageReconstructor(Reconstructor):
             start(float, datetime): fit start (epoch timestamp or datetime).
             end(float, datetim): fit end (epoch timestamp or datetime).
         """
-        return super(PeriodicAverageReconstructor, self).fit(data, data_loss_threshold, periodicity, dst_affected, offset_method, start, end, **kwargs)
-
-    def _fit(self, series, data_loss_threshold=0.5, periodicity='auto', dst_affected=False, offset_method='average', start=None, end=None, **kwargs):
 
         if not offset_method in ['average', 'extremes']:
             raise Exception('Unknown offset method "{}"'.format(offset_method))
@@ -554,8 +525,13 @@ class PeriodicAverageReconstructor(Reconstructor):
 
         logger.debug('Processed "%s" items', processed)
 
+    @Reconstructor.predict_function
+    def predict(self, series, from_i, to_i):
 
-    def _predict(self, series, from_i, to_i):
+        if from_i - self.window < 0:
+            raise ValueError('There is not enough data before the gap to reconstruct for the required window (from_i={}, to_i={}, window_size={}, series_len={})'.format(from_i, to_i, self.window, len(series)))
+        if to_i + self.window > len(series) - 1:
+            raise ValueError('There is not enough data after the gap to reconstruct for the required window (from_i={}, to_i={}, window_size={}, series_len={})'.format(from_i, to_i, self.window, len(series)))
 
         if verbose_debug:
             logger.debug('Periodic Average Reconstructor predicting from_i=%s to_i=%s (included)', from_i, to_i)
@@ -608,7 +584,8 @@ class ProphetReconstructor(Reconstructor, _ProphetModel):
 
     window = 0
 
-    def _fit(self, series, start=None, end=None, **kwargs):
+    @Reconstructor.fit_function
+    def fit(self, series, start=None, end=None, **kwargs):
 
         if len(series.data_labels()) > 1:
             raise NotImplementedError('Multivariate time series are not supported by this reconstructor')
@@ -649,7 +626,8 @@ class ProphetReconstructor(Reconstructor, _ProphetModel):
         # Fit tjhe Prophet model
         self.prophet_model.fit(data)
 
-    def _predict(self, series, from_i, to_i):
+    @Reconstructor.predict_function
+    def predict(self, series, from_i, to_i):
 
         if verbose_debug:
             logger.debug('Periodic Average Reconstructor predicting from_i=%s to_i=%s (included)', from_i, to_i)
