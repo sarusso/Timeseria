@@ -68,13 +68,14 @@ class TestBaseModelClasses(unittest.TestCase):
 
         # Define a fittable parametric model mock
         class FittableParametricModelMock(Model):
-            def _fit(self, data):
+            @Model.fit_function
+            def fit(self, series):
                 self.data['param1'] = 1
-            def _predict(self, data):
-                return data
-            def _apply(self, data):
-                return data
-            def _evaluate(self, data):
+            def _predict(self, series):
+                return series
+            def _apply(self, series):
+                return series
+            def _evaluate(self, series):
                 return {'grade': 'A'}
 
         parametric_model = FittableParametricModelMock()
@@ -106,21 +107,21 @@ class TestBaseModelClasses(unittest.TestCase):
         # Check predict
         with self.assertRaises(ValueError):
             parametric_model.predict(empty_time_series)
-        with self.assertRaises(NotImplementedError):
+        with self.assertRaises(TypeError):
             parametric_model.predict([1,2,3,4,5,6])
         self.assertEqual(parametric_model.predict(time_series), time_series)
 
         # Check apply
         with self.assertRaises(ValueError):
             parametric_model.apply(empty_time_series)
-        with self.assertRaises(NotImplementedError):
+        with self.assertRaises(TypeError):
             parametric_model.apply([1,2,3,4,5,6])
         self.assertEqual(parametric_model.apply(time_series), time_series)
 
         # Check evaluate
         with self.assertRaises(ValueError):
             parametric_model.evaluate(empty_time_series)
-        with self.assertRaises(NotImplementedError):
+        with self.assertRaises(TypeError):
             parametric_model.evaluate([1,2,3,4,5,6])
         self.assertEqual(parametric_model.evaluate(time_series), {'grade': 'A'})
 

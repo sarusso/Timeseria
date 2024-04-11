@@ -453,9 +453,8 @@ class PeriodicAverageReconstructor(Reconstructor):
 
     window = 1
 
-    def fit(self, data, data_loss_threshold=0.5, periodicity='auto', dst_affected=False,  offset_method='average', start=None, end=None, **kwargs):
-        # This is a fit wrapper only to allow correct documentation
-
+    @Reconstructor.fit_function
+    def fit(self, series, data_loss_threshold=0.5, periodicity='auto', dst_affected=False, offset_method='average', start=None, end=None, **kwargs):
         # TODO: periodicity, dst_affected, offset_method -> move them in the init?
         """
         Fit the reconstructor on some data.
@@ -469,9 +468,6 @@ class PeriodicAverageReconstructor(Reconstructor):
             start(float, datetime): fit start (epoch timestamp or datetime).
             end(float, datetim): fit end (epoch timestamp or datetime).
         """
-        return super(PeriodicAverageReconstructor, self).fit(data, data_loss_threshold, periodicity, dst_affected, offset_method, start, end, **kwargs)
-
-    def _fit(self, series, data_loss_threshold=0.5, periodicity='auto', dst_affected=False, offset_method='average', start=None, end=None, **kwargs):
 
         if not offset_method in ['average', 'extremes']:
             raise Exception('Unknown offset method "{}"'.format(offset_method))
@@ -608,7 +604,8 @@ class ProphetReconstructor(Reconstructor, _ProphetModel):
 
     window = 0
 
-    def _fit(self, series, start=None, end=None, **kwargs):
+    @Reconstructor.fit_function
+    def fit(self, series, start=None, end=None, **kwargs):
 
         if len(series.data_labels()) > 1:
             raise NotImplementedError('Multivariate time series are not supported by this reconstructor')

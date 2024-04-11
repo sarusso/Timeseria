@@ -31,7 +31,7 @@ except (ImportError,AttributeError):
 #======================
 
 class Model():
-    """A generic series model. This can be either a stateless model, where all the information is coded and there are no parameters, or a
+    """A generic model for series data. This can be either a stateless model, where all the information is coded and there are no parameters, or a
     stateful (parametric) model, where there are a number of parameters which can be both set manually or learnt (fitted) from the data.
 
     All models expose a ``predict()``, ``apply()`` and ``evaluate()`` methods, while parametric models also provide a ``save()`` method to
@@ -50,16 +50,14 @@ class Model():
         try:
             self.data
         except:
-            # No data (parameters) for the model. Check if there is a fit
-            try:
-                self._fit
-            except AttributeError:
-                # If not, then the model has no parameters at all
-                self._type = 'non-parametric'
-            else:
-                # Otherwise, the model is parameter and the parameters
+            # No data (parameters) for the model. Check if there is a fit implemented
+            if self.is_fit_implemented():
+                # Yes: the model is parameter and the parameters
                 # are still to be set via the fit
                 self._type = 'parametric'
+            else:
+                # No: the model has no parameters at all
+                self._type = 'non-parametric'
         else:
             # If we have data, it means that there are parameters and
             # the model is parametric.
@@ -72,6 +70,16 @@ class Model():
             self.data['id'] = id
         except AttributeError:
             self.data = {'id': id}
+
+    def is_fit_implemented(self):
+            try:
+                self.fit(series=None)
+            except NotImplementedError:
+                return False
+            except Exception:
+                return True
+            else:
+                return True
 
     @classmethod
     def load(cls, path):
@@ -112,43 +120,44 @@ class Model():
         else:
             return False
 
+    @staticmethod
+    def fit_function(fit_function):
+        def do_fit(self, series, *args, **kwargs):
+
+            # Check data
+            if not isinstance(series, TimeSeries):
+                raise TypeError('Models work only with TimeSeries data for now (got "{}")'.format(series.__class__.__name__))
+
+            # If TimeSeries data, check it
+            if isinstance(series, TimeSeries):
+                _check_time_series(series)
+
+                # Set resolution
+                try:
+                    self.data['resolution'] = series.resolution
+                except AttributeError:
+                    pass
+
+                # Set data labels
+                try:
+                    self.data['data_labels'] = series.data_labels()
+                except AttributeError:
+                    pass
+
+            # Call fit logic
+            fit_output = fit_function(self, series, *args, **kwargs)
+
+            self.data['fitted_at'] = now_s()
+            self.fitted = True
+
+            return fit_output
+
+        return do_fit
+
+
     def fit(self, series, *args, **kwargs):
         """Fit the model on a series."""
-
-        # Check if fit logic is implemented
-        try:
-            self._fit
-        except AttributeError:
-            raise NotImplementedError('Fitting this model is not implemented')
-
-        # Check data
-        if not isinstance(series, TimeSeries):
-            raise NotImplementedError('Models work only with TimeSeries data for now (got "{}")'.format(series.__class__.__name__))
-
-        # If TimeSeries data, check it
-        if isinstance(series, TimeSeries):
-            _check_time_series(series)
-
-            # Set resolution
-            try:
-                self.data['resolution'] = series.resolution
-            except AttributeError:
-                pass
-
-            # Set data labels
-            try:
-                self.data['data_labels'] = series.data_labels()
-            except AttributeError:
-                pass
-
-        # Call fit logic
-        fit_output = self._fit(series, *args, **kwargs)
-
-        self.data['fitted_at'] = now_s()
-        self.fitted = True
-
-        # Return output
-        return fit_output
+        raise NotImplementedError('Fitting this model is not implemented')
 
     def predict(self, series, *args, **kwargs):
         """Call the model predict logic on a series."""
@@ -160,17 +169,12 @@ class Model():
             raise NotImplementedError('Predicting from this model is not implemented')
 
         # Ensure the model is fitted if it has to.
-        try:
-            self._fit
-        except AttributeError:
-            pass
-        else:
-            if not self.fitted:
-                raise NotFittedError()
+        if self.is_fit_implemented() and not self.fitted:
+            raise NotFittedError()
 
         # Check data
         if not isinstance(series, TimeSeries):
-            raise NotImplementedError('Models work only with TimeSeries data for now (got "{}")'.format(series.__class__.__name__))
+            raise TypeError('Models work only with TimeSeries data for now (got "{}")'.format(series.__class__.__name__))
 
         # If TimeSeries data, check it
         if isinstance(series, TimeSeries):
@@ -195,18 +199,13 @@ class Model():
         except AttributeError:
             raise NotImplementedError('Applying this model is not implemented') from None
 
-        # Ensure the model is fitted if it has to
-        try:
-            self._fit
-        except AttributeError:
-            pass
-        else:
-            if not self.fitted:
-                raise NotFittedError()
+        # Ensure the model is fitted if it has to.
+        if self.is_fit_implemented() and not self.fitted:
+            raise NotFittedError()
 
         # Check data
         if not isinstance(series, TimeSeries):
-            raise NotImplementedError('Models work only with TimeSeries data for now (got "{}")'.format(series.__class__.__name__))
+            raise TypeError('Models work only with TimeSeries data for now (got "{}")'.format(series.__class__.__name__))
 
         # If TimeSeries data, check it
         if isinstance(series, TimeSeries):
@@ -231,18 +230,13 @@ class Model():
         except AttributeError:
             raise NotImplementedError('Evaluating this model is not implemented')
 
-        # Ensure the model is fitted if it has to
-        try:
-            self._fit
-        except AttributeError:
-            pass
-        else:
-            if not self.fitted:
-                raise NotFittedError()
+        # Ensure the model is fitted if it has to.
+        if self.is_fit_implemented() and not self.fitted:
+            raise NotFittedError()
 
         # Check data
         if not isinstance(series, TimeSeries):
-            raise NotImplementedError('Models work only with TimeSeries data for now (got "{}")'.format(series.__class__.__name__))
+            raise TypeError('Models work only with TimeSeries data for now (got "{}")'.format(series.__class__.__name__))
 
         # If TimeSeries data, check it
         if isinstance(series, TimeSeries):
@@ -282,7 +276,7 @@ class Model():
 
         # Check data
         if not isinstance(series, TimeSeries):
-            raise NotImplementedError('Models work only with TimeSeries data for now (got "{}")'.format(series.__class__.__name__))
+            raise TypeError('Models work only with TimeSeries data for now (got "{}")'.format(series.__class__.__name__))
 
         # If TimeSeries data, check it
         if isinstance(series, TimeSeries):
@@ -362,13 +356,8 @@ class Model():
             raise TypeError('Saving a non-parametric model from a path does not make sense') # TODO: is this the right exception?
 
         # Ensure the model is fitted if it has to
-        try:
-            self._fit
-        except AttributeError:
-            pass
-        else:
-            if not self.fitted:
-                raise NotFittedError()
+        if self.is_fit_implemented() and not self.fitted:
+            raise NotFittedError()
 
         if not path:
             raise ValueError('Got empty path, cannot save')

@@ -149,7 +149,8 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
             return (actual, predicted)
 
 
-    def _fit(self, series, *args, **kwargs):
+    @AnomalyDetector.fit_function
+    def fit(self, series, *args, **kwargs):
 
         error_distribution = kwargs.pop('error_distribution', None)
         if not error_distribution:

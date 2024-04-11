@@ -552,6 +552,7 @@ class PeriodicAverageForecaster(Forecaster):
         model.data['averages'] = {int(key):value for key, value in model.data['averages'].items()}
         return model
 
+    @Forecaster.fit_function
     def fit(self, series, periodicity='auto', dst_affected=False, start=None, end=None, **kwargs):
         """Fit the model on a series.
 
@@ -561,9 +562,6 @@ class PeriodicAverageForecaster(Forecaster):
             start(float, datetime): fit start (epoch timestamp or datetime).
             end(float, datetime): fit end (epoch timestamp or datetime).
         """
-        return super(PeriodicAverageForecaster, self).fit(series, periodicity, dst_affected, start, end, **kwargs)
-
-    def _fit(self, series, periodicity='auto', dst_affected=False, start=None, end=None, **kwargs):
 
         if len(series.data_labels()) > 1:
             raise NotImplementedError('Multivariate time series are not yet supported')
@@ -710,7 +708,8 @@ class ProphetForecaster(Forecaster, _ProphetModel):
 
     window = None
 
-    def _fit(self, series, start=None, end=None, **kwargs):
+    @Forecaster.fit_function
+    def fit(self, series, start=None, end=None, **kwargs):
 
         if len(series.data_labels()) > 1:
             raise Exception('Multivariate time series are not yet supported')
@@ -816,7 +815,8 @@ class ARIMAForecaster(Forecaster, _ARIMAModel):
         # TODO: save the above in data[]?
         super(ARIMAForecaster, self).__init__()
 
-    def _fit(self, series):
+    @Forecaster.fit_function
+    def fit(self, series):
 
         import statsmodels.api as sm
 
@@ -861,7 +861,8 @@ class AARIMAForecaster(Forecaster, _ARIMAModel):
 
     window = 0
 
-    def _fit(self, series, **kwargs):
+    @Forecaster.fit_function
+    def fit(self, series, **kwargs):
 
         import pmdarima as pm
 
@@ -948,20 +949,18 @@ class LSTMForecaster(Forecaster, _KerasModel):
 
     @classmethod
     def load(cls, path):
+        # Override the load method to load the Keras model as well
         model = super().load(path)
-        # Load the Kears model as well
         model._load_keras_model(path)
         return model
 
     def save(self, path):
-
-        # Call parent save
+        # Override the save method to load the Keras model as well
         super(LSTMForecaster, self).save(path)
-
-        # Now save the Keras model itself
         self._save_keras_model(path)
 
-    def _fit(self, series, start=None, end=None, verbose=False, epochs=30, normalize=True, **kwargs):
+    @Forecaster.fit_function
+    def fit(self, series, start=None, end=None, verbose=False, epochs=30, normalize=True, **kwargs):
 
         # Handle start/end
         if start is not None:
