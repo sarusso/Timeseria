@@ -3,7 +3,7 @@
 
 from copy import deepcopy
 from ..utilities import _Gaussian, rescale
-from .forecasters import Forecaster, PeriodicAverageForecaster
+from .forecasters import Forecaster, PeriodicAverageForecaster, LSTMForecaster
 from .reconstructors import Reconstructor, PeriodicAverageReconstructor
 from .base import Model
 from math import log10
@@ -129,7 +129,7 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
             if isinstance(self.model, Reconstructor):
                 prediction = self.model.predict(series, from_i=i,to_i=i)
             elif isinstance(self.model, Forecaster):
-                prediction = self.model.predict(series, steps=1, forecast_start = i-1) # TODO: why the "-1"?
+                prediction = self.model.predict(series, steps=1, from_i=i) 
             else:
                 raise TypeError('Don\'t know how to handle predictive model of type "{}"'.format(self.model.__class__.__name__))
 
@@ -139,7 +139,10 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
             if isinstance(prediction, list):
                 predicted = prediction[0][data_label]
             elif isinstance(prediction, dict):
-                predicted = prediction[data_label][0]
+                if isinstance(prediction[data_label], list):
+                    predicted = prediction[data_label][0]
+                else:
+                    predicted = prediction[data_label]
             else:
                 raise TypeError('Don\'t know how to handle a prediction with of type "{}"'.format(prediction.__class__.__name__))
 
@@ -147,9 +150,6 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
 
 
     def _fit(self, series, *args, **kwargs):
-
-        if len(series.data_labels()) > 1:
-            raise NotImplementedError('Multivariate time series are not yet supported')
 
         error_distribution = kwargs.pop('error_distribution', None)
         if not error_distribution:
@@ -162,11 +162,12 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
 
         # Fit the predictive model
         self.model.fit(series, *args, **kwargs)
+        logger.info('Predictive model fitted')
 
         # Evaluate the predictive for one step ahead and get the forecasting errors
         prediction_errors = []
         for data_label in series.data_labels():
-
+            logger.debug('Computing actual vs predicted for "%s"...', data_label)
             for i, _ in enumerate(series):
 
                 # Before the window
@@ -179,6 +180,7 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
                         break
 
                 # Predict & append the error
+                #logger.debug('Predicting and computing the difference (i=%s)', i)
                 actual, predicted = self._get_actual_and_predicted(series, i, data_label, self.model.window)
                 prediction_errors.append(actual-predicted)
 
@@ -211,6 +213,7 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
 
         from statistics import stdev
         self.data['stdev'] = stdev(prediction_errors)
+        logger.info('Anomaly detector fitted')
 
     def inspect(self, plot=True):
         '''Inspect the model and plot the error distribution'''
@@ -247,7 +250,7 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
             plt.show()
 
 
-    def apply(self, series, index_range=['avg_err','max_err'], index_type='log', threshold=None, details=False):
+    def apply(self, series, index_range=['avg_err','max_err'], index_type='log', threshold=None, multivariate_index_strategy='max', details=False):
 
         """Apply the anomaly detection model on a series.
 
@@ -269,14 +272,17 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
 
             threshold(float): a threshold to make the anomaly index categorical (0-1) instead of continuous.
 
+            multivariate_index_strategy(str, callable): the strategy to use when computing the overall anomaly index for multivariate
+                                                        time series items. Possible choices are "max" to use the maximum one, "avg"
+                                                        for the mean and "min" for the minimum; or a callable taking as input the
+                                                        list of the anomaly indexes for each data label. Defaults to "max".
+
+
             details(bool, list): if to add details to the time series as the predicted value, the error and the
                                  corresponding error distribution function (dist) value. If set to True, it adds
                                  all of them, if instead using a list only selected details can be added: "pred"
                                  for the predicted values, "err" for the error, and "dist" for the error distribution.
         """
-
-        if len(series.data_labels()) > 1:
-            raise NotImplementedError('Multivariate time series are not yet supported')
 
         # Support vars
         result_series = series.__class__()
@@ -286,50 +292,51 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
         error_distribution_function = DistributionFunction(self.data['error_distribution'],
                                                            self.data['error_distribution_params'])
 
-        for data_label in series.data_labels():
+        # Set anomaly index boundaries
+        prediction_errors = self.data['prediction_errors']
+        abs_prediction_errors = [abs(prediction_error) for prediction_error in prediction_errors]
+        index_range = index_range[:]
 
-            # Set anomaly index boundaries
-            prediction_errors = self.data['prediction_errors']
-            abs_prediction_errors = [abs(prediction_error) for prediction_error in prediction_errors]
-            index_range = index_range[:]
+        for i in range(2):
+            if isinstance(index_range[i], str):
+                if index_range[i] == 'max_err':
+                    index_range[i] = max(abs_prediction_errors)
+                elif index_range[i] == 'avg_err':
+                    index_range[i] = sum(abs_prediction_errors)/len(abs_prediction_errors)
+                elif index_range[i].endswith('_sigma'):
+                    index_range[i] = float(index_range[i].replace('_sigma',''))*sigma
+                elif index_range[i].endswith('sig'):
+                    index_range[i] = float(index_range[i].replace('sig',''))*sigma
+                else:
+                    raise ValueError('Unknwon index start or end value "{}"'.format(index_range[i]))
 
-            for i in range(2):
-                if isinstance(index_range[i], str):
-                    if index_range[i] == 'max_err':
-                        index_range[i] = max(abs_prediction_errors)
-                    elif index_range[i] == 'avg_err':
-                        index_range[i] = sum(abs_prediction_errors)/len(abs_prediction_errors)
-                    elif index_range[i].endswith('_sigma'):
-                        index_range[i] = float(index_range[i].replace('_sigma',''))*sigma
-                    elif index_range[i].endswith('sig'):
-                        index_range[i] = float(index_range[i].replace('sig',''))*sigma
-                    else:
-                        raise ValueError('Unknwon index start or end value "{}"'.format(index_range[i]))
+        x_start = index_range[0]
+        x_end = index_range[1]
 
-            x_start = index_range[0]
-            x_end = index_range[1]
+        # Compute error distribution function values for index start/end
+        y_start = error_distribution_function(x_start)
+        y_end = error_distribution_function(x_end)
 
-            # Compute error distribution function values for index start/end
-            y_start = error_distribution_function(x_start)
-            y_end = error_distribution_function(x_end)
+        for i, item in enumerate(series):
 
-            for i, item in enumerate(series):
-                model_window = self.model.window
+            # Before the window
+            if i <=  self.model.window:
+                continue
 
-                # Before the window
-                if i <=  self.model.window:
-                    continue
+            # After the window (if using a reconstructor)
+            if isinstance(self.model, Reconstructor):
+                if i >  len(series)-self.model.window-1:
+                    break
 
-                # After the window (if using a reconstructor)
-                if isinstance(self.model, Reconstructor):
-                    if i >  len(series)-self.model.window-1:
-                        break
+            item_anomaly_indexes = [] 
 
-                # Duplicate this sereis item
+            for data_label_i, data_label in enumerate(series.data_labels()):
+
+                # Duplicate this series item
                 item = deepcopy(item)
 
                 # Compute the prediction error index
-                actual, predicted = self._get_actual_and_predicted(series, i, data_label, model_window)
+                actual, predicted = self._get_actual_and_predicted(series, i, data_label, self.model.window)
                 prediction_error = abs(actual-predicted)
 
                 # Compute the anomaly index in the given range (which defaults to 0, max_err)
@@ -372,8 +379,8 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
                     else:
                         anomaly_index = 1
 
-                # Set the anomaly index
-                item.data_indexes['anomaly'] = anomaly_index
+                # Add this anomaly index for this data label to the list of the item anomaly indexes
+                item_anomaly_indexes.append(anomaly_index)
 
                 # Add details?
                 if details:
@@ -389,7 +396,21 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
                         item.data['{}_err'.format(data_label)] = prediction_error
                         item.data['dist({}_err)'.format(data_label)] = error_distribution_function(prediction_error)
 
-                result_series.append(item)
+            # Set anomaly index & append
+            if len(item_anomaly_indexes) == 1:
+                item.data_indexes['anomaly'] = item_anomaly_indexes[0]
+            else:
+                if multivariate_index_strategy == 'min':
+                    item.data_indexes['anomaly'] = min(item_anomaly_indexes)
+                elif multivariate_index_strategy == 'max':
+                    item.data_indexes['anomaly'] = max(item_anomaly_indexes)
+                elif multivariate_index_strategy == 'avg':
+                    item.data_indexes['anomaly'] = sum(item_anomaly_indexes)/len(item_anomaly_indexes)
+                else:
+                    item.data_indexes['anomaly'] = multivariate_index_strategy(item_anomaly_indexes)
+
+            # Append
+            result_series.append(item)
 
         return result_series
 
@@ -406,11 +427,7 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
 #===================================
 
 class PeriodicAverageAnomalyDetector(ModelBasedAnomalyDetector):
-    """An anomaly detection model based on a periodic average forecaster.
-
-    Args:
-        path (str): a path from which to load a saved model. Will override all other init settings.
-    """
+    """An anomaly detection model based on a periodic average forecaster."""
 
     model_class = PeriodicAverageForecaster
 
@@ -422,12 +439,17 @@ class PeriodicAverageAnomalyDetector(ModelBasedAnomalyDetector):
 #===================================
 
 class PeriodicAverageReconstructorAnomalyDetector(ModelBasedAnomalyDetector):
-    """An anomaly detection model based on a periodic average reconstructor.
-
-    Args:
-        path (str): a path from which to load a saved model. Will override all other init settings.
-    """
+    """An anomaly detection model based on a periodic average reconstructor."""
 
     model_class = PeriodicAverageReconstructor
 
+
+#===================================
+#  LSTM Anomaly Detector
+#===================================
+
+class LSTMAnomalyDetector(ModelBasedAnomalyDetector):
+    """An anomaly detection model based on a LSTM neural network."""
+
+    model_class = LSTMForecaster
 

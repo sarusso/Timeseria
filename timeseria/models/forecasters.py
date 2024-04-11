@@ -639,19 +639,17 @@ class PeriodicAverageForecaster(Forecaster):
 
         logger.debug('Processed %s items', processed)
 
-    def _predict(self, series, steps=1, forecast_start=None):
-
-        # TODO: remove the forecast_start or move it in the parent(s).
+    def _predict(self, series, steps=1, from_i=None):
 
         # Univariate is enforced by the fit
         data_label = self.data['data_labels'][0]
 
         # Set forecast starting item
-        if forecast_start is None:
-            forecast_start = len(series) - 1
+        if from_i is None:
+            from_i = len(series) - 1
 
         # Get forecast start item
-        forecast_start_item = series[forecast_start]
+        forecast_start_item = series[from_i]
 
         # Support vars
         forecast_timestamps = []
@@ -660,9 +658,9 @@ class PeriodicAverageForecaster(Forecaster):
         # Compute the offset (avg diff between the real values and the forecasts on the first window)
         diffs  = 0
         for j in range(self.data['window']):
-            serie_index = forecast_start - self.data['window'] + j
-            real_value = series[serie_index].data[data_label]
-            forecast_value = self.data['averages'][_get_periodicity_index(series[serie_index], series.resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])]
+            series_index = from_i - self.data['window'] + j
+            real_value = series[series_index].data[data_label]
+            forecast_value = self.data['averages'][_get_periodicity_index(series[series_index], series.resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])]
             diffs += (real_value - forecast_value)
 
         # Sum the avg diff between the real and the forecast on the window to the forecast (the offset)
@@ -966,30 +964,11 @@ class LSTMForecaster(Forecaster, _KerasModel):
     def _fit(self, series, start=None, end=None, verbose=False, epochs=30, normalize=True, **kwargs):
 
         # Handle start/end
-        from_t = kwargs.get('from_t', None)
-        to_t = kwargs.get('to_t', None)
-        from_dt = kwargs.get('from_dt', None)
-        to_dt = kwargs.get('to_dt', None)
-        if from_t or to_t or from_dt or to_dt:
-            logger.warning('The from_t, to_t, from_dt and to_d arguments are deprecated, please use start and end instead')
-        from_t, to_t = _set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
-
         if start is not None:
-            if isinstance(start, datetime):
-                from_dt = start
-            else:
-                try:
-                    from_t = float(start)
-                except:
-                    raise ValueError('Cannot use "{}" as start value, not a datetime nor an epoch timestamp'.format(start))
+            raise NotImplementedError()
+
         if end is not None:
-            if isinstance(end, datetime):
-                to_dt = end
-            else:
-                try:
-                    to_t = float(end)
-                except:
-                    raise ValueError('Cannot use "{}" as end value, not a datetime nor an epoch timestamp'.format(end))
+            raise NotImplementedError()
 
         # Set verbose switch
         if verbose:
@@ -1001,7 +980,7 @@ class LSTMForecaster(Forecaster, _KerasModel):
         data_labels = series.data_labels()
 
         if normalize:
-            # Set min and max
+            # Set min and max (for each label)
             min_values = series.min()
             max_values = series.max()
 
@@ -1048,7 +1027,7 @@ class LSTMForecaster(Forecaster, _KerasModel):
         # Fit
         self.keras_model.fit(array(window_features), array(target_values_vector), epochs=epochs, verbose=verbose)
 
-    def _predict(self, series, steps=1, verbose=False):
+    def _predict(self, series, steps=1, from_i=None, verbose=False):
 
         if steps>1:
             raise NotImplementedError('This forecaster does not support multi-step predictions.')
@@ -1060,7 +1039,10 @@ class LSTMForecaster(Forecaster, _KerasModel):
             verbose=0
 
         # Get the window if we were given a longer series
-        window_series = series[-self.data['window']:]
+        if from_i is not None:
+            window_series = series[from_i-self.data['window']:from_i]
+        else:
+            window_series = series[-self.data['window']:]
 
         # Duplicate so that we ae free to normalize in-place at the next step
         window_series = window_series.duplicate()

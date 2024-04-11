@@ -266,11 +266,10 @@ class TestForecasters(unittest.TestCase):
 
         forecaster = LSTMForecaster()
         forecaster.fit(sine_minute_time_series)
-        predicted_value = forecaster.predict(sine_minute_time_series)['value']
+        predicted_data = forecaster.predict(sine_minute_time_series)
 
-        # Give some tolerance
-        self.assertTrue(predicted_value>0.5)
-        self.assertTrue(predicted_value<1.1)
+        # Test with tolerance
+        self.assertTrue(0.5 < predicted_data['value'] <1.1, 'got {}'.format(predicted_data['value']))
 
         # Not-existent features
         with self.assertRaises(ValueError):
@@ -285,20 +284,21 @@ class TestForecasters(unittest.TestCase):
         try:
             import tensorflow
         except ImportError:
-            print('Skipping LSTM forecaster tests as no tensorflow module installed')
+            print('Skipping LSTM forecaster tests with multivariate series as no tensorflow module installed')
             return
 
         # Create a minute-resolution test DataTimeSlotSeries
-        sine_minute_time_series = TimeSeries()
+        sine_cosine_minute_time_series = TimeSeries()
         for i in range(10):
-            sine_minute_time_series.append(DataTimeSlot(start=TimePoint(i*60), end=TimePoint((i+1)*60), data={'sin':sin(i/10.0), 'cos':cos(i/10.0)}))
+            sine_cosine_minute_time_series.append(DataTimePoint(t=i*60,  data={'sin':sin(i/10.0), 'cos':cos(i/10.0)}))
 
         forecaster = LSTMForecaster()
-        forecaster.fit(sine_minute_time_series)
-        predicted_data = forecaster.predict(sine_minute_time_series)
+        forecaster.fit(sine_cosine_minute_time_series)
+        predicted_data = forecaster.predict(sine_cosine_minute_time_series)
 
-        self.assertTrue('sin' in predicted_data)
-        self.assertTrue('cos' in predicted_data)
+        # Test with tolerance
+        self.assertTrue(0.5 <  predicted_data['sin'] < 1.1, 'got {}'.format(predicted_data['sin']))
+        self.assertTrue(0.5 <  predicted_data['cos'] < 1.1, 'got {}'.format(predicted_data['cos']))
 
 
     def test_LSTMForecaster_save_load(self):
@@ -306,7 +306,7 @@ class TestForecasters(unittest.TestCase):
         try:
             import tensorflow
         except ImportError:
-            print('Skipping LSTM forecaster tests as no tensorflow module installed')
+            print('Skipping LSTM save/load forecaster tests as no tensorflow module installed')
             return
 
         # Create a minute-resolution test DataTimeSlotSeries
