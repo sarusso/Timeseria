@@ -225,36 +225,38 @@ class Model():
         """Call the model apply logic on a series."""
         raise NotImplementedError('Applying this model is not implemented')
 
+    @staticmethod
+    def evaluate_function(evaluate_function):
+        @functools.wraps(evaluate_function)
+        def do_evaluate(self, series, *args, **kwargs):
+
+            # Ensure the model is fitted if it has to.
+            if self.is_fit_implemented() and not self.fitted:
+                raise NotFittedError()
+
+            # Check data
+            if not isinstance(series, TimeSeries):
+                raise TypeError('Models work only with TimeSeries data for now (got "{}")'.format(series.__class__.__name__))
+
+            # If TimeSeries data, check it
+            if isinstance(series, TimeSeries):
+                _check_time_series(series)
+                if self.is_parametric():
+                    if isinstance(series.items_type, Point) and len(series) == 1:
+                        # Do not check if the data is a point time series and has only one item
+                        pass
+                    else:
+                        _check_resolution(series, self.data['resolution'])
+                    _check_data_labels(series, self.data['data_labels'])
+
+            # Call evaluate logic
+            return evaluate_function(self, series, *args, **kwargs)
+
+        return do_evaluate
+
     def evaluate(self, series, *args, **kwargs):
-        """Evaluate the model on a series."""
-
-        # Check if evaluate logic is implemented
-        try:
-            self._evaluate
-        except AttributeError:
-            raise NotImplementedError('Evaluating this model is not implemented')
-
-        # Ensure the model is fitted if it has to.
-        if self.is_fit_implemented() and not self.fitted:
-            raise NotFittedError()
-
-        # Check data
-        if not isinstance(series, TimeSeries):
-            raise TypeError('Models work only with TimeSeries data for now (got "{}")'.format(series.__class__.__name__))
-
-        # If TimeSeries data, check it
-        if isinstance(series, TimeSeries):
-            _check_time_series(series)
-            if self.is_parametric():
-                if isinstance(series.items_type, Point) and len(series) == 1:
-                    # Do not check if the data is a point time series and has only one item
-                    pass
-                else:
-                    _check_resolution(series, self.data['resolution'])
-                _check_data_labels(series, self.data['data_labels'])
-
-        # Call evaluate logic
-        return self._evaluate(series, *args, **kwargs)
+        """Call the model evaluate logic on a series."""
+        raise NotImplementedError('Evaluating this model is not implemented')
 
     def cross_validate(self, series, rounds=10, *args, **kwargs):
         """Cross validate the model on a series, by default with 10 fit/evaluate rounds.
@@ -265,18 +267,6 @@ class Model():
         Args:
             rounds(int): how many rounds of cross validation to run.
         """
-
-        # Check if fit logic is implemented
-        try:
-            self._evaluate
-        except AttributeError:
-            raise NotImplementedError('Fitting this model is not implemented, cannot cross validate')
-
-        # Check if evaluate logic is implemented
-        try:
-            self._evaluate
-        except AttributeError:
-            raise NotImplementedError('Evaluating this model is not implemented, cannot cross validate')
 
         # Check data
         if not isinstance(series, TimeSeries):

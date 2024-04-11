@@ -154,7 +154,8 @@ class Forecaster(Model):
         else:
             return None
 
-    def evaluate(self, series, steps='auto', limit=None, plot=False, plots=False, metrics=['RMSE', 'MAE'], details=False, start=None, end=None, evaluation_series=False, **kwargs):
+    @Model.evaluate_function
+    def evaluate(self, series, steps='auto', limit=None, plots=False, plot=False, metrics=['RMSE', 'MAE'], details=False, start=None, end=None, evaluation_series=False, **kwargs):
         """Evaluate the forecaster on a series.
 
         Args:
@@ -176,9 +177,6 @@ class Forecaster(Model):
             end(float, datetime): evaluation end (epoch timestamp or datetime).
             evaluation_series(bool): if to add to the results an evaluation timeseirs containing the eror metrics. Defaulted to false.
         """
-        return super(Forecaster, self).evaluate(series, steps, limit, plots, plot, metrics, details, start, end, evaluation_series, **kwargs)
-
-    def _evaluate(self, series, steps='auto', limit=None, plots=False, plot=False, metrics=['RMSE', 'MAE'], details=False, start=None, end=None, evaluation_series=False, **kwargs):
 
         if len(series.data_labels()) > 1:
             raise NotImplementedError('Sorry, evaluating models built for multivariate time series is not supported yet')

@@ -46,14 +46,8 @@ class AnomalyDetector(Model):
         """Disabled. Anomaly detectors cannot be evaluated yet."""
         raise NotImplementedError('Anomaly detectors cannot be evaluated yet.') from None
 
-    def _evaluate(self, series, *args, **kwargs):
-        raise NotImplementedError('Anomaly detectors cannot be evaluated yet.') from None
-
     def cross_validate(self, series, *args, **kwargs):
         """Disabled. Anomaly detectors cannot be evaluated yet."""
-        raise NotImplementedError('Anomaly detectors cannot be evaluated yet.') from None
-
-    def _cross_validate(self, series, *args, **kwargs):
         raise NotImplementedError('Anomaly detectors cannot be evaluated yet.') from None
 
 

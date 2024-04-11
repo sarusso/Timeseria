@@ -77,7 +77,8 @@ class TestBaseModelClasses(unittest.TestCase):
             @Model.apply_function
             def apply(self, series):
                 return series
-            def _evaluate(self, series):
+            @Model.evaluate_function
+            def evaluate(self, series):
                 return {'grade': 'A'}
 
         parametric_model = FittableParametricModelMock()

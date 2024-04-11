@@ -146,12 +146,8 @@ class Reconstructor(Model):
         if not inplace:
             return reconstructed_data
 
-
+    @Model.evaluate_function
     def evaluate(self, series, steps='auto', limit=None, data_loss_threshold=1, metrics=['RMSE', 'MAE'], details=False, start=None, end=None, **kwargs):
-        # This method is overwritten just to change the docstring
-        # TODO: Maybe completely overwrite this kind of methods and get the automatic sanification with decorators,
-        # leaving this approach only for the _fit and _predict but maybe even there it would be better to completely
-        # overwrite and use decorators instead. Consider also fit_logic() or similar. p.s. @model_fit sounds nice.
         """Evaluate the reconstructor on a series.
 
         Args:
@@ -168,9 +164,6 @@ class Reconstructor(Model):
             start(float, datetime): evaluation start (epoch timestamp or datetime).
             end(float, datetim): evaluation end (epoch timestamp or datetime).
         """
-        return super(Reconstructor, self).evaluate(series, steps, limit, data_loss_threshold, metrics, details, start, end, **kwargs)
-
-    def _evaluate(self, series, steps='auto', limit=None, data_loss_threshold=1, metrics=['RMSE', 'MAE'], details=False, start=None, end=None, **kwargs):
 
         if len(series.data_labels()) > 1:
             raise NotImplementedError('Evaluating on multivariate time sries is not yet implemented')
