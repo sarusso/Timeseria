@@ -282,10 +282,15 @@ class TestForecasters(unittest.TestCase):
 
         # Create a minute-resolution test DataTimeSlotSeries
         sine_minute_time_series = TimeSeries()
-        for i in range(10):
+        for i in range(15):
             sine_minute_time_series.append(DataTimeSlot(start=TimePoint(i*60), end=TimePoint((i+1)*60), data={'value':sin(i/10.0)}))
 
         forecaster = LSTMForecaster()
+
+        # Test the cross validation
+        forecaster.cross_validate(sine_minute_time_series, rounds=3)
+
+        # Fit and predict
         forecaster.fit(sine_minute_time_series)
         predicted_data = forecaster.predict(sine_minute_time_series)
 
@@ -295,6 +300,7 @@ class TestForecasters(unittest.TestCase):
         # Not-existent features
         with self.assertRaises(ValueError):
             LSTMForecaster(features=['values','not_existent_feature']).fit(sine_minute_time_series)
+
 
         # Test using another feature
         LSTMForecaster(features=['values','diffs']).fit(sine_minute_time_series)

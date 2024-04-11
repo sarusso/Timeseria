@@ -5,7 +5,7 @@ import copy
 from pandas import DataFrame
 from numpy import array
 from math import sqrt
-from propertime.utils import now_s, dt_from_s
+from propertime.utils import now_s, dt_from_s, s_from_dt
 from datetime import datetime
 
 from ..datastructures import DataTimeSlot, TimePoint, DataTimePoint, Slot, Point, TimeSeries
@@ -947,10 +947,20 @@ class LSTMForecaster(Forecaster, _KerasModel):
 
         # Handle start/end
         if start is not None:
-            raise NotImplementedError()
+            if isinstance(start, datetime):
+                start_t = s_from_dt(start)
+            elif isinstance(start, float):
+                start_t = start
+            else:
+                raise ValueError('Unsupported value for "start", must be either datetime or epoch seconds as float (got {})'.format(type(start)))
 
         if end is not None:
-            raise NotImplementedError()
+            if isinstance(end, datetime):
+                end_t = s_from_dt(end)
+            elif isinstance(end, float):
+                end_t = end
+            else:
+                raise ValueError('Unsupported value for "end", must be either datetime or epoch seconds as float (got {})'.format(type(end)))
 
         # Set verbose switch
         if verbose:
@@ -961,14 +971,31 @@ class LSTMForecaster(Forecaster, _KerasModel):
         # Data labels shortcut
         data_labels = series.data_labels()
 
+        if start is None and end is None:
+            if normalize:
+                series = series.duplicate()
+        else:
+            filtered_series = series.__class__()
+            for item in series:
+                valid = True
+                if start is not None and item.t < start_t:
+                    valid = False
+                if end is not None and item.t >= end_t:
+                    valid = False
+                if valid:
+                    if normalize:
+                        filtered_series.append(copy.deepcopy(item))
+                    else:
+                        filtered_series.append(item)
+            series = filtered_series
+
         if normalize:
             # Set min and max (for each label)
             min_values = series.min()
             max_values = series.max()
 
             # Normalize series
-            series_normalized = series.duplicate()
-            for datapoint in series_normalized:
+            for datapoint in series:
                 for data_label in datapoint.data:
                     datapoint.data[data_label] = (datapoint.data[data_label] - min_values[data_label]) / (max_values[data_label] - min_values[data_label])
 
@@ -976,14 +1003,11 @@ class LSTMForecaster(Forecaster, _KerasModel):
             self.data['min_values'] = min_values
             self.data['max_values'] = max_values
 
-        else:
-            # TODO: here the name is wrong
-            series_normalized = series
 
         # Move to "matrix" of windows plus "vector" of targets data representation. Or, in other words:
         # window_datapoints is a list of lists (matrix) where each nested list (row) is a list of window datapoints.
-        window_datapoints_matrix = self._to_window_datapoints_matrix(series_normalized, window=self.data['window'], steps=1)
-        target_values_vector = self._to_target_values_vector(series_normalized, window=self.data['window'], steps=1)
+        window_datapoints_matrix = self._to_window_datapoints_matrix(series, window=self.data['window'], steps=1)
+        target_values_vector = self._to_target_values_vector(series, window=self.data['window'], steps=1)
 
         # Compute window features
         window_features = []

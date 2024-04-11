@@ -262,6 +262,7 @@ class Model():
         """Call the model evaluate logic on a series."""
         raise NotImplementedError('Evaluating this model is not implemented')
 
+
     def cross_validate(self, series, rounds=10, *args, **kwargs):
         """Cross validate the model on a series, by default with 10 fit/evaluate rounds.
 
@@ -271,6 +272,9 @@ class Model():
         Args:
             rounds(int): how many rounds of cross validation to run.
         """
+
+        if self.fitted:
+            raise NotImplementedError('You are trying to cross-validate a model already fitted, this is not supported yet')
 
         # Check data
         if not isinstance(series, TimeSeries):
@@ -303,27 +307,53 @@ class Model():
         logger.debug('Items per round: {}'.format(round_items))
 
         # Start the fit / evaluate loop
+        temp_model = self
         evaluations = []
         for i in range(rounds):
-            from_t = series[(round_items*i)].t
+            validate_from_i = round_items*i
+            validate_to_i =   (round_items*i)+round_items
+            validate_from_t = series[validate_from_i].t
             try:
-                to_t = series[(round_items*i) + round_items].t
+                validate_to_t = series[validate_to_i].t
             except IndexError:
-                to_t = series[(round_items*i) + round_items - 1].t
-            from_dt = dt_from_s(from_t)
-            to_dt   = dt_from_s(to_t)
-            logger.info('Cross validation round #{} of {}: validate from {} ({}) to {} ({}), fit on the rest.'.format(i+1, rounds, from_t, from_dt, to_t, to_dt))
+                validate_to_t = series[validate_to_i - 1].t
+            validate_from_dt = dt_from_s(validate_from_t)
+            validate_to_dt   = dt_from_s(validate_to_t)
 
-            # Fit
-            if i == 0:
-                logger.debug('Fitting from {} ({})'.format(to_t, to_dt))
-                self.fit(series, start=to_t, **fit_kwargs)
+            logger.debug('Cross validation round #{} of {}: validate from {} ({}) to {} ({}), fit on the rest.'.format(i+1, rounds, validate_from_t, validate_from_dt, validate_to_t, validate_to_dt))
+
+            if validate_from_i == 0:
+                logger.debug('Fitting from {} to the end'.format(validate_to_t))
+                self.fit(series, start=float(validate_to_t), **fit_kwargs)
+            elif validate_to_i >= len(series):
+                logger.debug('Fitting from the beginning to {}'.format(validate_from_t))
+                self.fit(series, end=float(validate_from_t), **fit_kwargs)
             else:
-                logger.debug('Fitting until {} ({}) and then from {} ({}).'.format(to_t, to_dt, from_t, from_dt))
-                self.fit(series, start=to_t, end=from_t, **fit_kwargs)
+                # Find the bigger chunk and fit first on that:
+                if validate_from_t > len(series)-validate_to_t:
+                    logger.debug('Fitting from the beginning to {}'.format(validate_from_t))
+                    self.fit(series, end=float(validate_from_t), **fit_kwargs)
+                    # Now try to fit on the other chunk as well:
+                    try:
+                        logger.debug('Now trying to fit also from {} to the end'.format(validate_to_t))
+                        self.fit_update(series, start=float(validate_to_t), **fit_kwargs)
+                    except (AttributeError, NotImplementedError):
+                        # TODO: Log a warning?
+                        logger.debug('Not supported')
+                else:
+                    logger.debug('Fitting from {} to the end'.format(validate_to_t))
+                    self.fit(series, start=float(validate_to_t), **fit_kwargs)
+                    # Now try to fit on the other chunk as well:
+                    try:
+                        logger.debug('Now trying to fit also from the beginning to {}'.format(validate_from_t))
+                        self.fit_update(series, end=float(validate_from_t), **fit_kwargs)
+                    except (AttributeError, NotImplementedError):
+                        # TODO: Log a warning?
+                        logger.debug('Not supported')
 
             # Evaluate & append
-            evaluations.append(self.evaluate(series, start=from_t, end=to_t, **evaluate_kwargs))
+            evaluations.append(self.evaluate(series, start=float(validate_from_t), end=float(validate_to_t), **evaluate_kwargs))
+            self.fitted = False
 
         # Regroup evaluations
         evaluation_metrics = list(evaluations[0].keys())

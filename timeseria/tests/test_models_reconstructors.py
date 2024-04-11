@@ -141,29 +141,30 @@ class TestReconstructors(unittest.TestCase):
         evaluation = reconstructor.evaluate(time_series, steps=[1,3], limit=100, details=True)
         self.assertAlmostEqual(evaluation['RMSE_3_steps'], 0.23007000302456676)
 
-        # Cross validations
-        reconstructor = PeriodicAverageReconstructor()
-        cross_validation = reconstructor.cross_validate(time_series, evaluate_steps=[1,3], evaluate_limit=100, evaluate_details=True)
-        self.assertAlmostEqual(cross_validation['MAE_3_steps_avg'],  0.2201375926633982)
-        self.assertAlmostEqual(cross_validation['MAE_3_steps_stdev'], 0.035208711688853166)
-
         # Test the evaluate
         evaluation = reconstructor.evaluate(time_series, limit=100, details=True)
-        self.assertAlmostEqual(evaluation['RMSE_1_steps'], 0.13272865912894907)
-        self.assertAlmostEqual(evaluation['MAE_1_steps'], 0.09466327970737677)
-        self.assertAlmostEqual(evaluation['RMSE_24_steps'], 0.6570425995634208)
-        self.assertAlmostEqual(evaluation['MAE_24_steps'], 0.5390349265995485)
-        self.assertAlmostEqual(evaluation['RMSE'], 0.39488562934618493)
-        self.assertAlmostEqual(evaluation['MAE'], 0.31684910315346265)
+        self.assertAlmostEqual(evaluation['RMSE_1_steps'], 0.1311006911714766)
+        self.assertAlmostEqual(evaluation['MAE_1_steps'], 0.09456930013365056)
+        self.assertAlmostEqual(evaluation['RMSE_24_steps'], 0.5906359921625686)
+        self.assertAlmostEqual(evaluation['MAE_24_steps'], 0.48590243600529004)
+        self.assertAlmostEqual(evaluation['RMSE'], 0.3608683416670226)
+        self.assertAlmostEqual(evaluation['MAE'], 0.2902358680694703)
 
         # Test the evaluate on specific steps:
         evaluation = reconstructor.evaluate(time_series, steps=[1,3], limit=100, details=True)
-        self.assertAlmostEqual(evaluation['RMSE_1_steps'], 0.13272865912894907)
-        self.assertAlmostEqual(evaluation['MAE_1_steps'], 0.09466327970737677)
-        self.assertAlmostEqual(evaluation['RMSE_3_steps'], 0.24206666463988694)
-        self.assertAlmostEqual(evaluation['MAE_3_steps'], 0.19434430892864815)
-        self.assertAlmostEqual(evaluation['RMSE'], 0.187397661884418)
-        self.assertAlmostEqual(evaluation['MAE'], 0.14450379431801247)
+        print(evaluation)
+        self.assertAlmostEqual(evaluation['RMSE_1_steps'], 0.1311006911714766)
+        self.assertAlmostEqual(evaluation['MAE_1_steps'], 0.09456930013365056)
+        self.assertAlmostEqual(evaluation['RMSE_3_steps'], 0.23007000302456676)
+        self.assertAlmostEqual(evaluation['MAE_3_steps'], 0.1839695537186356)
+        self.assertAlmostEqual(evaluation['RMSE'], 0.18058534709802168)
+        self.assertAlmostEqual(evaluation['MAE'], 0.13926942692614308)
+
+        # Test the cross validations
+        reconstructor = PeriodicAverageReconstructor()
+        cross_validation = reconstructor.cross_validate(time_series, evaluate_steps=[1,3], evaluate_limit=100, evaluate_details=True)
+        self.assertAlmostEqual(cross_validation['MAE_3_steps_avg'],  0.21579957004654)
+        self.assertAlmostEqual(cross_validation['MAE_3_steps_stdev'], 0.04253001276141535)
 
         # Test on Points as well
         time_series = CSVFileStorage(TEST_DATA_PATH + '/csv/temperature.csv').get(limit=200)
