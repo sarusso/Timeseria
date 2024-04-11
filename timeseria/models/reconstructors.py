@@ -42,28 +42,6 @@ class Reconstructor(Model):
         path (str): a path from which to load a saved model. Will override all other init settings.
     """
 
-    def predict(self, series, from_i, to_i, *args, **kwargs):
-        "Predict the reconstructed value(s) from/to the given indexes (included)."
-
-        # Check series # TODO: this check here is redundant, as already performed in the parent predict(),
-        # but otherwise the following len check might fail.
-        if not isinstance(series, TimeSeries):
-            raise NotImplementedError('Models work only with TimeSeries data for now (got "{}")'.format(series.__class__.__name__))
-
-        # Check if we have enough data to predict, if there is a window.
-        # Note: for reconstructors, widows are assumed to be symmetric
-        # Also note: considerationson the data loss are don in the apply, not here.
-        try:
-            if from_i - self.window < 0:
-                raise ValueError('There is not enough data before the gap to reconstruct for the required window (from_i={}, to_i={}, window_size={}, series_len={})'.format(from_i, to_i, self.window, len(series)))
-            if to_i + self.window > len(series) - 1:
-                raise ValueError('There is not enough data after the gap to reconstruct for the required window (from_i={}, to_i={}, window_size={}, series_len={})'.format(from_i, to_i, self.window, len(series)))
-        except KeyError:
-            pass
-
-        # Call parent predict
-        return super(Reconstructor, self).predict(series, from_i, to_i, *args, **kwargs)
-
     def _apply(self, series, remove_data_loss=False, data_loss_threshold=1, inplace=False):
 
         logger.debug('Using data_loss_threshold="%s"', data_loss_threshold)
@@ -415,10 +393,13 @@ class LinearInterpolationReconstructor(Reconstructor):
 
     window = 1
 
-    def _predict_to_refactor(self, series, data_label, from_index, to_index):
-        pass
+    @Reconstructor.predict_function
+    def predict(self, series, from_i, to_i):
 
-    def _predict(self, series, from_i, to_i):
+        if from_i - self.window < 0:
+            raise ValueError('There is not enough data before the gap to reconstruct for the required window (from_i={}, to_i={}, window_size={}, series_len={})'.format(from_i, to_i, self.window, len(series)))
+        if to_i + self.window > len(series) - 1:
+            raise ValueError('There is not enough data after the gap to reconstruct for the required window (from_i={}, to_i={}, window_size={}, series_len={})'.format(from_i, to_i, self.window, len(series)))
 
         logger.debug('Linear Interpolator reconstructing from #%s to #%s (included)', from_i, to_i)
 
@@ -550,8 +531,13 @@ class PeriodicAverageReconstructor(Reconstructor):
 
         logger.debug('Processed "%s" items', processed)
 
+    @Reconstructor.predict_function
+    def predict(self, series, from_i, to_i):
 
-    def _predict(self, series, from_i, to_i):
+        if from_i - self.window < 0:
+            raise ValueError('There is not enough data before the gap to reconstruct for the required window (from_i={}, to_i={}, window_size={}, series_len={})'.format(from_i, to_i, self.window, len(series)))
+        if to_i + self.window > len(series) - 1:
+            raise ValueError('There is not enough data after the gap to reconstruct for the required window (from_i={}, to_i={}, window_size={}, series_len={})'.format(from_i, to_i, self.window, len(series)))
 
         if verbose_debug:
             logger.debug('Periodic Average Reconstructor predicting from_i=%s to_i=%s (included)', from_i, to_i)
@@ -646,7 +632,8 @@ class ProphetReconstructor(Reconstructor, _ProphetModel):
         # Fit tjhe Prophet model
         self.prophet_model.fit(data)
 
-    def _predict(self, series, from_i, to_i):
+    @Reconstructor.predict_function
+    def predict(self, series, from_i, to_i):
 
         if verbose_debug:
             logger.debug('Periodic Average Reconstructor predicting from_i=%s to_i=%s (included)', from_i, to_i)

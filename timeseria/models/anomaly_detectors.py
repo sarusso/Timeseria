@@ -42,9 +42,6 @@ class AnomalyDetector(Model):
         """Disabled. Anomaly detectors can be used only with the ``apply()`` method."""
         raise NotImplementedError('Anomaly detectors can be used only with the apply() method') from None
 
-    def _predict(self, series, *args, **kwargs):
-        raise NotImplementedError('Anomaly detectors can be used only with the apply() method') from None
-
     def evaluate(self, series, *args, **kwargs):
         """Disabled. Anomaly detectors cannot be evaluated yet."""
         raise NotImplementedError('Anomaly detectors cannot be evaluated yet.') from None

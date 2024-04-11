@@ -71,7 +71,8 @@ class TestBaseModelClasses(unittest.TestCase):
             @Model.fit_function
             def fit(self, series):
                 self.data['param1'] = 1
-            def _predict(self, series):
+            @Model.predict_function
+            def predict(self, series):
                 return series
             def _apply(self, series):
                 return series

@@ -43,10 +43,10 @@ except ImportError:
 #======================
 
 class Forecaster(Model):
-    """A generic series forecasting model. Besides the ``predict()`` and  ``apply()`` methods, it also provides a ``forecast()``
+    """A generic series forecasting model. Besides the ``predict()`` and  ``apply()`` methods, it also has a ``forecast()``
     method which, in case of nested data structures (i.e. DataPoint or DataSlot) allows to get the full forecasted points
-    or slots instead of just the raw, inner data values returned by the ``predict()``. In case of plain data structures (e.g. a list),
-    the ``forecast()`` method is instead equivalent to the ``predict()``.
+    or slots instead of just the raw, inner data values returned by the ``predict()``. In case of plain data structures
+    (e.g. a list), the ``forecast()`` method is instead equivalent to the ``predict()``.
 
     Series resolution and data labels consistency are enforced between all methods and save/load operations.
 
@@ -54,27 +54,8 @@ class Forecaster(Model):
         path (str): a path from which to load a saved model. Will override all other init settings.
     """
 
-    def predict(self, series, steps=1, *args, **kwargs):
-        "Predict n steps-ahead forecast data values."
-
-        # Check series # TODO: this check here is redundant, as already performed in the parent predict(),
-        # but otherwise the following len check might fail.
-        if not isinstance(series, TimeSeries):
-            raise NotImplementedError('Models work only with TimeSeries data for now (got "{}")'.format(series.__class__.__name__))
-
-        # Check if the input series is shorter than the window, if any.
-        # Note that nearly all forecasters use windows, at least of one point.
-        try:
-            if len(series) < self.data['window']:
-                raise ValueError('The data length ({}) is shorter than the model window ({}), it must be at least equal.'.format(len(series), self.data['window']))
-        except KeyError:
-            pass
-
-        # Call parent predict
-        return super(Forecaster, self).predict(series, steps, *args, **kwargs)
-
     def forecast(self, series, steps=1, forecast_start=None):
-        """Forecast n steps-ahead, on some data."""
+        """Forecast n steps-ahead"""
 
         # Check series
         if not isinstance(series, TimeSeries):
@@ -637,7 +618,11 @@ class PeriodicAverageForecaster(Forecaster):
 
         logger.debug('Processed %s items', processed)
 
-    def _predict(self, series, steps=1, from_i=None):
+    @Forecaster.predict_function
+    def predict(self, series, steps=1, from_i=None):
+
+        if len(series) < self.data['window']:
+            raise ValueError('The series length ({}) is shorter than the model window ({})'.format(len(series), self.data['window']))
 
         # Univariate is enforced by the fit
         data_label = self.data['data_labels'][0]
@@ -756,7 +741,8 @@ class ProphetForecaster(Forecaster, _ProphetModel):
         # Prophet, as the ARIMA models, has no window
         self.data['window'] = 0
 
-    def _predict(self, data, steps=1):
+    @Forecaster.predict_function
+    def predict(self, data, steps=1):
 
         series = data
 
@@ -836,7 +822,8 @@ class ARIMAForecaster(Forecaster, _ARIMAModel):
         # The ARIMA models, as Prophet, have no window
         self.data['window'] = 0
 
-    def _predict(self, data, steps=1):
+    @Forecaster.predict_function
+    def predict(self, data, steps=1):
 
         series = data
 
@@ -895,7 +882,8 @@ class AARIMAForecaster(Forecaster, _ARIMAModel):
         # The ARIMA models, as Prophet, have no window
         self.data['window'] = 0
 
-    def _predict(self, series, steps=1):
+    @Forecaster.predict_function
+    def predict(self, series, steps=1):
 
         data_label = self.data['data_labels'][0]
 
@@ -1026,7 +1014,11 @@ class LSTMForecaster(Forecaster, _KerasModel):
         # Fit
         self.keras_model.fit(array(window_features), array(target_values_vector), epochs=epochs, verbose=verbose)
 
-    def _predict(self, series, steps=1, from_i=None, verbose=False):
+    @Forecaster.predict_function
+    def predict(self, series, steps=1, from_i=None, verbose=False):
+
+        if len(series) < self.data['window']:
+            raise ValueError('The series length ({}) is shorter than the model window ({})'.format(len(series), self.data['window']))
 
         if steps>1:
             raise NotImplementedError('This forecaster does not support multi-step predictions.')

@@ -4,6 +4,7 @@
 import os
 import json
 import uuid
+import functools
 import statistics
 from propertime.utils import now_s, dt_from_s
 from pandas import DataFrame
@@ -104,7 +105,6 @@ class Model():
 
         return model
 
-
     @property
     def id(self):
         """A unique identifier for the model. Only for parametric models."""
@@ -122,6 +122,7 @@ class Model():
 
     @staticmethod
     def fit_function(fit_function):
+        @functools.wraps(fit_function)
         def do_fit(self, series, *args, **kwargs):
 
             # Check data
@@ -154,41 +155,43 @@ class Model():
 
         return do_fit
 
-
     def fit(self, series, *args, **kwargs):
         """Fit the model on a series."""
         raise NotImplementedError('Fitting this model is not implemented')
 
+    @staticmethod
+    def predict_function(predict_function):
+        @functools.wraps(predict_function)
+        def do_predict(self, series, *args, **kwargs):
+
+            # Ensure the model is fitted if it has to.
+            if self.is_fit_implemented() and not self.fitted:
+                raise NotFittedError()
+
+            # Check data
+            if not isinstance(series, TimeSeries):
+                raise TypeError('Models work only with TimeSeries data for now (got "{}")'.format(series.__class__.__name__))
+
+            # If TimeSeries data, check it
+            if isinstance(series, TimeSeries):
+                _check_time_series(series)
+                if self.is_parametric():
+                    if isinstance(series.items_type, Point) and len(series) == 1:
+                        # Do not check if the data is a point time series and has only one item
+                        pass
+                    else:
+                        _check_resolution(series, self.data['resolution'])
+                    _check_data_labels(series, self.data['data_labels'])
+
+            # Call predict logic
+            return predict_function(self, series, *args, **kwargs)
+
+        return do_predict
+
     def predict(self, series, *args, **kwargs):
         """Call the model predict logic on a series."""
+        raise NotImplementedError('Predicting with this model is not implemented')
 
-        # Check if predict logic is implemented
-        try:
-            self._predict
-        except AttributeError:
-            raise NotImplementedError('Predicting from this model is not implemented')
-
-        # Ensure the model is fitted if it has to.
-        if self.is_fit_implemented() and not self.fitted:
-            raise NotFittedError()
-
-        # Check data
-        if not isinstance(series, TimeSeries):
-            raise TypeError('Models work only with TimeSeries data for now (got "{}")'.format(series.__class__.__name__))
-
-        # If TimeSeries data, check it
-        if isinstance(series, TimeSeries):
-            _check_time_series(series)
-            if self.is_parametric():
-                if isinstance(series.items_type, Point) and len(series) == 1:
-                    # Do not check if the data is a point time series and has only one item
-                    pass
-                else:
-                    _check_resolution(series, self.data['resolution'])
-                _check_data_labels(series, self.data['data_labels'])
-
-        # Call predict logic
-        return self._predict(series, *args, **kwargs)
 
     def apply(self, series, *args, **kwargs):
         """Apply the model on a series."""
