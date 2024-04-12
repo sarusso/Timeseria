@@ -420,7 +420,7 @@ class CSVFileStorage(Storage):
                     if t is None:
                         if dt.tzinfo is None:
                             if not naive_warned:
-                                logger.warning('Got naive timestamps, assuming UTC.')
+                                logger.info('Got naive timestamps, assuming UTC.')
                                 naive_warned = True
                             dt = pytz.UTC.localize(dt)
                         t = s_from_dt(dt)
