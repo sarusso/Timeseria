@@ -25,10 +25,8 @@ echo -e  "====================================\n"
 # Reduce verbosity, disable Python buffering and set the log level
 ENV_VARS="PYTHONWARNINGS=ignore TF_CPP_MIN_LOG_LEVEL=3 PYTHONUNBUFFERED=on TIMESERIA_LOGLEVEL=$TIMESERIA_LOGLEVEL"
 
-# Note: "cd" as first command does not work, hence the "date".
-# Note: requirements are usually already installed, the pip install here is necessary only when changing them.
 if [ $# -eq 0 ]; then
-    docker run -v $PWD:/opt/Timeseria -it timeseria "date && pip install -r /opt/Timeseria/requirements.txt && cd /opt/Timeseria && $ENV_VARS python3 -m unittest discover"
+    docker run -v $PWD:/opt/Timeseria -it timeseria "date && cd /opt/Timeseria && $ENV_VARS python3 -m unittest discover"
 else
-    docker run -v $PWD:/opt/Timeseria -it timeseria "date && pip install -r /opt/Timeseria/requirements.txt && cd /opt/Timeseria && $ENV_VARS python3 -m unittest $@"
+    docker run -v $PWD:/opt/Timeseria -it timeseria "date && cd /opt/Timeseria && $ENV_VARS python3 -m unittest $@"
 fi

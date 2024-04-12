@@ -27,5 +27,4 @@ echo -e  "====================================\n"
 ENV_VARS="PYTHONWARNINGS=ignore TF_CPP_MIN_LOG_LEVEL=3 PYTHONUNBUFFERED=one"
 
 # Start the build
-# Note: requirements are usually already installed, the pip install here is necessary only when changing them.
-docker run -v $PWD:/opt/Timeseria -it timeseria "pip install -r /opt/Timeseria/requirements.txt && cd /opt/Timeseria/docs && $ENV_VARS make clean && make html"
+docker run -v $PWD:/opt/Timeseria -it timeseria "cd /opt/Timeseria/docs && $ENV_VARS make clean && make html"
