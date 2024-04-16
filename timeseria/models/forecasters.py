@@ -54,12 +54,18 @@ class Forecaster(Model):
         path (str): a path from which to load a saved model. Will override all other init settings.
     """
 
-    def forecast(self, series, steps=1, forecast_start=None):
-        """Forecast n steps-ahead"""
+    window = None
+
+    def forecast(self, series, steps=1, forecast_start=None, context_data=None):
+        """Forecast n steps-ahead data points or slots"""
 
         # Check series
         if not isinstance(series, TimeSeries):
             raise NotImplementedError('Models work only with TimeSeries data for now (got "{}")'.format(series.__class__.__name__))
+
+        if 'target_data_labels' in self.data and self.data['target_data_labels'] and set(self.data['target_data_labels']) != set(series.data_labels()):
+            if not context_data:
+                raise ValueError('Forecasting with a forecaster fit to specific target data labels requires to give context data')
 
         # Set forecast starting item
         if forecast_start is not None:
@@ -70,17 +76,25 @@ class Forecaster(Model):
         # Handle forecast start
         if forecast_start is not None:
             try:
-                predicted_data = self.predict(series, steps=steps, forecast_start=forecast_start)
+                if context_data:
+                    predicted_data = self.predict(series, steps=steps, forecast_start=forecast_start, context_data=context_data)
+                else:
+                    predicted_data = self.predict(series, steps=steps, forecast_start=forecast_start)
             except TypeError as e:
                 if 'unexpected keyword argument' and  'forecast_start' in str(e):
                     raise NotImplementedError('The model does not support the "forecast_start" parameter, cannot proceed')
                 else:
                     raise
         else:
-            predicted_data = self.predict(series, steps=steps)
+            if context_data:
+                predicted_data = self.predict(series, steps=steps, context_data=context_data)
+            else:
+                predicted_data = self.predict(series, steps=steps)
 
         # List of predictions or single prediction?
         if isinstance(predicted_data,list):
+            if context_data:
+                raise NotImplementedError('Context with multi step-ahead predictions is not yet implemented')
             forecast = []
             last_item = forecast_start_item
             for data in predicted_data:
@@ -90,13 +104,15 @@ class Forecaster(Model):
                                                  unit  = series.resolution,
                                                  data_loss = None,
                                                  #tz = series.tz,
-                                                 data  = data))
+                                                 data = data))
                 else:
                     forecast.append(DataTimePoint(t = last_item.t + series.resolution,
                                                   tz = series.tz,
-                                                  data  = data))
+                                                  data = data))
                 last_item = forecast[-1]
         else:
+            if context_data:
+                predicted_data.update(context_data)
             if isinstance(series[0], Slot):
                 forecast = DataTimeSlot(start = forecast_start_item.end,
                                         unit  = series.resolution,
@@ -111,8 +127,13 @@ class Forecaster(Model):
         return forecast
 
     @Model.apply_function
-    def apply(self, series, steps=1, inplace=False):
-        """Apply the forecast on the series for n steps-ahead."""
+    def apply(self, series, steps=1, inplace=False, context_data=None):
+        """Apply the forecast on the given series for n steps-ahead."""
+
+        if 'target_data_labels' in self.data and self.data['target_data_labels'] and set(self.data['target_data_labels']) != set(series.data_labels()):
+            if not context_data:
+                raise ValueError('Applying a forecaster fit to target specific data labels requires to give context data (target_data_labels={})'.format(self.data['target_data_labels']))
+
         if not inplace:
             series = series.duplicate()
 
@@ -124,7 +145,10 @@ class Forecaster(Model):
 
         # Call model forecasting logic
         try:
-            forecast_model_results = self.forecast(series, steps=steps)
+            if context_data:
+                forecast_model_results = self.forecast(series, steps=steps, context_data=context_data)
+            else:
+                forecast_model_results = self.forecast(series, steps=steps)
             if not isinstance(forecast_model_results, list):
                 series.append(forecast_model_results)
             else:
@@ -137,7 +161,10 @@ class Forecaster(Model):
             for _ in range(steps):
 
                 # Call the forecast only on the last point
-                forecast_model_results = self.forecast(series, steps=1)
+                if context_data:
+                    forecast_model_results = self.forecast(series, steps=1, context_data=context_data)
+                else:
+                    forecast_model_results = self.forecast(series, steps=1)
 
                 # Add forecasted index
                 forecast_model_results.data_indexes['forecast'] = 1
@@ -226,30 +253,7 @@ class Forecaster(Model):
                 evaluation_series = evaluation_series[:limit]
 
         # Handle start/end
-        from_t = kwargs.get('from_t', None)
-        to_t = kwargs.get('to_t', None)
-        from_dt = kwargs.get('from_dt', None)
-        to_dt = kwargs.get('to_dt', None)
-        if from_t or to_t or from_dt or to_dt:
-            logger.warning('The from_t, to_t, from_dt and to_d arguments are deprecated, please use start and end instead')
-        from_t, to_t = _set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
-
-        if start is not None:
-            if isinstance(start, datetime):
-                from_dt = start
-            else:
-                try:
-                    from_t = float(start)
-                except:
-                    raise ValueError('Cannot use "{}" as start value, not a datetime nor an epoch timestamp'.format(start))
-        if end is not None:
-            if isinstance(end, datetime):
-                to_dt = end
-            else:
-                try:
-                    to_t = float(end)
-                except:
-                    raise ValueError('Cannot use "{}" as end value, not a datetime nor an epoch timestamp'.format(end))
+        start_t, end_t = self._handle_start_end(start, end)
 
         # Support vars
         results = {}
@@ -350,7 +354,7 @@ class Forecaster(Model):
 
                         # Skip if needed
                         try:
-                            if not _item_is_in_range(series[i], from_t, to_t):
+                            if not _item_is_in_range(series[i], start_t, end_t):
                                 continue
                         except StopIteration:
                             break
@@ -529,44 +533,20 @@ class PeriodicAverageForecaster(Forecaster):
         return model
 
     @Forecaster.fit_function
-    def fit(self, series, periodicity='auto', dst_affected=False, start=None, end=None, **kwargs):
+    def fit(self, series, start=None, end=None, periodicity='auto', dst_affected=False):
         """Fit the model on a series.
 
         Args:
-            periodicity(int): the periodicty of the series. If set to ``auto`` then it will be automatically detected using a FFT.
-            dst_affected(bool): if the model should take into account DST effects.
             start(float, datetime): fit start (epoch timestamp or datetime).
             end(float, datetime): fit end (epoch timestamp or datetime).
+            periodicity(int): the periodicty of the series. If set to ``auto`` then it will be automatically detected using a FFT.
+            dst_affected(bool): if the model should take into account DST effects.
         """
 
         if len(series.data_labels()) > 1:
             raise NotImplementedError('Multivariate time series are not yet supported')
 
-        # Handle start/end
-        from_t = kwargs.get('from_t', None)
-        to_t = kwargs.get('to_t', None)
-        from_dt = kwargs.get('from_dt', None)
-        to_dt = kwargs.get('to_dt', None)
-        if from_t or to_t or from_dt or to_dt:
-            logger.warning('The from_t, to_t, from_dt and to_d arguments are deprecated, please use start and end instead')
-        from_t, to_t = _set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
-
-        if start is not None:
-            if isinstance(start, datetime):
-                from_dt = start
-            else:
-                try:
-                    from_t = float(start)
-                except:
-                    raise ValueError('Cannot use "{}" as start value, not a datetime nor an epoch timestamp'.format(start))
-        if end is not None:
-            if isinstance(end, datetime):
-                to_dt = end
-            else:
-                try:
-                    to_t = float(end)
-                except:
-                    raise ValueError('Cannot use "{}" as end value, not a datetime nor an epoch timestamp'.format(end))
+        start_t, end_t = self._handle_start_end(start, end)
 
         # Set or detect periodicity
         if periodicity == 'auto':
@@ -591,7 +571,7 @@ class PeriodicAverageForecaster(Forecaster):
 
                 # Skip if needed
                 try:
-                    if not _item_is_in_range(item, from_t, to_t):
+                    if not _item_is_in_range(item, start_t, end_t):
                         continue
                 except StopIteration:
                     break
@@ -614,7 +594,7 @@ class PeriodicAverageForecaster(Forecaster):
         logger.debug('Processed %s items', processed)
 
     @Forecaster.predict_function
-    def predict(self, series, steps=1, from_i=None):
+    def predict(self, series, from_i=None, steps=1):
 
         if len(series) < self.data['window']:
             raise ValueError('The series length ({}) is shorter than the model window ({})'.format(len(series), self.data['window']))
@@ -689,40 +669,16 @@ class ProphetForecaster(Forecaster, _ProphetModel):
     window = None
 
     @Forecaster.fit_function
-    def fit(self, series, start=None, end=None, **kwargs):
+    def fit(self, series, start=None, end=None):
 
         if len(series.data_labels()) > 1:
             raise Exception('Multivariate time series are not yet supported')
 
         from prophet import Prophet
 
-        # Handle start/end
-        from_t = kwargs.get('from_t', None)
-        to_t = kwargs.get('to_t', None)
-        from_dt = kwargs.get('from_dt', None)
-        to_dt = kwargs.get('to_dt', None)
-        if from_t or to_t or from_dt or to_dt:
-            logger.warning('The from_t, to_t, from_dt and to_d arguments are deprecated, please use start and end instead')
-        from_t, to_t = _set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
+        start_t, end_t = self._handle_start_end(start, end)
 
-        if start is not None:
-            if isinstance(start, datetime):
-                from_dt = start
-            else:
-                try:
-                    from_t = float(start)
-                except:
-                    raise ValueError('Cannot use "{}" as start value, not a datetime nor an epoch timestamp'.format(start))
-        if end is not None:
-            if isinstance(end, datetime):
-                to_dt = end
-            else:
-                try:
-                    to_t = float(end)
-                except:
-                    raise ValueError('Cannot use "{}" as end value, not a datetime nor an epoch timestamp'.format(end))
-
-        data = self._from_timeseria_to_prophet(series, from_t=from_t, to_t=to_t)
+        data = self._from_timeseria_to_prophet(series, from_t=start_t, to_t=end_t)
 
         # Instantiate the Prophet model
         self.prophet_model = Prophet()
@@ -943,24 +899,50 @@ class LSTMForecaster(Forecaster, _KerasModel):
         self._save_keras_model(path)
 
     @Forecaster.fit_function
-    def fit(self, series, start=None, end=None, verbose=False, epochs=30, normalize=True, **kwargs):
+    def fit(self, series, start=None, end=None, epochs=30, normalize=True, target_data_labels='all', with_context=False, verbose=False):
+        """Fit the model on a series.
 
-        # Handle start/end
-        if start is not None:
-            if isinstance(start, datetime):
-                start_t = s_from_dt(start)
-            elif isinstance(start, float):
-                start_t = start
-            else:
-                raise ValueError('Unsupported value for "start", must be either datetime or epoch seconds as float (got {})'.format(type(start)))
+        Args:
+            series(series): the series on whihc to fit the model.
+            start(datetieme,float): the start timestamp of the fit.
+            end(datetieme,float): the end timestamp of the fit.
+            epochs(int): for how many epochs to train.
+            normalize(bool): if to normalize the data between 0 and 1 or not.
+            target_data_labels(str,list): if to target specific data labels only.
+            with_context(dict): if to use context data when predicting.
+            verbose(bool): if to print the training output in the process.
+        """
 
-        if end is not None:
-            if isinstance(end, datetime):
-                end_t = s_from_dt(end)
-            elif isinstance(end, float):
-                end_t = end
+        # Set and save the targets and context data labels
+        context_data_labels = None
+        if target_data_labels == 'all':
+            target_data_labels = series.data_labels()
+            if with_context:
+                raise ValueError('Cannot use context with all data labels, choose which ones')
+        else:
+            if isinstance(target_data_labels, str):
+                target_data_labels = [target_data_labels]
+            elif isinstance(target_data_labels, list):
+                pass
+                #target_data_labels = target_data_labels
             else:
-                raise ValueError('Unsupported value for "end", must be either datetime or epoch seconds as float (got {})'.format(type(end)))
+                raise TypeError('Don\'t know how to target for data labels as type "{}"'.format(target_data_labels.__class__.__name__))
+            for target_data_label in target_data_labels:
+                if target_data_label not in series.data_labels():
+                    raise ValueError('Cannot target data label "{}" as not found in the series labels ({})'.format(target_data_label, series.data_labels()))
+            if with_context:
+                context_data_labels = []
+                for series_data_label in series.data_labels():
+                    if series_data_label not in target_data_labels:
+                        context_data_labels.append(series_data_label)
+
+        #logger.debug('target_data_labels: {}'.format(target_data_labels))
+        #logger.series_with_forecast('context_data_labels: {}'.format(context_data_labels))
+
+        self.data['target_data_labels'] = target_data_labels
+        self.data['context_data_labels'] = context_data_labels
+
+        start_t, end_t = self._handle_start_end(start, end)
 
         # Set verbose switch
         if verbose:
@@ -976,6 +958,7 @@ class LSTMForecaster(Forecaster, _KerasModel):
                 series = series.duplicate()
         else:
             filtered_series = series.__class__()
+            # TODO: Use _item_is_in_range()? 
             for item in series:
                 valid = True
                 if start is not None and item.t < start_t:
@@ -1003,18 +986,21 @@ class LSTMForecaster(Forecaster, _KerasModel):
             self.data['min_values'] = min_values
             self.data['max_values'] = max_values
 
-
         # Move to "matrix" of windows plus "vector" of targets data representation. Or, in other words:
         # window_datapoints is a list of lists (matrix) where each nested list (row) is a list of window datapoints.
         window_datapoints_matrix = self._to_window_datapoints_matrix(series, window=self.data['window'], steps=1)
-        target_values_vector = self._to_target_values_vector(series, window=self.data['window'], steps=1)
+        if with_context:
+            context_data_matrix = self._to_context_data_matrix(series, window=self.data['window'], context_data_labels=context_data_labels, steps=1)
+        target_values_vector = self._to_target_values_vector(series, window=self.data['window'], steps=1, target_data_labels=target_data_labels)
 
-        # Compute window features
+        # Compute window (plus context) features
         window_features = []
-        for window_datapoints in window_datapoints_matrix:
-            window_features.append(self._compute_window_features(window_datapoints,
-                                                                data_labels = data_labels,
-                                                                features=self.data['features']))
+        for i in range(len(window_datapoints_matrix)):
+            window_features.append(self._compute_window_features(window_datapoints_matrix[i],
+                                                                 data_labels = data_labels,
+                                                                 time_unit = series.resolution,
+                                                                 features = self.data['features'],
+                                                                 context_data = context_data_matrix[i] if with_context else None))
 
         # Obtain the number of features based on _compute_window_features() output
         features_per_window_item = len(window_features[0][0])
@@ -1026,7 +1012,7 @@ class LSTMForecaster(Forecaster, _KerasModel):
             from keras.layers import Dense
             from keras.layers import LSTM
             self.keras_model = Sequential()
-            self.keras_model.add(LSTM(self.data['neurons'], input_shape=(self.data['window'], features_per_window_item)))
+            self.keras_model.add(LSTM(self.data['neurons'], input_shape=(self.data['window'] + 1 if with_context else self.data['window'], features_per_window_item)))
             self.keras_model.add(Dense(output_dimension))
             self.keras_model.compile(loss='mean_squared_error', optimizer='adam')
 
@@ -1034,7 +1020,18 @@ class LSTMForecaster(Forecaster, _KerasModel):
         self.keras_model.fit(array(window_features), array(target_values_vector), epochs=epochs, verbose=verbose)
 
     @Forecaster.predict_function
-    def predict(self, series, steps=1, from_i=None, verbose=False):
+    def predict(self, series, from_i=None, steps=1, context_data=None,  verbose=False):
+        """Fit the model on a series.
+
+        Args:
+            series(series): the series on which to fit the model.
+            from_i(int): the start of the prediction as series position (index).
+            steps(int): how may steps-haead to predict.
+            context_data(dict): the data to use as context for the prediction.
+            verbose(bool): if to print the predict output in the process.
+        """
+
+        # TODO: from_i -> start(datetieme,float,int): the start of the prediction (float for epoch and int for an index).
 
         if len(series) < self.data['window']:
             raise ValueError('The series length ({}) is shorter than the model window ({})'.format(len(series), self.data['window']))
@@ -1054,8 +1051,11 @@ class LSTMForecaster(Forecaster, _KerasModel):
         else:
             window_series = series[-self.data['window']:]
 
-        # Duplicate so that we ae free to normalize in-place at the next step
+        # Duplicate so that we are free to normalize in-place at the next step
         window_series = window_series.duplicate()
+
+        # Convert to list in order to be able to handle datapoints with different labels for the contex
+        window_datapoints = list(window_series)
 
         # Normalize window data if we have to do so
         try:
@@ -1064,18 +1064,18 @@ class LSTMForecaster(Forecaster, _KerasModel):
             normalize = False
         else:
             normalize = True
-            for datapoint in window_series:
+            for datapoint in window_datapoints:
                 for data_label in datapoint.data:
                     datapoint.data[data_label] = (datapoint.data[data_label] - self.data['min_values'][data_label]) / (self.data['max_values'][data_label] - self.data['min_values'][data_label])
 
-        # Compute window features
-        window_features = self._compute_window_features(window_series, data_labels=self.data['data_labels'], features=self.data['features'])
+        # Compute window (plus context) features
+        window_features = self._compute_window_features(window_datapoints, data_labels=self.data['data_labels'], time_unit=series.resolution, features=self.data['features'], context_data=context_data)
 
         # Perform the predict and set prediction data
         yhat = self.keras_model.predict(array([window_features]), verbose=verbose)
 
         predicted_data = {}
-        for i, data_label in enumerate(self.data['data_labels']):
+        for i, data_label in enumerate(self.data['target_data_labels']):
 
             # Get the prediction
             predicted_value_normalized = yhat[0][i]

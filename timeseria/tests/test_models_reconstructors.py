@@ -273,7 +273,7 @@ class TestReconstructors(unittest.TestCase):
         reconstructor = LinearInterpolationReconstructor()
 
         # Check parametric param just in case
-        self.assertFalse(reconstructor.is_parametric())
+        self.assertFalse(reconstructor._is_parametric())
 
         # Apply the reconstructor
         reconstructed_time_series = reconstructor.apply(resampled_time_series)

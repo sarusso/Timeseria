@@ -42,6 +42,8 @@ class Reconstructor(Model):
         path (str): a path from which to load a saved model. Will override all other init settings.
     """
 
+    window = None
+
     @Model.apply_function
     def apply(self, series, remove_data_loss=False, data_loss_threshold=1, inplace=False):
 

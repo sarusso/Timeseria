@@ -6,7 +6,8 @@ import json
 import uuid
 import functools
 import statistics
-from propertime.utils import now_s, dt_from_s
+from propertime.utils import now_s, dt_from_s, s_from_dt
+from datetime import datetime
 from pandas import DataFrame
 import shutil
 
@@ -52,7 +53,7 @@ class Model():
             self.data
         except:
             # No data (parameters) for the model. Check if there is a fit implemented
-            if self.is_fit_implemented():
+            if self._is_fit_implemented():
                 # Yes: the model is parameter and the parameters
                 # are still to be set via the fit
                 self._type = 'parametric'
@@ -72,20 +73,19 @@ class Model():
         except AttributeError:
             self.data = {'id': id}
 
-    def is_fit_implemented(self):
-            try:
-                self.fit(series=None)
-            except NotImplementedError:
-                return False
-            except Exception:
-                return True
-            else:
-                return True
+    @property
+    def id(self):
+        """A unique identifier for the model. Only for parametric models."""
+        if not self._is_parametric():
+            raise TypeError('Non-parametric models have no ID') # TODO: is this the right exception?
+        else:
+            return self.data['id']
 
     @classmethod
     def load(cls, path):
+        """Load the model from a path."""
         # Do we have to load the model (if parametric?)
-        #if not cls.is_parametric():
+        #if not cls._is_parametric():
         #    raise ValueError('Loading a non-parametric model from a path does not make sense')
 
         # Create the model
@@ -105,15 +105,80 @@ class Model():
 
         return model
 
-    @property
-    def id(self):
-        """A unique identifier for the model. Only for parametric models."""
-        if not self.is_parametric():
-            raise TypeError('Non-parametric models have no ID') # TODO: is this the right exception?
-        else:
-            return self.data['id']
+    def _handle_start_end(self, start, end):
+        """Handle start/end arguments."""
+        start_t = None
+        end_t = None
+        if start is not None:
+            if isinstance(start, datetime):
+                start_t = s_from_dt(start)
+            elif isinstance(start, float):
+                start_t = start
+            else:
+                raise ValueError('Unsupported value for "start", must be either datetime or epoch seconds as float (got {})'.format(type(start)))
+        if end is not None:
+            if isinstance(end, datetime):
+                end_t = s_from_dt(end)
+            elif isinstance(end, float):
+                end_t = end
+            else:
+                raise ValueError('Unsupported value for "end", must be either datetime or epoch seconds as float (got {})'.format(type(end)))
+        if start_t is not None and end_t is not None:
+                if start_t >= end_t:
+                    raise ValueError('Start is grater or equal than end')
+        return(start_t,end_t)
 
-    def is_parametric(self):
+    def save(self, path):
+        """Save the model in the given path. The model is saved in "directory format",
+         meaning that a new directory will be created containing the data for the model."""
+
+        # Is this model parametric?
+        if not self._is_parametric():
+            raise TypeError('Saving a non-parametric model from a path does not make sense') # TODO: is this the right exception?
+
+        # Ensure the model is fitted if it has to
+        if self._is_fit_implemented() and not self.fitted:
+            raise NotFittedError()
+
+        if not path:
+            raise ValueError('Got empty path, cannot save')
+
+        if os.path.exists(path):
+            raise ValueError('The path "{}" already exists'.format(path))
+
+        # Prepare model dir and dump data as json
+        os.makedirs(path)
+        model_data_file = '{}/data.json'.format(path)
+
+        # Temporary change the resolution to its string representation (if any)
+        if 'resolution' in self.data:
+            resolution_obj = self.data['resolution']
+            self.data['resolution'] = str(resolution_obj)
+
+        # Write the data
+        try:
+            with open(model_data_file, 'w') as f:
+                f.write(json.dumps(self.data))
+        finally:
+            # In any case revert resolution back to object (if any)
+            if 'resolution' in self.data:
+                self.data['resolution'] = resolution_obj
+
+        logger.info('Saved model with id "%s" in "%s"', self.data['id'], path)
+
+
+    def _is_fit_implemented(self):
+        """If the model has a fit method implemented or not."""
+        try:
+            self.fit(series=None)
+        except NotImplementedError:
+            return False
+        except Exception:
+            return True
+        else:
+            return True
+
+    def _is_parametric(self):
         """If the model is parametric or not."""
         if self._type == 'parametric':
             return True
@@ -167,7 +232,7 @@ class Model():
         def do_predict(self, series, *args, **kwargs):
 
             # Ensure the model is fitted if it has to.
-            if self.is_fit_implemented() and not self.fitted:
+            if self._is_fit_implemented() and not self.fitted:
                 raise NotFittedError()
 
             # Check data
@@ -177,13 +242,19 @@ class Model():
             # If TimeSeries data, check it
             if isinstance(series, TimeSeries):
                 _check_time_series(series)
-                if self.is_parametric():
+                if self._is_parametric():
                     if isinstance(series.items_type, Point) and len(series) == 1:
                         # Do not check if the data is a point time series and has only one item
                         pass
                     else:
                         _check_resolution(series, self.data['resolution'])
                     _check_data_labels(series, self.data['data_labels'])
+
+            # Check context
+            if 'context_data' in kwargs and kwargs['context_data'] and ('context_data_labels' not in self.data or not self.data['context_data_labels']):
+                raise ValueError('This model does not accept context data')
+            if 'context_data_labels' in self.data and self.data['context_data_labels'] and ('context_data' not in kwargs or not kwargs['context_data']):
+                raise ValueError('This model requires context data ({})'.format(self.data['context_data_labels']))
 
             # Call predict logic
             return predict_function(self, series, *args, **kwargs)
@@ -201,7 +272,7 @@ class Model():
         def do_apply(self, series, *args, **kwargs):
 
             # Ensure the model is fitted if it has to.
-            if self.is_fit_implemented() and not self.fitted:
+            if self._is_fit_implemented() and not self.fitted:
                 raise NotFittedError()
 
             # Check data
@@ -211,7 +282,7 @@ class Model():
             # If TimeSeries data, check it
             if isinstance(series, TimeSeries):
                 _check_time_series(series)
-                if self.is_parametric():
+                if self._is_parametric():
                     if isinstance(series.items_type, Point) and len(series) == 1:
                         # Do not check if the data is a point time series and has only one item
                         pass
@@ -235,7 +306,7 @@ class Model():
         def do_evaluate(self, series, *args, **kwargs):
 
             # Ensure the model is fitted if it has to.
-            if self.is_fit_implemented() and not self.fitted:
+            if self._is_fit_implemented() and not self.fitted:
                 raise NotFittedError()
 
             # Check data
@@ -245,7 +316,7 @@ class Model():
             # If TimeSeries data, check it
             if isinstance(series, TimeSeries):
                 _check_time_series(series)
-                if self.is_parametric():
+                if self._is_parametric():
                     if isinstance(series.items_type, Point) and len(series) == 1:
                         # Do not check if the data is a point time series and has only one item
                         pass
@@ -261,7 +332,6 @@ class Model():
     def evaluate(self, series, *args, **kwargs):
         """Call the model evaluate logic on a series."""
         raise NotImplementedError('Evaluating this model is not implemented')
-
 
     def cross_validate(self, series, rounds=10, *args, **kwargs):
         """Cross validate the model on a series, by default with 10 fit/evaluate rounds.
@@ -374,44 +444,6 @@ class Model():
             results[evaluation_metric+'_avg'] = statistics.mean(scores_by_evaluation_metric[evaluation_metric])
             results[evaluation_metric+'_stdev'] = statistics.stdev(scores_by_evaluation_metric[evaluation_metric])
         return results
-
-    def save(self, path):
-        """Save the model in the given path. The model is saved in "directory format",
-         meaning that a new directory will be created containing the data for the model."""
-
-        # Is this model parametric?
-        if not self.is_parametric():
-            raise TypeError('Saving a non-parametric model from a path does not make sense') # TODO: is this the right exception?
-
-        # Ensure the model is fitted if it has to
-        if self.is_fit_implemented() and not self.fitted:
-            raise NotFittedError()
-
-        if not path:
-            raise ValueError('Got empty path, cannot save')
-
-        if os.path.exists(path):
-            raise ValueError('The path "{}" already exists'.format(path))
-
-        # Prepare model dir and dump data as json
-        os.makedirs(path)
-        model_data_file = '{}/data.json'.format(path)
-
-        # Temporary change the resolution to its string representation (if any)
-        if 'resolution' in self.data:
-            resolution_obj = self.data['resolution']
-            self.data['resolution'] = str(resolution_obj)
-
-        # Write the data
-        try:
-            with open(model_data_file, 'w') as f:
-                f.write(json.dumps(self.data))
-        finally:
-            # In any case revert resolution back to object (if any)
-            if 'resolution' in self.data:
-                self.data['resolution'] = resolution_obj
-
-        logger.info('Saved model with id "%s" in "%s"', self.data['id'], path)
 
 
 #=========================
@@ -534,10 +566,10 @@ class _KerasModel(Model):
     # ARIMA and Prophet above also. Consider moving them in a "utility" package or directly in the models.
 
     @staticmethod
-    def _to_window_datapoints_matrix(series, window, steps, encoder=None):
+    def _to_window_datapoints_matrix(series, window, steps):
         '''Compute window datapoints matrix from a time series.'''
-        # steps to be intended as steps ahead (for the forecaster)
-        window_datapoints = []
+        # The "steps" are to be intended as steps ahead (i.e. for forecasters, which is usually not implemented for values >1)
+        window_datapoints_matrix = []
         for i, _ in enumerate(series):
             if i <  window:
                 continue
@@ -545,19 +577,32 @@ class _KerasModel(Model):
                 break
 
             # Add window values
-            row = []
+            window_datapoints = []
             for j in range(window):
-                row.append(series[i-window+j])
-            window_datapoints.append(row)
+                window_datapoints.append(series[i-window+j])
+            window_datapoints_matrix.append(window_datapoints)
 
-        return window_datapoints
+        return window_datapoints_matrix
 
     @staticmethod
-    def _to_target_values_vector(series, window, steps):
+    def _to_context_data_matrix(series, window, steps, context_data_labels):
+        '''Compute context data for partial forecasters from a time series.'''
+        if steps > 1:
+            raise NotImplementedError('Context with multi steps-ahead is not yet implemented')
+        context_data_matrix = []
+        for i, _ in enumerate(series):
+            if i <  window:
+                continue
+
+            # Add context data
+            context_data_matrix.append({data_label: series[i].data[data_label] for data_label in context_data_labels})
+
+        return context_data_matrix
+
+    @staticmethod
+    def _to_target_values_vector(series, window, steps, target_data_labels):
         '''Compute target values vector from a time series.'''
         # steps to be intended as steps ahead (for the forecaster)
-
-        data_labels = series.data_labels()
 
         targets = []
         for i, _ in enumerate(series):
@@ -569,14 +614,14 @@ class _KerasModel(Model):
             # Add forecast target value(s)
             row = []
             for j in range(steps):
-                for data_label in data_labels:
-                    row.append(series[i+j].data[data_label])
+                for target_data_label in target_data_labels:
+                    row.append(series[i+j].data[target_data_label])
             targets.append(row)
 
         return targets
 
     @staticmethod
-    def _compute_window_features(window_datapoints, data_labels, features):
+    def _compute_window_features(window_datapoints, data_labels, time_unit, features, context_data=None):
         """Compute features from a list of window data points (or slots).
 
         Args:
@@ -594,8 +639,20 @@ class _KerasModel(Model):
             if feature not in available_features:
                 raise ValueError('Unknown feature "{}"'.format(feature))
 
-        window_features=[]
+        # Handle context data if any (as "fake", context datapoint)
+        if context_data:
+            context_datapoint_dt = window_datapoints[-1].dt + time_unit
+            context_datapoint = window_datapoints[-1].__class__(dt = context_datapoint_dt, data = context_data)
+            # for data_label in data_labels:
+            #     if data_label not in context_datapoint.data:
+            #         context_datapoint.data[data_label] = None
+            window_datapoints.append(context_datapoint)
 
+        #for item in window_datapoints:
+        #    logger.critical(item)
+
+        # Compute the features
+        window_features = []
         for i in range(len(window_datapoints)):
 
             datapoint_features = []
@@ -603,20 +660,27 @@ class _KerasModel(Model):
             # 1) Data point/slot values (for all data labels)
             if 'values' in features:
                 for data_label in data_labels:
-                    datapoint_features.append(window_datapoints[i].data[data_label])
+                    #if window_datapoints[i].data[data_label] is not None:
+                    try:
+                        datapoint_features.append(window_datapoints[i].data[data_label])
+                    except KeyError:
+                        datapoint_features.append(0.0)
 
             # 2) Compute diffs on normalized datapoints
             if 'diffs' in features:
                 for data_label in data_labels:
-                    if i == 0:
-                        diff = window_datapoints[1].data[data_label] - window_datapoints[0].data[data_label]
-                    elif i == len(window_datapoints)-1:
-                        diff = window_datapoints[-1].data[data_label] - window_datapoints[-2].data[data_label]
-                    else:
-                        diff = (window_datapoints[i+1].data[data_label] - window_datapoints[i-1].data[data_label]) /2
-                    if diff == 0:
-                        diff = 1
-                    datapoint_features.append(diff)
+                    try:
+                        if i == 0:
+                            diff = window_datapoints[1].data[data_label] - window_datapoints[0].data[data_label]
+                        elif i == len(window_datapoints)-1:
+                            diff = window_datapoints[-1].data[data_label] - window_datapoints[-2].data[data_label]
+                        else:
+                            diff = (window_datapoints[i+1].data[data_label] - window_datapoints[i-1].data[data_label]) /2
+                        if diff == 0:
+                            diff = 1
+                        datapoint_features.append(diff)
+                    except KeyError:
+                        datapoint_features.append(0.0)
 
             # 3) Hour (normlized)
             if 'hours' in features:
@@ -624,6 +688,8 @@ class _KerasModel(Model):
 
             # Now append to the window features
             window_features.append(datapoint_features)
+
+
 
         return window_features
 
