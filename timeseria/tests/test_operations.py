@@ -489,29 +489,38 @@ class TestOpertions(unittest.TestCase):
     def test_filter(self):
 
         # Test  data
-        series =  TimeSeries(DataTimePoint(t=60, data={'a':1, 'b':2}),
-                             DataTimePoint(t=120, data={'a':2, 'b':4}),
-                             DataTimePoint(t=180, data={'a':3, 'b':8}))
+        series =  TimeSeries(DataTimePoint(t=60, data={'a':1, 'b':2, 'c':3}),
+                             DataTimePoint(t=120, data={'a':2, 'b':4, 'c':4}),
+                             DataTimePoint(t=180, data={'a':3, 'b':8, 'c':5}))
 
         # Test get item by string key (filtering on data labels)
         self.assertEqual(filter(series, 'b')[0].data, {'b': 2})
 
         # Test get item by string key (filtering on data labels), from the series
+        self.assertEqual(series.filter('a').data_labels(), ['a'])
+        self.assertEqual(len(series.filter('a')), 3 )
         self.assertEqual(series.filter('a')[0].data, {'a': 1})
         self.assertEqual(series.filter('a')[1].data, {'a': 2})
         self.assertEqual(series.filter('a')[2].data, {'a': 3})
-        self.assertEqual(len(series.filter('a')), 3 )
+
 
         # Test that we haven't modified the original series
-        self.assertEqual(series.data_labels(), ['a', 'b'])
+        self.assertEqual(series.data_labels(), ['a', 'b', 'c'])
         self.assertEqual(series[1].data['b'], 4)
 
+        # Test for multiple filtering data labels
+        self.assertEqual(set(series.filter('a', 'c').data_labels()), {'a', 'c'})
+        self.assertEqual(len(series.filter('a', 'c')), 3 )
+        self.assertEqual(series.filter('a', 'c')[0].data, {'a': 1,'c':3})
+        self.assertEqual(series.filter('a', 'c')[1].data, {'a': 2, 'c':4})
+        self.assertEqual(series.filter('a', 'c')[2].data, {'a': 3, 'c':5})
+
+        # Test error when filtering for non key-value  data
         series =  TimeSeries(DataTimePoint(t=60, data=[1,2]),
                              DataTimePoint(t=120, data=[3,4]),
                              DataTimePoint(t=180, data=[5,6]))
-
         with self.assertRaises(TypeError):
-            series.filter(data_label='0')
+            series.filter('0')
 
 
     def test_slice(self):

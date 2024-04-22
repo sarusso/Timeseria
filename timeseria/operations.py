@@ -827,7 +827,7 @@ class Get(Operation):
 class Filter(Operation):
     """Filter operation (callable object)."""
 
-    def _compute(self, series, data_label):
+    def _compute(self, series, *data_labels):
 
         _check_series_of_points_or_slots(series)
         _check_indexed_data(series)
@@ -842,7 +842,7 @@ class Filter(Operation):
             raise TypeError('Cannot filter by data label on non key-value data (Got "{}")'.format(series[0].data.__class__.__name__))
         for item in series:
             filtered_item = copy(item)
-            filtered_item._data = {data_label: item._data_by_label(data_label)}
+            filtered_item._data = {data_label: item._data_by_label(data_label) for data_label in data_labels}
             filtered_series.append(filtered_item)
 
         # Re-set reference data as well

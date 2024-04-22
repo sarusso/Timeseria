@@ -1064,10 +1064,10 @@ class Series(list):
         from .operations import get as get_operation
         return get_operation(self, position)
 
-    def filter(self, data_label):
-        """Filter a series by a ``data_label``. A series of DataPoints or DataSlots is required."""
+    def filter(self, *data_labels):
+        """Filter a series by data label(s). A series of DataPoints or DataSlots is required."""
         from .operations import filter as filter_operation
-        return filter_operation(self, data_label=data_label)
+        return filter_operation(self, *data_labels)
 
     def slice(self, start=None, end=None):
         """Slice a series from a "start" to an "end". A series of DataPoints or DataSlots is required."""
