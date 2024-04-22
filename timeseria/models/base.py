@@ -221,7 +221,7 @@ class Model():
 
         return do_fit
 
-    def fit(self, series, *args, **kwargs):
+    def fit(self, series, verbose=False):
         """Fit the model on a series."""
         raise NotImplementedError('Fitting this model is not implemented')
 
@@ -261,7 +261,7 @@ class Model():
 
         return do_predict
 
-    def predict(self, series, *args, **kwargs):
+    def predict(self, series):
         """Call the model predict logic on a series."""
         raise NotImplementedError('Predicting with this model is not implemented')
 
@@ -295,7 +295,7 @@ class Model():
 
         return do_apply
 
-    def apply(self, series, *args, **kwargs):
+    def apply(self, series):
         """Call the model apply logic on a series."""
         raise NotImplementedError('Applying this model is not implemented')
 
@@ -329,11 +329,11 @@ class Model():
 
         return do_evaluate
 
-    def evaluate(self, series, *args, **kwargs):
+    def evaluate(self, series):
         """Call the model evaluate logic on a series."""
         raise NotImplementedError('Evaluating this model is not implemented')
 
-    def cross_validate(self, series, rounds=10, *args, **kwargs):
+    def cross_validate(self, series, rounds=10, **kwargs):
         """Cross validate the model on a series, by default with 10 fit/evaluate rounds.
 
         All the parameters starting with the ``fit_`` prefix are forwarded to the model ``fit()`` method (without the prefix), and
@@ -377,7 +377,6 @@ class Model():
         logger.debug('Items per round: {}'.format(round_items))
 
         # Start the fit / evaluate loop
-        temp_model = self
         evaluations = []
         for i in range(rounds):
             validate_from_i = round_items*i

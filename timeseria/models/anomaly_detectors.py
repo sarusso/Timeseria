@@ -9,7 +9,7 @@ from .base import Model
 from math import log10
 from fitter import Fitter, get_common_distributions, get_distributions
 from ..utilities import DistributionFunction
-
+from statistics import stdev
 import fitter as fitter_library
 
 
@@ -86,15 +86,12 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
             if model_class:
                 raise ValueError('The model_class was given in the init but it is already set in the anomaly detector')
 
+        self.predictive_model_args = args
+        self.predictive_model_kwargs = kwargs
+
         # Call parent init
         super(ModelBasedAnomalyDetector, self).__init__()
  
-        # Initialize the internal model
-        self.model = self.model_class(*args, **kwargs)
-
-        # Finally, set the id of the model in the data
-        self.data['model_id'] = self.model.data['id']
-
     @classmethod
     def load(cls, path):
         model = super().load(path)
@@ -113,18 +110,23 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
         self.model.save(path+'/'+str(self.model.id))
 
 
-    def _get_actual_and_predicted(self, series, i, data_label, window):
+    def _get_actual_and_predicted(self, series, i, data_label, with_partials):
 
             # Call model predict logic and compare with the actual data
             actual = series[i].data[data_label]
-            if isinstance(self.model, Reconstructor):
+            if issubclass(self.model_class, Reconstructor):
                 prediction = self.model.predict(series, from_i=i,to_i=i)
-            elif isinstance(self.model, Forecaster):
-                prediction = self.model.predict(series, steps=1, from_i=i) 
+            elif issubclass(self.model_class, Forecaster):
+                if with_partials:
+                    prediction = self.models[data_label].predict(series, steps=1, from_i=i, context_data=series[i].data)
+                else:
+                    # TODO: in case of forecasters without partials, this is a performance hit for multivariate
+                    # time series as the same predict is called in the exact same way for each data label.
+                    prediction = self.model.predict(series, steps=1, from_i=i)
             else:
-                raise TypeError('Don\'t know how to handle predictive model of type "{}"'.format(self.model.__class__.__name__))
+                raise TypeError('Don\'t know how to handle predictive model class "{}"'.format(self.model_class.__name__))
 
-            # Handle list of dicts or dict of lists (of wich we have only one value here)
+            # Handle list of dicts or dict of lists (of which we have only one value here)
             #{'value': [0.2019341593004146, 0.29462641146884005]}
 
             if isinstance(prediction, list):
@@ -136,113 +138,186 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
                     predicted = prediction[data_label]
             else:
                 raise TypeError('Don\'t know how to handle a prediction with of type "{}"'.format(prediction.__class__.__name__))
-
+            #logger.debug('{:f}\tvs\t{}:\tdiff={}'.format(actual, predicted, actual-predicted))
             return (actual, predicted)
 
 
     @AnomalyDetector.fit_function
-    def fit(self, series, *args, **kwargs):
+    def fit(self, series, verbose=False, summary=False, with_partials=False, **kwargs):
 
         error_distribution = kwargs.pop('error_distribution', None)
         if not error_distribution:
             error_distributions = kwargs.pop('error_distributions', fitter_library.fitter.get_common_distributions() +['gennorm'])
-            #distributions = kwargs.pop('distributions', fitter_library.fitter.get_distributions())
         else:
             error_distributions = [error_distribution]
 
-        summary = kwargs.pop('summary', False)
+        # Fit the predictive model(s)
+        if with_partials:
+            if not len(series.data_labels()) > 1:
+                raise ValueError('Anomaly detection with partial predictions on univariate series does not make sense')
 
-        # Fit the predictive model
-        self.model.fit(series, *args, **kwargs)
-        logger.info('Predictive model fitted')
+            # Fit separate models, one for each data label
+            self.models = {}
+            self.data['model_ids'] = {}
+            for data_label in series.data_labels():
+                if verbose:
+                    print('Fitting for "{}":'.format(data_label))
+                logger.debug('Fitting for "%s"...', data_label)
+
+                # Initialize the internal model for this label
+                self.models[data_label] = self.model_class(*self.predictive_model_args, **self.predictive_model_kwargs)
+
+                # Set the id of the internal model in the data
+                self.data['model_ids'][data_label] = self.models[data_label].data['id']
+
+                # Fit it
+                self.models[data_label].fit(series, **kwargs, target_data_labels=[data_label], with_context_data=True, verbose=verbose)
+
+                # Set the model window if not already done:
+                if 'model_window' not in self.data:
+                    self.data['model_window'] = self.models[data_label].window
+
+        else:
+            # Initialize the internal model
+            self.model = self.model_class(*self.predictive_model_args, **self.predictive_model_kwargs)
+
+            # Set the id of the internal model in the data
+            self.data['model_id'] = self.model.data['id']
+
+            # Fit it
+            self.model.fit(series, **kwargs, verbose=verbose)
+
+            # Set the model window
+            self.data['model_window'] = self.model.window
+
+        if verbose:
+            print('Predictive model(s) fitted, now evaluating')
+        logger.info('Predictive model(s) fitted, now evaluating...')
+
+        # Store if to use partials or not
+        self.data['with_partials'] = with_partials
+
+        # Initialize internal dictionaries
+        self.data['prediction_errors'] = {}
+        self.data['stdevs'] = {} 
+        self.data['error_distributions'] = {}
+        self.data['error_distributions_params'] = {}
+        self.data['error_distributions_stats'] = {}
 
         # Evaluate the predictive for one step ahead and get the forecasting errors
-        prediction_errors = []
+        prediction_errors = {}
+        progress_step = len(series)/10
+
         for data_label in series.data_labels():
-            logger.debug('Computing actual vs predicted for "%s"...', data_label)
+
+            prediction_errors[data_label] = []
+
+            if verbose:
+                print('Computing actual vs predicted for "{}": '.format(data_label), end='')
+            logger.info('Computing actual vs predicted for "{}": '.format(data_label))
+
             for i, _ in enumerate(series):
+                if verbose:
+                    if int(i%progress_step) == 0:
+                        print('.', end='')
 
                 # Before the window
-                if i <=  self.model.window:
+                if i <=  self.data['model_window']:
                     continue
 
                 # After the window (if using a reconstructor)
-                if isinstance(self.model, Reconstructor):
-                    if i > len(series)-self.model.window-1:
+                if issubclass(self.model_class, Reconstructor):
+                    if i > len(series)-self.data['model_window']-1:
                         break
 
                 # Predict & append the error
                 #logger.debug('Predicting and computing the difference (i=%s)', i)
-                actual, predicted = self._get_actual_and_predicted(series, i, data_label, self.model.window)
-                prediction_errors.append(actual-predicted)
+                actual, predicted = self._get_actual_and_predicted(series, i, data_label, with_partials)
+                prediction_errors[data_label].append(actual-predicted)
 
-        # Store the forecasting errors internally in the model
-        self.data['prediction_errors'] = prediction_errors
+            # Store the forecasting errors internally in the model
+            self.data['prediction_errors'] = prediction_errors
 
-        # Fit the distributions and select the best one
-        fitter = fitter_library.fitter.Fitter(prediction_errors, distributions=error_distributions)
-        fitter.fit(progress=False)
+            if verbose:
+                print('')
 
-        if summary:
-            # Warning: the summary() function will also generate a plot
-            print(fitter.summary())
+        if verbose:
+            print('Model(s) evaluated, now computing the error distribution(s)')
+        logger.info('Model(s) evaluated, now computing the error distribution(s)...')
 
-        best_error_distribution = list(fitter.get_best().keys())[0]
-        best_error_distribution_stats = fitter.summary(plot=False).transpose().to_dict()[best_error_distribution]
-        error_distribution_params = fitter.get_best()[best_error_distribution]
+        for data_label in series.data_labels():
+            if verbose:
+                print('Selecting error distribution for "{}"'.format(data_label))
+            logger.info('Selecting error distribution for "{}"'.format(data_label))
+            # Fit the distributions and select the best one
+            fitter = fitter_library.fitter.Fitter(prediction_errors[data_label], distributions=error_distributions)
+            fitter.fit(progress=False)
 
-        if best_error_distribution_stats['ks_pvalue'] < 0.05:
+            if summary:
+                # Warning: the summary() function will also generate a plot
+                print(fitter.summary())
 
-            logger.warning('The error distribution ({}) ks p-value is low ({}). '.format(best_error_distribution, best_error_distribution_stats['ks_pvalue']) +
-                           'Expect issues. In case of math domain errors, try using lower index boundaries.')
+            best_error_distribution = list(fitter.get_best().keys())[0]
+            best_error_distribution_stats = fitter.summary(plot=False).transpose().to_dict()[best_error_distribution]
+            error_distribution_params = fitter.get_best()[best_error_distribution]
 
-        if not (-0.01 <= error_distribution_params['loc'] <= 0.01):
-            logger.warning('The error distribution is not centered in (almost) zero, but in {}. Expect issues.'.format(error_distribution_params['loc']))
+            if best_error_distribution_stats['ks_pvalue'] < 0.05:
 
-        self.data['error_distribution'] = best_error_distribution
-        self.data['error_distribution_params'] = error_distribution_params
-        self.data['error_distribution_stats'] = best_error_distribution_stats
+                logger.warning('The error distribution for "{}" ({}) ks p-value is low ({}). '.format(data_label, best_error_distribution, best_error_distribution_stats['ks_pvalue']) +
+                               'Expect issues. In case of math domain errors, try using lower index boundaries.')
 
-        from statistics import stdev
-        self.data['stdev'] = stdev(prediction_errors)
-        logger.info('Anomaly detector fitted')
+            if not (-0.01 <= error_distribution_params['loc'] <= 0.01):
+                logger.warning('The error distribution for "{}" is not centered in (almost) zero, but in {}. Expect issues.'.format(data_label, error_distribution_params['loc']))
+
+            self.data['error_distributions'][data_label] = best_error_distribution
+            self.data['error_distributions_params'][data_label] = error_distribution_params
+            self.data['error_distributions_stats'][data_label] = best_error_distribution_stats
+
+            self.data['stdevs'][data_label] = stdev(prediction_errors[data_label])
+            logger.info('Anomaly detector fitted')
 
     def inspect(self, plot=True):
         '''Inspect the model and plot the error distribution'''
 
-        abs_prediction_errors = [abs(prediction_error) for prediction_error in self.data['prediction_errors']]
+        for data_label in self.data['error_distributions']:
 
-        print('Predictive model avg error (abs): {}'.format(sum(abs_prediction_errors)/len(abs_prediction_errors)))
-        print('Predictive model min error (abs): {}'.format(min(abs_prediction_errors)))
-        print('Predictive model max error (abs): {}'.format(max(abs_prediction_errors)))
+            abs_prediction_errors = [abs(prediction_error) for prediction_error in self.data['prediction_errors'][data_label]]
 
-        print('Error distribution: {}'.format(self.data['error_distribution']))
-        print('Error distribution params: {}'.format(self.data['error_distribution_params']))
-        print('Error distribution stats: {}'.format(self.data['error_distribution_stats']))
+            print('\n==========================')
+            print(' Details for "{}"'.format(data_label))
+            print('==========================')
 
-        if plot:
+            print('Predictive model avg error (abs): {}'.format(sum(abs_prediction_errors)/len(abs_prediction_errors)))
+            print('Predictive model min error (abs): {}'.format(min(abs_prediction_errors)))
+            print('Predictive model max error (abs): {}'.format(max(abs_prediction_errors)))
 
-            x_min = min(self.data['prediction_errors'])
-            x_max = max(self.data['prediction_errors'])
+            print('Error distribution: {}'.format(self.data['error_distributions'][data_label]))
+            print('Error distribution params: {}'.format(self.data['error_distributions_params'][data_label]))
+            print('Error distribution stats: {}'.format(self.data['error_distributions_stats'][data_label]))
 
-            # Instantiate the errro distribution function
-            distribution_function = DistributionFunction(self.data['error_distribution'],
-                                                         self.data['error_distribution_params'])
+            if plot:
 
-            # Get the error distribution function plot
-            plt = distribution_function.plot(show=False, x_min=x_min, x_max=x_max)
+                x_min = min(self.data['prediction_errors'][data_label])
+                x_max = max(self.data['prediction_errors'][data_label])
 
-            # Add the histogram to the plot
-            plt.hist(self.data['prediction_errors'], bins=100, density=True, alpha=1, color='steelblue')
+                # Instantiate the errro distribution function
+                distribution_function = DistributionFunction(self.data['error_distributions'][data_label],
+                                                             self.data['error_distributions_params'][data_label])
 
-            # Override title
-            #plt.title('Error distribution: {}'.format(self.data['error_distribution']))
+                # Get the error distribution function plot
+                plt = distribution_function.plot(show=False, x_min=x_min, x_max=x_max)
 
-            # Show the plot
-            plt.show()
+                # Add the histogram to the plot
+                plt.hist(self.data['prediction_errors'][data_label], bins=100, density=True, alpha=1, color='steelblue')
+
+                # Override title
+                #plt.title('Error distribution: {}'.format(self.data['error_distribution']))
+
+                # Show the plot
+                plt.show()
 
     @Model.apply_function
-    def apply(self, series, index_range=['avg_err','max_err'], index_type='log', threshold=None, multivariate_index_strategy='max', details=False):
+    def apply(self, series, index_range=['avg_err','max_err'], index_type='log', threshold=None, multivariate_index_strategy='max', details=False, verbose=False):
 
         """Apply the anomaly detection model on a series.
 
@@ -276,60 +351,83 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
                                  for the predicted values, "err" for the error, and "dist" for the error distribution.
         """
 
-        # Support vars
+
+        # Initialize the result time series
         result_series = series.__class__()
-        sigma = self.data['stdev']
 
         # Initialize the error distribution function
-        error_distribution_function = DistributionFunction(self.data['error_distribution'],
-                                                           self.data['error_distribution_params'])
+        error_distribution_functions = {}
+        for data_label in self.data['error_distributions']:
+            error_distribution_functions[data_label] = DistributionFunction(self.data['error_distributions'][data_label],
+                                                                            self.data['error_distributions_params'][data_label])
 
         # Set anomaly index boundaries
-        prediction_errors = self.data['prediction_errors']
-        abs_prediction_errors = [abs(prediction_error) for prediction_error in prediction_errors]
-        index_range = index_range[:]
+        x_starts = {}
+        x_ends = {}
+        y_starts = {}
+        y_ends = {}
+        for data_label in self.data['error_distributions']:
 
-        for i in range(2):
-            if isinstance(index_range[i], str):
-                if index_range[i] == 'max_err':
-                    index_range[i] = max(abs_prediction_errors)
-                elif index_range[i] == 'avg_err':
-                    index_range[i] = sum(abs_prediction_errors)/len(abs_prediction_errors)
-                elif index_range[i].endswith('_sigma'):
-                    index_range[i] = float(index_range[i].replace('_sigma',''))*sigma
-                elif index_range[i].endswith('sig'):
-                    index_range[i] = float(index_range[i].replace('sig',''))*sigma
-                else:
-                    raise ValueError('Unknwon index start or end value "{}"'.format(index_range[i]))
+            abs_prediction_errors = [abs(prediction_error) for prediction_error in self.data['prediction_errors'][data_label]]
+            index_range = index_range[:]
 
-        x_start = index_range[0]
-        x_end = index_range[1]
+            for i in range(2):
+                if isinstance(index_range[i], str):
+                    if index_range[i] == 'max_err':
+                        index_range[i] = max(abs_prediction_errors)
+                    elif index_range[i] == 'avg_err':
+                        index_range[i] = sum(abs_prediction_errors)/len(abs_prediction_errors)
+                    elif index_range[i].endswith('_sigma'):
+                        index_range[i] = float(index_range[i].replace('_sigma',''))*self.data['stdevs'][data_label]
+                    elif index_range[i].endswith('sig'):
+                        index_range[i] = float(index_range[i].replace('sig',''))*self.data['stdevs'][data_label]
+                    else:
+                        raise ValueError('Unknwon index start or end value "{}"'.format(index_range[i]))
 
-        # Compute error distribution function values for index start/end
-        y_start = error_distribution_function(x_start)
-        y_end = error_distribution_function(x_end)
+            x_starts[data_label] = index_range[0]
+            x_ends[data_label] = index_range[1]
 
+            # Compute error distribution function values for index start/end
+            y_starts[data_label] = error_distribution_functions[data_label](x_starts[data_label])
+            y_ends[data_label] = error_distribution_functions[data_label](x_ends[data_label])
+
+        # Start processing
+        progress_step = len(series)/10
+        if verbose:
+            print('Applying the anomaly detector: ', end='')
         for i, item in enumerate(series):
 
+            if verbose:
+                if int(i%progress_step) == 0:
+                    print('.', end='')
+
             # Before the window
-            if i <=  self.model.window:
+            if i <=  self.data['model_window']:
                 continue
 
             # After the window (if using a reconstructor)
-            if isinstance(self.model, Reconstructor):
-                if i >  len(series)-self.model.window-1:
+            if issubclass(self.model_class, Reconstructor):
+                if i >  len(series)-self.data['model_window']-1:
                     break
 
             item_anomaly_indexes = [] 
 
-            for data_label_i, data_label in enumerate(series.data_labels()):
+            for data_label in series.data_labels():
+
+                # Shortcuts
+                error_distribution_function = error_distribution_functions[data_label]
+                x_start = x_starts[data_label]
+                x_end = x_ends[data_label]
+                y_start = y_starts[data_label]
+                y_end = y_ends[data_label]
 
                 # Duplicate this series item
                 item = deepcopy(item)
 
                 # Compute the prediction error index
-                actual, predicted = self._get_actual_and_predicted(series, i, data_label, self.model.window)
+                actual, predicted = self._get_actual_and_predicted(series, i, data_label, self.data['with_partials'])
                 prediction_error = abs(actual-predicted)
+                #print(actual, predicted)
 
                 # Compute the anomaly index in the given range (which defaults to 0, max_err)
                 # Below the start it means anomaly (0), above always anomaly (1). In the middle it
@@ -337,7 +435,9 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
 
                 x = prediction_error
                 y = error_distribution_function(x)
-
+                #print('---------')
+                #print(x,x_start,x_end)
+                #print(y,y_start,y_end)
                 if x <= x_start:
                     anomaly_index = 0
                 elif x >= x_end:
@@ -351,7 +451,7 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
                                 raise ValueError('Got a math domain error. This is likely due to an error distribution function badly approximating the real error distribution. Try changing it, or using lower index boundaries.') from None
                             else:
                                 raise
-                    elif  index_type=='log':
+                    elif index_type=='log':
                         try:
                             anomaly_index = (log10(y) - log10(y_start)) / (log10(y_end) - log10(y_start))
                         except ValueError as e:
@@ -403,6 +503,9 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
 
             # Append
             result_series.append(item)
+
+        if verbose:
+            print('')
 
         return result_series
 
