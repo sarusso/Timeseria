@@ -1,6 +1,8 @@
 import unittest
 import os
 import tempfile
+import random
+import numpy
 from math import sin, cos
 from propertime.utils import dt
 
@@ -20,12 +22,6 @@ logger.setup()
 TEST_DATA_PATH = '/'.join(os.path.realpath(__file__).split('/')[0:-1]) + '/test_data/'
 TEMP_MODELS_DIR = tempfile.TemporaryDirectory().name
 
-# Ensure reproducibility
-import random
-import numpy as np
-random.seed(0)
-np.random.seed(0)
-
 
 class TestForecasters(unittest.TestCase):
 
@@ -41,6 +37,21 @@ class TestForecasters(unittest.TestCase):
         for i in range(1000):
             step = 60 * 60 * 24
             self.sine_day_time_series.append(DataTimeSlot(start=TimePoint(i*step), end=TimePoint((i+1)*step), data={'value':sin(i/10.0)}))
+
+        # Ensure reproducibility
+        random.seed(0)
+        numpy.random.seed(0)
+        try:
+            import tensorflow
+            import keras
+        except ImportError:
+            pass
+        else:
+            # Ensure reproducibility for Keras and Tensorflow as well
+            # https://stackoverflow.com/questions/45230448/how-to-get-reproducible-result-when-running-keras-with-tensorflow-backend
+            tensorflow_session_conf = tensorflow.compat.v1.ConfigProto(intra_op_parallelism_threads=1, inter_op_parallelism_threads=1)
+            keras.backend.set_session(tensorflow.compat.v1.Session(graph=tensorflow.compat.v1.get_default_graph(), config=tensorflow_session_conf))
+            tensorflow.random.set_seed(0)
 
 
     def test_BaseForecasters(self):
@@ -267,60 +278,107 @@ class TestForecasters(unittest.TestCase):
         forecasted_time_series  = forecaster.apply(time_series)
 
 
-    def test_LSTMForecaster(self):
+    def test_LSTMForecaster_univariate(self):
 
         try:
             import tensorflow
         except ImportError:
-            print('Skipping LSTM forecaster tests as no tensorflow module installed')
+            print('Skipping LSTM forecaster tests with univariate time series as no tensorflow module installed')
             return
-
-        # Create a minute-resolution test DataTimeSlotSeries
-        sine_minute_time_series = TimeSeries()
-        for i in range(15):
-            sine_minute_time_series.append(DataTimeSlot(start=TimePoint(i*60), end=TimePoint((i+1)*60), data={'value':sin(i/10.0)}))
-
+    
+        timeseries = TimeSeries()
+        for i in range(980):
+            timeseries.append(DataTimePoint(t=i*60, data={'sin': sin(i/10.0)}))
         forecaster = LSTMForecaster()
+        forecaster.fit(timeseries, epochs=50)
 
-        # Test the cross validation
-        forecaster.cross_validate(sine_minute_time_series, rounds=3)
+        # Test the evaluation
+        evaluation_results = forecaster.evaluate(timeseries[0:10])
+        self.assertAlmostEqual(evaluation_results['RMSE'], 0.0489, places=3)
+        self.assertAlmostEqual(evaluation_results['MAE'], 0.041, places=2)
 
-        # Fit and predict
-        forecaster.fit(sine_minute_time_series)
-        predicted_data = forecaster.predict(sine_minute_time_series)
+        # Test the predict
+        self.assertAlmostEqual(forecaster.predict(timeseries)['sin'], -0.53, places=2)
 
-        # Test with tolerance
-        self.assertTrue(0.5 < predicted_data['value'] <1.1, 'got {}'.format(predicted_data['value']))
+        # Test apply results
+        timeseries_with_forecast = forecaster.apply(timeseries[0:970], steps=10)
+        # for i in range(10):
+        #     print('{:.2f} vs {:.2f} ({})'.format(timeseries_with_forecast[970+i].data['sin'], timeseries[970+i].data['sin'], timeseries_with_forecast[970+i].data_indexes))
+        # 0.37 vs 0.38 ({'forecast': 1})
+        # 0.26 vs 0.29 ({'forecast': 1})
+        # 0.15 vs 0.19 ({'forecast': 1})
+        # 0.04 vs 0.09 ({'forecast': 1})
+        # -0.07 vs -0.01 ({'forecast': 1})
+        # -0.17 vs -0.11 ({'forecast': 1})
+        # -0.25 vs -0.21 ({'forecast': 1})
+        # -0.32 vs -0.31 ({'forecast': 1})
+        # -0.37 vs -0.40 ({'forecast': 1})
+        # -0.40 vs -0.49 ({'forecast': 1})
+        self.assertAlmostEqual(timeseries_with_forecast[970].data['sin'], 0.37, places=2)
+        self.assertAlmostEqual(timeseries_with_forecast[973].data['sin'], 0.04, places=2)
+        self.assertAlmostEqual(timeseries_with_forecast[974].data['sin'], -0.07, places=2)
+        self.assertAlmostEqual(timeseries_with_forecast[979].data['sin'], -0.40, places=2)
 
-        # Not-existent features
+        # Test using other parameters and features
+        forecaster = LSTMForecaster(neurons=16, features=['values','diffs'])
+        forecaster.fit(timeseries)
+        self.assertAlmostEqual(forecaster.predict(timeseries)['sin'], -0.58, places=2)
+
+        # Test for non-existent features
         with self.assertRaises(ValueError):
-            LSTMForecaster(features=['values','not_existent_feature']).fit(sine_minute_time_series)
-
-
-        # Test using another feature
-        LSTMForecaster(features=['values','diffs']).fit(sine_minute_time_series)
+            LSTMForecaster(features=['values','not_existent_feature']).fit(timeseries)
 
 
     def test_LSTMForecaster_multivariate(self):
-
         try:
             import tensorflow
         except ImportError:
-            print('Skipping LSTM forecaster tests with multivariate series as no tensorflow module installed')
+            print('Skipping LSTM forecaster tests with multivariate time series as no tensorflow module installed')
             return
 
-        # Create a minute-resolution test DataTimeSlotSeries
-        sine_cosine_minute_time_series = TimeSeries()
-        for i in range(10):
-            sine_cosine_minute_time_series.append(DataTimePoint(t=i*60,  data={'sin':sin(i/10.0), 'cos':cos(i/10.0)}))
-
+        timeseries = TimeSeries()
+        for i in range(980):
+            timeseries.append(DataTimePoint(t=i*60, data={'sin': sin(i/10.0), 'cos': cos(i/10.0)}))
         forecaster = LSTMForecaster()
-        forecaster.fit(sine_cosine_minute_time_series)
-        predicted_data = forecaster.predict(sine_cosine_minute_time_series)
+        forecaster.fit(timeseries, epochs=10)
 
-        # Test with tolerance
-        self.assertTrue(0.5 <  predicted_data['sin'] < 1.1, 'got {}'.format(predicted_data['sin']))
-        self.assertTrue(0.5 <  predicted_data['cos'] < 1.1, 'got {}'.format(predicted_data['cos']))
+        # Test the evaluation (TODO: this is not yet implemented!)
+        #evaluation_results = forecaster.evaluate(timeseries[0:10])
+        #self.assertAlmostEqual(evaluation_results['RMSE'], 0.0489, places=3)
+        #self.assertAlmostEqual(evaluation_results['MAE'], 0.041, places=2)
+
+        # Test the predict
+        #self.assertAlmostEqual(forecaster.predict(timeseries)['sin'], -0.53, places=2)
+
+        # Test apply results
+        timeseries_with_forecast = forecaster.apply(timeseries[0:970], steps=5)
+        #for i in range(10):
+        #    print('{:.2f},{:.2f} vs {:.2f},{:.2f} ({})'.format(timeseries_with_forecast[970+i].data['sin'],
+        #                                                       timeseries_with_forecast[970+i].data['cos'],
+        #                                                       timeseries[970+i].data['sin'],
+        #                                                       timeseries[970+i].data['cos'],
+        #                                                       timeseries_with_forecast[970+i].data_indexes))
+        # 0.36,-0.92 vs 0.38,-0.93 ({'forecast': 1})
+        # 0.26,-0.95 vs 0.29,-0.96 ({'forecast': 1})
+        # 0.15,-0.97 vs 0.19,-0.98 ({'forecast': 1})
+        # 0.05,-0.97 vs 0.09,-1.00 ({'forecast': 1})
+        # -0.05,-0.96 vs -0.01,-1.00 ({'forecast': 1})
+        self.assertAlmostEqual(timeseries_with_forecast[970].data['sin'], 0.36, places=2)
+        self.assertAlmostEqual(timeseries_with_forecast[970].data['cos'], -0.92, places=2)
+        self.assertAlmostEqual(timeseries_with_forecast[973].data['sin'], 0.05, places=2)
+        self.assertAlmostEqual(timeseries_with_forecast[973].data['cos'], -0.97, places=2)
+        self.assertAlmostEqual(timeseries_with_forecast[974].data['sin'], -0.05, places=2)
+        self.assertAlmostEqual(timeseries_with_forecast[974].data['cos'], -0.96, places=2)
+
+        # Test using other parameters and features
+        forecaster = LSTMForecaster(neurons=16, features=['values','diffs'])
+        forecaster.fit(timeseries)
+        self.assertAlmostEqual(forecaster.predict(timeseries)['sin'], -0.56, places=2)
+        self.assertAlmostEqual(forecaster.predict(timeseries)['cos'], -0.80, places=2)
+
+        # Test for non-existent features
+        with self.assertRaises(ValueError):
+            LSTMForecaster(features=['values','not_existent_feature']).fit(timeseries)
 
 
     def test_LSTMForecaster_multivariate_with_targets(self):
@@ -328,46 +386,45 @@ class TestForecasters(unittest.TestCase):
         try:
             import tensorflow
         except ImportError:
-            print('Skipping LSTM forecaster tests with multivariate serieswith targets as no tensorflow module installed')
+            print('Skipping LSTM forecaster tests with multivariate time series with targets as no tensorflow module installed')
             return
 
-        # Create a minute-resolution test DataTimeSlotSeries
-        sine_cosine_minute_time_series = TimeSeries()
-        for i in range(10):
-            sine_cosine_minute_time_series.append(DataTimePoint(t=i*60,  data={'sin':sin(i/10.0), 'cos':cos(i/10.0)}))
+        timeseries = TimeSeries()
+        for i in range(980):
+            timeseries.append(DataTimePoint(t=i*60, data={'sin': sin(i/10.0), 'cos': cos(i/10.0)}))
 
         # Target, no context
         forecaster = LSTMForecaster()
-        forecaster.fit(sine_cosine_minute_time_series, target_data_labels=['cos'], with_context=False)
+        forecaster.fit(timeseries, target_data_labels=['cos'], with_context_data=False)
 
         with self.assertRaises(ValueError):
-            forecaster.predict(sine_cosine_minute_time_series, context_data={'sin':0.5})
+            forecaster.predict(timeseries, context_data={'sin': -0.57})
 
-        predicted_data = forecaster.predict(sine_cosine_minute_time_series)
+        predicted_data = forecaster.predict(timeseries)
         self.assertEqual(list(predicted_data.keys()), ['cos'])
-        self.assertTrue(0.5 <  predicted_data['cos'] < 1.1, 'got {}'.format(predicted_data['cos']))
+        self.assertAlmostEqual(predicted_data['cos'], -0.82, places=2)
 
         # All other methods will raise
         with self.assertRaises(ValueError):
-            forecaster.forecast(sine_cosine_minute_time_series)
+            forecaster.forecast(timeseries)
 
         with self.assertRaises(ValueError):
-            forecaster.apply(sine_cosine_minute_time_series)
+            forecaster.apply(timeseries)
 
         # Target and context
         forecaster = LSTMForecaster()
-        forecaster.fit(sine_cosine_minute_time_series, target_data_labels=['cos'], with_context=True)
+        forecaster.fit(timeseries, target_data_labels=['cos'], with_context_data=True)
 
-        predicted_data = forecaster.predict(sine_cosine_minute_time_series, context_data={'sin':0.5})
-        self.assertTrue(0.5 <  predicted_data['cos'] < 1.1, 'got {}'.format(predicted_data['cos']))
+        predicted_data = forecaster.predict(timeseries, context_data={'sin': -0.57})
+        self.assertAlmostEqual(predicted_data['cos'], -0.89, places=2)
 
-        forecasted_data = forecaster.forecast(sine_cosine_minute_time_series, context_data={'sin':0.5})
-        self.assertEqual(forecasted_data.data['sin'], 0.5)
-        self.assertTrue(0.5 <  forecasted_data.data['cos'] < 1.1, 'got {}'.format(predicted_data['cos']))
+        forecasted_data = forecaster.forecast(timeseries, context_data={'sin': -0.57})
+        self.assertEqual(forecasted_data.data['sin'], -0.57)
+        self.assertAlmostEqual(forecasted_data.data['cos'], -0.89, places=2)
 
-        series_with_forecast = forecaster.apply(sine_cosine_minute_time_series, context_data={'sin':0.5})
-        self.assertEqual(series_with_forecast[-1].data['sin'], 0.5)
-        self.assertTrue(0.5 <  series_with_forecast[-1].data['cos'] < 1.1, 'got {}'.format(predicted_data['cos']))
+        timeseries_with_forecast = forecaster.apply(timeseries, context_data={'sin': -0.57})
+        self.assertEqual(timeseries_with_forecast[-1].data['sin'], -0.57)
+        self.assertAlmostEqual(timeseries_with_forecast[-1].data['cos'], -0.89, places=2)
 
 
     def test_LSTMForecaster_save_load(self):
