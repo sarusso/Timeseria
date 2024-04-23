@@ -150,9 +150,12 @@ class Forecaster(Model):
             else:
                 forecast_model_results = self.forecast(series, steps=steps)
             if not isinstance(forecast_model_results, list):
+                # Add forecasted index and append
+                forecast_model_results.data_indexes['forecast'] = 1
                 series.append(forecast_model_results)
             else:
                 for item in forecast_model_results:
+                    # Add forecasted index for each item and append
                     item.data_indexes['forecast'] = 1
                     series.append(item)
 
@@ -1056,7 +1059,7 @@ class LSTMForecaster(Forecaster, _KerasModel):
         # Convert to list in order to be able to handle datapoints with different labels for the contex
         window_datapoints = list(window_series)
 
-        # Normalize window data if we have to do so
+        # Normalize window and context data if we have to do so
         try:
             self.data['min_values']
         except:
@@ -1066,6 +1069,11 @@ class LSTMForecaster(Forecaster, _KerasModel):
             for datapoint in window_datapoints:
                 for data_label in datapoint.data:
                     datapoint.data[data_label] = (datapoint.data[data_label] - self.data['min_values'][data_label]) / (self.data['max_values'][data_label] - self.data['min_values'][data_label])
+
+            if context_data:
+                context_data = {key: value for key,value in context_data.items()}
+                for data_label in context_data:
+                    context_data[data_label] = (context_data[data_label] - self.data['min_values'][data_label]) / (self.data['max_values'][data_label] - self.data['min_values'][data_label])
 
         # Compute window (plus context) features
         window_features = self._compute_window_features(window_datapoints, data_labels=self.data['data_labels'], time_unit=series.resolution, features=self.data['features'], context_data=context_data)

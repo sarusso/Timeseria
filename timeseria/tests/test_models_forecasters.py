@@ -13,6 +13,7 @@ from ..models.forecasters import ProphetForecaster, PeriodicAverageForecaster, A
 from ..models.anomaly_detectors import PeriodicAverageAnomalyDetector
 from ..exceptions import NotFittedError, NonContiguityError
 from ..storages import CSVFileStorage
+from .. import TEST_DATASETS_PATH
 
 # Setup logging
 from .. import logger
@@ -381,7 +382,7 @@ class TestForecasters(unittest.TestCase):
             LSTMForecaster(features=['values','not_existent_feature']).fit(timeseries)
 
 
-    def test_LSTMForecaster_multivariate_with_targets(self):
+    def test_LSTMForecaster_multivariate_with_targets_and_context(self):
 
         try:
             import tensorflow
@@ -416,15 +417,36 @@ class TestForecasters(unittest.TestCase):
         forecaster.fit(timeseries, target_data_labels=['cos'], with_context_data=True)
 
         predicted_data = forecaster.predict(timeseries, context_data={'sin': -0.57})
-        self.assertAlmostEqual(predicted_data['cos'], -0.89, places=2)
+        self.assertAlmostEqual(predicted_data['cos'], -0.820, places=2)
 
         forecasted_data = forecaster.forecast(timeseries, context_data={'sin': -0.57})
         self.assertEqual(forecasted_data.data['sin'], -0.57)
-        self.assertAlmostEqual(forecasted_data.data['cos'], -0.89, places=2)
+        self.assertAlmostEqual(forecasted_data.data['cos'], -0.820, places=2)
 
         timeseries_with_forecast = forecaster.apply(timeseries, context_data={'sin': -0.57})
         self.assertEqual(timeseries_with_forecast[-1].data['sin'], -0.57)
-        self.assertAlmostEqual(timeseries_with_forecast[-1].data['cos'], -0.89, places=2)
+        self.assertAlmostEqual(timeseries_with_forecast[-1].data['cos'], -0.820, places=2)
+
+
+    def test_LSTMForecaster_multivariate_with_targets_and_context_humitemp(self):
+
+        try:
+            import tensorflow
+        except ImportError:
+            print('Skipping LSTM forecaster tests with multivariate time series on humitemp with targets as no tensorflow module installed')
+            return
+
+        # This test is here mainly te ensure there are no issues with the normalization of the context data
+        timeseries = TimeSeries.from_csv(TEST_DATASETS_PATH + 'humitemp_long.csv')
+        timeseries_full = timeseries.resample('1h')
+        timeseries = timeseries_full[300:400] 
+
+        forecaster = LSTMForecaster()
+        forecaster.fit(timeseries, target_data_labels=['humidity'], with_context_data=True)
+
+        prediction = forecaster.predict(timeseries[:-1], context_data = timeseries[-1].data)
+
+        self.assertAlmostEqual(prediction['humidity'], 41.6734, places=2)
 
 
     def test_LSTMForecaster_save_load(self):
