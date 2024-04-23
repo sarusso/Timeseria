@@ -39,22 +39,6 @@ class TestForecasters(unittest.TestCase):
             step = 60 * 60 * 24
             self.sine_day_time_series.append(DataTimeSlot(start=TimePoint(i*step), end=TimePoint((i+1)*step), data={'value':sin(i/10.0)}))
 
-        # Ensure reproducibility
-        random.seed(0)
-        numpy.random.seed(0)
-        try:
-            import tensorflow
-            import keras
-        except ImportError:
-            pass
-        else:
-            # Ensure reproducibility for Keras and Tensorflow as well
-            # https://stackoverflow.com/questions/45230448/how-to-get-reproducible-result-when-running-keras-with-tensorflow-backend
-            tensorflow_session_conf = tensorflow.compat.v1.ConfigProto(intra_op_parallelism_threads=1, inter_op_parallelism_threads=1)
-            keras.backend.set_session(tensorflow.compat.v1.Session(graph=tensorflow.compat.v1.get_default_graph(), config=tensorflow_session_conf))
-            tensorflow.random.set_seed(0)
-
-
     def test_BaseForecasters(self):
 
         # This test is done using the Linear Interpolator Reconstructor
@@ -286,12 +270,12 @@ class TestForecasters(unittest.TestCase):
         except ImportError:
             print('Skipping LSTM forecaster tests with univariate time series as no tensorflow module installed')
             return
-    
+
         timeseries = TimeSeries()
         for i in range(980):
             timeseries.append(DataTimePoint(t=i*60, data={'sin': sin(i/10.0)}))
         forecaster = LSTMForecaster()
-        forecaster.fit(timeseries, epochs=50)
+        forecaster.fit(timeseries, epochs=50, reproducible=True)
 
         # Test the evaluation
         evaluation_results = forecaster.evaluate(timeseries[0:10])
@@ -322,7 +306,7 @@ class TestForecasters(unittest.TestCase):
 
         # Test using other parameters and features
         forecaster = LSTMForecaster(neurons=16, features=['values','diffs'])
-        forecaster.fit(timeseries)
+        forecaster.fit(timeseries, reproducible=True)
         self.assertAlmostEqual(forecaster.predict(timeseries)['sin'], -0.58, places=2)
 
         # Test for non-existent features
@@ -341,7 +325,7 @@ class TestForecasters(unittest.TestCase):
         for i in range(980):
             timeseries.append(DataTimePoint(t=i*60, data={'sin': sin(i/10.0), 'cos': cos(i/10.0)}))
         forecaster = LSTMForecaster()
-        forecaster.fit(timeseries, epochs=10)
+        forecaster.fit(timeseries, epochs=10, reproducible=True)
 
         # Test the evaluation (TODO: this is not yet implemented!)
         #evaluation_results = forecaster.evaluate(timeseries[0:10])
@@ -373,8 +357,8 @@ class TestForecasters(unittest.TestCase):
 
         # Test using other parameters and features
         forecaster = LSTMForecaster(neurons=16, features=['values','diffs'])
-        forecaster.fit(timeseries)
-        self.assertAlmostEqual(forecaster.predict(timeseries)['sin'], -0.56, places=2)
+        forecaster.fit(timeseries, reproducible=True)
+        self.assertAlmostEqual(forecaster.predict(timeseries)['sin'], -0.541, places=2)
         self.assertAlmostEqual(forecaster.predict(timeseries)['cos'], -0.80, places=2)
 
         # Test for non-existent features
@@ -396,7 +380,7 @@ class TestForecasters(unittest.TestCase):
 
         # Target, no context
         forecaster = LSTMForecaster()
-        forecaster.fit(timeseries, target='cos', with_context=False)
+        forecaster.fit(timeseries, target='cos', with_context=False, reproducible=True)
 
         with self.assertRaises(ValueError):
             forecaster.predict(timeseries, context_data={'sin': -0.57})
@@ -414,7 +398,7 @@ class TestForecasters(unittest.TestCase):
 
         # Target and context
         forecaster = LSTMForecaster()
-        forecaster.fit(timeseries, target='cos', with_context=True)
+        forecaster.fit(timeseries, target='cos', with_context=True, reproducible=True)
 
         predicted_data = forecaster.predict(timeseries, context_data={'sin': -0.57})
         self.assertAlmostEqual(predicted_data['cos'], -0.820, places=2)
@@ -442,7 +426,7 @@ class TestForecasters(unittest.TestCase):
         timeseries = timeseries_full[300:400] 
 
         forecaster = LSTMForecaster()
-        forecaster.fit(timeseries, target='humidity', with_context=True)
+        forecaster.fit(timeseries, target='humidity', with_context=True, reproducible=True)
 
         prediction = forecaster.predict(timeseries[:-1], context_data = timeseries[-1].data)
 
@@ -463,7 +447,7 @@ class TestForecasters(unittest.TestCase):
             sine_minute_time_series.append(DataTimeSlot(start=TimePoint(i*60), end=TimePoint((i+1)*60), data={'sin':sin(i/10.0), 'cos':cos(i/10.0)}))
 
         forecaster = LSTMForecaster()
-        forecaster.fit(sine_minute_time_series)
+        forecaster.fit(sine_minute_time_series, reproducible=True)
 
         # Set model path
         model_path = TEMP_MODELS_DIR+ '/test_LSTM_model'

@@ -10,7 +10,7 @@ from datetime import datetime
 
 from ..datastructures import DataTimeSlot, TimePoint, DataTimePoint, Slot, Point, TimeSeries
 from ..exceptions import NonContiguityError
-from ..utilities import detect_periodicity, _get_periodicity_index, _item_is_in_range, mean_absolute_percentage_error
+from ..utilities import detect_periodicity, _get_periodicity_index, _item_is_in_range, mean_absolute_percentage_error, ensure_reproducibility
 from ..units import Unit, TimeUnit
 from .base import Model, _ProphetModel, _ARIMAModel, _KerasModel
 
@@ -901,7 +901,7 @@ class LSTMForecaster(Forecaster, _KerasModel):
         self._save_keras_model(path)
 
     @Forecaster.fit_function
-    def fit(self, series, start=None, end=None, epochs=30, normalize=True, target='all', with_context=False, verbose=False):
+    def fit(self, series, start=None, end=None, epochs=30, normalize=True, target='all', with_context=False, reproducible=False, verbose=False):
         """Fit the model on a series.
 
         Args:
@@ -912,8 +912,12 @@ class LSTMForecaster(Forecaster, _KerasModel):
             normalize(bool): if to normalize the data between 0 and 1 or not.
             target(str,list): what data labels to target, 'all' for all of them.
             with_context(bool): if to use context data when predicting.
+            reproducible(bool): if to make the fit deterministic.
             verbose(bool): if to print the training output in the process.
         """
+
+        if reproducible:
+            ensure_reproducibility()
 
         # Set and save the targets and context data labels
         context_data_labels = None
