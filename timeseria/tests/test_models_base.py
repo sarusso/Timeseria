@@ -180,12 +180,15 @@ class TestBaseKerasModel(unittest.TestCase):
         self.assertEqual(window_datapoints_matrix[-1][1].t, 5)
 
 
-    def _to_target_values_vector(self):
-
-        target_vector = _KerasModel._to_target_values_vector(self.test_time_series, window=2, steps=1)
+    def test_to_target_values_vector(self):
 
         # What to expect (using the data value to represent a data point):
         # [0.3], [0.4], [0.5], [0.6] Note that they are lists in order to support multi-step forecast
+        target_vector = _KerasModel._to_target_values_vector(self.test_time_series, window=2, steps=1, target_data_labels=['label_1'])
+        self.assertEqual(target_vector, [[0.3], [0.4], [0.5], [0.6]])
+
+        # Test for multivariate as well
+        target_vector = _KerasModel._to_target_values_vector(self.test_time_series_mv, window=2, steps=1, target_data_labels=['label_1'])
         self.assertEqual(target_vector, [[0.3], [0.4], [0.5], [0.6]])
 
 
