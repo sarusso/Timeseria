@@ -110,17 +110,17 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
         self.model.save(path+'/'+str(self.model.id))
 
 
-    def _get_actual_and_predicted(self, series, i, data_label, with_partials):
+    def _get_actual_and_predicted(self, series, i, data_label, with_context):
 
             # Call model predict logic and compare with the actual data
             actual = series[i].data[data_label]
             if issubclass(self.model_class, Reconstructor):
                 prediction = self.model.predict(series, from_i=i,to_i=i)
             elif issubclass(self.model_class, Forecaster):
-                if with_partials:
+                if with_context:
                     prediction = self.models[data_label].predict(series, steps=1, from_i=i, context_data=series[i].data)
                 else:
-                    # TODO: in case of forecasters without partials, this is a performance hit for multivariate
+                    # TODO: in case of forecasters without partial predictions, this is a performance hit for multivariate
                     # time series as the same predict is called in the exact same way for each data label.
                     prediction = self.model.predict(series, steps=1, from_i=i)
             else:
@@ -143,7 +143,7 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
 
 
     @AnomalyDetector.fit_function
-    def fit(self, series, verbose=False, summary=False, with_partials=False, **kwargs):
+    def fit(self, series, with_context=False, verbose=False, summary=False, **kwargs):
 
         error_distribution = kwargs.pop('error_distribution', None)
         if not error_distribution:
@@ -152,7 +152,7 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
             error_distributions = [error_distribution]
 
         # Fit the predictive model(s)
-        if with_partials:
+        if with_context:
             if not len(series.data_labels()) > 1:
                 raise ValueError('Anomaly detection with partial predictions on univariate series does not make sense')
 
@@ -171,7 +171,7 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
                 self.data['model_ids'][data_label] = self.models[data_label].data['id']
 
                 # Fit it
-                self.models[data_label].fit(series, **kwargs, target_data_labels=[data_label], with_context_data=True, verbose=verbose)
+                self.models[data_label].fit(series, **kwargs, target=data_label, with_context=True, verbose=verbose)
 
                 # Set the model window if not already done:
                 if 'model_window' not in self.data:
@@ -194,8 +194,8 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
             print('Predictive model(s) fitted, now evaluating')
         logger.info('Predictive model(s) fitted, now evaluating...')
 
-        # Store if to use partials or not
-        self.data['with_partials'] = with_partials
+        # Store if to use context or not
+        self.data['with_context'] = with_context
 
         # Initialize internal dictionaries
         self.data['prediction_errors'] = {}
@@ -232,7 +232,7 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
 
                 # Predict & append the error
                 #logger.debug('Predicting and computing the difference (i=%s)', i)
-                actual, predicted = self._get_actual_and_predicted(series, i, data_label, with_partials)
+                actual, predicted = self._get_actual_and_predicted(series, i, data_label, with_context)
                 prediction_errors[data_label].append(actual-predicted)
 
             # Store the forecasting errors internally in the model
@@ -425,7 +425,7 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
                 item = deepcopy(item)
 
                 # Compute the prediction error index
-                actual, predicted = self._get_actual_and_predicted(series, i, data_label, self.data['with_partials'])
+                actual, predicted = self._get_actual_and_predicted(series, i, data_label, self.data['with_context'])
                 prediction_error = abs(actual-predicted)
                 #print(actual, predicted)
 

@@ -122,7 +122,7 @@ class TestAnomalyDetectors(unittest.TestCase):
         loaded_anomaly_detector = PeriodicAverageAnomalyDetector.load(model_path)
         self.assertEqual(set(anomaly_detector.data.keys()), set(['id', 'model_id', 'resolution', 'data_labels', 'prediction_errors',
                                                               'error_distributions', 'error_distributions_params', 'error_distributions_stats',
-                                                              'fitted_at', 'stdevs', 'model_window', 'with_partials']))
+                                                              'fitted_at', 'stdevs', 'model_window', 'with_context']))
 
         self.assertAlmostEqual(anomaly_detector.data['error_distributions_params']['sin']['loc'], 0.00029083304321826024, places=5)
         self.assertAlmostEqual(anomaly_detector.data['error_distributions_params']['sin']['scale'], 0.23226485795568802, places=4)
@@ -205,7 +205,7 @@ class TestAnomalyDetectors(unittest.TestCase):
         self.assertEqual(results_timeseries[86].data_indexes['anomaly'], 1)
 
 
-    def test_LSTMAnomalyDetector_multivariate_with_partials(self):
+    def test_LSTMAnomalyDetector_multivariate_with_context(self):
 
         timeseries_clean = TimeSeries()
         for i in range(200):
@@ -224,7 +224,7 @@ class TestAnomalyDetectors(unittest.TestCase):
 
         # Semi-supervised
         anomaly_detector = LSTMAnomalyDetector(window=10)
-        anomaly_detector.fit(timeseries_clean, error_distribution='norm', epochs=5, with_partials=True)
+        anomaly_detector.fit(timeseries_clean, error_distribution='norm', epochs=5, with_context=True)
         self.assertAlmostEqual(anomaly_detector.data['stdevs']['cos'], 0.104, places=2) 
         self.assertAlmostEqual(anomaly_detector.data['stdevs']['sin'], 0.070, places=2)
 
@@ -240,7 +240,7 @@ class TestAnomalyDetectors(unittest.TestCase):
 
         # Unsupervised TODO: Does not really work...
         # anomaly_detector = LSTMAnomalyDetector()
-        # anomaly_detector.fit(timeseries_with_anomalies, error_distribution='norm', epochs=20, with_partials=True)
+        # anomaly_detector.fit(timeseries_with_anomalies, error_distribution='norm', epochs=20, with_context=True)
         # self.assertAlmostEqual(anomaly_detector.data['stdevs']['cos'], 0.059, places=2)
         # self.assertAlmostEqual(anomaly_detector.data['stdevs']['sin'], 0.357, places=2)
         #

@@ -901,7 +901,7 @@ class LSTMForecaster(Forecaster, _KerasModel):
         self._save_keras_model(path)
 
     @Forecaster.fit_function
-    def fit(self, series, start=None, end=None, epochs=30, normalize=True, target_data_labels='all', with_context_data=False, verbose=False):
+    def fit(self, series, start=None, end=None, epochs=30, normalize=True, target='all', with_context=False, verbose=False):
         """Fit the model on a series.
 
         Args:
@@ -910,29 +910,28 @@ class LSTMForecaster(Forecaster, _KerasModel):
             end(datetieme,float): the end timestamp of the fit.
             epochs(int): for how many epochs to train.
             normalize(bool): if to normalize the data between 0 and 1 or not.
-            target_data_labels(str,list): if to target specific data labels only.
-            with_context_data(bool): if to use context data when predicting.
+            target(str,list): what data labels to target, 'all' for all of them.
+            with_context(bool): if to use context data when predicting.
             verbose(bool): if to print the training output in the process.
         """
 
         # Set and save the targets and context data labels
         context_data_labels = None
-        if target_data_labels == 'all':
+        if target == 'all':
             target_data_labels = series.data_labels()
-            if with_context_data:
+            if with_context:
                 raise ValueError('Cannot use context with all data labels, choose which ones')
         else:
-            if isinstance(target_data_labels, str):
-                target_data_labels = [target_data_labels]
+            if isinstance(target, str):
+                target_data_labels = [target]
             elif isinstance(target_data_labels, list):
-                pass
-                #target_data_labels = target_data_labels
+                target_data_labels = target
             else:
                 raise TypeError('Don\'t know how to target for data labels as type "{}"'.format(target_data_labels.__class__.__name__))
             for target_data_label in target_data_labels:
                 if target_data_label not in series.data_labels():
                     raise ValueError('Cannot target data label "{}" as not found in the series labels ({})'.format(target_data_label, series.data_labels()))
-            if with_context_data:
+            if with_context:
                 context_data_labels = []
                 for series_data_label in series.data_labels():
                     if series_data_label not in target_data_labels:
@@ -991,7 +990,7 @@ class LSTMForecaster(Forecaster, _KerasModel):
         # Move to "matrix" of windows plus "vector" of targets data representation. Or, in other words:
         # window_datapoints is a list of lists (matrix) where each nested list (row) is a list of window datapoints.
         window_datapoints_matrix = self._to_window_datapoints_matrix(series, window=self.data['window'], steps=1)
-        if with_context_data:
+        if with_context:
             context_data_matrix = self._to_context_data_matrix(series, window=self.data['window'], context_data_labels=context_data_labels, steps=1)
         target_values_vector = self._to_target_values_vector(series, window=self.data['window'], steps=1, target_data_labels=target_data_labels)
 
@@ -1002,7 +1001,7 @@ class LSTMForecaster(Forecaster, _KerasModel):
                                                                  data_labels = data_labels,
                                                                  time_unit = series.resolution,
                                                                  features = self.data['features'],
-                                                                 context_data = context_data_matrix[i] if with_context_data else None))
+                                                                 context_data = context_data_matrix[i] if with_context else None))
 
         # Obtain the number of features based on _compute_window_features() output
         features_per_window_item = len(window_features[0][0])
@@ -1014,7 +1013,7 @@ class LSTMForecaster(Forecaster, _KerasModel):
             from keras.layers import Dense
             from keras.layers import LSTM
             self.keras_model = Sequential()
-            self.keras_model.add(LSTM(self.data['neurons'], input_shape=(self.data['window'] + 1 if with_context_data else self.data['window'], features_per_window_item)))
+            self.keras_model.add(LSTM(self.data['neurons'], input_shape=(self.data['window'] + 1 if with_context else self.data['window'], features_per_window_item)))
             self.keras_model.add(Dense(output_dimension))
             self.keras_model.compile(loss='mean_squared_error', optimizer='adam')
 

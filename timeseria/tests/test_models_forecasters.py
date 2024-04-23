@@ -396,7 +396,7 @@ class TestForecasters(unittest.TestCase):
 
         # Target, no context
         forecaster = LSTMForecaster()
-        forecaster.fit(timeseries, target_data_labels=['cos'], with_context_data=False)
+        forecaster.fit(timeseries, target='cos', with_context=False)
 
         with self.assertRaises(ValueError):
             forecaster.predict(timeseries, context_data={'sin': -0.57})
@@ -414,7 +414,7 @@ class TestForecasters(unittest.TestCase):
 
         # Target and context
         forecaster = LSTMForecaster()
-        forecaster.fit(timeseries, target_data_labels=['cos'], with_context_data=True)
+        forecaster.fit(timeseries, target='cos', with_context=True)
 
         predicted_data = forecaster.predict(timeseries, context_data={'sin': -0.57})
         self.assertAlmostEqual(predicted_data['cos'], -0.820, places=2)
@@ -442,7 +442,7 @@ class TestForecasters(unittest.TestCase):
         timeseries = timeseries_full[300:400] 
 
         forecaster = LSTMForecaster()
-        forecaster.fit(timeseries, target_data_labels=['humidity'], with_context_data=True)
+        forecaster.fit(timeseries, target='humidity', with_context=True)
 
         prediction = forecaster.predict(timeseries[:-1], context_data = timeseries[-1].data)
 
