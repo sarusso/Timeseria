@@ -1,7 +1,7 @@
 # Timeseria
 
 
-[![Tests status](https://github.com/sarusso/timeseria/actions/workflows/ci.yml/badge.svg)](https://github.com/sarusso/Timeseria/actions) [![Licence Apache 2](https://img.shields.io/github/license/sarusso/Timeseria)](https://github.com/sarusso/Timeseria/blob/master/LICENSE) [![Semver 2.0.0](https://img.shields.io/badge/semver-v2.0.0-blue)](https://semver.org/spec/v2.0.0.html) 
+[![Tests status](https://github.com/sarusso/timeseria/actions/workflows/ci.yml/badge.svg)](https://github.com/sarusso/Timeseria/actions) [![Licence Apache 2](https://img.shields.io/github/license/sarusso/Timeseria)](https://github.com/sarusso/Timeseria/blob/main/LICENSE) [![Semver 2.0.0](https://img.shields.io/badge/semver-v2.0.0-blue)](https://semver.org/spec/v2.0.0.html) 
 
 Timeseria is an object-oriented time series processing library which aims at making it easy to manipulate time series data and to build statistical and machine learning models on top of it.
 
@@ -16,7 +16,7 @@ Timeseria  comes with a built-in set of common operations (resampling, aggregati
 
 ## Getting started
 
-You can get started by reading the [quickstart](https://github.com/sarusso/Timeseria-notebooks/blob/master/notebooks/Quickstart.ipynb) or the [welcome](https://github.com/sarusso/Timeseria-notebooks/blob/master/notebooks/Welcome.ipynb) notebooks, or have a look at the other example notebooks provided in the [Timeseria-notebooks](https://github.com/sarusso/Timeseria-notebooks) repository. 
+You can get started by reading the [quickstart](https://github.com/sarusso/Timeseria-notebooks/blob/main/notebooks/Quickstart.ipynb) or the [welcome](https://github.com/sarusso/Timeseria-notebooks/blob/main/notebooks/Welcome.ipynb) notebooks, or have a look at the other example notebooks provided in the [Timeseria-notebooks](https://github.com/sarusso/Timeseria-notebooks) repository. 
 
 Also the [reference documentation](https://timeseria.readthedocs.io) might be useful.
 
@@ -65,7 +65,7 @@ Every push on the Timeseria codebase as well as all the pull requests are automa
 
 
 ## License
-Timeseria is licensed under the Apache License version 2.0, unless otherwise specified. See [LICENSE](https://github.com/sarusso/Timeseria/blob/master/LICENSE) for the full license text.
+Timeseria is licensed under the Apache License version 2.0, unless otherwise specified. See [LICENSE](https://github.com/sarusso/Timeseria/blob/main/LICENSE) for the full license text.
 
 
 
