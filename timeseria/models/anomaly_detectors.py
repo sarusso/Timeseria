@@ -214,7 +214,7 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
 
             if verbose:
                 print('Computing actual vs predicted for "{}": '.format(data_label), end='')
-            logger.info('Computing actual vs predicted for "{}": '.format(data_label))
+            logger.info('Computing actual vs predicted for "{}"...'.format(data_label))
 
             for i, _ in enumerate(series):
                 if verbose:
@@ -246,9 +246,10 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
         logger.info('Model(s) evaluated, now computing the error distribution(s)...')
 
         for data_label in series.data_labels():
-            if verbose:
-                print('Selecting error distribution for "{}"'.format(data_label))
-            logger.info('Selecting error distribution for "{}"'.format(data_label))
+            #if verbose:
+            #    print('Selecting error distribution for "{}"'.format(data_label))
+            #logger.debug('Selecting error distribution for "%s"', data_label))
+
             # Fit the distributions and select the best one
             fitter = fitter_library.fitter.Fitter(prediction_errors[data_label], distributions=error_distributions)
             fitter.fit(progress=False)
@@ -274,7 +275,7 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
             self.data['error_distributions_stats'][data_label] = best_error_distribution_stats
 
             self.data['stdevs'][data_label] = stdev(prediction_errors[data_label])
-            logger.info('Anomaly detector fitted')
+        logger.info('Anomaly detector fitted')
 
     def inspect(self, plot=True):
         '''Inspect the model and plot the error distribution'''
@@ -283,9 +284,7 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
 
             abs_prediction_errors = [abs(prediction_error) for prediction_error in self.data['prediction_errors'][data_label]]
 
-            print('\n==========================')
-            print(' Details for "{}"'.format(data_label))
-            print('==========================')
+            print('\nDetails for: "{}"'.format(data_label))
 
             print('Predictive model avg error (abs): {}'.format(sum(abs_prediction_errors)/len(abs_prediction_errors)))
             print('Predictive model min error (abs): {}'.format(min(abs_prediction_errors)))
