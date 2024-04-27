@@ -39,7 +39,7 @@ class Operation():
         """
 
         try:
-            self._compute
+            self._call
         except AttributeError:
             raise NotImplementedError('No operation logic implemented.')
         else:
@@ -59,7 +59,7 @@ class Operation():
                     raise TypeError('Operations can only work on series or lists of series')
 
             # Call compute logic
-            return self._compute(series, *args, **kwargs)
+            return self._call(series, *args, **kwargs)
 
     @property
     def __name__(self):
@@ -76,7 +76,7 @@ class Max(Operation):
     def __init__(self):
         self.built_in_max = max
 
-    def _compute(self, series, data_label=None):
+    def _call(self, series, data_label=None):
 
         _check_series_of_points_or_slots(series)
         _check_indexed_data(series)
@@ -104,7 +104,7 @@ class Min(Operation):
     def __init__(self):
         self.built_in_min = min
 
-    def _compute(self, series, data_label=None):
+    def _call(self, series, data_label=None):
 
         _check_series_of_points_or_slots(series)
         _check_indexed_data(series)
@@ -129,7 +129,7 @@ class Avg(Operation):
 
     _supports_weights = True
 
-    def _compute(self, series, data_label=None):
+    def _call(self, series, data_label=None):
 
         _check_series_of_points_or_slots(series)
         _check_indexed_data(series)
@@ -191,7 +191,7 @@ class Avg(Operation):
 class Sum(Operation):
     """Sum operation (callable object)."""
 
-    def _compute(self, series, data_label=None):
+    def _call(self, series, data_label=None):
 
         _check_series_of_points_or_slots(series)
         _check_indexed_data(series)
@@ -213,7 +213,7 @@ class Sum(Operation):
 class Derivative(Operation):
     """Derivative operation (callable object)."""
 
-    def _compute(self, series, inplace=False, normalize=True, diffs=False):
+    def _call(self, series, inplace=False, normalize=True, diffs=False):
 
         _check_series_of_points_or_slots(series)
         _check_indexed_data(series)
@@ -355,7 +355,7 @@ class Derivative(Operation):
 class Integral(Operation):
     """Integral operation (callable object)."""
 
-    def _compute(self, series, inplace=False, normalize=True, c=0, offset=0):
+    def _call(self, series, inplace=False, normalize=True, c=0, offset=0):
 
         _check_series_of_points_or_slots(series)
         _check_indexed_data(series)
@@ -513,24 +513,24 @@ class Integral(Operation):
 
 class Diff(Derivative):
     """Incremental differences operation (callable object)."""
-    def _compute(self, series, inplace=False):
+    def _call(self, series, inplace=False):
         if series.resolution == 'variable':
             raise ValueError('The differences cannot be computed on variable resolution time series, resample it or use the derivative operation.')
-        return super(Diff, self)._compute(series, inplace=inplace, normalize=False, diffs=True)
+        return super(Diff, self)._call(series, inplace=inplace, normalize=False, diffs=True)
 
 
 class CSum(Integral):
     """Cumulative sum operation (callable object)."""
-    def _compute(self, series, inplace=False, offset=None):
+    def _call(self, series, inplace=False, offset=None):
         if series.resolution == 'variable':
             raise ValueError('The cumulative sums cannot be computed on variable resolution time series, resample it or use the integral operation.')
-        return super(CSum, self)._compute(series, inplace=inplace, normalize=False, offset=offset)
+        return super(CSum, self)._call(series, inplace=inplace, normalize=False, offset=offset)
 
 
 class Normalize(Operation):
     """Normalization operation (callable object)"""
 
-    def _compute(self, series, range=[0,1], inplace=False):
+    def _call(self, series, range=[0,1], inplace=False):
 
         _check_series_of_points_or_slots(series)
         _check_indexed_data(series)
@@ -613,7 +613,7 @@ class Normalize(Operation):
 class Rescale(Operation):
     """Rescaling operation (callable object)"""
 
-    def _compute(self, series, value, inplace=False):
+    def _call(self, series, value, inplace=False):
 
         _check_series_of_points_or_slots(series)
         _check_indexed_data(series)
@@ -677,7 +677,7 @@ class Rescale(Operation):
 class Offset(Operation):
     """Offsetting operation (callable object)"""
 
-    def _compute(self, series, value, inplace=False):
+    def _call(self, series, value, inplace=False):
 
         _check_series_of_points_or_slots(series)
         _check_indexed_data(series)
@@ -742,7 +742,7 @@ class Offset(Operation):
 class MAvg(Operation):
     """Moving average operation (callable object)."""
 
-    def _compute(self, series, window, inplace=False):
+    def _call(self, series, window, inplace=False):
 
         _check_series_of_points_or_slots(series)
         _check_indexed_data(series)
@@ -809,7 +809,7 @@ class Get(Operation):
         else:
             return super(Get, self).__call__(series, *args, **kwargs)
 
-    def _compute(self, series, at):
+    def _call(self, series, at):
 
         # Detect argument type
         if isinstance(at, int):
@@ -827,7 +827,7 @@ class Get(Operation):
 class Filter(Operation):
     """Filter operation (callable object)."""
 
-    def _compute(self, series, *data_labels):
+    def _call(self, series, *data_labels):
 
         _check_series_of_points_or_slots(series)
         _check_indexed_data(series)
@@ -857,7 +857,7 @@ class Filter(Operation):
 class Slice(Operation):
     """Slice operation (callable object)."""
 
-    def _compute(self, series, start=None, end=None):
+    def _call(self, series, start=None, end=None):
 
         # TODO: check for series type to allow time-based slicing? Same in the Get..
 
@@ -953,7 +953,7 @@ class Slice(Operation):
 class Merge(Operation):
     """Merge operation (callable object)."""
 
-    def _compute(self, *series):
+    def _call(self, *series):
 
         seriess = series
 
@@ -1082,7 +1082,7 @@ class Merge(Operation):
 class Select(Operation):
     """Select operation (callable object)."""
 
-    def _compute(self, series, query):
+    def _call(self, series, query):
 
         _check_series_of_points_or_slots(series)
         _check_indexed_data(series)
