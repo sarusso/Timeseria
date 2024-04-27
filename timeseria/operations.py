@@ -910,9 +910,6 @@ class Slice(Operation):
         # Instantiate the new, sliced series
         sliced_series = series.__class__()
 
-        # Preserve mark if any TODO: Check if mark still in the sliced series?
-        sliced_series.mark = series.mark
-
         # Select sliced series items based on start end (if set) or just duplicate it
         if (start_t is not None or end_t is not None):
             for item in series:

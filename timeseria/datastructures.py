@@ -702,18 +702,6 @@ class Series(list):
     def __hash__(self):
         return id(self)
 
-    @property
-    def title(self):
-        """A title for the series, to be used for the plots."""
-        try:
-            return self._title
-        except AttributeError:
-            return None
-
-    @title.setter
-    def title(self, title):
-        self._title=title
-
     def __repr__(self):
         return '{} of #{} elements'.format(self.__class__.__name__, len(self))
 
@@ -743,48 +731,6 @@ class Series(list):
         ordered_data_index_names += sorted(data_index_names)
 
         return ordered_data_index_names
-
-    @property
-    def mark(self):
-        """A mark for the series, used for highlighting a portion of a plot.
-           Required to be formatted as a list or tuple with two elements, the
-           first from where the mark has to start and the second where it has
-           to end.
-        """
-        try:
-            return self._mark
-        except AttributeError:
-            return None
-
-    @mark.setter
-    def mark(self, value):
-        if not value:
-            try:
-                del self._mark
-            except:
-                pass
-        else:
-            # Check valid mark
-            if not isinstance(value, (list, tuple)):
-                raise TypeError('Series mark must be a list or tuple')
-            if not len(value) == 2:
-                raise ValueError('Series mark must be a list or tuple of two elements')
-            self._mark = value
-
-    @property
-    def mark_title(self):
-        """A tile for the mark, to be displayed in the plot legend."""
-        try:
-            return self._mark_title
-        except AttributeError:
-            return None
-
-    @mark_title.setter
-    def mark_title(self, value):
-        if not value:
-            del self._mark_title
-        else:
-            self._mark_title = value
 
     # Inherited methods to be edited
     def insert(self, i, x):
@@ -921,11 +867,6 @@ class Series(list):
             series = self.__class__()
             for i in indices:
                 series.append(super(Series, self).__getitem__(i))
-            try:
-                # Preserve mark if any
-                series.mark = self.mark
-            except:
-                pass
             return series
         elif isinstance(key, str):
             # Try filtering on this data label only

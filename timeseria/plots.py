@@ -93,7 +93,7 @@ def _to_dg_time(dt):
     else:
         return 'new Date(Date.UTC({}, {}, {}, {}, {}, {}))'.format(dt.year, dt.month-1, dt.day, dt.hour, dt.minute, dt.second)
 
-def _to_dg_data(serie, data_labels_to_plot, data_indexes_to_plot, full_precision, aggregate_by=0):
+def _to_dg_data(serie, data_labels_to_plot, data_indexes_to_plot, full_precision, aggregate_by=0, mark=None):
     '''{% for timestamp,value in metric_data.items %}{{timestamp}},{{value}}\n{%endfor%}}'''
 
     from .datastructures import DataTimePoint, DataTimeSlot
@@ -105,9 +105,9 @@ def _to_dg_data(serie, data_labels_to_plot, data_indexes_to_plot, full_precision
     global_min = None
     global_max = None
 
-    if serie.mark:
-        series_mark_start_t = s_from_dt(serie.mark[0])
-        series_mark_end_t = s_from_dt(serie.mark[1])
+    if mark:
+        series_mark_start_t = s_from_dt(mark[0])
+        series_mark_end_t = s_from_dt(mark[1])
 
     for i, item in enumerate(serie):
 
@@ -220,7 +220,7 @@ def _to_dg_data(serie, data_labels_to_plot, data_indexes_to_plot, full_precision
                         data_part+='[null,null,null],'
 
                 # Do we have a mark?
-                if serie.mark and RENDER_MARK_AS_INDEX:
+                if mark and RENDER_MARK_AS_INDEX:
                     if item.start.t >= series_mark_start_t and item.end.t < series_mark_end_t:
                         # Add the (active) mark
                         data_part+='[0,1,1],'
@@ -288,7 +288,7 @@ def _to_dg_data(serie, data_labels_to_plot, data_indexes_to_plot, full_precision
                     data_part+='null,'
 
             # Do we have a mark?
-            if serie.mark and RENDER_MARK_AS_INDEX:
+            if mark and RENDER_MARK_AS_INDEX:
                 if item.t >= series_mark_start_t and item.t < series_mark_end_t:
                     # Add the (active) mark
                     data_part+='1,'
@@ -314,7 +314,7 @@ def _to_dg_data(serie, data_labels_to_plot, data_indexes_to_plot, full_precision
 
 def dygraphs_plot(series, data_labels='all', data_indexes='all', aggregate=None, aggregate_by=None, full_precision=False,
                   color=None, height=None, image=DEFAULT_PLOT_AS_IMAGE, image_resolution='auto', html=False, save_to=None,
-                  mini_plot='auto', value_range='auto', minimal_legend=False, legacy=None):
+                  mini_plot='auto', value_range='auto', minimal_legend=False, title=None, mark=None, mark_title=None, legacy=None):
     """Plot a time series using Dygraphs interactive plots.
 
        Args:
@@ -345,6 +345,10 @@ def dygraphs_plot(series, data_labels='all', data_indexes='all', aggregate=None,
                             saving the plot in image format.
            value_range(list): a value range for the y axes to force the plot to stick with, in the form ``[min, max]``.
            minimal_legend(bool): if to strip down the information in the legend to the very minimum.
+           title(str): a title for the plot.
+           mark(str): a mark, to be used for highlighting a portion of the plot. Required to be formatted as a list or tuple
+                      with two elements, the first from where the mark has to start and the second where it has to end.
+           mark_title(str): a tile for the mark, to be displayed in the legend.
            legacy(bool): if to enable legacy mode (required for Jupyter Notebook < 7, never required for Jupyter Lab).
     """
     # Credits: the interactive plot is based on the work here: https://www.stefaanlippens.net/jupyter-custom-d3-visualization.html.
@@ -492,12 +496,10 @@ def dygraphs_plot(series, data_labels='all', data_indexes='all', aggregate=None,
     graph_div_id  = graph_id + '_plotarea'
     legend_div_id = graph_id + '_legend'
 
-    # Do we have to show a series mark?
-    if series.mark:
+    # Do we have to show a mark?
+    if mark:
         #logger.info('Found series mark and showing it')
-        if series.mark_title:
-            mark_title = series.mark_title
-        else:
+        if not mark_title:
             mark_title = 'mark'
         series_mark_html = '<span style="background:rgba(255, 255, 102, .6);">&nbsp;{}&nbsp;</span>'.format(mark_title)
         series_mark_html_off = '<span style="background:rgba(255, 255, 102, .2);">&nbsp;{}&nbsp;</span>'.format(mark_title)
@@ -660,14 +662,14 @@ function legendFormatter(data) {
         labels+=',{}'.format(index)
 
     # Handle series mark (as index)
-    if series.mark and RENDER_MARK_AS_INDEX:
+    if mark and RENDER_MARK_AS_INDEX:
         labels+=',data_mark'
 
     # Prepare labels string list for Dygraphs
     labels_list = ['Timestamp'] + labels.split(',')
 
     # Get series data in Dygraphs format (and aggregate if too much data and find global min and max)
-    global_min, global_max, dg_data = _to_dg_data(series, data_labels_to_plot, data_indexes_to_plot, full_precision, aggregate_by)
+    global_min, global_max, dg_data = _to_dg_data(series, data_labels_to_plot, data_indexes_to_plot, full_precision, aggregate_by, mark)
     if height:
         global_max = height
     if global_max != global_min:
@@ -827,17 +829,17 @@ animatedZooms: true,"""
             dygraphs_javascript += """colors: ['rgb(0,128,128)'],"""
 
     # Handle series mark (only if not handled as an index)
-    if series.mark and not RENDER_MARK_AS_INDEX:
+    if mark and not RENDER_MARK_AS_INDEX:
 
         # Check that we know how to use this mark
-        if not isinstance(series.mark[0], datetime.datetime):
-            raise TypeError('Series marks must be datetime objects')
-        if not isinstance(series.mark[1], datetime.datetime):
-            raise TypeError('Series marks must be datetime objects')
+        if not isinstance(mark[0], datetime.datetime):
+            raise TypeError('Mark start/end must be datetime objects')
+        if not isinstance(mark[1], datetime.datetime):
+            raise TypeError('Mark start/end marks be datetime objects')
 
         # Convert the mark to fake epoch milliseconds
-        mark_start = _utc_fake_s_from_dt(series.mark[0])*1000
-        mark_end   = _utc_fake_s_from_dt(series.mark[1])*1000
+        mark_start = _utc_fake_s_from_dt(mark[0])*1000
+        mark_end   = _utc_fake_s_from_dt(mark[1])*1000
 
         # Add js code
         dygraphs_javascript += 'underlayCallback: function(canvas, area, g) {'
@@ -915,12 +917,12 @@ define('"""+graph_id+"""', ['dgenv'], function (Dygraph) {
             with open(STATIC_DATA_PATH+'css/dygraph-2.1.0.css') as dg_css_file:
                 html_content += '\n<style>'+dg_css_file.read()+'</style>\n'
             html_content += '</head>\n<body style="font-family:\'Helvetica Neue\', Helvetica, Arial, sans-serif; font-size:1.0em">\n'
-            if series.title:
-                html_content += '<div style="text-align: center; margin-top:15px; margin-bottom:15px; font-size:1.2em"><h3>{}</h3></div>'.format(series.title)
+            if title:
+                html_content += '<div style="text-align: center; margin-top:15px; margin-bottom:15px; font-size:1.2em"><h3>{}</h3></div>'.format(title)
             html_content += '<div style="height:36px; padding:0; margin-left:0px; margin-top:10px">\n'
         else:
-            if series.title:
-                html_content += '<div style="text-align: center; margin-top:15px; margin-bottom:15px; font-size:1.2em"><h3>{}</h3></div>'.format(series.title)
+            if title:
+                html_content += '<div style="text-align: center; margin-top:15px; margin-bottom:15px; font-size:1.2em"><h3>{}</h3></div>'.format(title)
         html_content += '<div id="{}" style="width:100%"></div>\n'.format(legend_div_id)
         html_content += '<div id="{}" style="width:100%; margin-right:0px"></div>\n'.format(graph_div_id)
         if not return_html_code:
@@ -962,7 +964,7 @@ define('"""+graph_id+"""', ['dgenv'], function (Dygraph) {
 
             # Render HTML to image
             if image_resolution == 'auto':
-                if series.title:
+                if title:
                     image_resolution='1280x430'
                 else:
                     image_resolution='1280x380'
@@ -1021,8 +1023,8 @@ define('"""+graph_id+"""', ['dgenv'], function (Dygraph) {
 
             # Load Dygraphs Javascript and html code
             display_html = ''
-            if series.title:
-                display_html += '<div style="text-align: center; margin-bottom:20px; font-size:0.95em"><h3>{}</h3></div>'.format(series.title)
+            if title:
+                display_html += '<div style="text-align: center; margin-bottom:20px; font-size:0.95em"><h3>{}</h3></div>'.format(title)
             display_html += '<div style="height:36px; padding:0; margin-left:0px; margin-top:10px">'
             display_html += '''<div id="'''+legend_div_id+'''" style="width:100%"></div></div>
                             <div id="'''+graph_div_id+'''" style="width:100%; margin-right:0px"></div>'''
@@ -1046,8 +1048,8 @@ define('"""+graph_id+"""', ['dgenv'], function (Dygraph) {
                 display_html += '\n<script type="text/javascript">'+dg_js_file.read()+'</script>\n'
             with open(STATIC_DATA_PATH+'css/dygraph-2.1.0.css') as dg_css_file:
                 display_html += '\n<style>'+dg_css_file.read()+'</style>\n'
-            if series.title:
-                display_html += '<div style="text-align: center; margin-top:15px; margin-bottom:15px; font-size:1.2em"><h3>{}</h3></div>'.format(series.title)
+            if title:
+                display_html += '<div style="text-align: center; margin-top:15px; margin-bottom:15px; font-size:1.2em"><h3>{}</h3></div>'.format(title)
             display_html += '<div style="height:36px; padding:0; margin-left:0px; margin-top:10px">\n'
             display_html += '<div id="{}" style="width:100%"></div>\n'.format(legend_div_id)
             display_html += '<div id="{}" style="width:100%; margin-right:0px"></div>\n'.format(graph_div_id)
