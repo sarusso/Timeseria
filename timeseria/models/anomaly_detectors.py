@@ -94,11 +94,18 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
  
     @classmethod
     def load(cls, path):
+
+        # Load the anomaly detection model
         model = super().load(path)
-        # Load the internal model as well
-        # Note: the model_id is the nested folder where the model is saved
-        internal_model_dir = path+'/'+model.data['model_id']
-        model.model= model.model_class.load(internal_model_dir)
+
+        # ..and load the inner model(s) as nested model
+        if model.data['with_context']:
+            model.models = {}
+            for data_label in model.data['data_labels']:
+                model.models[data_label] = model.model_class.load('{}/{}_model'.format(path, data_label))
+        else:
+            model.model= model.model_class.load('{}/model'.format(path))
+
         return model
 
     def save(self, path):
@@ -106,8 +113,12 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
         # Save the anomaly detection model
         super(ModelBasedAnomalyDetector, self).save(path)
 
-        # ..and save the inner model as nested model
-        self.model.save(path+'/'+str(self.model.id))
+        # ..and save the inner model(s) as nested model
+        if self.data['with_context']:
+            for data_label in self.models:
+                self.models[data_label].save('{}/{}_model'.format(path, data_label))
+        else:
+            self.model.save('{}/model'.format(path))
 
 
     def _get_actual_and_predicted(self, series, i, data_label, with_context):

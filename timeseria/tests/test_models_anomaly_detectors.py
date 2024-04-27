@@ -238,6 +238,22 @@ class TestAnomalyDetectors(unittest.TestCase):
         self.assertAlmostEqual(results_timeseries[139].data_indexes['anomaly'], 0.818, places=2)
         self.assertEqual(results_timeseries[169].data_indexes['anomaly'], 1)
 
+        # Save & load
+        model_path = TEMP_MODELS_DIR+'/test_anomaly_model_with_context'
+        anomaly_detector.save(model_path)
+        loaded_anomaly_detector = LSTMAnomalyDetector.load(model_path)
+        self.assertAlmostEqual(anomaly_detector.data['stdevs']['cos'], 0.104, places=2) 
+        self.assertAlmostEqual(anomaly_detector.data['stdevs']['sin'], 0.07858, places=2)
+        results_timeseries = loaded_anomaly_detector.apply(timeseries_with_anomalies, index_range=['max_err','10_sigma'], verbose=False, details=False)
+        self.assertEqual(results_timeseries[0].data_indexes['anomaly'], 0)
+        self.assertEqual(results_timeseries[19].data_indexes['anomaly'], 1)
+        self.assertAlmostEqual(results_timeseries[20].data_indexes['anomaly'], 0.271, places=2)
+        self.assertEqual(results_timeseries[49].data_indexes['anomaly'], 1)
+        self.assertEqual(results_timeseries[79].data_indexes['anomaly'], 1)
+        self.assertEqual(results_timeseries[109].data_indexes['anomaly'], 1)
+        self.assertAlmostEqual(results_timeseries[139].data_indexes['anomaly'], 0.818, places=2)
+        self.assertEqual(results_timeseries[169].data_indexes['anomaly'], 1)
+
         # Unsupervised TODO: Does not really work...
         # anomaly_detector = LSTMAnomalyDetector()
         # anomaly_detector.fit(timeseries_with_anomalies, error_distribution='norm', epochs=20, with_context=True, reproducible=True)
@@ -255,5 +271,6 @@ class TestAnomalyDetectors(unittest.TestCase):
         # self.assertEqual(results_timeseries[109].data_indexes['anomaly'], 1)
         # self.assertEqual(results_timeseries[139].data_indexes['anomaly'], 1)
         # self.assertEqual(results_timeseries[169].data_indexes['anomaly'], 1)
+
 
 
