@@ -314,7 +314,8 @@ def _to_dg_data(serie, data_labels_to_plot, data_indexes_to_plot, full_precision
 
 def dygraphs_plot(series, data_labels='all', data_indexes='all', aggregate=None, aggregate_by=None, full_precision=False,
                   color=None, height=None, image=DEFAULT_PLOT_AS_IMAGE, image_resolution='auto', html=False, save_to=None,
-                  mini_plot='auto', value_range='auto', minimal_legend=False, title=None, mark=None, mark_title=None, legacy=None):
+                  mini_plot='auto', value_range='auto', minimal_legend=False, title=None, highlight=None, highlight_title=None,
+                  legacy=None):
     """Plot a time series using Dygraphs interactive plots.
 
        Args:
@@ -346,9 +347,9 @@ def dygraphs_plot(series, data_labels='all', data_indexes='all', aggregate=None,
            value_range(list): a value range for the y axes to force the plot to stick with, in the form ``[min, max]``.
            minimal_legend(bool): if to strip down the information in the legend to the very minimum.
            title(str): a title for the plot.
-           mark(str): a mark, to be used for highlighting a portion of the plot. Required to be formatted as a list or tuple
+           highlight(str): a mark, to be used for highlighting a portion of the plot. Required to be formatted as a list or tuple
                       with two elements, the first from where the mark has to start and the second where it has to end.
-           mark_title(str): a tile for the mark, to be displayed in the legend.
+           highlight_title(str): a tile for the mark, to be displayed in the legend.
            legacy(bool): if to enable legacy mode (required for Jupyter Notebook < 7, never required for Jupyter Lab).
     """
     # Credits: the interactive plot is based on the work here: https://www.stefaanlippens.net/jupyter-custom-d3-visualization.html.
@@ -496,9 +497,11 @@ def dygraphs_plot(series, data_labels='all', data_indexes='all', aggregate=None,
     graph_div_id  = graph_id + '_plotarea'
     legend_div_id = graph_id + '_legend'
 
-    # Do we have to show a mark?
+    # Do we have to show an highlight?
+    mark = highlight
+    mark_title = highlight_title
     if mark:
-        #logger.info('Found series mark and showing it')
+        #logger.info('Found series highlight and showing it')
         if not mark_title:
             mark_title = 'mark'
         series_mark_html = '<span style="background:rgba(255, 255, 102, .6);">&nbsp;{}&nbsp;</span>'.format(mark_title)
