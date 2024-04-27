@@ -1528,7 +1528,7 @@ class TimeSeries(Series):
                 else:
                     break
         if not metadata:
-            raise ValueError('The fiel provided is not a Timeseria time series data file. Perhaps you wanted to use the from_csv() method?')
+            raise ValueError('The file provided is not a Timeseria time series data file. Perhaps you wanted to use the from_csv() method?')
 
         as_points = True if metadata['type'] == 'points' else False
         as_slots = True if metadata['type'] == 'slots' else False

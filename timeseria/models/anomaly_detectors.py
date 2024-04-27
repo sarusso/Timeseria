@@ -143,10 +143,10 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
 
 
     @AnomalyDetector.fit_function
-    def fit(self, series, with_context=False, verbose=False, summary=False, **kwargs):
+    def fit(self, series, with_context=False, error_distribution='auto', verbose=False, summary=False, **kwargs):
 
-        error_distribution = kwargs.pop('error_distribution', None)
-        if not error_distribution:
+        # Handle the error distribution(s)
+        if error_distribution == 'auto':
             error_distributions = kwargs.pop('error_distributions', fitter_library.fitter.get_common_distributions() +['gennorm'])
         else:
             error_distributions = [error_distribution]
