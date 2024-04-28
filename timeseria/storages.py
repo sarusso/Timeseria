@@ -63,11 +63,11 @@ class CSVFileStorage(Storage):
 
     Args:
         filename: the file name (including its path).
-        timestamp_label: the column label to be used as timestamp. Either use this or the time_label and/or date_label parameters.
+        timestamp_column: the column label to be used as timestamp. Either use this or the time_column and/or date_column parameters.
         timestamp_format: the timestamp column format.
-        time_label: the column label to be used as the time part of the timestamp.
+        time_column: the column label to be used as the time part of the timestamp.
         time_format: the time column format.
-        date_label: the column label to be used as the date part of the timestamp.
+        date_column: the column label to be used as the date part of the timestamp.
         date_format: the date column format.
         tz: the timezone on which to create the time series on. If the timestamps in the file are naive, then they are assumed on
             such timezone. If they are instead offset-aware, including UTC, then they are just moved on the given timezone.
@@ -84,40 +84,40 @@ class CSVFileStorage(Storage):
         silence_errors: if to completely silence errors when skipping them or not.
     """
 
-    def __init__(self, filename, timestamp_label='auto', timestamp_format='auto',
-                 time_label=None, time_format=None, date_label=None, date_format=None,
+    def __init__(self, filename, timestamp_column='auto', timestamp_format='auto',
+                 time_column=None, time_format=None, date_column=None, date_format=None,
                  tz='UTC', data_labels='all', data_type='auto', series_type='auto', sort=False,
                  separator=',', newline='\n', comment_chars = ['#', ';'],  encoding='auto',
                  skip_errors=False, silence_errors=False):
 
         # Parameters sanity checks and adjustments
-        if timestamp_label is None and time_label is None and date_label is None and not data_labels:
+        if timestamp_column is None and time_column is None and date_column is None and not data_labels:
             raise ValueError('No timestamp column, time column, date column or data columns provided, cannot get anything from this CSV file')
 
-        if timestamp_label != 'auto' and (time_label or date_label):
+        if timestamp_column != 'auto' and (time_column or date_column):
             raise ValueError('Got both timestamp column and time/date columns, choose which approach to use.')
 
-        if timestamp_label is not None and not isinstance(timestamp_label, int) and not isinstance(timestamp_label, str):
-            raise ValueError('timestamp_label argument must be a string (or integer for coulmn number) (got "{}")'.format(timestamp_label.__class__.__name__))
+        if timestamp_column is not None and not isinstance(timestamp_column, int) and not isinstance(timestamp_column, str):
+            raise ValueError('timestamp_column argument must be a string (or integer for coulmn number) (got "{}")'.format(timestamp_column.__class__.__name__))
 
-        if time_label is not None:
-            if not isinstance(time_label, int) and not isinstance(time_label, str):
-                raise ValueError('time_label argument must be a string (or integer for coulmn number) (got "{}")'.format(time_label.__class__.__name__))
+        if time_column is not None:
+            if not isinstance(time_column, int) and not isinstance(time_column, str):
+                raise ValueError('time_column argument must be a string (or integer for coulmn number) (got "{}")'.format(time_column.__class__.__name__))
             if not time_format:
-                raise ValueError('If giving a time_label, a time_format is required as well')
+                raise ValueError('If giving a time_column, a time_format is required as well')
 
             # Disble the timestamp label if a time (or date) label is set
-            timestamp_label = None
+            timestamp_column = None
             timestamp_format = None
 
-        if date_label is not None:
-            if not isinstance(date_label, int) and not isinstance(date_label, str):
-                raise ValueError('date_label argument must be a string (or integer for coulmn number) (got "{}")'.format(date_label.__class__.__name__))
+        if date_column is not None:
+            if not isinstance(date_column, int) and not isinstance(date_column, str):
+                raise ValueError('date_column argument must be a string (or integer for coulmn number) (got "{}")'.format(date_column.__class__.__name__))
             if not date_format:
-                raise ValueError('If giving a date_label, a date_format is required as well')
+                raise ValueError('If giving a date_column, a date_format is required as well')
 
             # Disble the timestamp label if a date (or time) label is set
-            timestamp_label = None
+            timestamp_column = None
             timestamp_format = None
 
         if data_labels != 'all' and not isinstance(data_labels, list):
@@ -131,13 +131,13 @@ class CSVFileStorage(Storage):
             self.encoding = encoding
 
         # Set time parameters
-        self.timestamp_label = timestamp_label
+        self.timestamp_column = timestamp_column
         self.timestamp_format = timestamp_format
 
-        self.date_label = date_label
+        self.date_column = date_column
         self.date_format = date_format
 
-        self.time_label = time_label
+        self.time_column = time_column
         self.time_format = time_format
 
         # Timezone
@@ -194,9 +194,9 @@ class CSVFileStorage(Storage):
         column_indexes = None
         column_labels = None
 
-        timestamp_label_index = None
-        time_label_index = None
-        date_label_index = None
+        timestamp_column_index = None
+        time_column_index = None
+        date_column_index = None
 
         data_label_indexes = None
         data_label_names = None
@@ -277,78 +277,78 @@ class CSVFileStorage(Storage):
                 #====================
 
                 # Set timestamp column index if not already done
-                if self.timestamp_label is not None and timestamp_label_index is None:
-                    if self.timestamp_label=='auto':
+                if self.timestamp_column is not None and timestamp_column_index is None:
+                    if self.timestamp_column=='auto':
                         # TODO: improve this auto-detect: try different column names and formats.
                         #       Maybe, fix position as the first element for the timestamp.
                         if column_labels:
-                            for posssible_timestamp_label_name in POSSIBLE_TIMESTAMP_labelS:
-                                if posssible_timestamp_label_name in column_labels:
-                                    timestamp_label_index = column_labels.index(posssible_timestamp_label_name)
-                                    self.timestamp_label = posssible_timestamp_label_name
+                            for posssible_timestamp_column_name in POSSIBLE_TIMESTAMP_labelS:
+                                if posssible_timestamp_column_name in column_labels:
+                                    timestamp_column_index = column_labels.index(posssible_timestamp_column_name)
+                                    self.timestamp_column = posssible_timestamp_column_name
                                     break
-                            if timestamp_label_index is None:
+                            if timestamp_column_index is None:
                                 #raise Exception('Cannot auto-detect timestamp column')
-                                timestamp_label_index = 0
+                                timestamp_column_index = 0
                         else:
-                            timestamp_label_index = 0
+                            timestamp_column_index = 0
                         # TODO: Try to convert to timestamp here?
                     else:
-                        if isinstance(self.timestamp_label, int):
-                            timestamp_label_index = self.timestamp_label
+                        if isinstance(self.timestamp_column, int):
+                            timestamp_column_index = self.timestamp_column
                         else:
-                            if self.timestamp_label in column_labels:
-                                timestamp_label_index = column_labels.index(self.timestamp_label)
+                            if self.timestamp_column in column_labels:
+                                timestamp_column_index = column_labels.index(self.timestamp_column)
                             else:
-                                if self.timestamp_label is not None:
-                                    raise Exception('Cannot find requested timestamp column "{}" in labels (got "{}")'.format(self.timestamp_label, column_labels))
-                                elif self.timestamp_label is not None:
-                                    raise Exception('Cannot find requested time column "{}" in labels (got "{}")'.format(self.timestamp_label, column_labels))
+                                if self.timestamp_column is not None:
+                                    raise Exception('Cannot find requested timestamp column "{}" in labels (got "{}")'.format(self.timestamp_column, column_labels))
+                                elif self.timestamp_column is not None:
+                                    raise Exception('Cannot find requested time column "{}" in labels (got "{}")'.format(self.timestamp_column, column_labels))
                                 else:
                                     pass
-                    logger.debug('Set time column index = "%s"', timestamp_label_index)
+                    logger.debug('Set time column index = "%s"', timestamp_column_index)
 
                 # Set time column index if required and not already done
-                if self.time_label is not None and time_label_index is None:
-                    if isinstance(self.time_label, int):
-                        time_label_index = self.time_label
+                if self.time_column is not None and time_column_index is None:
+                    if isinstance(self.time_column, int):
+                        time_column_index = self.time_column
                     else:
-                        if self.time_label in column_labels:
-                            time_label_index = column_labels.index(self.time_label)
+                        if self.time_column in column_labels:
+                            time_column_index = column_labels.index(self.time_column)
                         else:
-                            raise Exception('Cannot find requested time column "{}" in labels (got "{}")'.format(self.time_label, column_labels))
-                    logger.debug('Set date column index = "%s"', time_label_index)
+                            raise Exception('Cannot find requested time column "{}" in labels (got "{}")'.format(self.time_column, column_labels))
+                    logger.debug('Set date column index = "%s"', time_column_index)
 
                 # Set date column index if required and not already done
-                if self.date_label is not None and date_label_index is None:
-                    if isinstance(self.date_label, int):
-                        date_label_index = self.date_label
+                if self.date_column is not None and date_column_index is None:
+                    if isinstance(self.date_column, int):
+                        date_column_index = self.date_column
                     else:
-                        if self.date_label in column_labels:
-                            date_label_index = column_labels.index(self.date_label)
+                        if self.date_column in column_labels:
+                            date_column_index = column_labels.index(self.date_column)
                         else:
-                            raise Exception('Cannot find requested time column "{}" in labels (got "{}")'.format(self.time_label, column_labels))
-                    logger.debug('Set date column index = "%s"', date_label_index)
+                            raise Exception('Cannot find requested time column "{}" in labels (got "{}")'.format(self.time_column, column_labels))
+                    logger.debug('Set date column index = "%s"', date_column_index)
 
-                # If all the three of timestamp_label_index, time_label_index and date_label_index are None, there is something wrong:
-                if timestamp_label_index is None and time_label_index is None and date_label_index is None:
-                    raise ConsistencyException('Could not set timestamp_label_index nor time_label_index nor date_label_index, somehting wrong happened.')
+                # If all the three of timestamp_column_index, time_column_index and date_column_index are None, there is something wrong:
+                if timestamp_column_index is None and time_column_index is None and date_column_index is None:
+                    raise ConsistencyException('Could not set timestamp_column_index nor time_column_index nor date_column_index, somehting wrong happened.')
 
                 # Ok,now get the timestamp as string
-                if timestamp_label_index is not None:
+                if timestamp_column_index is not None:
                     # Just use the Timestamp column
-                    timestamp = _sanitize_string(line_items[timestamp_label_index],NO_DATA_PLACEHOLDERS)
+                    timestamp = _sanitize_string(line_items[timestamp_column_index],NO_DATA_PLACEHOLDERS)
 
                 else:
                     # Time part
                     time_part=None
-                    if time_label_index is not None:
-                        time_part = _sanitize_string(line_items[time_label_index],NO_DATA_PLACEHOLDERS)
+                    if time_column_index is not None:
+                        time_part = _sanitize_string(line_items[time_column_index],NO_DATA_PLACEHOLDERS)
 
                     # Date part
                     date_part=None
-                    if date_label_index is not None:
-                        date_part = _sanitize_string(line_items[date_label_index],NO_DATA_PLACEHOLDERS)
+                    if date_column_index is not None:
+                        date_part = _sanitize_string(line_items[date_column_index],NO_DATA_PLACEHOLDERS)
 
                     # Assemble timestamp
                     if time_part is not None and date_part is not None:
@@ -368,15 +368,15 @@ class CSVFileStorage(Storage):
                     dt = None
 
                     # Both time and date labels
-                    if self.time_label is not None and self.date_label is not None:
+                    if self.time_column is not None and self.date_column is not None:
                         dt = datetime.datetime.strptime(timestamp, self.date_format + '\t' + self.time_format)
 
                     # Only date label
-                    elif self.date_label is not None:
+                    elif self.date_column is not None:
                         dt = datetime.datetime.strptime(timestamp, self.date_format)
 
                     # Only time label (TODO: does this make sense?)
-                    elif self.time_label is not None:
+                    elif self.time_column is not None:
                         dt = datetime.datetime.strptime(timestamp, self.time_format)
 
                     # Use the timestamp label and format
@@ -468,14 +468,14 @@ class CSVFileStorage(Storage):
                         data_label_indexes = column_indexes
 
                         # Remove timestamp, time and date indexes from the data_label_indexes
-                        if timestamp_label_index is not None:
-                            data_label_indexes.remove(timestamp_label_index)
+                        if timestamp_column_index is not None:
+                            data_label_indexes.remove(timestamp_column_index)
 
-                        if time_label_index is not None:
-                            data_label_indexes.remove(time_label_index)
+                        if time_column_index is not None:
+                            data_label_indexes.remove(time_column_index)
 
-                        if date_label_index is not None:
-                            data_label_indexes.remove(date_label_index)
+                        if date_column_index is not None:
+                            data_label_indexes.remove(date_column_index)
 
                     # Ok, now based on the data_label_indexes fill the data_label_names if we have column labels
                     if column_labels:

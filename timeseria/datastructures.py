@@ -1471,17 +1471,17 @@ class TimeSeries(Series):
         if not metadata:
             raise ValueError('The file provided is not a Timeseria time series data file. Perhaps you wanted to use the from_csv() method?')
 
-        as_points = True if metadata['type'] == 'points' else False
-        as_slots = True if metadata['type'] == 'slots' else False
-        as_tz = metadata['tz']
-        if as_slots:
-            slot_unit = metadata['resolution']
+        force_points = True if metadata['type'] == 'points' else False
+        force_slots = True if metadata['type'] == 'slots' else False
+        force_tz = metadata['tz']
+        if force_slots:
+            force_slot_unit = metadata['resolution']
         else:
-            slot_unit = 'auto'
+            force_slot_unit = None
 
         from .storages import CSVFileStorage
         storage = CSVFileStorage(file_name)
-        loaded_series = storage.get(as_points=as_points, as_slots=as_slots, as_tz=as_tz, slot_unit=slot_unit)
+        loaded_series = storage.get(force_points=force_points, force_slots=force_slots, force_tz=force_tz, force_slot_unit=force_slot_unit)
 
         if loaded_series.__class__ == cls:
             return loaded_series

@@ -131,15 +131,15 @@ class TestCSVFileStorage(unittest.TestCase):
         # Autodetect iso
         storage = CSVFileStorage(TEST_DATA_PATH + '/csv/multi_values_with_labels.csv')
         self.assertEqual(storage.timestamp_format, 'auto')
-        self.assertEqual(storage.timestamp_label, 'auto')
+        self.assertEqual(storage.timestamp_column, 'auto')
         data_time_point_series = storage.get()
         self.assertEqual(storage.timestamp_format, 'iso8601')
-        self.assertEqual(storage.timestamp_label, 'timestamp')
+        self.assertEqual(storage.timestamp_column, 'timestamp')
         self.assertEqual(len(data_time_point_series), 50)
 
         # Epoch timestamp format
         storage = CSVFileStorage(TEST_DATA_PATH + '/csv/temp_short_1h.csv',
-                                  timestamp_label = 'epoch',
+                                  timestamp_column = 'epoch',
                                   timestamp_format = 'epoch',)
         data_time_point_series = storage.get()
         self.assertEqual(len(data_time_point_series), 100)
@@ -148,7 +148,7 @@ class TestCSVFileStorage(unittest.TestCase):
 
         # Use only month and year as date column
         storage = CSVFileStorage(TEST_DATA_PATH + '/csv/shampoo_sales.csv',
-                                 date_label = 'Month',
+                                 date_column = 'Month',
                                  date_format = '%y-%m')
         data_time_point_series = storage.get()
         self.assertEqual(len(data_time_point_series), 36)
@@ -157,9 +157,9 @@ class TestCSVFileStorage(unittest.TestCase):
 
         # Separate time and date columns, custom format
         storage = CSVFileStorage(TEST_DATA_PATH + '/csv/format2.csv',
-                                 date_label = 'Date',
+                                 date_column = 'Date',
                                  date_format = '%d/%m/%Y',
-                                 time_label = 'Time',
+                                 time_column = 'Time',
                                  time_format = '%H:%M')
         data_time_point_series = storage.get()
         self.assertEqual(len(data_time_point_series), 6)
