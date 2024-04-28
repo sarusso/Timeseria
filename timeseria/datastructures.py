@@ -901,12 +901,13 @@ class Series(list):
             # TODO: move to the DataPoint/DataSlot?
             item.data[new_data_label] = item.data.pop(old_data_label)
 
-    def remove_data_loss(self):
-        """Remove the ``data_loss`` index, in-place."""
+    def remove_data_label(self, data_label):
+        """Remove a data label, in-place."""
         if len(self) > 0 and not self._item_data_reference:
-            raise TypeError('Series items have no data, cannot remove the data loss')
+            raise TypeError('Series items have no data, cannot rename a label')
         for item in self:
-            item.data_indexes.pop('data_loss', None)
+            # TODO: move to the DataPoint/DataSlot?
+            item.data.pop(data_label, None)
 
     def remove_data_index(self, data_index):
         """Remove a data index, in-place."""
@@ -914,6 +915,15 @@ class Series(list):
             raise TypeError('Series items have no data, cannot rename data indexes')
         for item in self:
             item.data_indexes.pop(data_index, None)
+
+    def remove_data_loss(self):
+        """Remove the ``data_loss`` index, in-place."""
+        if len(self) > 0 and not self._item_data_reference:
+            raise TypeError('Series items have no data, cannot remove the data loss')
+        for item in self:
+            item.data_indexes.pop('data_loss', None)
+
+
 
 
     #=========================

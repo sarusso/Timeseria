@@ -643,7 +643,7 @@ class TestTimeSeries(unittest.TestCase):
         self.assertEqual(time_series.resolution, 86400) # No DST occurred
         self.assertEqual(time_series.resolution, '86400s') # No DST occurred
 
-        # Test data labels and rename a data labels
+        # Test data labels and rename/remove a data labels
         time_series = TimeSeries(DataTimePoint(dt=dt(2015,10,27,0,0,0, tz='Europe/Rome'), data={'a':23.8, 'b':1}),
                                  DataTimePoint(dt=dt(2015,10,28,0,0,0, tz='Europe/Rome'), data={'a':24.1, 'b':2}),
                                  DataTimePoint(dt=dt(2015,10,29,0,0,0, tz='Europe/Rome'), data={'a':23.1, 'b':3}))
@@ -653,6 +653,9 @@ class TestTimeSeries(unittest.TestCase):
 
         with self.assertRaises(KeyError):
             time_series.rename_data_label('notexistent_label','c')
+
+        time_series.remove_data_label('c')
+        self.assertEqual(time_series.data_labels, ['a'])
 
         # Check timezone
         time_series = TimeSeries(DataTimePoint(dt=dt(2015,10,25,0,0,0, tz='Europe/Rome'), data={'a':23.8}),
