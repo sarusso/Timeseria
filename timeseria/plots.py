@@ -193,9 +193,9 @@ def _to_dg_data(serie, data_labels_to_plot, data_indexes_to_plot, full_precision
 
             # Dump aggregated data?
             if (i!=0)  and ((i % aggregate_by)==0):
-                if issubclass(serie.items_type, DataTimePoint):
+                if issubclass(serie.item_type, DataTimePoint):
                     last_t = item.t
-                elif issubclass(serie.items_type,DataTimeSlot):
+                elif issubclass(serie.item_type,DataTimeSlot):
                     last_t = item.end.t
                 aggregation_t = first_t + ((last_t-first_t) /2)
                 data_part=''
@@ -436,14 +436,14 @@ def dygraphs_plot(series, data_labels='all', data_indexes='all', aggregate=None,
 
     # Checks
     from .datastructures import DataTimePoint, DataTimeSlot
-    if issubclass(series.items_type, DataTimePoint):
+    if issubclass(series.item_type, DataTimePoint):
         stepPlot_value   = 'false'
         drawPoints_value = 'true'
         if aggregate_by:
             legend_pre = 'Point (aggregated by {}) at '.format(aggregate_by)
         else:
             legend_pre = 'Point at '
-    elif issubclass(series.items_type, DataTimeSlot):
+    elif issubclass(series.item_type, DataTimeSlot):
         if isinstance(series.resolution, TimeUnit):
             series_unit_string = str(series.resolution)
         else:
@@ -469,13 +469,13 @@ def dygraphs_plot(series, data_labels='all', data_indexes='all', aggregate=None,
         legend_tz=''
 
     # Set series description
-    if issubclass(series.items_type, DataTimePoint):
+    if issubclass(series.item_type, DataTimePoint):
         if aggregate_by:
             series_desc = 'Time series of #{} points at {}, aggregated by {}'.format(len(series), series._resolution_string, aggregate_by)
         else:
             series_desc = 'Time series of #{} points at {}'.format(len(series), series._resolution_string)
 
-    elif issubclass(series.items_type, DataTimeSlot):
+    elif issubclass(series.item_type, DataTimeSlot):
         if aggregate_by:
             # TODO: "slots of unit" ?
             series_desc = 'Time series of #{} slots of {}, aggregated by {}'.format(len(series), series_unit_string, aggregate_by)

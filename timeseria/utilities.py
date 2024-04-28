@@ -762,8 +762,8 @@ def _check_data_labels(series, data_labels):
 
 def _check_series_of_points_or_slots(series):
     from .datastructures import DataPoint, DataSlot
-    if not (issubclass(series.items_type, DataPoint) or issubclass(series.items_type, DataSlot)):
-        raise TypeError('Cannot operate on a series of "{}", only series of DataPoints or DataSlots are supported'.format(series.items_type.__name__))
+    if not (issubclass(series.item_type, DataPoint) or issubclass(series.item_type, DataSlot)):
+        raise TypeError('Cannot operate on a series of "{}", only series of DataPoints or DataSlots are supported'.format(series.item_type.__name__))
 
 def _check_indexed_data(series):
     try:

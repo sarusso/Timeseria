@@ -242,14 +242,14 @@ class Transformation(object):
         if not isinstance(series, TimeSeries):
             raise NotImplementedError('Transformations work only with TimeSeries data for now (got "{}")'.format(series.__class__.__name__))
 
-        if not (issubclass(series.items_type, Point) or issubclass(series.items_type, Slot)):
+        if not (issubclass(series.item_type, Point) or issubclass(series.item_type, Slot)):
                 raise TypeError('Series items are not Points nor Slots, cannot compute any transformation')
 
         # Checks
         if include_extremes:
             raise NotImplementedError('Including the extremes is not yet implemented')
-        if not issubclass(series.items_type, DataTimePoint):
-            raise TypeError('Can process only time series of DataTimePoints, got time series of items type "{}"'.format(series.items_type.__name__))
+        if not issubclass(series.item_type, DataTimePoint):
+            raise TypeError('Can process only time series of DataTimePoints, got time series of items type "{}"'.format(series.item_type.__name__))
         if not series:
             raise ValueError('Cannot process empty series')
         if target not in ['points', 'slots']:

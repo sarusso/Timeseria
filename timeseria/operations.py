@@ -225,7 +225,7 @@ class Derivative(Operation):
                 raise ValueError('The derivative cannot be computed on an empty series')
 
         if normalize:
-            if not (issubclass(series.items_type, Point) or issubclass(series.items_type, Slot)):
+            if not (issubclass(series.item_type, Point) or issubclass(series.item_type, Slot)):
                 raise TypeError('Series items are not Points nor Slots, cannot compute a derivative')
 
         if len(series) == 1:
@@ -367,7 +367,7 @@ class Integral(Operation):
                 raise ValueError('The cumulative sum cannot be computed on an empty series')
 
         if normalize:
-            if not (issubclass(series.items_type, Point) or issubclass(series.items_type, Slot)):
+            if not (issubclass(series.item_type, Point) or issubclass(series.item_type, Slot)):
                 raise TypeError('Series items are not Points nor Slots, cannot compute an integral')
 
         if normalize:

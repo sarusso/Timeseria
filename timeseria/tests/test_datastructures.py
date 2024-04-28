@@ -419,7 +419,7 @@ class TestSeries(unittest.TestCase):
         series = Series(1.0,4.0,5.0)
         self.assertEqual(series, [1.0,4.0,5.0])
         self.assertEqual(len(series), 3)
-        self.assertEqual(series.items_type, float)
+        self.assertEqual(series.item_type, float)
 
         # Test head, tail & content
         series = Series(1.0,4.0,5.0)
@@ -862,7 +862,7 @@ class TestTimeSeries(unittest.TestCase):
         self.assertEqual((time_series[0].data['RH']), 54.9)
 
         df = pd.read_csv(TEST_DATA_PATH+'csv/format4.csv', header=0, parse_dates=[0], index_col=0)
-        time_series = TimeSeries.from_df(df, items_type=DataTimeSlot)
+        time_series = TimeSeries.from_df(df, item_type=DataTimeSlot)
         self.assertEqual(len(time_series),5)
         self.assertEqual(time_series[0].start.dt,dt(2020,4,3,0,0,0))
         self.assertEqual(time_series[4].end.dt,dt(2020,4,3,10,0,0))

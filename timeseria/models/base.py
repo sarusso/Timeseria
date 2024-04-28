@@ -243,7 +243,7 @@ class Model():
             if isinstance(series, TimeSeries):
                 _check_time_series(series)
                 if self._is_parametric():
-                    if isinstance(series.items_type, Point) and len(series) == 1:
+                    if isinstance(series.item_type, Point) and len(series) == 1:
                         # Do not check if the data is a point time series and has only one item
                         pass
                     else:
@@ -283,7 +283,7 @@ class Model():
             if isinstance(series, TimeSeries):
                 _check_time_series(series)
                 if self._is_parametric():
-                    if isinstance(series.items_type, Point) and len(series) == 1:
+                    if isinstance(series.item_type, Point) and len(series) == 1:
                         # Do not check if the data is a point time series and has only one item
                         pass
                     else:
@@ -317,7 +317,7 @@ class Model():
             if isinstance(series, TimeSeries):
                 _check_time_series(series)
                 if self._is_parametric():
-                    if isinstance(series.items_type, Point) and len(series) == 1:
+                    if isinstance(series.item_type, Point) and len(series) == 1:
                         # Do not check if the data is a point time series and has only one item
                         pass
                     else:

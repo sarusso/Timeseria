@@ -139,7 +139,7 @@ class Reconstructor(Model):
 
             else:
                 # Create an entire new item
-                reconstructed_item = series.items_type.__class__(t=series[j].t,
+                reconstructed_item = series.item_type.__class__(t=series[j].t,
                                                                  data=item_data,
                                                                  data_indexes=copy.deepcopy(series[j].data_indexes))
                 reconstructed_item.data_indexes['data_reconstructed'] = 1

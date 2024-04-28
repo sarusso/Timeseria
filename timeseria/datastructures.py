@@ -647,7 +647,7 @@ class Series(list):
             self.append(arg)
 
     @property
-    def items_type(self):
+    def item_type(self):
         """The type of the items of the series."""
         if not self:
             return None
@@ -661,9 +661,9 @@ class Series(list):
         # TODO: move to use the insert?
 
         # Check type
-        if self.items_type:
-            if not isinstance(item, self.items_type):
-                raise TypeError('Got incompatible type "{}", can only accept "{}"'.format(item.__class__.__name__, self.items_type.__name__))
+        if self.item_type:
+            if not isinstance(item, self.item_type):
+                raise TypeError('Got incompatible type "{}", can only accept "{}"'.format(item.__class__.__name__, self.item_type.__name__))
 
         # Check order or succession if not empty
         if self:
@@ -743,8 +743,8 @@ class Series(list):
         if len(self) > 0:
 
             # Check valid type
-            if not isinstance(x, self.items_type):
-                raise TypeError('Got incompatible type "{}", can only accept "{}"'.format(x.__class__.__name__, self.items_type.__name__))
+            if not isinstance(x, self.item_type):
+                raise TypeError('Got incompatible type "{}", can only accept "{}"'.format(x.__class__.__name__, self.item_type.__name__))
 
             # Check ordering/succession
             if i == 0:
@@ -1190,12 +1190,12 @@ class TimeSeries(Series):
         if not self:
             return 'Empty time series'
         else:
-            if issubclass(self.items_type, TimePoint):
+            if issubclass(self.item_type, TimePoint):
                 return 'Time series of #{} points at {}, from point @ {} ({}) to point @ {} ({})'.format(len(self), self._resolution_string, self[0].t, self[0].dt, self[-1].t, self[-1].dt)
-            elif issubclass(self.items_type, TimeSlot):
+            elif issubclass(self.item_type, TimeSlot):
                 return 'Time series of #{} slots of {}, from slot starting @ {} ({}) to slot starting @ {} ({})'.format(len(self), self.resolution, self[0].start.t, self[0].start.dt, self[-1].start.t, self[-1].start.dt)
             else:
-                raise ConsistencyException('Got no TimePoints nor TimeSlots in a Time Series, this is a consistency error (got {})'.format(self.items_type.__name__))
+                raise ConsistencyException('Got no TimePoints nor TimeSlots in a Time Series, this is a consistency error (got {})'.format(self.item_type.__name__))
 
 
     #=========================
@@ -1387,7 +1387,7 @@ class TimeSeries(Series):
 
     @property
     def _autodetected_sampling_interval(self):
-        if not issubclass(self.items_type, TimePoint):
+        if not issubclass(self.item_type, TimePoint):
             raise NotImplementedError('Auto-detecting the sampling rate (and its confidence) is implemented only for point series')
         try:
             return self.__autodetected_sampling_interval
@@ -1398,7 +1398,7 @@ class TimeSeries(Series):
 
     @property
     def _autodetected_sampling_interval_confidence(self):
-        if not issubclass(self.items_type, TimePoint):
+        if not issubclass(self.item_type, TimePoint):
             raise NotImplementedError('Auto-detecting the sampling rate (and its confidence) is implemented only for point series')
         try:
             return self.__autodetected_sampling_interval_confidence
@@ -1433,7 +1433,7 @@ class TimeSeries(Series):
                confidence (bool): if to return, together with the guessed resolution, also its confidence (in a 0-1 range).
 
         """
-        if not issubclass(self.items_type, TimePoint):
+        if not issubclass(self.item_type, TimePoint):
             raise NotImplementedError('Guessing the resolution is implemented only for point series')
         if not self:
             raise ValueError('Cannot guess the resolution for an empty time series')
@@ -1603,19 +1603,19 @@ class TimeSeries(Series):
 
 
     @classmethod
-    def from_df(cls, df, items_type='auto'):
+    def from_df(cls, df, item_type='auto'):
         """Create a time series from a Pandas data frame."""
 
-        if items_type == 'auto':
-            items_type = None
+        if item_type == 'auto':
+            item_type = None
 
         # Infer if we have to create points or slots and their unit
         unit_str_pd=df.index.inferred_freq
 
         if not unit_str_pd:
-            if not items_type:
+            if not item_type:
                 logger.info('Cannot infer the freqency of the dataframe, will just create points')
-                items_type = DataTimePoint
+                item_type = DataTimePoint
 
         else:
 
@@ -1643,17 +1643,17 @@ class TimeSeries(Series):
 
             if unit_type in ['Y', 'M', 'D']:
                 logger.info('Assuming slots with a slot time unit of "{}"'.format(unit_str))
-                if not items_type:
-                    items_type = DataTimeSlot
+                if not item_type:
+                    item_type = DataTimeSlot
                 else:
-                    if items_type==DataTimePoint:
+                    if item_type==DataTimePoint:
                         raise ValueError('Creating points with calendar time units is not supported.')
             else:
-                if not items_type:
-                    items_type = DataTimePoint
+                if not item_type:
+                    item_type = DataTimePoint
 
         # Now create the points or the slots
-        if items_type==DataTimeSlot:
+        if item_type==DataTimeSlot:
 
             # Init the unit
             unit = TimeUnit(unit_str)
@@ -1903,7 +1903,7 @@ class _TimeSeriesView(TimeSeries):
             return 'Time series view'
 
     @property
-    def items_type(self):
+    def item_type(self):
         for item in self:
             return item.__class__
 
