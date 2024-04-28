@@ -910,7 +910,6 @@ define('"""+graph_id+"""', ['dgenv'], function (Dygraph) {
                 pass
 
         # Start building HTML content
-        # TODO: here "html" has to be read as "return_html_code"
         return_html_code = html
         html_content = ''
         if not return_html_code:
@@ -1045,14 +1044,16 @@ define('"""+graph_id+"""', ['dgenv'], function (Dygraph) {
             """ % (graph_div_id)))
 
         else:
-
-            display_html = '<div style="height:360px">'
+            if title:
+                display_html = '<div style="height:370px">'
+            else:
+                display_html = '<div style="height:360px">'
             with open(STATIC_DATA_PATH+'/js/dygraph-2.1.0.min.js') as dg_js_file:
                 display_html += '\n<script type="text/javascript">'+dg_js_file.read()+'</script>\n'
             with open(STATIC_DATA_PATH+'css/dygraph-2.1.0.css') as dg_css_file:
                 display_html += '\n<style>'+dg_css_file.read()+'</style>\n'
             if title:
-                display_html += '<div style="text-align: center; margin-top:15px; margin-bottom:15px; font-size:1.2em"><h3>{}</h3></div>'.format(title)
+                display_html += '<div style="text-align: center; margin-top:15px; margin-bottom:15px; font-size:1.0em"><h3>{}</h3></div>'.format(title)
             display_html += '<div style="height:36px; padding:0; margin-left:0px; margin-top:10px">\n'
             display_html += '<div id="{}" style="width:100%"></div>\n'.format(legend_div_id)
             display_html += '<div id="{}" style="width:100%; margin-right:0px"></div>\n'.format(graph_div_id)
