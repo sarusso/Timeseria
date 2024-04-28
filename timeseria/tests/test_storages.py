@@ -202,6 +202,27 @@ class TestCSVFileStorage(unittest.TestCase):
         self.assertEqual(timeseries[0].t, 946684800.0)
         self.assertEqual(str(timeseries.tz), 'America/New_York')
 
+        # Handle naive timestamps (04/03/2020 00:00)
+        storage = CSVFileStorage(TEST_DATA_PATH + '/csv/format3.csv',
+                                 timestamp_format = '%d/%m/%Y %H:%M',
+                                 tz='Europe/Rome')
+        timeseries = storage.get()
+        self.assertEqual(timeseries[0].t, 1583276400.0)
+        self.assertEqual(str(timeseries.tz), 'Europe/Rome')
+
+        storage = CSVFileStorage(TEST_DATA_PATH + '/csv/format3.csv',
+                                 timestamp_format = '%d/%m/%Y %H:%M')
+        timeseries = storage.get(force_tz='Europe/Rome')
+        self.assertEqual(timeseries[0].t, 1583276400.0)
+        self.assertEqual(str(timeseries.tz), 'Europe/Rome')
+
+        storage = CSVFileStorage(TEST_DATA_PATH + '/csv/format3.csv',
+                                 timestamp_format = '%d/%m/%Y %H:%M',
+                                 tz='Europe/Rome')
+        timeseries = storage.get(force_tz='America/New_York')
+        self.assertEqual(timeseries[0].t, 1583298000.0)
+        self.assertEqual(str(timeseries.tz), 'America/New_York')
+
 
     def test_CSVFileStorage_get_slots_reconstruction(self):
 

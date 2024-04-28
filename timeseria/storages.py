@@ -208,12 +208,16 @@ class CSVFileStorage(Storage):
         if not self.encoding:
             self.encoding = detect_encoding(self.filename, streaming=False)
 
-        items = []
+        # Set and timezonize the timezone. Using this in the points or slots will be just a pointer
+        if force_tz:
+            tz = timezonize(force_tz)
+        else:
+            tz = timezonize(self.tz)
 
+        # Loop over all CSV rows
         # TODO: evaluate rU vs newline='\n'
+        items = []
         with open(self.filename, 'r', encoding=self.encoding) as csv_file:
-
-            naive_warned = False
 
             while True:
 
@@ -404,7 +408,7 @@ class CSVFileStorage(Storage):
                         elif self.timestamp_format == 'epoch':
                             t = float(timestamp)
 
-                        # ISO8601 fromat?
+                        # ISO8601 format?
                         elif self.timestamp_format == 'iso8601':
                             dt = dt_from_str(timestamp)
 
@@ -416,10 +420,7 @@ class CSVFileStorage(Storage):
                     # Convert to t
                     if t is None:
                         if dt.tzinfo is None:
-                            if not naive_warned:
-                                logger.info('Got naive timestamps, assuming UTC.')
-                                naive_warned = True
-                            dt = pytz.UTC.localize(dt)
+                            dt = tz.localize(dt)
                         t = s_from_dt(dt)
 
 
@@ -656,12 +657,7 @@ class CSVFileStorage(Storage):
                 force_slot_unit = TimeUnit(force_slot_unit)
             slot_unit = force_slot_unit
 
-        # Set and timezonize the timezone. In this way the it will be just a pointer.
-        if force_tz:
-            tz = timezonize(force_tz)
-        else:
-            tz = timezonize(self.tz)
-
+        # Initialize the series
         series = TimeSeries()
 
         # Create point or slot series
