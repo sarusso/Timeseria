@@ -401,7 +401,7 @@ def dygraphs_plot(series, data_labels='all', data_indexes='all', aggregate=None,
     # Handle series data_lables
     if data_labels == 'all':
         # Plot all the series data_labels
-        data_labels_to_plot = series.data_labels()
+        data_labels_to_plot = series.data_labels
     elif data_labels is None:
         data_labels_to_plot = []
     else:
@@ -412,8 +412,8 @@ def dygraphs_plot(series, data_labels='all', data_indexes='all', aggregate=None,
         for label in data_labels:
             if not isinstance(label, str):
                 raise TypeError('The "data_labels" list items must be string (got type "{}")'.format(label.__class__.__name__))
-            if not label in series.data_labels():
-                raise ValueError('The data label "{}" is not present in the series data labeles (choices are: {})'.format(label, series.data_labels()))
+            if not label in series.data_labels:
+                raise ValueError('The data label "{}" is not present in the series data labeles (choices are: {})'.format(label, series.data_labels))
             data_labels_to_plot.append(label)
 
     # Handle series data_indexes

@@ -497,7 +497,7 @@ class TestOpertions(unittest.TestCase):
         self.assertEqual(filter(series, 'b')[0].data, {'b': 2})
 
         # Test get item by string key (filtering on data labels), from the series
-        self.assertEqual(series.filter('a').data_labels(), ['a'])
+        self.assertEqual(series.filter('a').data_labels, ['a'])
         self.assertEqual(len(series.filter('a')), 3 )
         self.assertEqual(series.filter('a')[0].data, {'a': 1})
         self.assertEqual(series.filter('a')[1].data, {'a': 2})
@@ -505,11 +505,11 @@ class TestOpertions(unittest.TestCase):
 
 
         # Test that we haven't modified the original series
-        self.assertEqual(series.data_labels(), ['a', 'b', 'c'])
+        self.assertEqual(series.data_labels, ['a', 'b', 'c'])
         self.assertEqual(series[1].data['b'], 4)
 
         # Test for multiple filtering data labels
-        self.assertEqual(set(series.filter('a', 'c').data_labels()), {'a', 'c'})
+        self.assertEqual(set(series.filter('a', 'c').data_labels), {'a', 'c'})
         self.assertEqual(len(series.filter('a', 'c')), 3 )
         self.assertEqual(series.filter('a', 'c')[0].data, {'a': 1,'c':3})
         self.assertEqual(series.filter('a', 'c')[1].data, {'a': 2, 'c':4})

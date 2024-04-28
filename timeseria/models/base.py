@@ -207,7 +207,7 @@ class Model():
 
                 # Set data labels
                 try:
-                    self.data['data_labels'] = series.data_labels()
+                    self.data['data_labels'] = series.data_labels
                 except AttributeError:
                     pass
 

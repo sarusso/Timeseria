@@ -31,7 +31,7 @@ def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_poi
     # Support vars
     interval_duration = to_t-from_t
     data = {}
-    data_labels = series.data_labels()
+    data_labels = series.data_labels
 
     # The prev can be None as lefts are included (edge case)
     if slot_prev_point_i is None:

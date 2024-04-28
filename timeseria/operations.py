@@ -81,7 +81,7 @@ class Max(Operation):
         _check_series_of_points_or_slots(series)
         _check_indexed_data(series)
 
-        maxs = {data_label: None for data_label in series.data_labels()}
+        maxs = {data_label: None for data_label in series.data_labels}
         for item in series:
             for _data_label in maxs:
 
@@ -109,7 +109,7 @@ class Min(Operation):
         _check_series_of_points_or_slots(series)
         _check_indexed_data(series)
 
-        mins = {data_label: None for data_label in series.data_labels()}
+        mins = {data_label: None for data_label in series.data_labels}
         for item in series:
             for _data_label in mins:
                 if mins[_data_label] is None:
@@ -145,7 +145,7 @@ class Avg(Operation):
             #raise AttributeError('Trying to apply a weightd average on non-weigthed point')
 
         # Prepare
-        sums = {data_label: None for data_label in series.data_labels()}
+        sums = {data_label: None for data_label in series.data_labels}
 
         # Compute
         if weighted:
@@ -196,7 +196,7 @@ class Sum(Operation):
         _check_series_of_points_or_slots(series)
         _check_indexed_data(series)
 
-        sums = {data_label: 0 for data_label in series.data_labels()}
+        sums = {data_label: 0 for data_label in series.data_labels}
         for item in series:
             for _data_label in sums:
                 sums[_data_label] += item._data_by_label(_data_label)
@@ -259,7 +259,7 @@ class Derivative(Operation):
         try:
             # Try to access by label, if data was non key-value this raise, as labels
             # are always generated as strings even for indexed data (as lists)
-            series[0].data[series.data_labels()[0]]
+            series[0].data[series.data_labels[0]]
             data_is_keyvalue = True
         except TypeError:
             data_is_keyvalue = False
@@ -273,7 +273,7 @@ class Derivative(Operation):
             if not inplace:
                 der_data = series[0].data.__class__()
 
-            for data_label in series.data_labels():
+            for data_label in series.data_labels:
                 diff_left = None
                 diff_right = None
                 diff = None
@@ -392,7 +392,7 @@ class Integral(Operation):
         try:
             # Try to access by label, if data was non key-value this raise, as labels
             # are always generated as strings even for indexed data (as lists)
-            series[0].data[series.data_labels()[0]]
+            series[0].data[series.data_labels[0]]
             data_is_keyvalue = True
         except TypeError:
             data_is_keyvalue = False
@@ -410,17 +410,17 @@ class Integral(Operation):
 
                 if isinstance(offset,dict):
                     if data_is_keyvalue:
-                        for data_label in series.data_labels():
+                        for data_label in series.data_labels:
                             prev_data['{}_{}'.format(data_label,postfix)] = offset[data_label]
                     else:
-                        for data_label in series.data_labels():
+                        for data_label in series.data_labels:
                             prev_data.append(offset[data_label])
                 else:
                     if data_is_keyvalue:
-                        for data_label in series.data_labels():
+                        for data_label in series.data_labels:
                             prev_data['{}_{}'.format(data_label,postfix)] = offset
                     else:
-                        for data_label in series.data_labels():
+                        for data_label in series.data_labels:
                             prev_data.append(offset[data_label])
 
                 if isinstance(item, Point):
@@ -440,7 +440,7 @@ class Integral(Operation):
             if not inplace:
                 data = series[0].data.__class__()
 
-            for data_label in series.data_labels():
+            for data_label in series.data_labels:
 
                 # Get the value
                 if not normalize:
@@ -543,7 +543,7 @@ class Normalize(Operation):
         if not inplace:
             normalized_series = series.__class__()
 
-        data_labels = series.data_labels()
+        data_labels = series.data_labels
 
         # Get min and max for the data labels
         for i, item in enumerate(series):
@@ -561,7 +561,7 @@ class Normalize(Operation):
         try:
             # Try to access by label, if data was non key-value this raise, as labels
             # are always generated as strings even for in-based indexed data (as lists)
-            series[0].data[series.data_labels()[0]]
+            series[0].data[series.data_labels[0]]
             data_is_keyvalue = True
         except TypeError:
             data_is_keyvalue = False
@@ -624,7 +624,7 @@ class Rescale(Operation):
         try:
             # Try to access by label, if data was non key-value this raise, as labels
             # are always generated as strings even for in-based indexed data (as lists)
-            series[0].data[series.data_labels()[0]]
+            series[0].data[series.data_labels[0]]
             data_is_keyvalue = True
         except TypeError:
             data_is_keyvalue = False
@@ -635,7 +635,7 @@ class Rescale(Operation):
                 rescaled_data = series[0].data.__class__()
 
             # Rescale data
-            for data_label in series.data_labels():
+            for data_label in series.data_labels:
                 if isinstance(value, dict):
                     if data_label in value:
                         rescaled_value = item._data_by_label(data_label) * value[data_label]
@@ -688,7 +688,7 @@ class Offset(Operation):
         try:
             # Try to access by label, if data was non key-value this raise, as labels
             # are always generated as strings even for in-based indexed data (as lists)
-            series[0].data[series.data_labels()[0]]
+            series[0].data[series.data_labels[0]]
             data_is_keyvalue = True
         except TypeError:
             data_is_keyvalue = False
@@ -699,7 +699,7 @@ class Offset(Operation):
                 offsetted_data = series[0].data.__class__()
 
             # Offset data
-            for data_label in series.data_labels():
+            for data_label in series.data_labels:
                 if isinstance(value, dict):
                     if data_label in value:
                         offsetted_value = item._data_by_label(data_label) + value[data_label]
@@ -758,7 +758,7 @@ class MAvg(Operation):
         try:
             # Try to access by label, if data was non key-value this raise, as labels
             # are always generated as strings even for in-based indexed data (as lists)
-            series[0].data[series.data_labels()[0]]
+            series[0].data[series.data_labels[0]]
             data_is_keyvalue = True
         except TypeError:
             data_is_keyvalue = False
@@ -772,7 +772,7 @@ class MAvg(Operation):
 
             mavg_data = series[0].data.__class__()
 
-            for data_label in series.data_labels():
+            for data_label in series.data_labels:
 
                 # Compute the moving average
                 value_sum = 0
@@ -837,7 +837,7 @@ class Filter(Operation):
 
         # Filter based on data label
         try:
-            series[0].data[series.data_labels()[0]]
+            series[0].data[series.data_labels[0]]
         except TypeError:
             raise TypeError('Cannot filter by data label on non key-value data (Got "{}")'.format(series[0].data.__class__.__name__))
         for item in series:

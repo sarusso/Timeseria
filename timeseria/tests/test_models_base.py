@@ -199,7 +199,7 @@ class TestBaseKerasModel(unittest.TestCase):
 
 
         window_features  = _KerasModel._compute_window_features(window_datapoints_matrix[0],
-                                                                data_labels = self.test_time_series.data_labels(),
+                                                                data_labels = self.test_time_series.data_labels,
                                                                 time_unit = self.test_time_series.resolution,
                                                                 features = ['values'])
 
@@ -207,7 +207,7 @@ class TestBaseKerasModel(unittest.TestCase):
 
 
         window_features  = _KerasModel._compute_window_features(window_datapoints_matrix[0],
-                                                                data_labels = self.test_time_series.data_labels(),
+                                                                data_labels = self.test_time_series.data_labels,
                                                                 time_unit = self.test_time_series.resolution,
                                                                 features = ['values', 'diffs'])
         self.assertAlmostEqual(window_features[0][0], 0.1)
@@ -220,7 +220,7 @@ class TestBaseKerasModel(unittest.TestCase):
         # Multivariate
         window_datapoints_matrix_mv = _KerasModel._to_window_datapoints_matrix(self.test_time_series_mv, window=3, steps=1)
         window_features  = _KerasModel._compute_window_features(window_datapoints_matrix_mv[0],
-                                                                data_labels = self.test_time_series_mv.data_labels(),
+                                                                data_labels = self.test_time_series_mv.data_labels,
                                                                 time_unit = self.test_time_series_mv.resolution,
                                                                 features = ['values'])
 
@@ -228,7 +228,7 @@ class TestBaseKerasModel(unittest.TestCase):
 
         # Multivariate with context
         window_features  = _KerasModel._compute_window_features(window_datapoints_matrix_mv[0],
-                                                                data_labels = self.test_time_series_mv.data_labels(),
+                                                                data_labels = self.test_time_series_mv.data_labels,
                                                                 time_unit = self.test_time_series_mv.resolution,
                                                                 features = ['values', 'diffs', 'hours'],
                                                                 context_data = {'label_2':4.0})

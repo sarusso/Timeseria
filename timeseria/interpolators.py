@@ -59,7 +59,7 @@ class LinearInterpolator(Interpolator):
         # at = 3 (i=2)
         # interpolation: 4
 
-        for label in self.series.data_labels():
+        for label in self.series.data_labels:
 
             if False:
                 # TODO: check the math here, this should be a better approach but tests fail...
@@ -118,7 +118,7 @@ class UniformInterpolator(Interpolator):
         # Compute the increment with respect to the interpolation
         interpolated_data = self.series[0].data.__class__()
 
-        for label in self.series.data_labels():
+        for label in self.series.data_labels:
             interpolated_data[label] = prev_point.data[label] + ((next_point.data[label] - prev_point.data[label]) /2)
 
         return interpolated_data

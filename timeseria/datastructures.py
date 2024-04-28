@@ -265,9 +265,10 @@ class DataPoint(Point):
             #raise AttributeError('No data loss index set for this point')
             return None
 
+    @property
     def data_labels(self):
-        """Return the data labels. If data is a dictionary, then these are the dictionary keys, if data
-        is list-like, then these are the list indexes (as strings). Other formats are not supported."""
+        """The data labels. If data is a dictionary, then these are the dictionary keys, if data is
+        list-like, then these are the list indexes (as strings). Other formats are not supported."""
         try:
             return sorted(list(self.data.keys()))
         except AttributeError:
@@ -572,9 +573,10 @@ class DataSlot(Slot):
             #raise AttributeError('No data loss index set for this point')
             return None
 
+    @property
     def data_labels(self):
-        """Return the data labels. If data is a dictionary, then these are the dictionary keys, if data
-        is list-like, then these are the list indexes (as strings). Other formats are not supported."""
+        """The data labels. If data is a dictionary, then these are the dictionary keys, if data is
+        list-like, then these are the list indexes (as strings). Other formats are not supported."""
         try:
             return sorted(list(self.data.keys()))
         except AttributeError:
@@ -879,16 +881,17 @@ class Series(list):
     #  Data-related
     #=========================
 
+    @property
     def data_labels(self):
-        """Returns the labels of the data carried by the series points or slots. If data is a dictionary,
-        then these are the dictionary keys, if data  is list-like, then these are the list indexes
+        """The labels of the data carried by the series items. If data is a dictionary, then
+        these are the dictionary keys, if data  is list-like, then these are the list indexes
         (as strings). Other formats are not supported."""
         if len(self) > 0 and not self._item_data_reference:
             raise TypeError('Series items have no data, cannot get data labels')
         if len(self) == 0:
             return None
         else:
-            return self[0].data_labels()
+            return self[0].data_labels
 
     def rename_data_label(self, old_data_label, new_data_label):
         """Rename a data label, in-place."""
@@ -1708,7 +1711,7 @@ class TimeSeries(Series):
 
     def to_df(self):
         """Convert the time series as a Pandas data frame."""
-        data_labels = self.data_labels()
+        data_labels = self.data_labels
 
         dump_data_loss = False
         for item in self:
@@ -1898,8 +1901,9 @@ class _TimeSeriesView(TimeSeries):
     def resolution(self):
         return self.series.resolution
 
+    @property
     def data_labels(self):
-        return self.series.data_labels()
+        return self.series.data_labels
 
 
 

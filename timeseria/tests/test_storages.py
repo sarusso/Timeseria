@@ -186,7 +186,7 @@ class TestCSVFileStorage(unittest.TestCase):
         storage = CSVFileStorage(TEST_DATA_PATH + '/csv/format5.csv')
         data_time_point_series = storage.get(filter_data_labels=['temp'])
         self.assertEqual(len(data_time_point_series), 6)
-        self.assertEqual(data_time_point_series[0].data_labels(), ['temp'])
+        self.assertEqual(data_time_point_series[0].data_labels, ['temp'])
 
 
     def test_CSVFileStorage_get_timezones(self):
