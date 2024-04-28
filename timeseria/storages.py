@@ -69,16 +69,17 @@ class CSVFileStorage(Storage):
         time_format: the time column format.
         date_label: the column label to be used as the date part of the timestamp.
         date_format: the date column format.
-        tz: the timezone on which to create the time series on.
+        tz: the timezone on which to create the time series on. If the timestamps in the file are naive, then they are assumed on
+            such timezone. If they are instead offset-aware, including UTC, then they are just moved on the given timezone.
         data_labels: the column labels to be used as data by default. Excpected as a list of
                      strings or list of integers, in which case are treated as column numbers.
         data_type: the data type (``list`` or ``dict``), set automatically by default.
-        series_type: the default type of the series, if ``points`` or ``slots``. Automatically set by default.
-        sort: if to sort the data file before creating the series.
+        series_type: the default type of the series, if ``points`` or ``slots``. Set automatically by default.
+        sort: if to sort the data before creating the series.
         separator: the separator for the records (fields), ``,`` by default.
         newline: the newline character, ``\\n`` by default.
         comment_chars: the characters used to mark a comment line. Defaulted to ``#`` and ``;``.
-        encoding: the encoding of the file, automatically detected by default.
+        encoding: the encoding of the file, set automatically by default.
         skip_errors: if to skip errors or raise an exception.
         silence_errors: if to completely silence errors when skipping them or not.
     """
@@ -160,7 +161,8 @@ class CSVFileStorage(Storage):
         self.series_type = series_type
 
 
-    def get(self, id=None, start=None, end=None, limit=None, as_tz=None, as_points=None, as_slots=None, data_labels='all', data_label=None, slot_unit='auto'):
+    def get(self, id=None, start=None, end=None, limit=None, filter_data_labels=[],
+            force_tz=None, force_points=False, force_slots=False, force_slot_unit=None):
         """Load the time series from the CSV file.
 
         Args:
@@ -168,12 +170,11 @@ class CSVFileStorage(Storage):
             start: Not implemented for this storage.
             end: Not implemented for this storage.
             limit: a row number limit.
-            as_tz: force a specific timezone.
-            as_points: force generating points.
-            as_slots: force generating slots.
-            data_labels: get only specific data labels.
-            data_label: get only a specific data label.
-            slot_unit: set the unit of the slots.
+            filter_data_labels: get only specific data labels.
+            force_tz: force a specific timezone.
+            force_points: force generating points.
+            force_slots: force generating slots.
+            force_slot_unit: set the unit of the slots.
         """
 
         if id:
@@ -183,12 +184,8 @@ class CSVFileStorage(Storage):
             raise NotImplementedError('This storage does not support loading only a portion of the time time series, so the start and end arguments cannot be used')
 
         # Sanity checks
-        if as_points and as_slots:
+        if force_points and force_slots:
             raise ValueError('Got both as_points and as_slots, set only one or none')
-
-        # Use the data label if given
-        if data_label is not None:
-            data_labels=[data_label]
 
         # Line counter
         line_number=0
@@ -440,8 +437,10 @@ class CSVFileStorage(Storage):
                 if data_label_indexes is None:
 
                     # If the requested data labels are all o the (default) ones, use the internal value
-                    if data_labels == 'all':
+                    if not filter_data_labels:
                         data_labels = self.data_labels
+                    else:
+                        data_labels = filter_data_labels
 
                     # Do we have to select only some data columns?
                     if data_labels != 'all':
@@ -546,10 +545,10 @@ class CSVFileStorage(Storage):
         autodetect_series_type = False
 
         # Set series type
-        if as_points:
+        if force_points:
             # Were we requested to generate points?
             series_type = 'points'
-        elif as_slots:
+        elif force_slots:
             # Were we requested to generate slots?
             series_type = 'slots'
         else:
@@ -584,28 +583,28 @@ class CSVFileStorage(Storage):
             # Years
             if detected_sampling_interval in [86400*365, 886400*366]:
                 detected_series_type = DataTimeSlot
-                detected_unit = TimeUnit('1Y')
+                auto_slot_unit = TimeUnit('1Y')
 
             # Months
             elif detected_sampling_interval in [86400*31, 86400*30, 86400*28]:
                 detected_series_type = DataTimeSlot
-                detected_unit = TimeUnit('1M')
+                auto_slot_unit = TimeUnit('1M')
 
             # Days
             elif detected_sampling_interval in [3600*24, 3600*23, 3600*25]:
                 detected_series_type = DataTimeSlot
-                detected_unit = TimeUnit('1D')
+                auto_slot_unit = TimeUnit('1D')
 
             # Weeks still to be implemented in the unit
             #elif detected_sampling_interval in [3600*24*7, (3600*24*7)-3600, (3600*24*7)+3600]:
             #    detected_series_type = DataTimeSlot
-            #    detected_unit = TimeUnit('1D')
+            #    auto_slot_unit = TimeUnit('1D')
 
             # Else, use points with no unit if we were not using slots
             else:
                 if series_type!='slots':
                     detected_series_type = DataTimePoint
-                    detected_unit = None
+                    auto_slot_unit = None
                 else:
                     # TODO: "detected_series_type" is not a nice name here, the
                     # code in the following should use series_type if forced..
@@ -613,53 +612,53 @@ class CSVFileStorage(Storage):
 
                     # Can we auto-detect unit? TODO: can we standardize this? Check also in the entire codebase..
                     if detected_sampling_interval == 3600:
-                        detected_unit = TimeUnit('1h')
+                        auto_slot_unit = TimeUnit('1h')
                     elif detected_sampling_interval == 1800:
-                        detected_unit = TimeUnit('30m')
+                        auto_slot_unit = TimeUnit('30m')
                     elif detected_sampling_interval == 900:
-                        detected_unit = TimeUnit('15m')
+                        auto_slot_unit = TimeUnit('15m')
                     elif detected_sampling_interval == 600:
-                        detected_unit = TimeUnit('10m')
+                        auto_slot_unit = TimeUnit('10m')
                     elif detected_sampling_interval == 300:
-                        detected_unit = TimeUnit('5m')
+                        auto_slot_unit = TimeUnit('5m')
                     elif detected_sampling_interval == 60:
-                        detected_unit = TimeUnit('1m')
+                        auto_slot_unit = TimeUnit('1m')
                     else:
-                        detected_unit = TimeUnit('{}s'.format(detected_sampling_interval))
+                        auto_slot_unit = TimeUnit('{}s'.format(detected_sampling_interval))
 
         # Do we have to force a specific type?
         if not autodetect_series_type:
             if series_type == 'points':
                 series_type = DataTimePoint
-                unit = None
+                slot_unit = None
             elif series_type == 'slots':
                 series_type = DataTimeSlot
-                unit = TimeUnit('{}s'.format(detected_sampling_interval))
+                slot_unit = TimeUnit('{}s'.format(detected_sampling_interval))
             else:
                 raise ValueError('Unknown value "{}" for type. Accepted types are "points" or "slots".'.format(self.series_type))
         else:
             # Log the type and unit we detected
             if detected_series_type == DataTimeSlot:
                 if series_type:
-                    logger.info('Assuming {} time unit and creating Slots.'.format(detected_unit))
+                    logger.info('Assuming {} time unit and creating Slots.'.format(auto_slot_unit))
                 else:
-                    logger.info('Assuming {} time unit and creating Slots. Use series_type=\'points\' if you want Points instead.'.format(detected_unit))
+                    logger.info('Assuming {} time unit and creating Slots. Use series_type=\'points\' if you want Points instead.'.format(auto_slot_unit))
             #else:
             #    logger.info('Assuming {} sampling interval and creating {}.'.format(detected_sampling_interval, series_type.__class__.__name__))
 
             # and use it.
             series_type = detected_series_type
-            unit = detected_unit
+            slot_unit = auto_slot_unit
 
         # If we were explicitly given a slot unit, override
-        if slot_unit != 'auto':
-            if not isinstance(slot_unit, TimeUnit):
-                slot_unit = TimeUnit(slot_unit)
-            unit = slot_unit
+        if force_slot_unit:
+            if not isinstance(force_slot_unit, TimeUnit):
+                force_slot_unit = TimeUnit(force_slot_unit)
+            slot_unit = force_slot_unit
 
         # Set and timezonize the timezone. In this way the it will be just a pointer.
-        if as_tz:
-            tz = timezonize(as_tz)
+        if force_tz:
+            tz = timezonize(force_tz)
         else:
             tz = timezonize(self.tz)
 
@@ -712,7 +711,7 @@ class CSVFileStorage(Storage):
                         data_indexes['data_loss'] = DEFAULT_SLOT_DATA_LOSS
 
                     # Create DataTimeSlot, set data and data_indexes
-                    data_time_slot = DataTimeSlot(t=item[0], unit=unit, data=item[1], data_indexes=data_indexes, tz=tz)
+                    data_time_slot = DataTimeSlot(t=item[0], unit=slot_unit, data=item[1], data_indexes=data_indexes, tz=tz)
 
                     # Append
                     series.append(data_time_slot)
@@ -722,15 +721,15 @@ class CSVFileStorage(Storage):
                     missing_timestamps = []
                     prev_dt = dt_from_s(items[i-1][0], tz=tz)
                     while True:
-                        dt = prev_dt + unit
+                        dt = prev_dt + slot_unit
                         # Note: the equal here is just to prevent endless loops, the check shoudl actally be just an equal
                         if s_from_dt(dt) >= item[0]:
                             # We are arrived, append all the missing items and then the item we originally tried to and break
                             for j, missing_timestamp in enumerate(missing_timestamps):
                                 # Set data by interpolation
                                 interpolated_data = {data_label: (((items[i][1][data_label]-items[i-1][1][data_label])/(len(missing_timestamps)+1)) * (j+1)) + items[i-1][1][data_label]  for data_label in  items[-1][1] }
-                                series.append(DataTimeSlot(t=missing_timestamp, unit=unit, data=interpolated_data, data_loss=1, tz=tz))
-                            series.append(DataTimeSlot(t=item[0], unit=unit, data=item[1], data_loss=DEFAULT_SLOT_DATA_LOSS, tz=tz))
+                                series.append(DataTimeSlot(t=missing_timestamp, unit=slot_unit, data=interpolated_data, data_loss=1, tz=tz))
+                            series.append(DataTimeSlot(t=item[0], unit=slot_unit, data=item[1], data_loss=DEFAULT_SLOT_DATA_LOSS, tz=tz))
                             break
 
                         else:
