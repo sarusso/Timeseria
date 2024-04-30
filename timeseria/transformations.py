@@ -407,18 +407,12 @@ class Transformation(object):
         # Log
         logger.debug('Computing from/to with include_extremes= %s', include_extremes)
 
-        # Set from and to. If creating points, we will move the start back of half unit
+        # Handle start/end. If creating points, we will move the start back of half unit
         # and the end forward of half unit as well, as the point will be in the center
-
-        from_t = kwargs.get('from_t', None)
-        to_t = kwargs.get('to_t', None)
-        from_dt = kwargs.get('from_dt', None)
-        to_dt = kwargs.get('to_dt', None)
-
-        if from_t or to_t or from_dt or to_dt:
-            logger.warning('The from_t, to_t, from_dt and to_d arguments are deprecated, please use the start/end end instead.')
-
-        # Handle start/end
+        from_t = None
+        to_t = None
+        from_dt = None
+        to_dt = None
         if start is not None:
             if isinstance(start, datetime):
                 from_dt = start
@@ -436,7 +430,7 @@ class Transformation(object):
                 except:
                     raise ValueError('Cannot use "{}" as end value, not a datetime nor an epoch timestamp'.format(end))
 
-        # Set "from". TODO: check given from_t/from_dt against shifted rounding if points?
+        # Set "from". TODO: check against shifted rounding if points?
         if from_t:
             from_dt = dt_from_s(from_t)
             if from_dt != self.time_unit.round(from_dt):
@@ -467,7 +461,7 @@ class Transformation(object):
             else:
                 raise ValueError('Don\'t know how to target "{}"'.format(target))
 
-        # Set "to". TODO: check given to_t/to_dt against shifted rounding if points?
+        # Set "to". TODO: check against shifted rounding if points?
         if to_t:
             to_dt = dt_from_s(to_t)
             if to_dt != self.time_unit.round(to_dt):

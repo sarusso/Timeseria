@@ -158,14 +158,6 @@ class TimePoint(Point):
         except AttributeError:
             return UTC
 
-    def zone(self, tz):
-        """This method is deprecated in favor of change_tz().
-
-        :meta private:
-        """
-        logger.warning('The change_timezone() method is deprecated in favor of change_tz().')
-        self.change_tz(tz)
-
     def change_tz(self, tz):
         """Change the time zone of the point, in-place."""
         self._tz = timezonize(tz)
@@ -448,14 +440,6 @@ class TimeSlot(Slot):
             return False
         else:
             return True
-
-    def change_timezone(self, tz):
-        """This method is deprecated in favor of change_tz().
-
-        :meta private:
-        """
-        logger.warning('The change_timezone() method is deprecated in favor of change_tz().')
-        self.change_tz(tz)
 
     def change_tz(self, tz):
         """Change the time zone of the slot, in-place."""
@@ -1358,27 +1342,11 @@ class TimeSeries(Series):
             time_point.change_tz(tz)
         self._tz = time_point.tz
 
-    def change_timezone(self, tz):
-        """This method is deprecated in favor of change_tz().
-
-        :meta private:
-        """
-        logger.warning('The change_timezone() method is deprecated in favor of change_tz().')
-        self.change_tz(tz)
-
     def as_tz(self, tz):
         """Get a copy of the time series on a new time zone."""
         new_series = self.duplicate()
         new_series.change_tz(tz)
         return new_series
-
-    def as_timezone(self, tz):
-        """This method is deprecated in favor of as_tz().
-
-        :meta private:
-        """
-        logger.warning('The as_timezone() method is deprecated in favor of as_tz().')
-        return self.as_tz(tz)
 
 
     #=========================
@@ -1881,67 +1849,4 @@ class TimeSeriesView(TimeSeries):
             return self.series.data_labels
         else:
             return super().data_labels
-
-
-
-#=========================
-#  Back-compatibility
-#=========================
-
-class DataPointSeries(Series):
-    """This class is deprecated in favor of the TimeSeries class.
-
-    :meta private:
-    """
-    def __init__(self, *args, **kwargs):
-        logger.warning('The DataPointSeries class is deprecated, please replace it with the new TimeSeries class.')
-        super(DataPointSeries, self).__init__(*args, **kwargs)
-
-class DataSlotSeries(Series):
-    """This class is deprecated in favor of the TimeSeries class.
-
-    :meta private:
-    """
-    def __init__(self, *args, **kwargs):
-        logger.warning('The DataSlotSeries class is deprecated, please replace it with the new TimeSeries class.')
-        super(DataSlotSeries, self).__init__(*args, **kwargs)
-
-class TimePointSeries(TimeSeries):
-    """This class is deprecated in favor of the TimeSeries class.
-
-    :meta private:
-    """
-    def __init__(self, *args, **kwargs):
-        logger.warning('The DataPointSeries class is deprecated, please replace it with the new TimeSeries class.')
-        super(TimePointSeries, self).__init__(*args, **kwargs)
-
-class DataTimePointSeries(TimeSeries):
-    """This class is deprecated in favor of the TimeSeries class.
-
-    :meta private:
-    """
-    def __init__(self, *args, **kwargs):
-        logger.warning('The DataTimePointSeries class is deprecated, please replace it with the new TimeSeries class.')
-        super(DataTimePointSeries, self).__init__(*args, **kwargs)
-
-class TimeSlotSeries(TimeSeries):
-    """This class is deprecated in favor of the TimeSeries class.
-
-    :meta private:
-    """
-    def __init__(self, *args, **kwargs):
-        logger.warning('The TimeSlotSeries class is deprecated, please replace it with the new TimeSeries class.')
-        super(TimeSlotSeries, self).__init__(*args, **kwargs)
-
-class DataTimeSlotSeries(TimeSeries):
-    """This class is deprecated in favor of the TimeSeries class.
-
-    :meta private:
-    """
-    def __init__(self, *args, **kwargs):
-        logger.warning('The DataTimeSlotSeries class is deprecated, please replace it with the new TimeSeries class.')
-        super(DataTimeSlotSeries, self).__init__(*args, **kwargs)
-
-
-
 
