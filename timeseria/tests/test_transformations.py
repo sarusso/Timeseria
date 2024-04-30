@@ -3,7 +3,7 @@ import os
 from propertime.utils import dt, s_from_dt, dt_from_str
 
 from ..datastructures import DataTimePoint, TimeSeries
-from ..transformations import Resampler, Aggregator
+from ..transformations import Resampler, Aggregator, _TimeSeriesDenseView
 from ..units import TimeUnit
 
 # Setup logging
@@ -12,6 +12,44 @@ logger.setup()
 
 # Set test data path
 TEST_DATA_PATH = '/'.join(os.path.realpath(__file__).split('/')[0:-1]) + '/test_data/'
+
+
+class TestTimeSeriesDenseView(unittest.TestCase):
+
+    def test_dense_TimeSeriesDenseView(self):
+        series = TimeSeries()
+        series.append(DataTimePoint(t = 0, data = {'value': 0}))
+        series.append(DataTimePoint(t = 1, data = {'value': 1}))
+        series.append(DataTimePoint(t = 2, data = {'value': 2}))
+        series.append(DataTimePoint(t = 3, data = {'value': 3}))
+        series.append(DataTimePoint(t = 4, data = {'value': 4}))
+        series.append(DataTimePoint(t = 7, data = {'value': 7}))
+        series.append(DataTimePoint(t = 8, data = {'value': 8}))
+        series.append(DataTimePoint(t = 9, data = {'value': 9}))
+
+        from ..utilities import _compute_validity_regions
+        validity_regions = _compute_validity_regions(series)
+        for point in series:
+            point.valid_from=validity_regions[point.t][0]
+            point.valid_to=validity_regions[point.t][1]
+
+        from ..interpolators import LinearInterpolator
+        series_view = _TimeSeriesDenseView(series, 2, 8, dense=True, interpolator_class=LinearInterpolator)
+
+        self.assertEqual(len(series_view), 7)
+
+        series_view_materialized=[]
+        for point in series_view:
+            series_view_materialized.append(point)
+
+        self.assertEqual(series_view_materialized[0].t, 2)
+        self.assertEqual(series_view_materialized[1].t, 3)
+        self.assertEqual(series_view_materialized[2].t, 4)
+        self.assertEqual(series_view_materialized[3].t, 5.5)
+        self.assertEqual(series_view_materialized[3].data['value'], 5.5)
+        self.assertEqual(series_view_materialized[4].t, 7)
+        self.assertEqual(series_view_materialized[5].t, 8)
+        self.assertEqual(series_view_materialized[6].t, 9)
 
 
 class TestResampler(unittest.TestCase):

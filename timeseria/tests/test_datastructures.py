@@ -8,7 +8,7 @@ from propertime.utils import dt, timezonize
 
 from ..datastructures import Point, TimePoint, DataPoint, DataTimePoint
 from ..datastructures import Slot, TimeSlot, DataSlot, DataTimeSlot
-from ..datastructures import Series, TimeSeries, _TimeSeriesView
+from ..datastructures import Series, TimeSeries, TimeSeriesView
 from ..units import Unit, TimeUnit
 
 from pytz import UTC
@@ -1025,78 +1025,38 @@ class TestTimeSeries(unittest.TestCase):
 class TestTimeSeriesView(unittest.TestCase):
 
     def test_TimeSeriesView(self):
-        series = TimeSeries()
-        series.append(DataTimePoint(t = 0, data = {'value': 0}))
-        series.append(DataTimePoint(t = 1, data = {'value': 1}))
-        series.append(DataTimePoint(t = 2, data = {'value': 2}))
-        series.append(DataTimePoint(t = 3, data = {'value': 3}))
-        series.append(DataTimePoint(t = 4, data = {'value': 4}))
-        series.append(DataTimePoint(t = 5, data = {'value': 5}))
-        series.append(DataTimePoint(t = 6, data = {'value': 6}))
-        series.append(DataTimePoint(t = 7, data = {'value': 7}))
-        series.append(DataTimePoint(t = 8, data = {'value': 8}))
-        series.append(DataTimePoint(t = 9, data = {'value': 9}))
+        timeseries = TimeSeries()
+        timeseries.append(DataTimePoint(t = 0, data = {'value': 0}))
+        timeseries.append(DataTimePoint(t = 1, data = {'value': 1}))
+        timeseries.append(DataTimePoint(t = 2, data = {'value': 2}))
+        timeseries.append(DataTimePoint(t = 3, data = {'value': 3}))
+        timeseries.append(DataTimePoint(t = 4, data = {'value': 4}))
+        timeseries.append(DataTimePoint(t = 5, data = {'value': 5}))
+        timeseries.append(DataTimePoint(t = 6, data = {'value': 6}))
+        timeseries.append(DataTimePoint(t = 7, data = {'value': 7}))
+        timeseries.append(DataTimePoint(t = 8, data = {'value': 8}))
+        timeseries.append(DataTimePoint(t = 9, data = {'value': 9}))
 
-        from ..utilities import _compute_validity_regions
-        validity_regions = _compute_validity_regions(series)
-        for point in series:
-            point.valid_from=validity_regions[point.t][0]
-            point.valid_to=validity_regions[point.t][1]
 
-        series_view = _TimeSeriesView(series, 2, 5)
+        timeseries_view = TimeSeriesView(series=timeseries, from_i=2, to_i=5)
 
-        self.assertEqual(len(series_view), 3)
+        self.assertEqual(len(timeseries_view), 3)
 
-        for i, point in enumerate(series_view):
+        for i, point in enumerate(timeseries_view):
             self.assertEqual(point.t, 2+i)
 
-        self.assertEqual(series_view[0].t, 2)
-        self.assertEqual(series_view[1].t, 3)
-        self.assertEqual(series_view[2].t, 4)
-        self.assertEqual(series_view[-1].t, 4)
+        self.assertEqual(timeseries_view[0].t, 2)
+        self.assertEqual(timeseries_view[1].t, 3)
+        self.assertEqual(timeseries_view[2].t, 4)
+        self.assertEqual(timeseries_view[-1].t, 4)
 
         # Test extra attributes
-        self.assertEqual(str(series_view.resolution), '1s')
-        self.assertEqual(series_view.data_labels, ['value'])
+        self.assertEqual(str(timeseries_view.resolution), '1s')
+        self.assertEqual(timeseries_view.data_labels, ['value'])
 
-        # TODO: Most operations are not supported on a TimeSeriesView and should be disabled
-        #with self.assertRaises(AttributeError):
-        #    series_view.diff()
-
-
-    def test_dense_TimeSeriesView(self):
-        series = TimeSeries()
-        series.append(DataTimePoint(t = 0, data = {'value': 0}))
-        series.append(DataTimePoint(t = 1, data = {'value': 1}))
-        series.append(DataTimePoint(t = 2, data = {'value': 2}))
-        series.append(DataTimePoint(t = 3, data = {'value': 3}))
-        series.append(DataTimePoint(t = 4, data = {'value': 4}))
-        series.append(DataTimePoint(t = 7, data = {'value': 7}))
-        series.append(DataTimePoint(t = 8, data = {'value': 8}))
-        series.append(DataTimePoint(t = 9, data = {'value': 9}))
-
-        from ..utilities import _compute_validity_regions
-        validity_regions = _compute_validity_regions(series)
-        for point in series:
-            point.valid_from=validity_regions[point.t][0]
-            point.valid_to=validity_regions[point.t][1]
-
-        from ..interpolators import LinearInterpolator
-        series_view = _TimeSeriesView(series, 2, 8, dense=True, interpolator_class=LinearInterpolator)
-
-        self.assertEqual(len(series_view), 7)
-
-        series_view_materialized=[]
-        for point in series_view:
-            series_view_materialized.append(point)
-
-        self.assertEqual(series_view_materialized[0].t, 2)
-        self.assertEqual(series_view_materialized[1].t, 3)
-        self.assertEqual(series_view_materialized[2].t, 4)
-        self.assertEqual(series_view_materialized[3].t, 5.5)
-        self.assertEqual(series_view_materialized[3].data['value'], 5.5)
-        self.assertEqual(series_view_materialized[4].t, 7)
-        self.assertEqual(series_view_materialized[5].t, 8)
-        self.assertEqual(series_view_materialized[6].t, 9)
-
+        # Test operations
+        diff_timeseries = timeseries_view.diff()
+        self.assertEqual(len(diff_timeseries), 2)
+        self.assertEqual(diff_timeseries[0].t, 3)
+        self.assertEqual(diff_timeseries[1].t, 4)
 

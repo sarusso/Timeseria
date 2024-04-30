@@ -1773,147 +1773,78 @@ class TimeSeries(Series):
 #  Time Series view
 #==============================
 
-class _TimeSeriesView(TimeSeries):
-    """A time series view. Only used internally, maybe in future it could be made public
-    as a more optimized way for performing some operations, as filtering and slicing.
+class TimeSeriesView(TimeSeries):
+    """A time series view. """
 
-    :meta private:
-    """
-    def __init__(self, series, from_i, to_i, from_t=None, to_t=None, dense=False, interpolator_class=None):
+    def __init__(self, *items, series=None, from_i=None, to_i=None, **kwargs):
         self.series = series
         self.from_i = from_i
         self.to_i = to_i
         self.len = None
-        self.new_points = {}
-        self.from_t = from_t
-        self.to_t=to_t
-        self.dense=dense
-        if self.dense:
-            if not interpolator_class:
-                raise ValueError('If requesting a dense slice you must provide an interpolator')
-            self.interpolator = interpolator_class(series)
-        else:
-            self.interpolator = None
 
     def __getitem__(self, i):
-        if self.dense:
-            raise NotImplementedError('Getting items by index on dense slices is not supporter. Use the iterator instead.')
-
-        if i>=0:
-            return self.series[self.from_i + i]
+        if self.series:
+            if i>=0:
+                return self.series[self.from_i + i]
+            else:
+                return self.series[self.to_i - abs(i)]
         else:
-            return self.series[self.to_i - abs(i)]
+            return super().__getitem__(i)
 
     def __iter__(self):
-        self.count = 0
-        self.prev_was_new = False
-        return self
+        if self.series:
+            self.count = 0
+            return self
+        else:
+            return super().__iter__()
 
     def __next__(self):
+        if self.series:
+            this_i = self.count + self.from_i
 
-        this_i = self.count + self.from_i
-
-        if this_i >= self.to_i:
-            # If reached the end stop
-            raise StopIteration
-
-        elif self.count == 0 or not self.dense:
-            # If first point or not dense just return
-            self.count += 1
-            return self.series[this_i]
-
-        else:
-            # Otherwise check if we have to add new missing points
-
-            if self.prev_was_new:
-                # If we just created a new missing point, return
-                self.prev_was_new = False
-                self.count += 1
-                return self.series[this_i]
+            if this_i >= self.to_i:
+                # If reached the end stop
+                raise StopIteration
 
             else:
-                # Check if we have to add a new missing point: do we have a gap?
-                prev_point = self.series[this_i-1]
-                this_point = self.series[this_i]
-
-
-                if prev_point.valid_to < this_point.valid_from:
-
-                    # yes, we do have a gap. Add a missing point by interpolation
-
-                    # Compute new point validity
-                    if self.from_t is not None and prev_point.valid_to < self.from_t:
-                        new_point_valid_from = self.from_t
-                    else:
-                        new_point_valid_from = prev_point.valid_to
-
-                    if self.to_t is not None and this_point.valid_from > self.to_t:
-                        new_point_valid_to = self.to_t
-                    else:
-                        new_point_valid_to = this_point.valid_from
-
-                    # Compute new point timestamp
-                    new_point_t = new_point_valid_from + (new_point_valid_to-new_point_valid_from)/2
-
-                    # Can we use cache?
-                    if new_point_t in self.new_points:
-                        self.prev_was_new = True
-                        return self.new_points[new_point_t]
-
-                    # Log new point creation
-                    logger.debug('New point t=,%s validity: [%s,%s]',new_point_t, new_point_valid_from,new_point_valid_to)
-
-                    # Compute the new point values using the interpolator
-                    new_point_data = self.interpolator.evaluate(new_point_t, prev_i=this_i-1, next_i=this_i)
-
-                    # Create the new point
-                    new_point = this_point.__class__(t = new_point_t, data = new_point_data)
-                    new_point.valid_from = new_point_valid_from
-                    new_point.valid_to = new_point_valid_to
-                    new_point._interpolated = True
-
-                    # Set flag
-                    self.prev_was_new = True
-
-                    # Add to cache
-                    self.new_points[new_point_t] = new_point
-
-                    # ..and return it
-                    return new_point
-
-                else:
-                    # Return this point if no gaps
-                    self.count += 1
-                    return this_point
+                # Otherwise return the corresponding item
+                self.count += 1
+                return self.series[this_i]
+        else:
+            return super().__next__()
 
     def __len__(self):
-        if not self.dense:
+        if self.series:
             return self.to_i-self.from_i
         else:
-            if self.len is None:
-                self.len=0
-                for _ in self:
-                    self.len+=1
-            return self.len
+            return super().__len__()
 
     def __repr__(self):
-        if not self.series:
-            return 'Empty time series view'
+        if self.series:
+            return 'View of {}'.format(self.series)
         else:
-            return 'Time series view'
+            return super().__repr__()
 
     @property
     def item_type(self):
-        for item in self:
-            return item.__class__
+        if self.series:
+            return self.series.item_type
+        else:
+            return super().item_type
 
     @property
     def resolution(self):
-        return self.series.resolution
+        if self.series:
+            return self.series.resolution
+        else:
+            return super().resolution
 
     @property
     def data_labels(self):
-        return self.series.data_labels
+        if self.series:
+            return self.series.data_labels
+        else:
+            return super().data_labels
 
 
 

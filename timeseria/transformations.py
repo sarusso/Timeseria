@@ -3,7 +3,7 @@
 
 from propertime.utils import dt_from_s, s_from_dt, as_tz
 from datetime import datetime
-from .datastructures import Point, Slot, DataTimeSlot, TimePoint, DataTimePoint, Series, TimeSeries, _TimeSeriesView
+from .datastructures import Point, Slot, DataTimeSlot, TimePoint, DataTimePoint, TimeSeries, TimeSeriesView
 from .utilities import _compute_data_loss, _compute_validity_regions
 from .operations import avg
 from .units import TimeUnit
@@ -16,10 +16,159 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-#  Support function for computing new items
+#==============================
+# Support classes and functions
+#==============================
+
+class _TimeSeriesDenseView(TimeSeriesView):
+    """A time series view which is "dense". Only used internally.
+
+    :meta private:
+    """
+    def __init__(self, series, from_i, to_i, from_t=None, to_t=None, dense=False, interpolator_class=None):
+        self.series = series
+        self.from_i = from_i
+        self.to_i = to_i
+        self.len = None
+        self.new_points = {}
+        self.from_t = from_t
+        self.to_t=to_t
+        self.dense=dense
+        if self.dense:
+            if not interpolator_class:
+                raise ValueError('If requesting a dense view you must provide an interpolator')
+            self.interpolator = interpolator_class(series)
+        else:
+            self.interpolator = None
+
+    def __getitem__(self, i):
+        if self.dense:
+            raise NotImplementedError('Getting items by index on dense views is not supported. Use the iterator instead.')
+
+        if i>=0:
+            return self.series[self.from_i + i]
+        else:
+            return self.series[self.to_i - abs(i)]
+
+    def __iter__(self):
+        self.count = 0
+        self.prev_was_new = False
+        return self
+
+    def __next__(self):
+
+        this_i = self.count + self.from_i
+
+        if this_i >= self.to_i:
+            # If reached the end stop
+            raise StopIteration
+
+        elif self.count == 0 or not self.dense:
+            # If first point or not dense just return
+            self.count += 1
+            return self.series[this_i]
+
+        else:
+            # Otherwise check if we have to add new missing points
+
+            if self.prev_was_new:
+                # If we just created a new missing point, return
+                self.prev_was_new = False
+                self.count += 1
+                return self.series[this_i]
+
+            else:
+                # Check if we have to add a new missing point: do we have a gap?
+                prev_point = self.series[this_i-1]
+                this_point = self.series[this_i]
+
+
+                if prev_point.valid_to < this_point.valid_from:
+
+                    # yes, we do have a gap. Add a missing point by interpolation
+
+                    # Compute new point validity
+                    if self.from_t is not None and prev_point.valid_to < self.from_t:
+                        new_point_valid_from = self.from_t
+                    else:
+                        new_point_valid_from = prev_point.valid_to
+
+                    if self.to_t is not None and this_point.valid_from > self.to_t:
+                        new_point_valid_to = self.to_t
+                    else:
+                        new_point_valid_to = this_point.valid_from
+
+                    # Compute new point timestamp
+                    new_point_t = new_point_valid_from + (new_point_valid_to-new_point_valid_from)/2
+
+                    # Can we use cache?
+                    if new_point_t in self.new_points:
+                        self.prev_was_new = True
+                        return self.new_points[new_point_t]
+
+                    # Log new point creation
+                    logger.debug('New point t=,%s validity: [%s,%s]',new_point_t, new_point_valid_from,new_point_valid_to)
+
+                    # Compute the new point values using the interpolator
+                    new_point_data = self.interpolator.evaluate(new_point_t, prev_i=this_i-1, next_i=this_i)
+
+                    # Create the new point
+                    new_point = this_point.__class__(t = new_point_t, data = new_point_data)
+                    new_point.valid_from = new_point_valid_from
+                    new_point.valid_to = new_point_valid_to
+                    new_point._interpolated = True
+
+                    # Set flag
+                    self.prev_was_new = True
+
+                    # Add to cache
+                    self.new_points[new_point_t] = new_point
+
+                    # ..and return it
+                    return new_point
+
+                else:
+                    # Return this point if no gaps
+                    self.count += 1
+                    return this_point
+
+    def __len__(self):
+        if not self.dense:
+            return self.to_i-self.from_i
+        else:
+            if self.len is None:
+                self.len=0
+                for _ in self:
+                    self.len+=1
+            return self.len
+
+    def __repr__(self):
+        if not self.series:
+            return 'Empty time series view'
+        else:
+            return 'Time series view'
+
+    @property
+    def item_type(self):
+        for item in self:
+            return item.__class__
+
+    @property
+    def resolution(self):
+        return self.series.resolution
+
+    @property
+    def data_labels(self):
+        return self.series.data_labels
+
+
 def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_point_i, slot_prev_point_i, slot_next_point_i,
                  unit, point_validity, timezone, fill_with, force_data_loss, fill_gaps, series_data_indexes, series_resolution,
                  force_compute_data_loss, interpolator_class, operations=None):
+    """Support function for computing new items.
+
+    :meta private:
+    """
 
     # Log. Note: if slot_first_point_i < slot_last_point_i, this means that the prev and next are outside the slot.
     # It is not a bug, it is how the system works. perhaps we could pass here the slot_prev_i and sòlot_next_i
@@ -38,8 +187,8 @@ def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_poi
         slot_prev_point_i = slot_first_point_i
 
     # Create a view of the series containing the slot datapoints plus the prev and next,
-    series_dense_view_extended  = _TimeSeriesView(series, from_i=slot_prev_point_i, to_i=slot_next_point_i+1,  # Slicing exclude the right
-                                                  from_t=from_t, to_t=to_t, dense=True, interpolator_class=interpolator_class)
+    series_dense_view_extended  = _TimeSeriesDenseView(series, from_i=slot_prev_point_i, to_i=slot_next_point_i+1,  # Slicing exclude the right
+                                                       from_t=from_t, to_t=to_t, dense=True, interpolator_class=interpolator_class)
 
     # Compute the data loss for the new element. This is forced
     # by the resampler or slotter if first or last point
@@ -105,8 +254,8 @@ def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_poi
         else:
             # Create a view of the original series to provide only the datapoints belonging to the slot
             #logger.critical('Slicing dense series from {} to {}'.format(slot_first_point_i, slot_last_point_i+1))
-            series_dense_view = _TimeSeriesView(series, from_i=slot_first_point_i, to_i=slot_last_point_i+1, # Slicing exclude the right
-                                                from_t=from_t, to_t=to_t, dense=True, interpolator_class=interpolator_class)
+            series_dense_view = _TimeSeriesDenseView(series, from_i=slot_first_point_i, to_i=slot_last_point_i+1, # Slicing exclude the right
+                                                     from_t=from_t, to_t=to_t, dense=True, interpolator_class=interpolator_class)
 
 
 
