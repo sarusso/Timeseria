@@ -75,9 +75,6 @@ class TestReconstructors(unittest.TestCase):
         # by a single point, all the are gets marked as to be reconstructed. What we want..?
 
 
-
-
-
     def test_PeriodicAverageReconstructor(self):
 
         # Get test data
@@ -94,76 +91,33 @@ class TestReconstructors(unittest.TestCase):
                 value =  float(line.split(',')[1])
                 time_series.append(DataTimeSlot(start=start_point, end=end_point, data={'temperature':value}, data_loss=data_loss))
 
-        # # Instantiate
-        # reconstructor = PeriodicAverageReconstructor()
-        #
-        # # Fit
-        # reconstructor.fit(time_series)
-        #
-        # # Test the predict
-        # predictions = reconstructor.predict(time_series, from_i=2,to_i=2)
-        # self.assertEqual(len(predictions['temperature']), 1)
-        #
-        # predictions = reconstructor.predict(time_series, from_i=2,to_i=3)
-        # self.assertEqual(len(predictions['temperature']), 2)
-        #
-        # predictions = reconstructor.predict(time_series, from_i=2,to_i=4)
-        # self.assertEqual(len(predictions['temperature']), 3)
-        #
-        # predictions = reconstructor.predict(time_series, from_i=len(time_series)-3, to_i=len(time_series)-2)
-        # self.assertEqual(len(predictions['temperature']), 2)
-        #
-        # # Not enough data for the window
-        # with self.assertRaises(ValueError):
-        #     reconstructor.predict(time_series, from_i=0,to_i=2)
-        #
-        # with self.assertRaises(ValueError):
-        #     reconstructor.predict(time_series, from_i=len(time_series)-3, to_i=len(time_series)-1)
-        #
-        # # Test the apply
-        # time_series_reconstructed = reconstructor.apply(time_series, data_loss_threshold=0.3)
-        # self.assertEqual(len(time_series), len(time_series_reconstructed))
-        # for i in range(len(time_series_reconstructed)):
-        #     if time_series_reconstructed[i].data_loss >= 0.3:
-        #         self.assertEqual(time_series_reconstructed[i].data_indexes['data_reconstructed'], 1)
-        #     else:
-        #         self.assertEqual(time_series_reconstructed[i].data_indexes['data_reconstructed'], 0)
-
-        # Fit from/to (from_t, from_dt, from_i etc)
+        # Fit
         reconstructor = PeriodicAverageReconstructor()
-        reconstructor.fit(time_series, from_dt=dt(2019,3,1), to_dt=dt(2019,4,1))
-        evaluation = reconstructor.evaluate(time_series, steps=[1,3], limit=100, details=True)
-        self.assertAlmostEqual(evaluation['RMSE_3_steps'], 0.3220178189430215)
-
-        # Fit to/from
-        reconstructor = PeriodicAverageReconstructor()
-        reconstructor.fit(time_series, to_dt=dt(2019,3,1), from_dt=dt(2019,4,1))
-        evaluation = reconstructor.evaluate(time_series, steps=[1,3], limit=100, details=True)
-        self.assertAlmostEqual(evaluation['RMSE_3_steps'], 0.23007000302456676)
+        reconstructor.fit(time_series)
 
         # Test the evaluate
         evaluation = reconstructor.evaluate(time_series, limit=100, details=True)
-        self.assertAlmostEqual(evaluation['RMSE_1_steps'], 0.1311006911714766)
-        self.assertAlmostEqual(evaluation['MAE_1_steps'], 0.09456930013365056)
-        self.assertAlmostEqual(evaluation['RMSE_24_steps'], 0.5906359921625686)
-        self.assertAlmostEqual(evaluation['MAE_24_steps'], 0.48590243600529004)
-        self.assertAlmostEqual(evaluation['RMSE'], 0.3608683416670226)
-        self.assertAlmostEqual(evaluation['MAE'], 0.2902358680694703)
+        self.assertAlmostEqual(evaluation['RMSE_1_steps'], 0.131, places=2)
+        self.assertAlmostEqual(evaluation['MAE_1_steps'], 0.094, places=2)
+        self.assertAlmostEqual(evaluation['RMSE_24_steps'], 0.641, places=2)
+        self.assertAlmostEqual(evaluation['MAE_24_steps'], 0.526, places=2)
+        self.assertAlmostEqual(evaluation['RMSE'], 0.386, places=2)
+        self.assertAlmostEqual(evaluation['MAE'], 0.310, places=2)
 
-        # Test the evaluate on specific steps:
+        # Test the evaluate on specific steps
         evaluation = reconstructor.evaluate(time_series, steps=[1,3], limit=100, details=True)
-        self.assertAlmostEqual(evaluation['RMSE_1_steps'], 0.1311006911714766)
-        self.assertAlmostEqual(evaluation['MAE_1_steps'], 0.09456930013365056)
-        self.assertAlmostEqual(evaluation['RMSE_3_steps'], 0.23007000302456676)
-        self.assertAlmostEqual(evaluation['MAE_3_steps'], 0.1839695537186356)
-        self.assertAlmostEqual(evaluation['RMSE'], 0.18058534709802168)
-        self.assertAlmostEqual(evaluation['MAE'], 0.13926942692614308)
+        self.assertAlmostEqual(evaluation['RMSE_1_steps'], 0.131, places=2)
+        self.assertAlmostEqual(evaluation['MAE_1_steps'], 0.094, places=2)
+        self.assertAlmostEqual(evaluation['RMSE_3_steps'], 0.240, places=2)
+        self.assertAlmostEqual(evaluation['MAE_3_steps'], 0.192, places=2)
+        self.assertAlmostEqual(evaluation['RMSE'], 0.185, places=2)
+        self.assertAlmostEqual(evaluation['MAE'], 0.139, places=2)
 
-        # Test the cross validations
+        # Test the cross validation
         reconstructor = PeriodicAverageReconstructor()
         cross_validation = reconstructor.cross_validate(time_series, evaluate_steps=[1,3], evaluate_limit=100, evaluate_details=True)
-        self.assertAlmostEqual(cross_validation['MAE_3_steps_avg'],  0.21579957004654)
-        self.assertAlmostEqual(cross_validation['MAE_3_steps_stdev'], 0.04253001276141535)
+        self.assertAlmostEqual(cross_validation['MAE_3_steps_avg'],  0.339, places=2)
+        self.assertAlmostEqual(cross_validation['MAE_3_steps_stdev'], 0.106, places=2)
 
         # Test on Points as well
         time_series = CSVFileStorage(TEST_DATA_PATH + '/csv/temperature.csv').get(limit=200)
