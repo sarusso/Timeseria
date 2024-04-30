@@ -12,8 +12,7 @@ h5py==3.6.0
 scipy==1.7.3
 pyppeteer==0.2.6
 fitter==1.7.0
-#propertime==0.2.0
-propertime@git+https://github.com/sarusso/Propertime@17a5c9ba3d0de73310f51ff948c4fbaef3720d1c
+propertime==1.0.0
 
 # Optional
 #tensorflow==2.7.0   # TensorFlow (also -gpu, -macos or -aarch64 variants)
