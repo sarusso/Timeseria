@@ -14,7 +14,7 @@ import shutil
 from ..exceptions import NotFittedError
 from ..utilities import _check_time_series, _check_resolution, _check_data_labels, _item_is_in_range
 from ..units import TimeUnit
-from ..datastructures import Point, Series, TimeSeries
+from ..datastructures import Point, Series, TimeSeries, TimeSeriesView
 
 # Setup logging
 import logging
@@ -104,29 +104,6 @@ class Model():
             model.data['resolution'] = TimeUnit(model.data['resolution'])
 
         return model
-
-    def _handle_start_end(self, start, end):
-        """Handle start/end arguments."""
-        start_t = None
-        end_t = None
-        if start is not None:
-            if isinstance(start, datetime):
-                start_t = s_from_dt(start)
-            elif isinstance(start, float):
-                start_t = start
-            else:
-                raise ValueError('Unsupported value for "start", must be either datetime or epoch seconds as float (got {})'.format(type(start)))
-        if end is not None:
-            if isinstance(end, datetime):
-                end_t = s_from_dt(end)
-            elif isinstance(end, float):
-                end_t = end
-            else:
-                raise ValueError('Unsupported value for "end", must be either datetime or epoch seconds as float (got {})'.format(type(end)))
-        if start_t is not None and end_t is not None:
-                if start_t >= end_t:
-                    raise ValueError('Start is grater or equal than end')
-        return(start_t,end_t)
 
     def save(self, path):
         """Save the model in the given path. The model is saved in "directory format",
@@ -389,39 +366,45 @@ class Model():
             validate_from_dt = dt_from_s(validate_from_t)
             validate_to_dt   = dt_from_s(validate_to_t)
 
-            logger.debug('Cross validation round #{} of {}: validate from {} ({}) to {} ({}), fit on the rest.'.format(i+1, rounds, validate_from_t, validate_from_dt, validate_to_t, validate_to_dt))
+            logger.info('Cross validation round {}/{}: validate from {} ({}) to {} ({}), fit on the rest.'.format(i+1, rounds, validate_from_t, validate_from_dt, validate_to_t, validate_to_dt))
 
             if validate_from_i == 0:
                 logger.debug('Fitting from {} to the end'.format(validate_to_t))
-                self.fit(series, start=float(validate_to_t), **fit_kwargs)
+                series_view = TimeSeriesView(series=series, from_i=validate_to_i, to_i=len(series))
+                self.fit(series_view, **fit_kwargs)
             elif validate_to_i >= len(series):
                 logger.debug('Fitting from the beginning to {}'.format(validate_from_t))
-                self.fit(series, end=float(validate_from_t), **fit_kwargs)
+                series_view = TimeSeriesView(series=series, from_i=0, to_i=validate_from_i)
+                self.fit(series_view, **fit_kwargs)
             else:
                 # Find the bigger chunk and fit first on that:
                 if validate_from_t > len(series)-validate_to_t:
                     logger.debug('Fitting from the beginning to {}'.format(validate_from_t))
-                    self.fit(series, end=float(validate_from_t), **fit_kwargs)
+                    series_view = TimeSeriesView(series=series, from_i=0, to_i=validate_from_i)
+                    self.fit(series_view, **fit_kwargs)
                     # Now try to fit on the other chunk as well:
                     try:
                         logger.debug('Now trying to fit also from {} to the end'.format(validate_to_t))
-                        self.fit_update(series, start=float(validate_to_t), **fit_kwargs)
+                        series_view = TimeSeriesView(series=series, from_i=validate_to_i, to_i=len(series))
+                        self.fit_update(series_view, **fit_kwargs)
                     except (AttributeError, NotImplementedError):
                         # TODO: Log a warning?
                         logger.debug('Not supported')
                 else:
                     logger.debug('Fitting from {} to the end'.format(validate_to_t))
-                    self.fit(series, start=float(validate_to_t), **fit_kwargs)
+                    series_view = TimeSeriesView(series=series, from_i=validate_to_i, to_i=len(series))
+                    self.fit(series_view, **fit_kwargs)
                     # Now try to fit on the other chunk as well:
                     try:
                         logger.debug('Now trying to fit also from the beginning to {}'.format(validate_from_t))
-                        self.fit_update(series, end=float(validate_from_t), **fit_kwargs)
+                        series_view = TimeSeriesView(series=series, from_i=0, to_i=validate_from_i)
+                        self.fit_update(series_view, **fit_kwargs)
                     except (AttributeError, NotImplementedError):
                         # TODO: Log a warning?
                         logger.debug('Not supported')
 
             # Evaluate & append
-            evaluations.append(self.evaluate(series, start=float(validate_from_t), end=float(validate_to_t), **evaluate_kwargs))
+            evaluations.append(self.evaluate(series_view, **evaluate_kwargs))
             self.fitted = False
 
         # Regroup evaluations
@@ -457,7 +440,7 @@ class _ProphetModel(Model):
         return dt.replace(tzinfo=None)
 
     @classmethod
-    def _from_timeseria_to_prophet(cls, series, from_t=None, to_t=None):
+    def _from_timeseria_to_prophet(cls, series):
 
         # Create Python lists with data
         try:
@@ -469,13 +452,6 @@ class _ProphetModel(Model):
 
         data_as_list=[]
         for item in series:
-
-            # Skip if needed
-            try:
-                if not _item_is_in_range(item, from_t, to_t):
-                    continue
-            except StopIteration:
-                break
 
             if data_labels_are_indexes:
                 data_as_list.append([cls._remove_timezone(item.dt), item.data[0]])

@@ -4,7 +4,7 @@ import os
 import json
 import tempfile
 import pandas as pd
-from propertime.utils import dt, timezonize
+from propertime.utils import dt, timezonize, dt_from_s
 
 from ..datastructures import Point, TimePoint, DataPoint, DataTimePoint
 from ..datastructures import Slot, TimeSlot, DataSlot, DataTimeSlot
@@ -1037,18 +1037,72 @@ class TestTimeSeriesView(unittest.TestCase):
         timeseries.append(DataTimePoint(t = 8, data = {'value': 8}))
         timeseries.append(DataTimePoint(t = 9, data = {'value': 9}))
 
+        # Create the view
+        timeseries_view = TimeSeriesView(series=timeseries, from_i=2, to_i=7)
 
-        timeseries_view = TimeSeriesView(series=timeseries, from_i=2, to_i=5)
+        # Expected timeseries view will contain
+        expected_timeseries_view = TimeSeries()
+        expected_timeseries_view.append(DataTimePoint(t = 2, data = {'value': 2}))
+        expected_timeseries_view.append(DataTimePoint(t = 3, data = {'value': 3}))
+        expected_timeseries_view.append(DataTimePoint(t = 4, data = {'value': 4}))
+        expected_timeseries_view.append(DataTimePoint(t = 5, data = {'value': 5}))
+        expected_timeseries_view.append(DataTimePoint(t = 6, data = {'value': 6}))
 
-        self.assertEqual(len(timeseries_view), 3)
+        # Test total length
+        self.assertEqual(len(timeseries_view), 5)
 
+        # Test iterator
         for i, point in enumerate(timeseries_view):
-            self.assertEqual(point.t, 2+i)
+            self.assertEqual(point, expected_timeseries_view[i])
 
+        # Test accessing by item (an view items)
         self.assertEqual(timeseries_view[0].t, 2)
         self.assertEqual(timeseries_view[1].t, 3)
         self.assertEqual(timeseries_view[2].t, 4)
-        self.assertEqual(timeseries_view[-1].t, 4)
+        self.assertEqual(timeseries_view[-1].t, 6)
+
+        # Test slicing
+        timeseries_view_sliced = timeseries_view[1:2]
+        self.assertEqual(len(timeseries_view_sliced), 1)
+        self.assertEqual(timeseries_view_sliced[0].t, 3)
+        self.assertEqual(timeseries_view_sliced, timeseries_view.slice(1,2))
+
+        timeseries_view_sliced = timeseries_view[0:2]
+        self.assertEqual(len(timeseries_view_sliced), 2)
+        self.assertEqual(timeseries_view_sliced[0].t, 2)
+        self.assertEqual(timeseries_view_sliced[1].t, 3)
+        self.assertEqual(timeseries_view_sliced, timeseries_view.slice(0,2))
+
+        timeseries_view_sliced = timeseries_view[:2]
+        self.assertEqual(len(timeseries_view_sliced), 2)
+        self.assertEqual(timeseries_view_sliced[0].t, 2)
+        self.assertEqual(timeseries_view_sliced[1].t, 3)
+        self.assertEqual(timeseries_view_sliced, timeseries_view.slice(None,2))
+
+        timeseries_view_sliced = timeseries_view[1:]
+        self.assertEqual(len(timeseries_view_sliced), 4)
+        self.assertEqual(timeseries_view_sliced[0].t, 3)
+        self.assertEqual(timeseries_view_sliced[1].t, 4)
+        self.assertEqual(timeseries_view_sliced[-1].t, 6)
+        self.assertEqual(timeseries_view_sliced, timeseries_view.slice(1,None))
+
+        timeseries_view_sliced = timeseries_view[:-1]
+        self.assertEqual(len(timeseries_view_sliced), 4)
+        self.assertEqual(timeseries_view_sliced[0].t, 2)
+        self.assertEqual(timeseries_view_sliced[-1].t, 5)
+        self.assertEqual(timeseries_view_sliced, timeseries_view.slice(None,-1))
+
+        timeseries_view_sliced = timeseries_view[-3:-1]
+        self.assertEqual(len(timeseries_view_sliced), 2)
+        self.assertEqual(timeseries_view_sliced[0].t, 4)
+        self.assertEqual(timeseries_view_sliced[1].t, 5)
+        self.assertEqual(timeseries_view_sliced, timeseries_view.slice(-3,-1))
+
+        timeseries_view_sliced = timeseries_view[dt_from_s(3):dt_from_s(5)]
+        self.assertEqual(len(timeseries_view_sliced), 2)
+        self.assertEqual(timeseries_view_sliced[0].t, 3)
+        self.assertEqual(timeseries_view_sliced[1].t, 4)
+        self.assertEqual(timeseries_view_sliced, timeseries_view.slice(dt_from_s(3),dt_from_s(5)))
 
         # Test extra attributes
         self.assertEqual(str(timeseries_view.resolution), '1s')
@@ -1056,7 +1110,8 @@ class TestTimeSeriesView(unittest.TestCase):
 
         # Test operations
         diff_timeseries = timeseries_view.diff()
-        self.assertEqual(len(diff_timeseries), 2)
+        self.assertEqual(len(diff_timeseries), 4)
         self.assertEqual(diff_timeseries[0].t, 3)
         self.assertEqual(diff_timeseries[1].t, 4)
+        self.assertEqual(diff_timeseries[-1].t, 6)
 

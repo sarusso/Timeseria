@@ -1782,14 +1782,44 @@ class TimeSeriesView(TimeSeries):
         self.to_i = to_i
         self.len = None
 
-    def __getitem__(self, i):
+    def __getitem__(self, arg):
+
         if self.series:
-            if i>=0:
-                return self.series[self.from_i + i]
+
+            if isinstance(arg, slice):
+
+                if isinstance(arg.start, int):
+                    if arg.start>=0:
+                        slice_start =  self.from_i + arg.start
+                    else:
+                        slice_start =  self.to_i - abs(arg.start)
+                elif arg.start is None:
+                    slice_start = self.from_i
+                else:
+                    slice_start = arg.start
+
+                if isinstance(arg.stop, int):
+                    if arg.stop>=0:
+                        slice_stop =  self.from_i + arg.stop
+                    else:
+                        slice_stop =  self.to_i - abs(arg.stop)
+                elif arg.stop is None:
+                    slice_stop = self.to_i
+                else:
+                    slice_stop = arg.stop
+
+                return self.series[slice_start:slice_stop]
+
             else:
-                return self.series[self.to_i - abs(i)]
+                if isinstance(arg, int):
+                    if arg>=0:
+                        return self.series[self.from_i + arg]
+                    else:
+                        return self.series[self.to_i - abs(arg)]
+                else:
+                    return super().__getitem__(arg)
         else:
-            return super().__getitem__(i)
+            return super().__getitem__(arg)
 
     def __iter__(self):
         if self.series:
@@ -1821,9 +1851,15 @@ class TimeSeriesView(TimeSeries):
 
     def __repr__(self):
         if self.series:
-            return 'View of {}'.format(self.series)
+            return 'View from element #{} to element #{} of {}'.format(self.from_i, self.to_i, self.series)
         else:
             return super().__repr__()
+
+    def __bool__(self):
+        if self.series is not None:
+            return True if len(self.series) else False
+        else:
+            return True if len(self) else False
 
     @property
     def item_type(self):

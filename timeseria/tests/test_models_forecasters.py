@@ -94,11 +94,6 @@ class TestForecasters(unittest.TestCase):
         self.assertAlmostEqual(evaluation['RMSE_3_steps'], 0.07253018513852955)
         self.assertAlmostEqual(evaluation['MAE_3_steps'], 0.06567523200748912)
 
-        # Fit from/to
-        forecaster.fit(self.sine_minute_time_series, start=20000.0, end=40000.0)
-        evaluation = forecaster.evaluate(self.sine_minute_time_series, steps=[1,3], limit=100, details=True)
-        self.assertAlmostEqual(evaluation['RMSE_1_steps'], 0.37831442005531923)
-
         # Test on Points as well
         time_series = CSVFileStorage(TEST_DATA_PATH + '/csv/temperature.csv').get(limit=200)
         forecaster = PeriodicAverageForecaster()

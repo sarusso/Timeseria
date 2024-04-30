@@ -56,7 +56,7 @@ class Forecaster(Model):
 
     window = None
 
-    def forecast(self, series, steps=1, forecast_start=None, context_data=None):
+    def forecast(self, series, steps=1, context_data=None):
         """Forecast n steps-ahead data points or slots"""
 
         # Check series
@@ -67,31 +67,13 @@ class Forecaster(Model):
             if not context_data:
                 raise ValueError('Forecasting with a forecaster fit to specific target data labels requires to give context data')
 
-        # Set forecast starting item
-        if forecast_start is not None:
-            forecast_start_item = series[forecast_start]
+        if context_data:
+            predicted_data = self.predict(series, steps=steps, context_data=context_data)
         else:
-            forecast_start_item = series[-1]
+            predicted_data = self.predict(series, steps=steps)
 
-        # Handle forecast start
-        if forecast_start is not None:
-            try:
-                if context_data:
-                    predicted_data = self.predict(series, steps=steps, forecast_start=forecast_start, context_data=context_data)
-                else:
-                    predicted_data = self.predict(series, steps=steps, forecast_start=forecast_start)
-            except TypeError as e:
-                if 'unexpected keyword argument' and  'forecast_start' in str(e):
-                    raise NotImplementedError('The model does not support the "forecast_start" parameter, cannot proceed')
-                else:
-                    raise
-        else:
-            if context_data:
-                predicted_data = self.predict(series, steps=steps, context_data=context_data)
-            else:
-                predicted_data = self.predict(series, steps=steps)
-
-        # List of predictions or single prediction?
+        # Handle list of predictions or single prediction
+        forecast_start_item = series[-1]
         if isinstance(predicted_data,list):
             if context_data:
                 raise NotImplementedError('Context with multi step-ahead predictions is not yet implemented')
@@ -185,7 +167,7 @@ class Forecaster(Model):
             return None
 
     @Model.evaluate_function
-    def evaluate(self, series, steps='auto', limit=None, plots=False, plot=False, metrics=['RMSE', 'MAE'], details=False, start=None, end=None, evaluation_series=False):
+    def evaluate(self, series, steps='auto', limit=None, plots=False, plot=False, metrics=['RMSE', 'MAE'], details=False, evaluation_series=False):
         """Evaluate the forecaster on a series.
 
         Args:
@@ -203,8 +185,6 @@ class Forecaster(Model):
                 ``MAE``  (Mean Absolute Error), and
                 ``MAPE``  (Mean Absolute percentage Error).
             details(bool): if to add intermediate steps details to the evaluation results.
-            start(float, datetime): evaluation start (epoch timestamp or datetime).
-            end(float, datetime): evaluation end (epoch timestamp or datetime).
             evaluation_series(bool): if to add to the results an evaluation timeseirs containing the eror metrics. Defaulted to false.
         """
 
@@ -254,9 +234,6 @@ class Forecaster(Model):
                 evaluation_series = evaluation_series[self.data['window']:]
             if limit:
                 evaluation_series = evaluation_series[:limit]
-
-        # Handle start/end
-        start_t, end_t = self._handle_start_end(start, end)
 
         # Support vars
         results = {}
@@ -354,13 +331,6 @@ class Forecaster(Model):
                 # Else, process in streaming the series, item by item, and properly take into account the window.
                 else:
                     for i in range(len(series)):
-
-                        # Skip if needed
-                        try:
-                            if not _item_is_in_range(series[i], start_t, end_t):
-                                continue
-                        except StopIteration:
-                            break
 
                         # Check that we can get enough data
                         if i < self.data['window']:
@@ -536,20 +506,16 @@ class PeriodicAverageForecaster(Forecaster):
         return model
 
     @Forecaster.fit_function
-    def fit(self, series, start=None, end=None, periodicity='auto', dst_affected=False, verbose=False):
+    def fit(self, series, periodicity='auto', dst_affected=False, verbose=False):
         """Fit the model on a series.
 
         Args:
-            start(float, datetime): fit start (epoch timestamp or datetime).
-            end(float, datetime): fit end (epoch timestamp or datetime).
             periodicity(int): the periodicty of the series. If set to ``auto`` then it will be automatically detected using a FFT.
             dst_affected(bool): if the model should take into account DST effects.
         """
 
         if len(series.data_labels) > 1:
             raise NotImplementedError('Multivariate time series are not yet supported')
-
-        start_t, end_t = self._handle_start_end(start, end)
 
         # Set or detect periodicity
         if periodicity == 'auto':
@@ -571,15 +537,6 @@ class PeriodicAverageForecaster(Forecaster):
             totals = {}
             processed = 0
             for item in series:
-
-                # Skip if needed
-                try:
-                    if not _item_is_in_range(item, start_t, end_t):
-                        continue
-                except StopIteration:
-                    break
-
-                # Process
                 periodicity_index = _get_periodicity_index(item, series.resolution, periodicity, dst_affected)
                 if not periodicity_index in sums:
                     sums[periodicity_index] = item.data[data_label]
@@ -672,7 +629,7 @@ class ProphetForecaster(Forecaster, _ProphetModel):
     window = None
 
     @Forecaster.fit_function
-    def fit(self, series, start=None, end=None, verbose=False):
+    def fit(self, series, verbose=False):
 
         if len(series.data_labels) > 1:
             raise Exception('Multivariate time series are not yet supported')
@@ -684,9 +641,7 @@ class ProphetForecaster(Forecaster, _ProphetModel):
             logging.getLogger('cmdstanpy').disabled = True
             logging.getLogger('prophet').disabled = True
 
-        start_t, end_t = self._handle_start_end(start, end)
-
-        data = self._from_timeseria_to_prophet(series, from_t=start_t, to_t=end_t)
+        data = self._from_timeseria_to_prophet(series)
 
         # Instantiate the Prophet model
         self.prophet_model = Prophet()
@@ -906,7 +861,7 @@ class LSTMForecaster(Forecaster, _KerasModel):
         self._save_keras_model(path)
 
     @Forecaster.fit_function
-    def fit(self, series, start=None, end=None, epochs=30, normalize=True, target='all', with_context=False, reproducible=False, verbose=False):
+    def fit(self, series, epochs=30, normalize=True, target='all', with_context=False, reproducible=False, verbose=False):
         """Fit the model on a series.
 
         Args:
@@ -952,8 +907,6 @@ class LSTMForecaster(Forecaster, _KerasModel):
         self.data['target_data_labels'] = target_data_labels
         self.data['context_data_labels'] = context_data_labels
 
-        start_t, end_t = self._handle_start_end(start, end)
-
         # Set verbose switch
         if verbose:
             verbose=1
@@ -963,26 +916,11 @@ class LSTMForecaster(Forecaster, _KerasModel):
         # Data labels shortcut
         data_labels = series.data_labels
 
-        if start is None and end is None:
-            if normalize:
-                series = series.duplicate()
-        else:
-            filtered_series = series.__class__()
-            # TODO: Use _item_is_in_range()? 
-            for item in series:
-                valid = True
-                if start is not None and item.t < start_t:
-                    valid = False
-                if end is not None and item.t >= end_t:
-                    valid = False
-                if valid:
-                    if normalize:
-                        filtered_series.append(copy.deepcopy(item))
-                    else:
-                        filtered_series.append(item)
-            series = filtered_series
-
         if normalize:
+
+            # We need this to in order not to modify original data
+            series = series.duplicate()
+
             # Set min and max (for each label)
             min_values = series.min()
             max_values = series.max()

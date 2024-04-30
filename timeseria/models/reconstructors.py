@@ -2,16 +2,13 @@
 """Data reconstructions models."""
 
 import copy
-import statistics
-from datetime import datetime
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 from pandas import DataFrame
 from math import sqrt
 from propertime.utils import dt_from_s
 
-from ..utilities import detect_periodicity, _get_periodicity_index, _set_from_t_and_to_t, _item_is_in_range, mean_absolute_percentage_error
+from ..utilities import detect_periodicity, _get_periodicity_index, mean_absolute_percentage_error
 from ..units import TimeUnit
-from ..datastructures import TimeSeries
 from ..exceptions import NotEnoughDataError
 from .base import Model, _ProphetModel
 
@@ -49,32 +46,12 @@ class Reconstructor(Model):
 
         logger.debug('Using data_loss_threshold="%s"', data_loss_threshold)
 
-        # TODO: understand if we want the apply from/to behavior. For now it is disabled
-        # (add from_t=None, to_t=None, from_dt=None, to_dt=None in the function call above)
-        # from_t, to_t = _set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
-        # Maybe also add a series.mark=[from_dt, to_dt]
-
-        from_t = None
-        to_t   = None
-
         if not inplace:
             series = series.duplicate()
 
         gap_start_i = None
 
         for i, item in enumerate(series):
-
-            # Skip if before from_t/dt of after to_t/dt
-            if from_t is not None and series[i].t < from_t:
-                continue
-            try:
-                # Handle slots
-                if to_t is not None and series[i].end.t > to_t:
-                    break
-            except AttributeError:
-                # Handle points
-                if to_t is not None and series[i].t > to_t:
-                    break
 
             if item.data_loss is not None and item.data_loss >= data_loss_threshold:
                 # This is the beginning of an area we want to reconstruct according to the data_loss_threshold
@@ -149,7 +126,7 @@ class Reconstructor(Model):
             return reconstructed_data
 
     @Model.evaluate_function
-    def evaluate(self, series, steps='auto', limit=None, data_loss_threshold=1, metrics=['RMSE', 'MAE'], details=False, start=None, end=None, **kwargs):
+    def evaluate(self, series, steps='auto', limit=None, data_loss_threshold=1, metrics=['RMSE', 'MAE'], details=False):
         """Evaluate the reconstructor on a series.
 
         Args:
@@ -163,8 +140,6 @@ class Reconstructor(Model):
                 ``MAE``  (Mean Absolute Error), and
                 ``MAPE``  (Mean Absolute percentage Error).
             details(bool): if to add intermediate steps details to the evaluation results.
-            start(float, datetime): evaluation start (epoch timestamp or datetime).
-            end(float, datetim): evaluation end (epoch timestamp or datetime).
         """
 
         if len(series.data_labels) > 1:
@@ -181,32 +156,6 @@ class Reconstructor(Model):
             pass
         else:
             steps = list(range(1, steps+1))
-
-        # Handle start/end
-        from_t = kwargs.get('from_t', None)
-        to_t = kwargs.get('to_t', None)
-        from_dt = kwargs.get('from_dt', None)
-        to_dt = kwargs.get('to_dt', None)
-        if from_t or to_t or from_dt or to_dt:
-            logger.warning('The from_t, to_t, from_dt and to_d arguments are deprecated, please use start and end instead')
-        from_t, to_t = _set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
-
-        if start is not None:
-            if isinstance(start, datetime):
-                from_dt = start
-            else:
-                try:
-                    from_t = float(start)
-                except:
-                    raise ValueError('Cannot use "{}" as start value, not a datetime nor an epoch timestamp'.format(start))
-        if end is not None:
-            if isinstance(end, datetime):
-                to_dt = end
-            else:
-                try:
-                    to_t = float(end)
-                except:
-                    raise ValueError('Cannot use "{}" as end value, not a datetime nor an epoch timestamp'.format(end))
 
         # Support vars
         evaluation_score = {}
@@ -230,14 +179,6 @@ class Reconstructor(Model):
                 logger.debug('Evaluating model for %s steps', steps_round)
 
                 for i in range(len(series)):
-
-                    # Skip if needed
-                    # TODO: Use series wiews/slices
-                    try:
-                        if not _item_is_in_range(series[i], from_t, to_t):
-                            continue
-                    except StopIteration:
-                        break
 
                     # Break if we have to
                     if limit is not None and processed_samples >= limit:
@@ -431,7 +372,7 @@ class PeriodicAverageReconstructor(Reconstructor):
     window = 1
 
     @Reconstructor.fit_function
-    def fit(self, series, data_loss_threshold=0.5, periodicity='auto', dst_affected=False, offset_method='average', start=None, end=None, **kwargs):
+    def fit(self, series, data_loss_threshold=0.5, periodicity='auto', dst_affected=False, offset_method='average', verbose=False):
         # TODO: periodicity, dst_affected, offset_method -> move them in the init?
         """
         Fit the reconstructor on some data.
@@ -442,8 +383,6 @@ class PeriodicAverageReconstructor(Reconstructor):
             dst_affected(bool): if the model should take into account DST effects.
             offset_method(str): how to offset the reconstructed data in order to align it to the missing data gaps. Valuse are ``avergae``
                                 to use the average gap value, or ``extrmes`` to use its extremes.
-            start(float, datetime): fit start (epoch timestamp or datetime).
-            end(float, datetim): fit end (epoch timestamp or datetime).
         """
 
         if not offset_method in ['average', 'extremes']:
@@ -455,32 +394,6 @@ class PeriodicAverageReconstructor(Reconstructor):
 
         # This reconstructor has always a one-point window (before and after gaps)
         self.window = 1
-
-        # Handle start/end
-        from_t = kwargs.get('from_t', None)
-        to_t = kwargs.get('to_t', None)
-        from_dt = kwargs.get('from_dt', None)
-        to_dt = kwargs.get('to_dt', None)
-        if from_t or to_t or from_dt or to_dt:
-            logger.warning('The from_t, to_t, from_dt and to_d arguments are deprecated, please use the slice() operation instead or the square brackets notation.')
-        from_t, to_t = _set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
-
-        if start is not None:
-            if isinstance(start, datetime):
-                from_dt = start
-            else:
-                try:
-                    from_t = float(start)
-                except:
-                    raise ValueError('Cannot use "{}" as start value, not a datetime nor an epoch timestamp'.format(start))
-        if end is not None:
-            if isinstance(end, datetime):
-                to_dt = end
-            else:
-                try:
-                    to_t = float(end)
-                except:
-                    raise ValueError('Cannot use "{}" as end value, not a datetime nor an epoch timestamp'.format(end))
 
         # Set or detect periodicity
         if periodicity == 'auto':
@@ -501,15 +414,6 @@ class PeriodicAverageReconstructor(Reconstructor):
             totals = {}
             processed = 0
             for item in series:
-
-                # Skip if needed
-                try:
-                    if not _item_is_in_range(item, from_t, to_t):
-                        continue
-                except StopIteration:
-                    break
-
-                # Process. Note: we do fit on data losses = None!
                 if item.data_loss is None or item.data_loss < data_loss_threshold:
                     periodicity_index = _get_periodicity_index(item, series.resolution, periodicity, dst_affected=dst_affected)
                     if not periodicity_index in sums:
@@ -587,7 +491,7 @@ class ProphetReconstructor(Reconstructor, _ProphetModel):
     window = 0
 
     @Reconstructor.fit_function
-    def fit(self, series, start=None, end=None, verbose=False, **kwargs):
+    def fit(self, series, verbose=False):
 
         if len(series.data_labels) > 1:
             raise NotImplementedError('Multivariate time series are not supported by this reconstructor')
@@ -599,33 +503,7 @@ class ProphetReconstructor(Reconstructor, _ProphetModel):
             logging.getLogger('cmdstanpy').disabled = True
             logging.getLogger('prophet').disabled = True
 
-        # Handle start/end
-        from_t = kwargs.get('from_t', None)
-        to_t = kwargs.get('to_t', None)
-        from_dt = kwargs.get('from_dt', None)
-        to_dt = kwargs.get('to_dt', None)
-        if from_t or to_t or from_dt or to_dt:
-            logger.warning('The from_t, to_t, from_dt and to_d arguments are deprecated, please use the slice() operation instead or the square brackets notation.')
-        from_t, to_t = _set_from_t_and_to_t(from_dt, to_dt, from_t, to_t)
-
-        if start is not None:
-            if isinstance(start, datetime):
-                from_dt = start
-            else:
-                try:
-                    from_t = float(start)
-                except:
-                    raise ValueError('Cannot use "{}" as start value, not a datetime nor an epoch timestamp'.format(start))
-        if end is not None:
-            if isinstance(end, datetime):
-                to_dt = end
-            else:
-                try:
-                    to_t = float(end)
-                except:
-                    raise ValueError('Cannot use "{}" as end value, not a datetime nor an epoch timestamp'.format(end))
-
-        data = self._from_timeseria_to_prophet(series, from_t, to_t)
+        data = self._from_timeseria_to_prophet(series)
 
         # Instantiate the Prophet model
         self.prophet_model = Prophet()
