@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Units and TimeUnits, which fully supports calendar arithmetic."""
+"""Units and the TimeUnit, which fully supports calendar arithmetic."""
 
 from .utilities import is_numerical
 from propertime import TimeSpan
@@ -180,4 +180,25 @@ class TimeUnit(TimeSpan, Unit):
             return TimePoint(dt=self.shift(other.dt, times=-1))
         else:
             return super().__rsub__(other)
+
+    # For the doc strings
+    def as_seconds(self, starting_at=None):
+        """The length (duration) of the time unit, in seconds"""
+        return super().as_seconds(starting_at)
+
+    def ceil(self, time):
+        """Ceil a time or datetime object according to this time unit."""
+        return super().ceil(time)
+
+    def floor(self, time):
+        """Floor a time or datetime object according to this time unit."""
+        return super().floor(time)
+
+    def round(self, time, how='half'):
+        """Round a time or datetime object according to this time unit."""
+        return super().round(time, how)
+
+    def shift(self, time, times=1):
+        """Shift a given time or datetime object n times this time unit."""
+        return super().shift(time, times)
 
