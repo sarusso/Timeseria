@@ -587,12 +587,17 @@ class ProphetReconstructor(Reconstructor, _ProphetModel):
     window = 0
 
     @Reconstructor.fit_function
-    def fit(self, series, start=None, end=None, **kwargs):
+    def fit(self, series, start=None, end=None, verbose=False, **kwargs):
 
         if len(series.data_labels) > 1:
             raise NotImplementedError('Multivariate time series are not supported by this reconstructor')
 
         from prophet import Prophet
+
+        if not verbose:
+            # https://stackoverflow.com/questions/45551000/how-to-control-output-from-fbprophet
+            logging.getLogger('cmdstanpy').disabled = True
+            logging.getLogger('prophet').disabled = True
 
         # Handle start/end
         from_t = kwargs.get('from_t', None)

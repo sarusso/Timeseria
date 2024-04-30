@@ -679,6 +679,11 @@ class ProphetForecaster(Forecaster, _ProphetModel):
 
         from prophet import Prophet
 
+        if not verbose:
+            # https://stackoverflow.com/questions/45551000/how-to-control-output-from-fbprophet
+            logging.getLogger('cmdstanpy').disabled = True
+            logging.getLogger('prophet').disabled = True
+
         start_t, end_t = self._handle_start_end(start, end)
 
         data = self._from_timeseria_to_prophet(series, from_t=start_t, to_t=end_t)
@@ -768,7 +773,7 @@ class ARIMAForecaster(Forecaster, _ARIMAModel):
 
         # Save model and fit
         self.model = sm.tsa.ARIMA(data, (self.p,self.d,self.q))
-        self.model_res = self.model.fit()
+        self.model_res = self.model.fit(disp=verbose)
 
         # Save the series we used for the fit.
         self.fit_series = series

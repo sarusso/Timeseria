@@ -152,7 +152,6 @@ class TestReconstructors(unittest.TestCase):
 
         # Test the evaluate on specific steps:
         evaluation = reconstructor.evaluate(time_series, steps=[1,3], limit=100, details=True)
-        print(evaluation)
         self.assertAlmostEqual(evaluation['RMSE_1_steps'], 0.1311006911714766)
         self.assertAlmostEqual(evaluation['MAE_1_steps'], 0.09456930013365056)
         self.assertAlmostEqual(evaluation['RMSE_3_steps'], 0.23007000302456676)
