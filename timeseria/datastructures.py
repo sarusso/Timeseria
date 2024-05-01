@@ -1748,6 +1748,9 @@ class TimeSeries(Series):
         from .operations import get as get_operation
         return get_operation(self, at_i, at_t, at_dt)
 
+    def view(self, from_i=None, to_i=None):
+        """Get a (lazy) view of the series"""
+        return TimeSeriesView(series=self, from_i=from_i, to_i=to_i)
 
     #=========================
     #  Plot-related

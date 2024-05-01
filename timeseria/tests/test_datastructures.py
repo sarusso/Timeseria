@@ -1147,3 +1147,6 @@ class TestTimeSeriesView(unittest.TestCase):
         self.assertEqual(timeseries_view[1].t, 2)
         self.assertEqual(timeseries_view[-1].t, 3)
 
+        # Test getting the view from a time series
+        self.assertEqual(timeseries.view(3,5), TimeSeriesView(series=timeseries, from_i=3, to_i=5))
+
