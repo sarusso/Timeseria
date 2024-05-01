@@ -1883,3 +1883,13 @@ class TimeSeriesView(TimeSeries):
         else:
             return super().data_labels
 
+    def materialize(self):
+        """Return a materialized series view"""
+        materialized_series = self.__class__()
+        for item in self:
+            materialized_series.append(deepcopy(item))
+        return materialized_series
+
+    def duplicate(self):
+        return self.materialize()
+

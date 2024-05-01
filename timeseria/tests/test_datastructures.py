@@ -1115,3 +1115,8 @@ class TestTimeSeriesView(unittest.TestCase):
         self.assertEqual(diff_timeseries[1].t, 4)
         self.assertEqual(diff_timeseries[-1].t, 6)
 
+        # Test materialized view
+        materialized_timeseries_view = timeseries_view.materialize()
+        materialized_timeseries_view[0]._data = {'value':3}
+        self.assertEqual(materialized_timeseries_view[0].data, {'value':3})
+        self.assertEqual(timeseries_view[0].data, {'value':2})
