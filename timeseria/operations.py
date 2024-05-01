@@ -809,19 +809,40 @@ class Get(Operation):
         else:
             return super(Get, self).__call__(series, *args, **kwargs)
 
-    def _call(self, series, at):
+    def _call(self, series, at_i=None, at_t=None, at_dt=None):
 
-        # Detect argument type
-        if isinstance(at, int):
-            return series._item_by_i(at)
-        if isinstance(at, float):
-            return series._item_by_t(at)
-        if isinstance(at, datetime):
-            return series._item_by_t(s_from_dt(at))
-        if  isinstance(at, TimePoint):
-            return series._item_by_t(at.t)
+        ats = 0
+        if at_i is not None:
+            if not isinstance(at_i, int):
+                raise ValueError('The argument at_i must be of type "int" (got "{}")'.format(at_i.__class__.__name__))
+            ats+=1
+        if at_t is not None:
+            if not (isinstance(at_t, int) or isinstance(at_t, float)):
+                raise ValueError('The argument at_t must be of type "int" or "float" (got "{}")'.format(at_t.__class__.__name__))
+            ats+=1
+        if at_dt is not None:
+            if not isinstance(at_dt, datetime):
+                raise ValueError('The argument at_dt must be of type "datetime" (got "{}")'.format(at_dt.__class__.__name__))
+            ats+=1
+        if ats > 1:
+            raise ValueError('Got more than one at_i, at_t or at_dt: choose one')
 
-        raise TypeError('Don\'t know how to get items from a series for type "{}"'.format(at.__class__.__name__))
+        if at_i is None:
+            if at_dt is not None:
+                at_t = s_from_dt(at_dt)
+
+        # Handle negative index
+        if at_i is not None and at_i < 0:
+            at_i = len(series) - abs(at_i)
+
+        if at_i is not None:
+            return series._item_by_i(at_i)
+
+        elif at_t is not None:
+            return series._item_by_t(at_t)
+
+        else:
+            raise ValueError('No more at_i, at_t or at_dt set')
 
 
 class Filter(Operation):
@@ -857,89 +878,114 @@ class Filter(Operation):
 class Slice(Operation):
     """Slice operation (callable object)."""
 
-    def _call(self, series, start=None, end=None):
+    def _call(self, series, from_i=None, to_i=None, from_t=None, to_t=None, from_dt=None, to_dt=None):
 
-        # TODO: check for series type to allow time-based slicing? Same in the Get..
+        if from_t is not None or to_t is not None or from_dt is not None or to_dt is not None:
+            from .datastructures import TimeSeries
+            if not isinstance(series, TimeSeries):
+                raise TypeError('Cannot slice time-based without a time series (got "{}")'.format(series.__class__.__name__))
 
-        start_i = None
-        end_i = None
-        start_t = None
-        end_t = None
+        froms = 0
+        if from_i is not None:
+            if not isinstance(from_i, int):
+                raise ValueError('The argument from_i must be of type "int" (got "{}")'.format(from_i.__class__.__name__))
+            froms+=1
+        if from_t is not None:
+            if not (isinstance(from_t, int) or isinstance(from_t, float)):
+                raise ValueError('The argument from_t must be of type "int" or "float" (got "{}")'.format(from_t.__class__.__name__))
+            froms+=1
+        if from_dt is not None:
+            if not isinstance(from_dt, datetime):
+                raise ValueError('The argument from_dt must be of type "datetime" (got "{}")'.format(from_dt.__class__.__name__))
+            froms+=1
+        if froms > 1:
+            raise ValueError('Got more than one from_i, from_t or from_dt: choose one')
 
-        # Handle start
-        if start is not None:
-            if isinstance(start, datetime):
-                start_t = s_from_dt(start)
-            elif isinstance(start, float):
-                start_t = start
-            elif isinstance(start, int):
-                if start < 0:
-                    start_i = len(series) - abs(start)
-                else:
-                    start_i = start
-            else:
-                raise ValueError('Cannot use "{}" as start value for the slice as not int, float (epoch timestamp) nor datetime'.format(start))
+        tos = 0
+        if to_i is not None:
+            if not isinstance(to_i, int):
+                raise ValueError('The argument to_i must be of type "int" (got "{}")'.format(to_i.__class__.__name__))
+            tos+=1
+        if to_t is not None:
+            if not (isinstance(to_t, int) or isinstance(to_t, float)):
+                raise ValueError('The argument to_t must be of type "int" or "float" (got "{}")'.format(to_t.__class__.__name__))
+            tos+=1
+        if to_dt is not None:
+            if not isinstance(to_dt, datetime):
+                raise ValueError('The argument to_dt must be of type "datetime" (got "{}")'.format(to_dt.__class__.__name__))
+            tos+=1
+        if tos > 1:
+            raise ValueError('Got more than one to_i, to_t or to_dt: choose one')
 
-        # Handle end
-        if end is not None:
-            if isinstance(end, datetime):
-                end_t = s_from_dt(end)
-            elif isinstance(end, float):
-                end_t = end
-            elif isinstance(end, int):
-                if end < 0:
-                    end_i = len(series) - abs(end) 
-                else:
-                    end_i = end
-            else:
-                raise ValueError('Cannot use "{}" as end value for the slice as not int, float (epoch timestamp) nor datetime'.format(end))
+        if from_i is None:
+            if from_dt is not None:
+                from_t = s_from_dt(from_dt)
 
-        # Check incompatibilities
-        if start_t is not None or end_t is not None:
-            if start_i is not None or end_i is not None:
-                raise ValueError('Cannot slice mixing int and float (epoch timestamp) or datetime')
+        if to_i is None:
+            if to_dt is not None:
+                to_t = s_from_dt(to_dt)
+
+        if from_i is not None and to_t is not None:
+            raise ValueError('Please use the same slicing method between indexes or time-based slicing')
+
+        if to_i is not None and from_t is not None:
+            raise ValueError('Please use the same slicing method between indexes or time-based slicing')
+
+        # Handle negative indexes
+        if from_i is not None and from_i < 0:
+            from_i = len(series) - abs(from_i)
+        if to_i is not None and to_i < 0:
+            to_i = len(series) - abs(to_i)
 
         # Handle inverted or equal positions (slight optimization)
-        if start_t is not None and end_t is not None:
-            if start_t >= end_t:
+        if from_t is not None and to_t is not None:
+            if from_t >= to_t:
                 return series.__class__()
-        if start_i is not None and end_i is not None:
-            if start_i >= end_i:
+        if from_i is not None and to_i is not None:
+            if from_i >= to_i:
                 return series.__class__()
 
         # Instantiate the new, sliced series
         sliced_series = series.__class__()
 
-        # Select sliced series items based on start end (if set) or just duplicate it
-        if (start_t is not None or end_t is not None):
+        # Loop over the series in order to support series views as well.
+        # TODO: use the original slicing if not a series view?
+        # TODO: use a time-based index if slicing based on time?
+
+        # A) Select sliced series items based on from_t and/or to_t
+        if from_t is not None or to_t is not None:
             for item in series:
-                if start_t is not None:
-                    if item.t < start_t:
+                if from_t is not None:
+                    if item.t < from_t:
                         continue
-                if end_t is not None:
+                if to_t is not None:
                     try:
                         # Slot?
-                        if item.end.t > end_t:
+                        if item.end.t > to_t:
                             break
                     except AttributeError:
                         # Point?
-                        if item.t >= end_t:
+                        if item.t >= to_t:
                             break
                 # If we are here this item has to be added to the slice
                 sliced_series.append(item)
 
-        elif (start_i is not None or end_i is not None):
+        # B) Select sliced series items based on from_i and/or to_i
+        elif from_i is not None or to_i is not None:
             for i, item in enumerate(series):
-                if start_i is not None:
-                    if i < start_i:
+                if from_i is not None:
+                    if i < from_i:
                         continue
-                if end_i is not None:
-                    if i >= end_i:
+                if to_i is not None:
+                    if i >= to_i:
                         break
                 # If we are here this item has to be added to the slice
                 sliced_series.append(item)
+
+        # C) No slicing indexes set, just re-create all the series.
         else:
-            sliced_series = series.duplicate()
+            for item in series:
+                sliced_series.append(item)
 
         # Re-set reference data as well
         try:

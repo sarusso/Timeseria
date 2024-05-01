@@ -10,6 +10,7 @@ from .exceptions import ConsistencyException
 from propertime.utils import s_from_dt , dt_from_s, timezonize, dt_from_str, str_from_dt
 from pytz import UTC
 import json
+from propertime import Time
 
 # Setup logging
 import logging
@@ -858,6 +859,7 @@ class Series(list):
             # Try filtering on this data label only
             return self.filter(key)
         else:
+            # TOOD: this will not work for SeriesView if ever implemented
             return super(Series, self).__getitem__(key)
 
 
@@ -998,19 +1000,19 @@ class Series(list):
         from .operations import merge as merge_operation
         return merge_operation(self, series)
 
-    def get(self, position):
+    def get(self, at_i=None):
         from .operations import get as get_operation
-        return get_operation(self, position)
+        return get_operation(self, at_i)
 
     def filter(self, *data_labels):
         """Filter a series by data label(s). A series of DataPoints or DataSlots is required."""
         from .operations import filter as filter_operation
         return filter_operation(self, *data_labels)
 
-    def slice(self, start=None, end=None):
-        """Slice a series from a "start" to an "end". A series of DataPoints or DataSlots is required."""
+    def slice(self, from_i=None, to_i=None):
+        """Slice a series. A series of DataPoints or DataSlots is required."""
         from .operations import slice as slice_operation
-        return slice_operation(self, start=start, end=end)
+        return slice_operation(self, from_i=from_i, to_i=to_i)
 
     def select(self, query):
         """Select one or more items of the series given an SQL-like query. A series of DataPoints or DataSlots is required."""
@@ -1306,10 +1308,29 @@ class TimeSeries(Series):
 
     def __getitem__(self, arg):
         if isinstance(arg, slice):
-            return self.slice(start=arg.start, end=arg.stop)
+            if isinstance(arg.start, int) or isinstance(arg.stop, int):
+                return self.slice(from_i=arg.start, to_i=arg.stop)
+            elif isinstance(arg.start, float) or isinstance(arg.stop, float):
+                if not (isinstance(arg.start, Time) and isinstance(arg.stop, Time)):
+                    logger.warning('Slicing in the square brackets notation with a float works (as epoch) but it can be ambiguous in the code')
+                return self.slice(from_t=arg.start, to_t=arg.stop)
+            elif isinstance(arg.start, datetime) or isinstance(arg.stop, datetime):
+                return self.slice(from_dt=arg.start, to_dt=arg.stop)
+            else:
+                raise ValueError('Don\'t know how to slice for data type "{}"'.format(arg.start.__class__.__name__))
         elif isinstance(arg, str):
             return self.filter(arg)
         else:
+            if isinstance(arg, int):
+                return self.get(at_i=arg)
+            elif isinstance(arg, float):
+                if not isinstance(arg, Time):
+                    logger.warning('Getting items in the square brackets notation with a float works (as epoch) but it can be ambiguous in the code')
+                return self.get(at_t=arg)
+            elif isinstance(arg, datetime):
+                return self.get(at_dt=arg)
+            else:
+                raise ValueError('Don\'t know how to slice for data type "{}"'.format(arg.start.__class__.__name__))
             return self.get(arg)
 
     #=========================
@@ -1714,6 +1735,18 @@ class TimeSeries(Series):
         return df
 
 
+    #=========================
+    #  Operations
+    #=========================
+
+    def slice(self, from_i=None, to_i=None, from_t=None, to_t=None, from_dt=None, to_dt=None):
+        """Slice a series. A series of DataPoints or DataSlots is required."""
+        from .operations import slice as slice_operation
+        return slice_operation(self, from_i=from_i, to_i=to_i, from_t=from_t, to_t=to_t, from_dt=from_dt, to_dt=to_dt)
+
+    def get(self, at_i=None, at_t=None, at_dt=None):
+        from .operations import get as get_operation
+        return get_operation(self, at_i, at_t, at_dt)
 
 
     #=========================

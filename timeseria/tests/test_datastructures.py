@@ -1102,7 +1102,7 @@ class TestTimeSeriesView(unittest.TestCase):
         self.assertEqual(len(timeseries_view_sliced), 2)
         self.assertEqual(timeseries_view_sliced[0].t, 3)
         self.assertEqual(timeseries_view_sliced[1].t, 4)
-        self.assertEqual(timeseries_view_sliced, timeseries_view.slice(dt_from_s(3),dt_from_s(5)))
+        self.assertEqual(timeseries_view_sliced, timeseries_view.slice(from_dt=dt_from_s(3),to_dt=dt_from_s(5)))
 
         # Test extra attributes
         self.assertEqual(str(timeseries_view.resolution), '1s')
