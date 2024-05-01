@@ -1782,6 +1782,8 @@ class TimeSeriesView(TimeSeries):
         self.from_i = from_i
         self.to_i = to_i
         self.len = None
+        # Call parent init in case we are using the series view as a normal series
+        super().__init__(*items, **kwargs)
 
     def __getitem__(self, arg):
 
@@ -1852,7 +1854,7 @@ class TimeSeriesView(TimeSeries):
 
     def __repr__(self):
         if self.series:
-            return 'View from element #{} to element #{} of {}'.format(self.from_i, self.to_i, self.series)
+            return 'View from element #{} to element #{} of: {}'.format(self.from_i, self.to_i, self.series)
         else:
             return super().__repr__()
 

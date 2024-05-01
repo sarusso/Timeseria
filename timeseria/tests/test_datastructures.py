@@ -1120,3 +1120,30 @@ class TestTimeSeriesView(unittest.TestCase):
         materialized_timeseries_view[0]._data = {'value':3}
         self.assertEqual(materialized_timeseries_view[0].data, {'value':3})
         self.assertEqual(timeseries_view[0].data, {'value':2})
+
+        # Nested view (TODO: do we want this feature?)
+        nested_timeseries_view = TimeSeriesView(series=timeseries_view, from_i=3, to_i=5)
+        self.assertEqual(len(nested_timeseries_view), 2)
+        self.assertEqual(nested_timeseries_view[0].t, 5)
+        self.assertEqual(nested_timeseries_view[-1].t, 6)
+
+        # Classic inits
+        timeseries_view = TimeSeriesView()
+        timeseries_view.append(DataTimePoint(t = 1, data = {'value': 1}))
+        timeseries_view.append(DataTimePoint(t = 2, data = {'value': 2}))
+        timeseries_view.append(DataTimePoint(t = 3, data = {'value': 3}))
+
+        self.assertEqual(len(timeseries_view), 3)
+        self.assertEqual(timeseries_view[0].t, 1)
+        self.assertEqual(timeseries_view[1].t, 2)
+        self.assertEqual(timeseries_view[-1].t, 3)
+
+        timeseries_view = TimeSeriesView(DataTimePoint(t = 1, data = {'value': 1}),
+                                         DataTimePoint(t = 2, data = {'value': 2}),
+                                         DataTimePoint(t = 3, data = {'value': 3}))
+
+        self.assertEqual(len(timeseries_view), 3)
+        self.assertEqual(timeseries_view[0].t, 1)
+        self.assertEqual(timeseries_view[1].t, 2)
+        self.assertEqual(timeseries_view[-1].t, 3)
+
