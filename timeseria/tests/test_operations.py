@@ -528,30 +528,30 @@ class TestOpertions(unittest.TestCase):
         series = TimeSeries(TimePoint(t=60),TimePoint(t=120),TimePoint(t=130),TimePoint(t=140),TimePoint(t=150),TimePoint(t=160))
 
         # Test start/end slicing
-        self.assertEqual(len(slice(series, float(1.0), float(140))),3)
+        self.assertEqual(len(slice(series, from_t=1.0, to_t=140)),3)
 
         # Test start/end slicing from the series
-        self.assertEqual(len(series.slice(float(1), float(140))),3)
-        self.assertEqual(len(series.slice(float(61), float(140))),2)
-        self.assertEqual(len(series.slice(start=float(61))),5)
-        self.assertEqual(len(series.slice(end=float(61))),1)
+        self.assertEqual(len(series.slice(from_t=float(1),to_t=float(140))),3)
+        self.assertEqual(len(series.slice(from_t=float(61), to_t=float(140))),2)
+        self.assertEqual(len(series.slice(from_t=float(61))),5)
+        self.assertEqual(len(series.slice(to_t=float(61))),1)
 
         # Test no keyword arguments
-        self.assertEqual(len(series.slice(float(61),float(140))),2)
+        self.assertEqual(len(series.slice(from_t=float(61),to_t=float(140))),2)
 
         # Test with slots
         slot_series = TimeSeries(DataTimeSlot(start=TimePoint(t=60), end=TimePoint(t=120),data=1),
                                  DataTimeSlot(start=TimePoint(t=120), end=TimePoint(t=180),data=1),
                                  DataTimeSlot(start=TimePoint(t=180), end=TimePoint(t=240),data=1),
                                  DataTimeSlot(start=TimePoint(t=240), end=TimePoint(t=300),data=1))
-        self.assertEqual(len(slice(slot_series,float(60),float(120))),1)
-        self.assertEqual(len(slice(slot_series,float(60),float(121))),1)
-        self.assertEqual(len(slice(slot_series,float(60),float(180))),2)
+        self.assertEqual(len(slice(slot_series,from_t=float(60),to_t=float(120))),1)
+        self.assertEqual(len(slice(slot_series,from_t=float(60),to_t=float(121))),1)
+        self.assertEqual(len(slice(slot_series,from_t=float(60),to_t=float(180))),2)
 
         # Check also time zone
         slot_series.change_tz('Europe/Rome')
-        self.assertEqual(slot_series.slice(float(60),float(60)).tz, None)
-        self.assertEqual(str(slot_series.slice(float(60),float(120)).tz), 'Europe/Rome')
+        self.assertEqual(slot_series.slice(from_t=float(60),to_t=float(60)).tz, None)
+        self.assertEqual(str(slot_series.slice(from_t=float(60),to_t=float(120)).tz), 'Europe/Rome')
 
 
     def test_select(self):
