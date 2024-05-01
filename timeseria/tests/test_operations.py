@@ -475,16 +475,13 @@ class TestOpertions(unittest.TestCase):
         self.assertEqual(get(series, -1), series[3])
 
         # By float (epoch timestamp)
-        self.assertEqual(get(series, float(0)), series[0])
-        self.assertEqual(get(series, float(60)), series[1])
+        self.assertEqual(get(series, at_t=float(0)), series[0])
+        self.assertEqual(get(series, at_t=float(60)), series[1])
 
         # By datetime
-        self.assertEqual(get(series, series[0].dt), series[0])
-        self.assertEqual(get(series, series[1].dt), series[1])
+        self.assertEqual(get(series, at_dt=series[0].dt), series[0])
+        self.assertEqual(get(series, at_dt=series[1].dt), series[1])
 
-        # By TimePoint
-        self.assertEqual(get(series, TimePoint(series[0])), series[0])
-        self.assertEqual(get(series, TimePoint(series[1])), series[1])
 
     def test_filter(self):
 

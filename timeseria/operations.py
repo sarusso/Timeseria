@@ -809,19 +809,40 @@ class Get(Operation):
         else:
             return super(Get, self).__call__(series, *args, **kwargs)
 
-    def _call(self, series, at):
+    def _call(self, series, at_i=None, at_t=None, at_dt=None):
 
-        # Detect argument type
-        if isinstance(at, int):
-            return series._item_by_i(at)
-        if isinstance(at, float):
-            return series._item_by_t(at)
-        if isinstance(at, datetime):
-            return series._item_by_t(s_from_dt(at))
-        if  isinstance(at, TimePoint):
-            return series._item_by_t(at.t)
+        ats = 0
+        if at_i is not None:
+            if not isinstance(at_i, int):
+                raise ValueError('The argument at_i must be of type "int" (got "{}")'.format(at_i.__class__.__name__))
+            ats+=1
+        if at_t is not None:
+            if not (isinstance(at_t, int) or isinstance(at_t, float)):
+                raise ValueError('The argument at_t must be of type "int" or "float" (got "{}")'.format(at_t.__class__.__name__))
+            ats+=1
+        if at_dt is not None:
+            if not isinstance(at_dt, datetime):
+                raise ValueError('The argument at_dt must be of type "datetime" (got "{}")'.format(at_dt.__class__.__name__))
+            ats+=1
+        if ats > 1:
+            raise ValueError('Got more than one at_i, at_t or at_dt: choose one')
 
-        raise TypeError('Don\'t know how to get items from a series for type "{}"'.format(at.__class__.__name__))
+        if at_i is None:
+            if at_dt is not None:
+                at_t = s_from_dt(at_dt)
+
+        # Handle negative index
+        if at_i is not None and at_i < 0:
+            at_i = len(series) - abs(at_i)
+
+        if at_i is not None:
+            return series._item_by_i(at_i)
+
+        elif at_t is not None:
+            return series._item_by_t(at_t)
+
+        else:
+            raise ValueError('No more at_i, at_t or at_dt set')
 
 
 class Filter(Operation):
@@ -871,7 +892,7 @@ class Slice(Operation):
             froms+=1
         if from_t is not None:
             if not (isinstance(from_t, int) or isinstance(from_t, float)):
-                raise ValueError('The argument from_t must be of type "int" or float (got "{}")'.format(from_t.__class__.__name__))
+                raise ValueError('The argument from_t must be of type "int" or "float" (got "{}")'.format(from_t.__class__.__name__))
             froms+=1
         if from_dt is not None:
             if not isinstance(from_dt, datetime):
@@ -887,7 +908,7 @@ class Slice(Operation):
             tos+=1
         if to_t is not None:
             if not (isinstance(to_t, int) or isinstance(to_t, float)):
-                raise ValueError('The argument to_t must be of type "int" or float (got "{}")'.format(to_t.__class__.__name__))
+                raise ValueError('The argument to_t must be of type "int" or "float" (got "{}")'.format(to_t.__class__.__name__))
             tos+=1
         if to_dt is not None:
             if not isinstance(to_dt, datetime):
