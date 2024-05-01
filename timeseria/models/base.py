@@ -378,33 +378,49 @@ class Model():
                 self.fit(series_view, **fit_kwargs)
             else:
                 # Find the bigger chunk and fit first on that:
-                if validate_from_t > len(series)-validate_to_t:
+                if validate_from_i > len(series)-validate_to_i:
                     logger.debug('Fitting from the beginning to {}'.format(validate_from_t))
                     series_view = TimeSeriesView(series=series, from_i=0, to_i=validate_from_i)
                     self.fit(series_view, **fit_kwargs)
                     # Now try to fit on the other chunk as well:
+                    model_window = None 
                     try:
-                        logger.debug('Now trying to fit also from {} to the end'.format(validate_to_t))
-                        series_view = TimeSeriesView(series=series, from_i=validate_to_i, to_i=len(series))
-                        self.fit_update(series_view, **fit_kwargs)
-                    except (AttributeError, NotImplementedError):
-                        # TODO: Log a warning?
-                        logger.debug('Not supported')
+                        model_window = self.window
+                    except AttributeError:
+                        pass
+                    if model_window and (len(series)-validate_to_i) < model_window:
+                        pass
+                    else:
+                        try:
+                            logger.debug('Now trying to fit also from {} to the end'.format(validate_to_t))
+                            series_view = TimeSeriesView(series=series, from_i=validate_to_i, to_i=len(series))
+                            self.fit_update(series_view, **fit_kwargs)
+                        except (AttributeError, NotImplementedError):
+                            # TODO: Log a warning?
+                            logger.debug('Not supported')
                 else:
                     logger.debug('Fitting from {} to the end'.format(validate_to_t))
                     series_view = TimeSeriesView(series=series, from_i=validate_to_i, to_i=len(series))
                     self.fit(series_view, **fit_kwargs)
-                    # Now try to fit on the other chunk as well:
+                    model_window = None 
                     try:
-                        logger.debug('Now trying to fit also from the beginning to {}'.format(validate_from_t))
-                        series_view = TimeSeriesView(series=series, from_i=0, to_i=validate_from_i)
-                        self.fit_update(series_view, **fit_kwargs)
-                    except (AttributeError, NotImplementedError):
-                        # TODO: Log a warning?
-                        logger.debug('Not supported')
+                        model_window = self.window
+                    except AttributeError:
+                        pass
+                    if model_window and validate_from_i < model_window:
+                        pass
+                    else:
+                        # Now try to fit on the other chunk as well:
+                        try:
+                                logger.debug('Now trying to fit also from the beginning to {}'.format(validate_from_t))
+                                series_view = TimeSeriesView(series=series, from_i=0, to_i=validate_from_i)
+                                self.fit_update(series_view, **fit_kwargs)
+                        except (AttributeError, NotImplementedError):
+                            # TODO: Log a warning?
+                            logger.debug('Not supported')
 
             # Evaluate & append
-            evaluations.append(self.evaluate(series_view, **evaluate_kwargs))
+            evaluations.append(self.evaluate(TimeSeriesView(series=series, from_i=validate_from_i, to_i=validate_to_i), **evaluate_kwargs))
             self.fitted = False
 
         # Regroup evaluations

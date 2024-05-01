@@ -115,9 +115,9 @@ class TestReconstructors(unittest.TestCase):
 
         # Test the cross validation
         reconstructor = PeriodicAverageReconstructor()
-        cross_validation = reconstructor.cross_validate(time_series, evaluate_steps=[1,3], evaluate_limit=100, evaluate_details=True)
-        self.assertAlmostEqual(cross_validation['MAE_3_steps_avg'],  0.339, places=2)
-        self.assertAlmostEqual(cross_validation['MAE_3_steps_stdev'], 0.106, places=2)
+        cross_validation_results = reconstructor.cross_validate(time_series, evaluate_steps=[1,3], fit_periodicity=24, evaluate_limit=100, evaluate_details=True)
+        self.assertAlmostEqual(cross_validation_results['MAE_3_steps_avg'],  0.2293, places=2)
+        self.assertAlmostEqual(cross_validation_results['MAE_3_steps_stdev'], 0.0313, places=2)
 
         # Test on Points as well
         time_series = CSVFileStorage(TEST_DATA_PATH + '/csv/temperature.csv').get(limit=200)

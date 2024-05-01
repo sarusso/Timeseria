@@ -188,6 +188,9 @@ class Forecaster(Model):
             evaluation_series(bool): if to add to the results an evaluation timeseirs containing the eror metrics. Defaulted to false.
         """
 
+        if not series:
+            raise ValueError('Cannot evaluate on an empty series')
+
         if len(series.data_labels) > 1:
             raise NotImplementedError('Sorry, evaluating models built for multivariate time series is not supported yet')
 
@@ -865,7 +868,7 @@ class LSTMForecaster(Forecaster, _KerasModel):
         """Fit the model on a series.
 
         Args:
-            series(series): the series on whihc to fit the model.
+            series(series): the series on which to fit the model.
             start(datetieme,float): the start timestamp of the fit.
             end(datetieme,float): the end timestamp of the fit.
             epochs(int): for how many epochs to train.

@@ -428,6 +428,22 @@ class TestForecasters(unittest.TestCase):
         self.assertAlmostEqual(prediction['humidity'], 41.6734, places=2)
 
 
+    def test_LSTMForecaster_cross_validation(self):
+
+        try:
+            import tensorflow
+        except ImportError:
+            print('Skipping LSTM forecaster cross validation tests as no tensorflow module installed')
+            return
+
+        temperature_timeseries = TimeSeries.from_csv(TEST_DATASETS_PATH + 'temperature_winter.csv').resample('1h')
+        forecaster = LSTMForecaster(window=12, neurons=64, features=['values', 'diffs', 'hours'])
+        cross_validation_results = forecaster.cross_validate(temperature_timeseries[0:100], rounds=3)
+
+        self.assertAlmostEqual(cross_validation_results['MAE_avg'], 0.3163, places=2)
+        self.assertAlmostEqual(cross_validation_results['MAE_stdev'], 0.1316, places=2)
+
+
     def test_LSTMForecaster_save_load(self):
 
         try:
