@@ -1648,7 +1648,7 @@ class TimeSeries(Series):
             unit = TimeUnit(unit_str)
 
             # Create data time points list
-            data_time_slots = []
+            datatimeslots = []
 
             # Get data frame labels
             labels = list(df.columns)
@@ -1672,14 +1672,14 @@ class TimeSeries(Series):
                         naive_warned = True
                     dt = UTC.localize(dt)
 
-                data_time_slots.append(DataTimeSlot(dt=dt, unit=unit, data=data))
+                datatimeslots.append(DataTimeSlot(dt=dt, unit=unit, data=data))
 
             # Set the list of data time points
-            return cls(*data_time_slots)
+            return cls(*datatimeslots)
 
         else:
             # Create data time points list
-            data_time_points = []
+            datatimepoints = []
 
             # Get data frame labels
             labels = list(df.columns)
@@ -1703,10 +1703,10 @@ class TimeSeries(Series):
                         naive_warned = True
                     dt = UTC.localize(dt)
 
-                data_time_points.append(DataTimePoint(dt=dt, data=data))
+                datatimepoints.append(DataTimePoint(dt=dt, data=data))
 
             # Set the list of data time points
-            return cls(*data_time_points)
+            return cls(*datatimepoints)
 
     def to_df(self):
         """Convert the time series as a Pandas data frame."""

@@ -677,10 +677,10 @@ class CSVFileStorage(Storage):
                             item[1].pop('__'+index)
 
                     # Create DataTimePoint, set data and data_indexes
-                    data_time_point = DataTimePoint(t=item[0], data=item[1], data_indexes=data_indexes, tz=tz)
+                    datatimepoint = DataTimePoint(t=item[0], data=item[1], data_indexes=data_indexes, tz=tz)
 
                     # Append
-                    series.append(data_time_point)
+                    series.append(datatimepoint)
 
                 except Exception as e:
                     if self.skip_errors:
@@ -707,10 +707,10 @@ class CSVFileStorage(Storage):
                         data_indexes['data_loss'] = DEFAULT_SLOT_DATA_LOSS
 
                     # Create DataTimeSlot, set data and data_indexes
-                    data_time_slot = DataTimeSlot(t=item[0], unit=slot_unit, data=item[1], data_indexes=data_indexes, tz=tz)
+                    datatimeslot = DataTimeSlot(t=item[0], unit=slot_unit, data=item[1], data_indexes=data_indexes, tz=tz)
 
                     # Append
-                    series.append(data_time_slot)
+                    series.append(datatimeslot)
 
                 except ValueError as e:
                     # The only ValueError that could (should) arise here is a "Not in succession" error.

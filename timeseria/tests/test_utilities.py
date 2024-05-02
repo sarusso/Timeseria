@@ -130,51 +130,51 @@ class TestComputeCoverageAndDataLoss(unittest.TestCase):
         # All the following time series have point with validity=1m
 
         # Time series from 16:58:00 to 17:32:00 (Europe/Rome)
-        self.data_time_point_series_1 = TimeSeries()
+        self.timeseries_1 = TimeSeries()
         start_t = 1436022000 - 120
         for i in range(35):
-            data_time_point = DataTimePoint(t = start_t + (i*60),
+            datatimepoint = DataTimePoint(t = start_t + (i*60),
                                             data = {'temperature': 154+i})
-            self.data_time_point_series_1.append(data_time_point)
-        attach_validity_regions(self.data_time_point_series_1)
+            self.timeseries_1.append(datatimepoint)
+        attach_validity_regions(self.timeseries_1)
 
         # Time series from 17:00:00 to 17:30:00 (Europe/Rome)
-        self.data_time_point_series_2 = TimeSeries()
+        self.timeseries_2 = TimeSeries()
         start_t = 1436022000
         for i in range(34):
-            data_time_point = DataTimePoint(t    = start_t + (i*60),
+            datatimepoint = DataTimePoint(t    = start_t + (i*60),
                                             data = {'temperature': 154+i})
-            self.data_time_point_series_2.append(data_time_point)
-        attach_validity_regions(self.data_time_point_series_2)
+            self.timeseries_2.append(datatimepoint)
+        attach_validity_regions(self.timeseries_2)
 
         # Time series from 17:00:00 to 17:20:00 (Europe/Rome)
-        self.data_time_point_series_3 = TimeSeries()
+        self.timeseries_3 = TimeSeries()
         start_t = 1436022000 - 120
         for i in range(23):
-            data_time_point = DataTimePoint(t    = start_t + (i*60),
+            datatimepoint = DataTimePoint(t    = start_t + (i*60),
                                             data = {'temperature': 154+i})
-            self.data_time_point_series_3.append(data_time_point)
-        attach_validity_regions(self.data_time_point_series_3)
+            self.timeseries_3.append(datatimepoint)
+        attach_validity_regions(self.timeseries_3)
 
         # Time series from 17:10:00 to 17:30:00 (Europe/Rome)
-        self.data_time_point_series_4 = TimeSeries()
+        self.timeseries_4 = TimeSeries()
         start_t = 1436022000 + 600
         for i in range(21):
-            data_time_point = DataTimePoint(t    = start_t + (i*60),
+            datatimepoint = DataTimePoint(t    = start_t + (i*60),
                                             data = {'temperature': 154+i})
-            self.data_time_point_series_4.append(data_time_point)
-        attach_validity_regions(self.data_time_point_series_4)
+            self.timeseries_4.append(datatimepoint)
+        attach_validity_regions(self.timeseries_4)
 
         # Time series from 16:58:00 to 17:32:00 (Europe/Rome)
-        self.data_time_point_series_5 = TimeSeries()
+        self.timeseries_5 = TimeSeries()
         start_t = 1436022000 - 120
         for i in range(35):
             if i > 10 and i <21:
                 continue
-            data_time_point = DataTimePoint(t    = start_t + (i*60),
+            datatimepoint = DataTimePoint(t    = start_t + (i*60),
                                             data = {'temperature': 154+i})
-            self.data_time_point_series_5.append(data_time_point)
-        attach_validity_regions(self.data_time_point_series_5)
+            self.timeseries_5.append(datatimepoint)
+        attach_validity_regions(self.timeseries_5)
 
 
         # The following time series has point with validity=15m
@@ -183,17 +183,17 @@ class TestComputeCoverageAndDataLoss(unittest.TestCase):
         from_dt  = dt(2019,10,1,1,0,0, tz='Europe/Rome')
         to_dt    = dt(2019,10,1,6,0,0, tz='Europe/Rome')
         time_unit = TimeUnit('15m')
-        self.data_time_point_series_6 = TimeSeries()
+        self.timeseries_6 = TimeSeries()
         slider_dt = from_dt
         count = 0
         while slider_dt < to_dt:
             if count not in [1, 6, 7, 8, 9, 10]:
-                data_time_point = DataTimePoint(t    = s_from_dt(slider_dt),
+                datatimepoint = DataTimePoint(t    = s_from_dt(slider_dt),
                                                 data = {'temperature': 154+count})
-                self.data_time_point_series_6.append(data_time_point)
+                self.timeseries_6.append(datatimepoint)
             slider_dt = slider_dt + time_unit
             count += 1
-        attach_validity_regions(self.data_time_point_series_6)
+        attach_validity_regions(self.timeseries_6)
 
 
     def test_compute_coverage(self):
@@ -202,35 +202,35 @@ class TestComputeCoverageAndDataLoss(unittest.TestCase):
         to_t   = 1436022000+1800  # 2015-07-04 17:30:00+02:00
 
         # A) Full coverage (coverage=1.0) and again, to test "reproducibility"
-        coverage = _compute_coverage(series = self.data_time_point_series_1, from_t = from_t, to_t = to_t)
+        coverage = _compute_coverage(series = self.timeseries_1, from_t = from_t, to_t = to_t)
         self.assertEqual(coverage, 1.0)
-        coverage = _compute_coverage(series = self.data_time_point_series_1, from_t = from_t, to_t = to_t)
+        coverage = _compute_coverage(series = self.timeseries_1, from_t = from_t, to_t = to_t)
         self.assertEqual(coverage, 1.0)
 
 
         # B) Full coverage (coverage=1.0) without prev/next in the time series
         # TODO: fix me
-        coverage = _compute_coverage(series = self.data_time_point_series_1, from_t = from_t, to_t = to_t)
+        coverage = _compute_coverage(series = self.timeseries_1, from_t = from_t, to_t = to_t)
         self.assertEqual(coverage, 1.0)
         self.assertEqual(coverage, 1.0)
 
 
         # C) Missing ten minutes over 30 at the end (coverage=0.683))
-        coverage = _compute_coverage(series = self.data_time_point_series_3, from_t = from_t, to_t = to_t)
+        coverage = _compute_coverage(series = self.timeseries_3, from_t = from_t, to_t = to_t)
 
         # 20 minutes plus other 30 secs validity for the 20th point over 30 minutes
         self.assertEqual(coverage, ( ((20*60.0)+30.0) / (30*60.0)) )
 
 
         # D) Missing ten minutes over 30 at the beginning (coverage=0.683)
-        coverage = _compute_coverage(series = self.data_time_point_series_4, from_t = from_t, to_t = to_t)
+        coverage = _compute_coverage(series = self.timeseries_4, from_t = from_t, to_t = to_t)
 
         # 20 minutes plus other 30 secs (previous) validity for the 10th point over 30 minutes
         self.assertEqual(coverage, ( ((20*60.0)+30.0) / (30*60.0)) )
 
 
         # E) Missing eleven minutes over 30 in the middle (coverage=0.66)
-        coverage = _compute_coverage(series = self.data_time_point_series_5, from_t = from_t, to_t = to_t)
+        coverage = _compute_coverage(series = self.timeseries_5, from_t = from_t, to_t = to_t)
 
         # 20 minutes plus other 30 secs (previous) validity for the 10th point over 30 minutes
         self.assertAlmostEqual(coverage, (2.0/3.0))
@@ -239,20 +239,20 @@ class TestComputeCoverageAndDataLoss(unittest.TestCase):
         # F) Missing half slot before slot re-start
         from_t = s_from_dt(dt=dt(2019,10,1,3,30,0, tz='Europe/Rome'))
         to_t   = s_from_dt(dt=dt(2019,10,1,3,45,0, tz='Europe/Rome'))
-        coverage = _compute_coverage(series = self.data_time_point_series_6, from_t = from_t, to_t = to_t)
+        coverage = _compute_coverage(series = self.timeseries_6, from_t = from_t, to_t = to_t)
 
         self.assertAlmostEqual(coverage, (0.5))
 
         # G) Border conditions for from_t and to_t:
-        data_time_point_series = TimeSeries()
-        data_time_point_series.append(DataTimePoint(t = 20, data = {'temperature': 23}))
-        data_time_point_series.append(DataTimePoint(t = 30, data = {'temperature': 23}))
-        data_time_point_series.append(DataTimePoint(t = 40, data = {'temperature': 23}))
-        data_time_point_series.append(DataTimePoint(t = 60, data = {'temperature': 23}))
-        data_time_point_series.append(DataTimePoint(t = 70, data = {'temperature': 23}))
-        attach_validity_regions(data_time_point_series)
+        timeseries = TimeSeries()
+        timeseries.append(DataTimePoint(t = 20, data = {'temperature': 23}))
+        timeseries.append(DataTimePoint(t = 30, data = {'temperature': 23}))
+        timeseries.append(DataTimePoint(t = 40, data = {'temperature': 23}))
+        timeseries.append(DataTimePoint(t = 60, data = {'temperature': 23}))
+        timeseries.append(DataTimePoint(t = 70, data = {'temperature': 23}))
+        attach_validity_regions(timeseries)
 
-        coverage = _compute_coverage(series = data_time_point_series, from_t = 30, to_t = 60)
+        coverage = _compute_coverage(series = timeseries, from_t = 30, to_t = 60)
         self.assertAlmostEqual(coverage, (2.0/3.0))
 
         # H) single-element series
@@ -333,7 +333,7 @@ class TestComputeCoverageAndDataLoss(unittest.TestCase):
         data_loss = _compute_data_loss(resampled_series, from_t = 30, to_t = 60)
         self.assertAlmostEqual(data_loss, 1.0/3.0)
 
-        resampled_series_5 = self.data_time_point_series_5.resample(60)
+        resampled_series_5 = self.timeseries_5.resample(60)
         attach_validity_regions(resampled_series_5)
 
         data_loss = _compute_data_loss(resampled_series_5, from_t = 1436022300, to_t = 1436022600)
@@ -359,11 +359,11 @@ class TestGetPeriodicity(unittest.TestCase):
 
     def test_get_periodicity(self):
 
-        univariate_data_time_point_series = CSVFileStorage(TEST_DATA_PATH + '/csv/temperature.csv').get()
+        univariate_timeseries = CSVFileStorage(TEST_DATA_PATH + '/csv/temperature.csv').get()
 
-        univariate_1h_data_time_slot_series = univariate_data_time_point_series.aggregate('1h')
+        univariate_1h_timeseries = univariate_timeseries.aggregate('1h')
 
-        perdiodicity = detect_periodicity(univariate_1h_data_time_slot_series)
+        perdiodicity = detect_periodicity(univariate_1h_timeseries)
 
         self.assertEqual(perdiodicity, 24)
 
@@ -372,18 +372,18 @@ class TestDetectSamplingInterval(unittest.TestCase):
 
     def test_detect_sampling_interval(self):
 
-        data_time_point_series = CSVFileStorage(TEST_DATA_PATH + '/csv/humitemp_short.csv').get()
-        self.assertEqual(detect_sampling_interval(data_time_point_series), 61)
-        self.assertAlmostEqual(detect_sampling_interval(data_time_point_series, confidence=True)[1], 0.7368421)
+        timeseries = CSVFileStorage(TEST_DATA_PATH + '/csv/humitemp_short.csv').get()
+        self.assertEqual(detect_sampling_interval(timeseries), 61)
+        self.assertAlmostEqual(detect_sampling_interval(timeseries, confidence=True)[1], 0.7368421)
 
-        data_time_point_series = CSVFileStorage(TEST_DATA_PATH + '/csv/shampoo_sales.csv', date_column = 'Month', date_format = '%y-%m').get()
-        self.assertEqual(detect_sampling_interval(data_time_point_series), 2678400)  # 2678400/60/60/24 = 31 Days (the most frequent)
+        timeseries = CSVFileStorage(TEST_DATA_PATH + '/csv/shampoo_sales.csv', date_column = 'Month', date_format = '%y-%m').get()
+        self.assertEqual(detect_sampling_interval(timeseries), 2678400)  # 2678400/60/60/24 = 31 Days (the most frequent)
 
-        data_time_point_series = CSVFileStorage(TEST_DATA_PATH + '/csv/temperature.csv').get()
-        self.assertEqual(detect_sampling_interval(data_time_point_series), 600)
+        timeseries = CSVFileStorage(TEST_DATA_PATH + '/csv/temperature.csv').get()
+        self.assertEqual(detect_sampling_interval(timeseries), 600)
 
-        data_time_point_series = CSVFileStorage(TEST_DATA_PATH + '/csv/temp_short_1h.csv').get()
-        self.assertEqual(detect_sampling_interval(data_time_point_series), 3600)
+        timeseries = CSVFileStorage(TEST_DATA_PATH + '/csv/temp_short_1h.csv').get()
+        self.assertEqual(detect_sampling_interval(timeseries), 3600)
 
 
 class TestDetectEncoding(unittest.TestCase):

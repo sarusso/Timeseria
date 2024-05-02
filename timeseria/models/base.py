@@ -12,7 +12,7 @@ from pandas import DataFrame
 import shutil
 
 from ..exceptions import NotFittedError
-from ..utilities import _check_time_series, _check_resolution, _check_data_labels, _item_is_in_range
+from ..utilities import _check_timeseries, _check_resolution, _check_data_labels, _item_is_in_range
 from ..units import TimeUnit
 from ..datastructures import Point, Series, TimeSeries, TimeSeriesView
 
@@ -174,7 +174,7 @@ class Model():
 
             # If TimeSeries data, check it
             if isinstance(series, TimeSeries):
-                _check_time_series(series)
+                _check_timeseries(series)
 
                 # Set resolution
                 try:
@@ -218,7 +218,7 @@ class Model():
 
             # If TimeSeries data, check it
             if isinstance(series, TimeSeries):
-                _check_time_series(series)
+                _check_timeseries(series)
                 if self._is_parametric():
                     if isinstance(series.item_type, Point) and len(series) == 1:
                         # Do not check if the data is a point time series and has only one item
@@ -258,7 +258,7 @@ class Model():
 
             # If TimeSeries data, check it
             if isinstance(series, TimeSeries):
-                _check_time_series(series)
+                _check_timeseries(series)
                 if self._is_parametric():
                     if isinstance(series.item_type, Point) and len(series) == 1:
                         # Do not check if the data is a point time series and has only one item
@@ -292,7 +292,7 @@ class Model():
 
             # If TimeSeries data, check it
             if isinstance(series, TimeSeries):
-                _check_time_series(series)
+                _check_timeseries(series)
                 if self._is_parametric():
                     if isinstance(series.item_type, Point) and len(series) == 1:
                         # Do not check if the data is a point time series and has only one item
@@ -329,7 +329,7 @@ class Model():
 
         # If TimeSeries data, check it
         if isinstance(series, TimeSeries):
-            _check_time_series(series)
+            _check_timeseries(series)
 
         # Decouple evaluate from fit args
         fit_kwargs = {}

@@ -63,8 +63,8 @@ class TestBaseBaseModel(unittest.TestCase):
     def test_Model_with_TimeSeries(self):
 
         # Define test time series
-        empty_time_series = TimeSeries()
-        time_series = TimeSeries(DataTimeSlot(start=TimePoint(t=1), end=TimePoint(t=2), data={'metric1': 56}),
+        empty_timeseries = TimeSeries()
+        timeseries = TimeSeries(DataTimeSlot(start=TimePoint(t=1), end=TimePoint(t=2), data={'metric1': 56}),
                                  DataTimeSlot(start=TimePoint(t=2), end=TimePoint(t=3), data={'metric1': 56}))
 
         # Define a fittable parametric model mock
@@ -88,15 +88,15 @@ class TestBaseBaseModel(unittest.TestCase):
 
         # Cannot predict form a model before fitting
         with self.assertRaises(NotFittedError):
-            parametric_model.predict(time_series)
+            parametric_model.predict(timeseries)
 
         # Cannot apply model before fitting
         with self.assertRaises(NotFittedError):
-            parametric_model.apply(time_series)
+            parametric_model.apply(timeseries)
 
         # Cannot evaluate model before fitting
         with self.assertRaises(NotFittedError):
-            parametric_model.evaluate(time_series)
+            parametric_model.evaluate(timeseries)
 
         # Cannot save model before fitting
         with self.assertRaises(NotFittedError):
@@ -104,30 +104,30 @@ class TestBaseBaseModel(unittest.TestCase):
 
         # Fit the model
         with self.assertRaises(ValueError):
-            parametric_model.fit(empty_time_series)
-        parametric_model.fit(time_series)
+            parametric_model.fit(empty_timeseries)
+        parametric_model.fit(timeseries)
         self.assertEqual(parametric_model.data['param1'], 1)
 
         # Check predict
         with self.assertRaises(ValueError):
-            parametric_model.predict(empty_time_series)
+            parametric_model.predict(empty_timeseries)
         with self.assertRaises(TypeError):
             parametric_model.predict([1,2,3,4,5,6])
-        self.assertEqual(parametric_model.predict(time_series), time_series)
+        self.assertEqual(parametric_model.predict(timeseries), timeseries)
 
         # Check apply
         with self.assertRaises(ValueError):
-            parametric_model.apply(empty_time_series)
+            parametric_model.apply(empty_timeseries)
         with self.assertRaises(TypeError):
             parametric_model.apply([1,2,3,4,5,6])
-        self.assertEqual(parametric_model.apply(time_series), time_series)
+        self.assertEqual(parametric_model.apply(timeseries), timeseries)
 
         # Check evaluate
         with self.assertRaises(ValueError):
-            parametric_model.evaluate(empty_time_series)
+            parametric_model.evaluate(empty_timeseries)
         with self.assertRaises(TypeError):
             parametric_model.evaluate([1,2,3,4,5,6])
-        self.assertEqual(parametric_model.evaluate(time_series), {'grade': 'A'})
+        self.assertEqual(parametric_model.evaluate(timeseries), {'grade': 'A'})
 
         # Save and re-load
         parametric_model.save(TEMP_MODELS_DIR+'/fittable_parametric_model')
@@ -141,23 +141,23 @@ class TestBaseKerasModel(unittest.TestCase):
 
     def setUp(self):
 
-        self.test_time_series = TimeSeries(DataTimePoint(t=1, data={'label_1': 0.1}),
-                                           DataTimePoint(t=2, data={'label_1': 0.2}),
-                                           DataTimePoint(t=3, data={'label_1': 0.3}),
-                                           DataTimePoint(t=4, data={'label_1': 0.4}),
-                                           DataTimePoint(t=5, data={'label_1': 0.5}),
-                                           DataTimePoint(t=6, data={'label_1': 0.6}),)
+        self.test_timeseries = TimeSeries(DataTimePoint(t=1, data={'label_1': 0.1}),
+                                          DataTimePoint(t=2, data={'label_1': 0.2}),
+                                          DataTimePoint(t=3, data={'label_1': 0.3}),
+                                          DataTimePoint(t=4, data={'label_1': 0.4}),
+                                          DataTimePoint(t=5, data={'label_1': 0.5}),
+                                          DataTimePoint(t=6, data={'label_1': 0.6}),)
 
-        self.test_time_series_mv = TimeSeries(DataTimePoint(t=1, data={'label_1': 0.1, 'label_2': 1.0}),
-                                              DataTimePoint(t=2, data={'label_1': 0.2, 'label_2': 2.0}),
-                                              DataTimePoint(t=3, data={'label_1': 0.3, 'label_2': 3.0}),
-                                              DataTimePoint(t=4, data={'label_1': 0.4, 'label_2': 4.0}),
-                                              DataTimePoint(t=5, data={'label_1': 0.5, 'label_2': 5.0}),
-                                              DataTimePoint(t=6, data={'label_1': 0.6, 'label_2': 6.0}),)
+        self.test_timeseries_mv = TimeSeries(DataTimePoint(t=1, data={'label_1': 0.1, 'label_2': 1.0}),
+                                             DataTimePoint(t=2, data={'label_1': 0.2, 'label_2': 2.0}),
+                                             DataTimePoint(t=3, data={'label_1': 0.3, 'label_2': 3.0}),
+                                             DataTimePoint(t=4, data={'label_1': 0.4, 'label_2': 4.0}),
+                                             DataTimePoint(t=5, data={'label_1': 0.5, 'label_2': 5.0}),
+                                             DataTimePoint(t=6, data={'label_1': 0.6, 'label_2': 6.0}),)
 
     def test_to_window_datapoints_matrix(self):
 
-        window_datapoints_matrix = _KerasModel._to_window_datapoints_matrix(self.test_time_series, window=2, steps=1)
+        window_datapoints_matrix = _KerasModel._to_window_datapoints_matrix(self.test_timeseries, window=2, steps=1)
 
         # What to expect (using the timestamp to represent a data point):
         # 1,2
@@ -184,31 +184,31 @@ class TestBaseKerasModel(unittest.TestCase):
 
         # What to expect (using the data value to represent a data point):
         # [0.3], [0.4], [0.5], [0.6] Note that they are lists in order to support multi-step forecast
-        target_vector = _KerasModel._to_target_values_vector(self.test_time_series, window=2, steps=1, target_data_labels=['label_1'])
+        target_vector = _KerasModel._to_target_values_vector(self.test_timeseries, window=2, steps=1, target_data_labels=['label_1'])
         self.assertEqual(target_vector, [[0.3], [0.4], [0.5], [0.6]])
 
         # Test for multivariate as well
-        target_vector = _KerasModel._to_target_values_vector(self.test_time_series_mv, window=2, steps=1, target_data_labels=['label_1'])
+        target_vector = _KerasModel._to_target_values_vector(self.test_timeseries_mv, window=2, steps=1, target_data_labels=['label_1'])
         self.assertEqual(target_vector, [[0.3], [0.4], [0.5], [0.6]])
 
 
     def test_compute_window_features(self):
 
 
-        window_datapoints_matrix = _KerasModel._to_window_datapoints_matrix(self.test_time_series, window=3, steps=1)
+        window_datapoints_matrix = _KerasModel._to_window_datapoints_matrix(self.test_timeseries, window=3, steps=1)
 
 
         window_features  = _KerasModel._compute_window_features(window_datapoints_matrix[0],
-                                                                data_labels = self.test_time_series.data_labels,
-                                                                time_unit = self.test_time_series.resolution,
+                                                                data_labels = self.test_timeseries.data_labels,
+                                                                time_unit = self.test_timeseries.resolution,
                                                                 features = ['values'])
 
         self.assertEqual(window_features, [[0.1],[0.2],[0.3]])
 
 
         window_features  = _KerasModel._compute_window_features(window_datapoints_matrix[0],
-                                                                data_labels = self.test_time_series.data_labels,
-                                                                time_unit = self.test_time_series.resolution,
+                                                                data_labels = self.test_timeseries.data_labels,
+                                                                time_unit = self.test_timeseries.resolution,
                                                                 features = ['values', 'diffs'])
         self.assertAlmostEqual(window_features[0][0], 0.1)
         self.assertAlmostEqual(window_features[0][1], 0.1)
@@ -218,18 +218,18 @@ class TestBaseKerasModel(unittest.TestCase):
         self.assertAlmostEqual(window_features[-1][1], 0.1)
 
         # Multivariate
-        window_datapoints_matrix_mv = _KerasModel._to_window_datapoints_matrix(self.test_time_series_mv, window=3, steps=1)
+        window_datapoints_matrix_mv = _KerasModel._to_window_datapoints_matrix(self.test_timeseries_mv, window=3, steps=1)
         window_features  = _KerasModel._compute_window_features(window_datapoints_matrix_mv[0],
-                                                                data_labels = self.test_time_series_mv.data_labels,
-                                                                time_unit = self.test_time_series_mv.resolution,
+                                                                data_labels = self.test_timeseries_mv.data_labels,
+                                                                time_unit = self.test_timeseries_mv.resolution,
                                                                 features = ['values'])
 
         self.assertEqual(window_features, [[0.1, 1.0], [0.2, 2.0], [0.3, 3.0]])
 
         # Multivariate with context
         window_features  = _KerasModel._compute_window_features(window_datapoints_matrix_mv[0],
-                                                                data_labels = self.test_time_series_mv.data_labels,
-                                                                time_unit = self.test_time_series_mv.resolution,
+                                                                data_labels = self.test_timeseries_mv.data_labels,
+                                                                time_unit = self.test_timeseries_mv.resolution,
                                                                 features = ['values', 'diffs', 'hours'],
                                                                 context_data = {'label_2':4.0})
         self.assertAlmostEqual(window_features[0][0], 0.1)

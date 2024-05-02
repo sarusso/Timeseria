@@ -80,12 +80,12 @@ def detect_encoding(file_name, streaming=False):
     return encoding
 
 
-def detect_sampling_interval(time_series, confidence=False):
+def detect_sampling_interval(timeseries, confidence=False):
     """Detect the sampling interval of a time series."""
 
     diffs={}
     prev_point=None
-    for point in time_series:
+    for point in timeseries:
         if prev_point is not None:
             diff = point.t - prev_point.t
             if diff not in diffs:
@@ -96,7 +96,7 @@ def detect_sampling_interval(time_series, confidence=False):
 
     # Iterate until the diffs are not too spread, then pick the maximum.
     i=0
-    while _is_almost_equal(len(diffs), len(time_series)):
+    while _is_almost_equal(len(diffs), len(timeseries)):
         or_diffs=diffs
         diffs={}
         for diff in or_diffs:
@@ -136,13 +136,13 @@ def detect_sampling_interval(time_series, confidence=False):
         return most_common_diff
 
 
-def detect_periodicity(time_series):
+def detect_periodicity(timeseries):
     """Detect the periodicity of a time series."""
 
-    _check_time_series(time_series)
+    _check_timeseries(timeseries)
 
     # TODO: fix me, data_loss must not belong as data_label
-    data_labels = time_series.data_labels
+    data_labels = timeseries.data_labels
 
     if len(data_labels) > 1:
         raise NotImplementedError()
@@ -152,9 +152,9 @@ def detect_periodicity(time_series):
 
         # Get data as a vector
         y = []
-        for item in time_series:
+        for item in timeseries:
             y.append(item.data[data_label])
-        #y = [item.data[data_label] for item in time_series]
+        #y = [item.data[data_label] for item in timeseries]
 
         # Compute FFT (Fast Fourier Transform)
         yf = fft.fft(y)
@@ -189,7 +189,7 @@ def detect_periodicity(time_series):
         max_peak_frequency = None
         for i in range(len(peaks)):
 
-            logger.debug('Peak #%s: \t index=%s,\t value=%s, freq=%s (over %s)', i, peaks[i][0], int(peaks[i][1]), peaks[i][2], len(time_series))
+            logger.debug('Peak #%s: \t index=%s,\t value=%s, freq=%s (over %s)', i, peaks[i][0], int(peaks[i][1]), peaks[i][2], len(timeseries))
 
             # Do not consider lower frequencies if there is a closer and higher one
             try:
@@ -197,7 +197,7 @@ def detect_periodicity(time_series):
                 diff2=peaks[i+1][1]-peaks[i+2][1]
                 if diff1 *3 < diff2:
                     logger.debug('Peak #{} candidate to removal'.format(i))
-                    if (peaks[i][2] > peaks[i+1][2]*10) and (peaks[i][2] > len(time_series)/10):
+                    if (peaks[i][2] > peaks[i+1][2]*10) and (peaks[i][2] > len(timeseries)/10):
                         logger.debug('peak #{} marked to be removed'.format(i))
                         continue
             except IndexError:
@@ -709,7 +709,7 @@ def _compute_data_loss(series, from_t, to_t, force=False, sampling_interval=None
     return data_loss
 
 
-def _check_time_series(series):
+def _check_timeseries(series):
     """Check a time series for type, not emptiness and fixed resolution."""
 
     # Import here or you will end up with cyclic imports
