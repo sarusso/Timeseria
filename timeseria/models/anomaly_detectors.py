@@ -291,9 +291,7 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
             error_distribution_params = fitter.get_best()[best_error_distribution]
 
             if best_error_distribution_stats['ks_pvalue'] < 0.05:
-
-                logger.warning('The error distribution for "{}" ({}) ks p-value is low ({}). '.format(data_label, best_error_distribution, best_error_distribution_stats['ks_pvalue']) +
-                               'Expect issues. In case of math domain errors, try using lower index boundaries.')
+                logger.warning('The error distribution for "{}" ({}) p-value is low ({}). Expect issues.'.format(data_label, best_error_distribution, best_error_distribution_stats['ks_pvalue']))
 
             if not (-0.01 <= error_distribution_params['loc'] <= 0.01):
                 logger.warning('The error distribution for "{}" is not centered in (almost) zero, but in {}. Expect issues.'.format(data_label, error_distribution_params['loc']))
@@ -393,6 +391,9 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
         x_ends = {}
         y_starts = {}
         y_ends = {}
+        log_10_y_starts = {}
+        log_10_y_ends = {}
+
         for data_label in self.data['error_distributions']:
 
             abs_prediction_errors = [abs(prediction_error) for prediction_error in self.data['prediction_errors'][data_label]]
@@ -417,6 +418,22 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
             # Compute error distribution function values for index start/end
             y_starts[data_label] = error_distribution_functions[data_label](x_starts[data_label])
             y_ends[data_label] = error_distribution_functions[data_label](x_ends[data_label])
+
+            if index_type == 'log':
+                try:
+                    log_10_y_starts[data_label] = log10(y_starts[data_label] )
+                except ValueError as e:
+                    if str(e) == 'math domain error':
+                        raise ValueError('Got a math domain error in computing the anomaly index start boundary for label "{}". This is likely due to extreme values and/or an error distribution badly approximating the real error distribution. Try changing the anomaly index boundaries or find a better error distribution.'.format(data_label)) from None
+                    else:
+                        raise
+                try:
+                    log_10_y_ends[data_label] = log10(y_ends[data_label] )
+                except ValueError as e:
+                    if str(e) == 'math domain error':
+                        raise ValueError('Got a math domain error in computing the anomaly index end boundary for label "{}". This is likely due to extreme values and/or an error distribution badly approximating the real error distribution. Try changing the anomaly index boundaries or find a better error distribution.'.format(data_label)) from None
+                    else:
+                        raise
 
         # Start processing
         progress_step = len(series)/10
@@ -447,6 +464,9 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
                 x_end = x_ends[data_label]
                 y_start = y_starts[data_label]
                 y_end = y_ends[data_label]
+                if index_type == 'log':
+                    log_10_y_start = log_10_y_starts[data_label]
+                    log_10_y_end = log_10_y_ends[data_label]
 
                 # Duplicate this series item
                 item = deepcopy(item)
@@ -454,7 +474,6 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
                 # Compute the prediction error index
                 actual, predicted = self._get_actual_and_predicted(series, i, data_label, self.data['with_context'])
                 prediction_error = abs(actual-predicted)
-                #print(actual, predicted)
 
                 # Compute the anomaly index in the given range (which defaults to 0, max_err)
                 # Below the start it means anomaly (0), above always anomaly (1). In the middle it
@@ -462,30 +481,16 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
 
                 x = prediction_error
                 y = error_distribution_function(x)
-                #print('---------')
-                #print(x,x_start,x_end)
-                #print(y,y_start,y_end)
+
                 if x <= x_start:
                     anomaly_index = 0
                 elif x >= x_end:
                     anomaly_index = 1
                 else:
-                    if index_type=='lin':
-                        try:
-                            anomaly_index = 1 - ((y-y_end)/(y_start-y_end))
-                        except ValueError as e:
-                            if str(e) == 'math domain error':
-                                raise ValueError('Got a math domain error. This is likely due to an error distribution function badly approximating the real error distribution. Try changing it, or using lower index boundaries.') from None
-                            else:
-                                raise
-                    elif index_type=='log':
-                        try:
-                            anomaly_index = (log10(y) - log10(y_start)) / (log10(y_end) - log10(y_start))
-                        except ValueError as e:
-                            if str(e) == 'math domain error':
-                                raise ValueError('Got a math domain error. This is likely due to an error distribution function badly approximating the real error distribution. Try changing it, or using lower index boundaries.') from None
-                            else:
-                                raise
+                    if index_type == 'lin':
+                        anomaly_index = 1 - ((y-y_end)/(y_start-y_end))
+                    elif index_type == 'log':
+                        anomaly_index = (log10(y) - log_10_y_start) / (log_10_y_end - log_10_y_start)
                     else:
                         if callable(index_type):
                             anomaly_index = index_type(x, y, x_start, x_end, y_start, y_end)
