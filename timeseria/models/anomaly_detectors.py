@@ -171,7 +171,7 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
 
 
     @AnomalyDetector.fit_function
-    def fit(self, series, with_context=False, error_distribution='auto', verbose=False, summary=False, **kwargs):
+    def fit(self, series, with_context=False, error_distribution='gennorm', verbose=False, summary=False, **kwargs):
 
         # Handle the error distribution(s)
         if error_distribution == 'auto':
