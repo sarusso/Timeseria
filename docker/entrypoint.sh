@@ -33,7 +33,7 @@ if [[ "x$@" == "x" ]] ; then
     echo ""
 
     cd /opt/Timeseria
-    jupyter trust $BASE_DIR/*.ipynb
+    #jupyter trust $BASE_DIR/*.ipynb
     jupyter notebook --ip=0.0.0.0 --port=$BASE_PORT --NotebookApp.token='' --NotebookApp.notebook_dir=$BASE_DIR
 
 else
