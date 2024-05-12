@@ -28,13 +28,6 @@ if [[ "x$@" == "x" ]] ; then
         BASE_DIR="'$BASE_DIR'"
     fi
 
-    # If base dir is empty, clone
-    if [ "x$(ls -A $BASE_DIR)" == "x" ]; then
-        echo "Notebooks directory is empty, downloading demo notebooks..."
-        cd /tmp && git clone https://github.com/sarusso/Timeseria-notebooks
-        mv Timeseria-notebooks/notebooks/* $BASE_DIR/
-    fi
-
     # Start Jupyter as default entrypoint
     echo "Running Jupyter..."
     echo ""
