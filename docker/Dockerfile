@@ -63,13 +63,13 @@ COPY ./ /opt/Timeseria
 COPY docker/entrypoint.sh /
 RUN chmod 755 /entrypoint.sh
 
+# Disable Jupyter announcements (news, updates)
+RUN jupyter labextension disable "@jupyterlab/apputils-extension:announcements"
+
 # Set user and entrypoint
 USER timeseria
 ENTRYPOINT ["/entrypoint.sh"]
 
-
-
-
-
-
+# Disable sudo message
+RUN touch /home/timeseria/.sudo_as_admin_successful
 

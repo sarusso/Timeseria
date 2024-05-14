@@ -32,7 +32,7 @@ if [[ "x$@" == "x" ]] ; then
     echo "Running Jupyter..."
     echo ""
     cd /opt/Timeseria
-    jupyter lab --FileContentsManager.delete_to_trash=False --ip=0.0.0.0 --port=$BASE_PORT --NotebookApp.token='' --NotebookApp.notebook_dir=$BASE_DIR
+    jupyter lab --LabApp.check_for_updates_class="jupyterlab.NeverCheckForUpdate" --FileContentsManager.delete_to_trash=False --ServerApp.terminado_settings="shell_command=['/bin/bash']" --ip=0.0.0.0 --port=$BASE_PORT --NotebookApp.token='' --NotebookApp.notebook_dir=$BASE_DIR
 
 else
     ENTRYPOINT_COMMAND=$@
