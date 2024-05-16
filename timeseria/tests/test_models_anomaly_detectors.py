@@ -200,9 +200,9 @@ class TestAnomalyDetectors(unittest.TestCase):
 
         results_timeseries = anomaly_detector.apply(timeseries_with_anomalies)
         self.assertAlmostEqual(results_timeseries[0].data_indexes['anomaly'], 0.00249, places=2)
-        self.assertEqual(results_timeseries[26].data_indexes['anomaly'], 1)
+        self.assertAlmostEqual(results_timeseries[26].data_indexes['anomaly'], 0.61560, places=2)
         self.assertEqual(results_timeseries[56].data_indexes['anomaly'], 1)
-        self.assertEqual(results_timeseries[86].data_indexes['anomaly'], 1)
+        self.assertAlmostEqual(results_timeseries[86].data_indexes['anomaly'], 0.4747, places=2)
 
 
     def test_LSTMAnomalyDetector_multivariate_with_context(self):
@@ -231,11 +231,11 @@ class TestAnomalyDetectors(unittest.TestCase):
         results_timeseries = anomaly_detector.apply(timeseries_with_anomalies, index_range=['max_err','10_sigma'], verbose=False, details=False)
         self.assertEqual(results_timeseries[0].data_indexes['anomaly'], 0)
         self.assertEqual(results_timeseries[19].data_indexes['anomaly'], 1)
-        self.assertAlmostEqual(results_timeseries[20].data_indexes['anomaly'], 0.0470, places=2)
+        self.assertEqual(results_timeseries[20].data_indexes['anomaly'], 0)
         self.assertEqual(results_timeseries[49].data_indexes['anomaly'], 1)
         self.assertEqual(results_timeseries[79].data_indexes['anomaly'], 1)
         self.assertEqual(results_timeseries[109].data_indexes['anomaly'], 1)
-        self.assertAlmostEqual(results_timeseries[139].data_indexes['anomaly'], 0.818, places=2)
+        self.assertEqual(results_timeseries[139].data_indexes['anomaly'], 1)
         self.assertEqual(results_timeseries[169].data_indexes['anomaly'], 1)
 
         # Save & load
@@ -247,11 +247,11 @@ class TestAnomalyDetectors(unittest.TestCase):
         results_timeseries = loaded_anomaly_detector.apply(timeseries_with_anomalies, index_range=['max_err','10_sigma'], verbose=False, details=False)
         self.assertEqual(results_timeseries[0].data_indexes['anomaly'], 0)
         self.assertEqual(results_timeseries[19].data_indexes['anomaly'], 1)
-        self.assertAlmostEqual(results_timeseries[20].data_indexes['anomaly'], 0.047, places=2)
+        self.assertEqual(results_timeseries[20].data_indexes['anomaly'], 0)
         self.assertEqual(results_timeseries[49].data_indexes['anomaly'], 1)
         self.assertEqual(results_timeseries[79].data_indexes['anomaly'], 1)
         self.assertEqual(results_timeseries[109].data_indexes['anomaly'], 1)
-        self.assertAlmostEqual(results_timeseries[139].data_indexes['anomaly'], 0.818, places=2)
+        self.assertEqual(results_timeseries[139].data_indexes['anomaly'], 1)
         self.assertEqual(results_timeseries[169].data_indexes['anomaly'], 1)
 
         # Unsupervised TODO: Does not really work...

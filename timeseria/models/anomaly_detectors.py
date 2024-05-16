@@ -449,31 +449,32 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
         y_ends = {}
         log_10_y_starts = {}
         log_10_y_ends = {}
+        index_ranges = {}
 
         for data_label in self.data['error_distributions']:
 
             abs_prediction_errors = [abs(prediction_error) for prediction_error in self.data['prediction_errors'][data_label]]
-            index_range = index_range[:]
+            index_ranges[data_label] = index_range[:]
 
             for i in range(2):
-                if isinstance(index_range[i], str):
-                    if index_range[i] == 'max_err':
-                        index_range[i] = max(abs_prediction_errors)
-                    elif index_range[i] == 'avg_err':
-                        index_range[i] = sum(abs_prediction_errors)/len(abs_prediction_errors)
-                    elif index_range[i].endswith('_sigma'):
-                        index_range[i] = float(index_range[i].replace('_sigma',''))*self.data['stdevs'][data_label]
-                    elif index_range[i].endswith('sig'):
-                        index_range[i] = float(index_range[i].replace('sig',''))*self.data['stdevs'][data_label]
-                    elif index_range[i].startswith('adherence_p/'):
-                        factor = float(index_range[i].split('/')[1])
+                if isinstance(index_ranges[data_label][i], str):
+                    if index_ranges[data_label][i] == 'max_err':
+                        index_ranges[data_label][i] = max(abs_prediction_errors)
+                    elif index_ranges[data_label][i] == 'avg_err':
+                        index_ranges[data_label][i] = sum(abs_prediction_errors)/len(abs_prediction_errors)
+                    elif index_ranges[data_label][i].endswith('_sigma'):
+                        index_ranges[data_label][i] = float(index_ranges[data_label][i].replace('_sigma',''))*self.data['stdevs'][data_label]
+                    elif index_ranges[data_label][i].endswith('sig'):
+                        index_ranges[data_label][i] = float(index_ranges[data_label][i].replace('sig',''))*self.data['stdevs'][data_label]
+                    elif index_ranges[data_label][i].startswith('adherence_p/'):
+                        factor = float(index_ranges[data_label][i].split('/')[1])
                         max_dist_value = error_distribution_functions[data_label](self.data['error_distributions_params'][data_label]['loc'])
-                        index_range[i] = error_distribution_functions[data_label].find_x(max_dist_value/factor)
+                        index_ranges[data_label][i] = error_distribution_functions[data_label].find_x(max_dist_value/factor)
                     else:
-                        raise ValueError('Unknown index start or end value "{}"'.format(index_range[i]))
+                        raise ValueError('Unknown index start or end value "{}"'.format(index_ranges[data_label][i]))
 
-            x_starts[data_label] = index_range[0]
-            x_ends[data_label] = index_range[1]
+            x_starts[data_label] = index_ranges[data_label][0]
+            x_ends[data_label] = index_ranges[data_label][1]
 
             # Compute error distribution function values for index start/end
             y_starts[data_label] = error_distribution_functions[data_label](x_starts[data_label])
