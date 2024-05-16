@@ -171,13 +171,18 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
 
 
     @AnomalyDetector.fit_function
-    def fit(self, series, with_context=False, error_distribution='gennorm', store_errors=True, verbose=False, summary=False, **kwargs):
+    def fit(self, series, with_context=False, error_metric='PE', error_distribution='gennorm', store_errors=True, verbose=False, summary=False, **kwargs):
         """Fit the anomaly detection model on a series.
 
         Args:
             with_context(bool): if to use  context for multivariate time series.
 
+            error_metric(str): the error metric to use for the model. supports ``E`` for simple error (actual-predicted),
+                               ``PE`` for the percentage error ((actual-predicted)/actual) , or any callable with two
+                               arguments (actual and predicted). Defaults to percentage error.
+
             error_distribution(str): if to use a specific error distribution or find it automatically (``error_distribution='auto'``).
+                                     Defaults to ``gennorm``, a generalized normal distribution.
 
             store_errors(float): if to store the prediction errors (together with actual and predicted values) internally for further analysis.
                                  Access them with ``model.data['prediction_errors']``, ``model.data['actual_values']`` or ``model.data['predicted_values']``.
@@ -238,6 +243,17 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
         # Store if to use context or not
         self.data['with_context'] = with_context
 
+        # Check and store error metric
+        if error_metric == 'E':
+            pass
+        elif error_metric == 'PE':
+            pass
+        elif callable(error_metric):
+            pass
+        else:
+            raise ValueError('Unknown error metric "{}"'.format(error_metric))
+        self.data['error_metric'] = error_metric
+
         # Initialize internal dictionaries
         if store_errors:
             self.data['actual_values'] = {}
@@ -285,7 +301,12 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
                 if store_errors:
                     actual_values[data_label].append(actual)
                     predicted_values[data_label].append(predicted)
-                prediction_errors[data_label].append(actual-predicted)
+                if error_metric == 'E':
+                    prediction_errors[data_label].append(actual-predicted)
+                elif error_metric == 'PE':
+                    prediction_errors[data_label].append((actual-predicted)/actual)
+                else:
+                    prediction_errors[data_label].append(error_metric(actual,predicted))
 
             if verbose:
                 print('')
@@ -410,6 +431,17 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
             error_distribution_functions[data_label] = DistributionFunction(self.data['error_distributions'][data_label],
                                                                             self.data['error_distributions_params'][data_label])
 
+        # Check error metric
+        if self.data['error_metric'] == 'E':
+            pass
+        elif self.data['error_metric'] == 'PE':
+            pass
+        elif callable(self.data['error_metric']):
+            # If the model is loaded, it will never get here
+            pass
+        else:
+            raise ValueError('Unknown error metric "{}"'.format(self.data['error_metric']))
+
         # Set anomaly index boundaries
         x_starts = {}
         x_ends = {}
@@ -501,12 +533,17 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
 
                 # Compute the prediction error index
                 actual, predicted = self._get_actual_and_predicted(series, i, data_label, self.data['with_context'])
-                prediction_error = actual - predicted
+
+                if self.data['error_metric'] == 'E':
+                    prediction_error = actual-predicted
+                elif self.data['error_metric'] == 'PE':
+                    prediction_error = (actual-predicted)/actual
+                else:
+                    prediction_error = self.data['error_metric'](actual,predicted)
 
                 # Reverse values on the left side of the error distribution
                 if prediction_error < self.data['error_distributions_params'][data_label]['loc']:
                     prediction_error =  abs(prediction_error) + self.data['error_distributions_params'][data_label]['loc']
-                prediction_error = abs(prediction_error)
 
                 # Compute the anomaly index in the given range (which defaults to 0, max_err)
                 # Below the start it means anomaly (0), above always anomaly (1). In the middle it
