@@ -171,8 +171,21 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
 
 
     @AnomalyDetector.fit_function
-    def fit(self, series, with_context=False, error_distribution='gennorm', verbose=False, summary=False, **kwargs):
+    def fit(self, series, with_context=False, error_distribution='gennorm', store_errors=True, verbose=False, summary=False, **kwargs):
+        """Fit the anomaly detection model on a series.
 
+        Args:
+            with_context(bool): if to use  context for multivariate time series.
+
+            error_distribution(str): if to use a specific error distribution or find it automatically (``error_distribution='auto'``).
+
+            store_errors(float): if to store the prediction errors (together with actual and predicted values) internally for further analysis.
+                                 Access them with ``model.data['prediction_errors']``, ``model.data['actual_values']`` or ``model.data['predicted_values']``.
+
+            verbose(bool): if to print the fit progress.
+
+            summary(bool): if to display a summary on the error distribution fitting or selection.
+        """
         # Handle the error distribution(s)
         if error_distribution == 'auto':
             error_distributions = kwargs.pop('error_distributions', fitter_library.fitter.get_common_distributions() +['gennorm'])
@@ -226,18 +239,26 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
         self.data['with_context'] = with_context
 
         # Initialize internal dictionaries
-        self.data['prediction_errors'] = {}
+        if store_errors:
+            self.data['actual_values'] = {}
+            self.data['predicted_values'] = {}
+            self.data['prediction_errors'] = {}
         self.data['stdevs'] = {} 
         self.data['error_distributions'] = {}
         self.data['error_distributions_params'] = {}
         self.data['error_distributions_stats'] = {}
 
         # Evaluate the predictive for one step ahead and get the forecasting errors
+        actual_values = {}
+        predicted_values = {}
         prediction_errors = {}
+
         progress_step = len(series)/10
 
         for data_label in series.data_labels:
 
+            actual_values[data_label] = []
+            predicted_values[data_label] = []
             prediction_errors[data_label] = []
 
             if verbose:
@@ -261,10 +282,10 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
                 # Predict & append the error
                 #logger.debug('Predicting and computing the difference (i=%s)', i)
                 actual, predicted = self._get_actual_and_predicted(series, i, data_label, with_context)
+                if store_errors:
+                    actual_values[data_label].append(actual)
+                    predicted_values[data_label].append(predicted)
                 prediction_errors[data_label].append(actual-predicted)
-
-            # Store the forecasting errors internally in the model
-            self.data['prediction_errors'] = prediction_errors
 
             if verbose:
                 print('')
@@ -293,14 +314,17 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
             if best_error_distribution_stats['ks_pvalue'] < 0.05:
                 logger.warning('The error distribution for "{}" ({}) p-value is low ({}). Expect issues.'.format(data_label, best_error_distribution, best_error_distribution_stats['ks_pvalue']))
 
-            if not (-0.01 <= error_distribution_params['loc'] <= 0.01):
-                logger.warning('The error distribution for "{}" is not centered in (almost) zero, but in {}. Expect issues.'.format(data_label, error_distribution_params['loc']))
-
             self.data['error_distributions'][data_label] = best_error_distribution
             self.data['error_distributions_params'][data_label] = error_distribution_params
             self.data['error_distributions_stats'][data_label] = best_error_distribution_stats
 
             self.data['stdevs'][data_label] = stdev(prediction_errors[data_label])
+
+        if store_errors:
+            self.data['actual_values'] = actual_values
+            self.data['predicted_values'] = predicted_values
+            self.data['prediction_errors'] = prediction_errors
+
         logger.info('Anomaly detector fitted')
 
     def inspect(self, plot=True):
@@ -325,7 +349,7 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
                 x_min = min(self.data['prediction_errors'][data_label])
                 x_max = max(self.data['prediction_errors'][data_label])
 
-                # Instantiate the errro distribution function
+                # Instantiate the error distribution function
                 distribution_function = DistributionFunction(self.data['error_distributions'][data_label],
                                                              self.data['error_distributions_params'][data_label])
 
@@ -349,10 +373,11 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
         Args:
             index_range(tuple): the range from which the anomaly index is computed, in terms of prediction
                                 error. Below the lower bound no anomaly will be assumed, and above always
-                                anomalous (1). In the middle it follows the error distribution.
-                                Defaults to ['avg_err', 'max_err'] as it assumes to work in unsupervised mode.
-                                Other supported values are 'x_sigma' where x is a sigma multiplier, or any
-                                numerical value. A good choice for semi-spervised mode is ['max_err', '5_sigma'].
+                                anomalous (1). In the middle it follows the error distribution. Defaults
+                                to ``['avg_err', 'max_err']`` as it is assumed to work in unsupervised mode.
+                                Other supported values are ``x_sigma`` where x is a standard deviation multiplier,
+                                ``adherence_p/x'`` where x is a divider for the model adherence_p probability,
+                                or any numerical value in terms of prediction error value.
 
             index_type(str, callable): if to use a logarithmic anomaly index ("log", the default value) which compresses
                                        the index range so that bigger anomalies stand out more than smaller ones, or if to
@@ -374,9 +399,8 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
                                  corresponding error distribution function (dist) value. If set to True, it adds
                                  all of them, if instead using a list only selected details can be added: "pred"
                                  for the predicted values, "err" for the error, and "dist" for the error distribution.
+
         """
-
-
         # Initialize the result time series
         result_series = series.__class__()
 
@@ -409,8 +433,12 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
                         index_range[i] = float(index_range[i].replace('_sigma',''))*self.data['stdevs'][data_label]
                     elif index_range[i].endswith('sig'):
                         index_range[i] = float(index_range[i].replace('sig',''))*self.data['stdevs'][data_label]
+                    elif index_range[i].startswith('adherence_p/'):
+                        factor = float(index_range[i].split('/')[1])
+                        max_dist_value = error_distribution_functions[data_label](self.data['error_distributions_params'][data_label]['loc'])
+                        index_range[i] = error_distribution_functions[data_label].find_x(max_dist_value/factor)
                     else:
-                        raise ValueError('Unknwon index start or end value "{}"'.format(index_range[i]))
+                        raise ValueError('Unknown index start or end value "{}"'.format(index_range[i]))
 
             x_starts[data_label] = index_range[0]
             x_ends[data_label] = index_range[1]
@@ -473,7 +501,12 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
 
                 # Compute the prediction error index
                 actual, predicted = self._get_actual_and_predicted(series, i, data_label, self.data['with_context'])
-                prediction_error = abs(actual-predicted)
+                prediction_error = actual - predicted
+
+                # Reverse values on the left side of the error distribution
+                if prediction_error < self.data['error_distributions_params'][data_label]['loc']:
+                    prediction_error =  abs(prediction_error) + self.data['error_distributions_params'][data_label]['loc']
+                prediction_error = abs(prediction_error)
 
                 # Compute the anomaly index in the given range (which defaults to 0, max_err)
                 # Below the start it means anomaly (0), above always anomaly (1). In the middle it
@@ -541,7 +574,6 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
 
         return result_series
 
-
     @property
     def error_distribution_function(self):
         distribution_function = DistributionFunction(self.data['error_distribution'],
@@ -576,7 +608,7 @@ class PeriodicAverageReconstructorAnomalyDetector(ModelBasedAnomalyDetector):
 #===================================
 
 class LSTMAnomalyDetector(ModelBasedAnomalyDetector):
-    """An anomaly detection model based on a LSTM neural network."""
+    """An anomaly detection model based on a LSTM neural network forecaster."""
 
     model_class = LSTMForecaster
 

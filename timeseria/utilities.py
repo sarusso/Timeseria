@@ -355,6 +355,23 @@ class DistributionFunction():
         """Compute the "adherence" of a value x with respect to the distribution (in a 0-1 range)"""
         return 2 * (1-self.dist_obj.cdf(abs(x), **self.params))
 
+    def find_x(self, y, wideness=1000, side='right'):
+        # Note: "self" can be any function, we use this class as a callable here
+
+        start = self.params['loc']
+        if side == 'right':
+            end = self.params['scale']*wideness
+        elif side == 'left':
+            end = -(self.params['scale']*wideness)
+        else:
+            raise ValueError('unknown side "{}"'.format(side))
+
+        def scaled_gaussian(x):
+            return self(x)-y
+
+        x = optimize.bisect(scaled_gaussian, start, end)
+
+        return x
 
 #===========================
 #  Private classes
@@ -412,7 +429,7 @@ class _Gaussian():
 
 
     def find_xes(self, y, wideness=1000):
-        # "self" can be any function, we use the gaussian class as a callable object here.
+        # Note: "self" can be any function, we use the gaussian class as a callable object here.
 
         start = self.mu
         end   = self.sigma*wideness
