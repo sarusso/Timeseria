@@ -187,7 +187,7 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
             store_errors(float): if to store the prediction errors (together with actual and predicted values) internally for further analysis.
                                  Access them with ``model.data['prediction_errors']``, ``model.data['actual_values']`` or ``model.data['predicted_values']``.
 
-            verbose(bool): if to print the fit progress.
+            verbose(bool): if to print the fit progress (one dot = 10% done).
 
             summary(bool): if to display a summary on the error distribution fitting or selection.
         """
@@ -415,12 +415,12 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
                                                         for the mean and "min" for the minimum; or a callable taking as input the
                                                         list of the anomaly indexes for each data label. Defaults to "max".
 
-
             details(bool, list): if to add details to the time series as the predicted value, the error and the
-                                 corresponding error distribution function (dist) value. If set to True, it adds
-                                 all of them, if instead using a list only selected details can be added: "pred"
-                                 for the predicted values, "err" for the error, and "dist" for the error distribution.
+                                 model adherence probability. If set to ``True``, it adds all of them, if instead using
+                                 a list only selected details can be added: ``pred`` for the predicted values, ``err`` for
+                                 the errors, and ``adh`` for the model adherence probability.
 
+            verbose(bool): if to print the apply progress (one dot = 10% done).
         """
         # Initialize the result time series
         result_series = series.__class__()
@@ -449,32 +449,31 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
         y_ends = {}
         log_10_y_starts = {}
         log_10_y_ends = {}
-        index_ranges = {}
+        y_maxes = {}
 
         for data_label in self.data['error_distributions']:
-
             abs_prediction_errors = [abs(prediction_error) for prediction_error in self.data['prediction_errors'][data_label]]
-            index_ranges[data_label] = index_range[:]
+            y_maxes[data_label] = error_distribution_functions[data_label](self.data['error_distributions_params'][data_label]['loc'])
+            this_index_range = index_range[:]
 
             for i in range(2):
-                if isinstance(index_ranges[data_label][i], str):
-                    if index_ranges[data_label][i] == 'max_err':
-                        index_ranges[data_label][i] = max(abs_prediction_errors)
-                    elif index_ranges[data_label][i] == 'avg_err':
-                        index_ranges[data_label][i] = sum(abs_prediction_errors)/len(abs_prediction_errors)
-                    elif index_ranges[data_label][i].endswith('_sigma'):
-                        index_ranges[data_label][i] = float(index_ranges[data_label][i].replace('_sigma',''))*self.data['stdevs'][data_label]
-                    elif index_ranges[data_label][i].endswith('sig'):
-                        index_ranges[data_label][i] = float(index_ranges[data_label][i].replace('sig',''))*self.data['stdevs'][data_label]
-                    elif index_ranges[data_label][i].startswith('adherence/'):
-                        factor = float(index_ranges[data_label][i].split('/')[1])
-                        max_dist_value = error_distribution_functions[data_label](self.data['error_distributions_params'][data_label]['loc'])
-                        index_ranges[data_label][i] = error_distribution_functions[data_label].find_x(max_dist_value/factor)
+                if isinstance(this_index_range[i], str):
+                    if this_index_range[i] == 'max_err':
+                        this_index_range[i] = max(abs_prediction_errors)
+                    elif this_index_range[i] == 'avg_err':
+                        this_index_range[i] = sum(abs_prediction_errors)/len(abs_prediction_errors)
+                    elif this_index_range[i].endswith('_sigma'):
+                        this_index_range[i] = float(this_index_range[i].replace('_sigma',''))*self.data['stdevs'][data_label]
+                    elif this_index_range[i].endswith('sig'):
+                        this_index_range[i] = float(this_index_range[i].replace('sig',''))*self.data['stdevs'][data_label]
+                    elif this_index_range[i].startswith('adherence/'):
+                        factor = float(this_index_range[i].split('/')[1])
+                        this_index_range[i] = error_distribution_functions[data_label].find_x(y_maxes[data_label]/factor)
                     else:
-                        raise ValueError('Unknown index start or end value "{}"'.format(index_ranges[data_label][i]))
+                        raise ValueError('Unknown index start or end value "{}"'.format(this_index_range[i]))
 
-            x_starts[data_label] = index_ranges[data_label][0]
-            x_ends[data_label] = index_ranges[data_label][1]
+            x_starts[data_label] = this_index_range[0]
+            x_ends[data_label] = this_index_range[1]
 
             # Compute error distribution function values for index start/end
             y_starts[data_label] = error_distribution_functions[data_label](x_starts[data_label])
@@ -528,6 +527,7 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
                 if index_type == 'log':
                     log_10_y_start = log_10_y_starts[data_label]
                     log_10_y_end = log_10_y_ends[data_label]
+                y_max = y_maxes[data_label]
 
                 # Duplicate this series item
                 item = deepcopy(item)
@@ -584,12 +584,14 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
                             item.data['{}_pred'.format(data_label)] = predicted
                         if 'err' in details:
                             item.data['{}_err'.format(data_label)] = prediction_error
-                        if 'dist' in details:
-                            item.data['dist({}_err)'.format(data_label)] = error_distribution_function(prediction_error)
-                    else:
+                        if 'adh' in details:
+                            item.data['{}_adh)'.format(data_label)] = error_distribution_function(prediction_error)
+                    elif isinstance(details, bool):
                         item.data['{}_pred'.format(data_label)] = predicted
                         item.data['{}_err'.format(data_label)] = prediction_error
-                        item.data['dist({}_err)'.format(data_label)] = error_distribution_function(prediction_error)
+                        item.data['{}_adh'.format(data_label)] = error_distribution_function(prediction_error)
+                    else:
+                        raise TypeError('The "details" argument accepts only True/False or a list containing what details to add, as strings.')
 
             # Set anomaly index & append
             if len(item_anomaly_indexes) == 1:
