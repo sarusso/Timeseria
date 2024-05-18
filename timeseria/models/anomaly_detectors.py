@@ -397,7 +397,7 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
                                 anomalous (1). In the middle it follows the error distribution. Defaults
                                 to ``['avg_err', 'max_err']`` as it is assumed to work in unsupervised mode.
                                 Other supported values are ``x_sigma`` where x is a standard deviation multiplier,
-                                ``adherence_p/x'`` where x is a divider for the model adherence_p probability,
+                                ``adherence/x'`` where x is a divider for the model adherence probability,
                                 or any numerical value in terms of prediction error value.
 
             index_type(str, callable): if to use a logarithmic anomaly index ("log", the default value) which compresses
@@ -466,7 +466,7 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
                         index_ranges[data_label][i] = float(index_ranges[data_label][i].replace('_sigma',''))*self.data['stdevs'][data_label]
                     elif index_ranges[data_label][i].endswith('sig'):
                         index_ranges[data_label][i] = float(index_ranges[data_label][i].replace('sig',''))*self.data['stdevs'][data_label]
-                    elif index_ranges[data_label][i].startswith('adherence_p/'):
+                    elif index_ranges[data_label][i].startswith('adherence/'):
                         factor = float(index_ranges[data_label][i].split('/')[1])
                         max_dist_value = error_distribution_functions[data_label](self.data['error_distributions_params'][data_label]['loc'])
                         index_ranges[data_label][i] = error_distribution_functions[data_label].find_x(max_dist_value/factor)
