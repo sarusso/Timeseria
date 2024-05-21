@@ -7,7 +7,7 @@ chardet==3.0.4
 convertdate==2.3.2
 lunarcalendar==0.0.9
 cython==0.29.17
-requests==2.26.0
+requests==2.32.0
 h5py==3.6.0
 scipy==1.7.3
 pyppeteer==0.2.6
