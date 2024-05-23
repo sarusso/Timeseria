@@ -121,11 +121,14 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
         else:
             self.model.save('{}/model'.format(path))
 
+    def _get_actual_value(self, series, i, data_label):
+        # TODO: support other data than key-value here?
+        actual = series[i].data[data_label]
+        return actual
 
-    def _get_actual_and_predicted(self, series, i, data_label, with_context):
+    def _get_predicted_value(self, series, i, data_label, with_context):
 
             # Call model predict logic and compare with the actual data
-            actual = series[i].data[data_label]
             if issubclass(self.model_class, Reconstructor):
                 prediction = self.model.predict(series, from_i=i,to_i=i)
             elif issubclass(self.model_class, Forecaster):
@@ -166,9 +169,8 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
                     predicted = prediction[data_label]
             else:
                 raise TypeError('Don\'t know how to handle a prediction with of type "{}"'.format(prediction.__class__.__name__))
-            #logger.debug('{:f}\tvs\t{}:\tdiff={}'.format(actual, predicted, actual-predicted))
-            return (actual, predicted)
 
+            return predicted
 
     @AnomalyDetector.fit_function
     def fit(self, series, with_context=False, error_metric='PE', error_distribution='gennorm', store_errors=True, verbose=False, summary=False, **kwargs):
@@ -297,7 +299,8 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
 
                 # Predict & append the error
                 #logger.debug('Predicting and computing the difference (i=%s)', i)
-                actual, predicted = self._get_actual_and_predicted(series, i, data_label, with_context)
+                actual = self._get_actual_value(series, i, data_label)
+                predicted = self._get_predicted_value(series, i, data_label, with_context)
                 if store_errors:
                     actual_values[data_label].append(actual)
                     predicted_values[data_label].append(predicted)
@@ -388,6 +391,40 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
                 # Show the plot
                 plt.show()
 
+    def preprocess(self, series, inplace=False, verbose=False):
+        """Pre-process a time series for this anomaly detector so that multiple apply() calls are much faster"""
+        if not inplace:
+            series = series.duplicate()
+
+        # Start pre-processing
+        series.predictions = {}
+        progress_step = len(series)/10
+        if verbose:
+            print('Pre-computing model predictions: ', end='')
+        for i, item in enumerate(series):
+
+            if verbose:
+                if int(i%progress_step) == 0:
+                    print('.', end='')
+
+            # Before the window
+            if i <=  self.data['model_window']:
+                continue
+
+            # After the window (if using a reconstructor)
+            if issubclass(self.model_class, Reconstructor):
+                if i >  len(series)-self.data['model_window']-1:
+                    break
+
+            ith_predictions = {} 
+            for data_label in series.data_labels:
+                ith_predictions[data_label] = self._get_predicted_value(series, i, data_label, self.data['with_context'])
+
+            series.predictions[i] = ith_predictions
+
+        series.preprocessed_by = self.id
+        return series
+
     @Model.apply_function
     def apply(self, series, index_range=['avg_err','max_err'], index_type='log', threshold=None, multivariate_index_strategy='max', details=False, verbose=False):
 
@@ -453,7 +490,7 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
         log_10_y_ends = {}
         y_maxes = {}
 
-        for data_label in self.data['error_distributions']:
+        for data_label in series.data_labels:
             abs_prediction_errors = [abs(prediction_error) for prediction_error in self.data['prediction_errors'][data_label]]
             y_maxes[data_label] = error_distribution_functions[data_label](self.data['error_distributions_params'][data_label]['loc'])
             this_index_range = index_range[:]
@@ -497,6 +534,12 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
                     else:
                         raise
 
+        # Is this series pre-processed?
+        try:
+            preprocessed = True if series.preprocessed_by == self.id else False
+        except AttributeError:
+            preprocessed = False
+
         # Start processing
         progress_step = len(series)/10
         if verbose:
@@ -535,7 +578,12 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
                 item = deepcopy(item)
 
                 # Compute the prediction error index
-                actual, predicted = self._get_actual_and_predicted(series, i, data_label, self.data['with_context'])
+                if preprocessed:
+                    actual = self._get_actual_value(series, i, data_label)
+                    predicted = series.predictions[i][data_label]
+                else:
+                    actual = self._get_actual_value(series, i, data_label)
+                    predicted = self._get_predicted_value(series, i, data_label, self.data['with_context'])
 
                 if self.data['error_metric'] == 'E':
                     prediction_error = actual-predicted
