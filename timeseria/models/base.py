@@ -28,6 +28,9 @@ except (ImportError,AttributeError):
     pass
 
 
+class TooMuchDataLoss(Exception):
+    pass
+
 #======================
 #  Base Model
 #======================
@@ -557,59 +560,49 @@ class _KerasModel(Model):
     # ARIMA and Prophet above also. Consider moving them in a "utility" package or directly in the models.
 
     @staticmethod
-    def _to_window_datapoints_matrix(series, window, steps):
-        '''Compute window datapoints matrix from a time series.'''
-        # The "steps" are to be intended as steps ahead (i.e. for forecasters, which is usually not implemented for values >1)
-        window_datapoints_matrix = []
-        for i, _ in enumerate(series):
-            if i <  window:
-                continue
-            if i == len(series) + 1 - steps:
-                break
+    def _to_matrix_representation(series, window, steps, context_data_labels, target_data_labels, data_loss_limit):
 
-            # Add window values
-            window_datapoints = []
-            for j in range(window):
-                window_datapoints.append(series[i-window+j])
-            window_datapoints_matrix.append(window_datapoints)
-
-        return window_datapoints_matrix
-
-    @staticmethod
-    def _to_context_data_matrix(series, window, steps, context_data_labels):
-        '''Compute context data for partial forecasters from a time series.'''
         if steps > 1:
-            raise NotImplementedError('Context with multi steps-ahead is not yet implemented')
-        context_data_matrix = []
+            raise NotImplementedError('Not implemented for steps >1')
+
+        window_elements_matrix = []
+        target_values_vector = []
+        context_data_vector = []
+
         for i, _ in enumerate(series):
             if i <  window:
                 continue
-
-            # Add context data
-            context_data_matrix.append({data_label: series[i].data[data_label] for data_label in context_data_labels})
-
-        return context_data_matrix
-
-    @staticmethod
-    def _to_target_values_vector(series, window, steps, target_data_labels):
-        '''Compute target values vector from a time series.'''
-        # steps to be intended as steps ahead (for the forecaster)
-
-        targets = []
-        for i, _ in enumerate(series):
-            if i <  window:
-                continue
-            if i == len(series) + 1 - steps:
+            if i == len(series):
                 break
 
-            # Add forecast target value(s)
-            row = []
-            for j in range(steps):
-                for target_data_label in target_data_labels:
-                    row.append(series[i+j].data[target_data_label])
-            targets.append(row)
+            try:
+                # Add window elements
+                window_elements_vector = []
+                for j in range(window):
+                    if data_loss_limit is not None and 'data_loss' in series[i-window+j].data_indexes and series[i-window+j].data_indexes['data_loss'] >= data_loss_limit:
+                        raise TooMuchDataLoss()
+                    window_elements_vector.append(series[i-window+j])
 
-        return targets
+                # Add target values
+                target_values_sub_vector = []
+                if data_loss_limit is not None and 'data_loss' in series[i].data_indexes and series[i].data_indexes['data_loss'] >= data_loss_limit:
+                    raise TooMuchDataLoss()
+                for target_data_label in target_data_labels:
+                    target_values_sub_vector.append(series[i].data[target_data_label])
+            except TooMuchDataLoss:
+                continue
+            else:
+
+                # Append window elements and target data
+                window_elements_matrix.append(window_elements_vector)
+                target_values_vector.append(target_values_sub_vector)
+
+                # Add context data if required
+                if context_data_labels is not None:
+                    context_data_vector.append({data_label: series[i].data[data_label] for data_label in context_data_labels})
+
+        return window_elements_matrix, target_values_vector, context_data_vector
+
 
     @staticmethod
     def _compute_window_features(window_datapoints, data_labels, time_unit, features, context_data=None):
@@ -630,17 +623,11 @@ class _KerasModel(Model):
             if feature not in available_features:
                 raise ValueError('Unknown feature "{}"'.format(feature))
 
-        # Handle context data if any (as "fake", context datapoint)
+        # Handle context data if any (as "fake", context datapoint).
         if context_data:
             context_datapoint_dt = window_datapoints[-1].dt + time_unit
             context_datapoint = window_datapoints[-1].__class__(dt = context_datapoint_dt, data = context_data)
-            # for data_label in data_labels:
-            #     if data_label not in context_datapoint.data:
-            #         context_datapoint.data[data_label] = None
             window_datapoints.append(context_datapoint)
-
-        #for item in window_datapoints:
-        #    logger.critical(item)
 
         # Compute the features
         window_features = []

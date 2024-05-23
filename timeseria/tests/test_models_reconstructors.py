@@ -111,7 +111,7 @@ class TestReconstructors(unittest.TestCase):
         self.assertAlmostEqual(evaluation['RMSE_3_steps'], 0.240, places=2)
         self.assertAlmostEqual(evaluation['MAE_3_steps'], 0.192, places=2)
         self.assertAlmostEqual(evaluation['RMSE'], 0.185, places=2)
-        self.assertAlmostEqual(evaluation['MAE'], 0.139, places=2)
+        self.assertAlmostEqual(evaluation['MAE'], 0.144, places=2)
 
         # Test the cross validation
         reconstructor = PeriodicAverageReconstructor()

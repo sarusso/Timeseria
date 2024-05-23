@@ -42,7 +42,7 @@ class Reconstructor(Model):
     window = None
 
     @Model.apply_function
-    def apply(self, series, remove_data_loss=False, data_loss_threshold=1, inplace=False):
+    def apply(self, series, data_loss_threshold=1.0, inplace=False):
 
         logger.debug('Using data_loss_threshold="%s"', data_loss_threshold)
 
@@ -70,9 +70,6 @@ class Reconstructor(Model):
                     gap_start_i = None
 
                 item.data_indexes['data_reconstructed'] = 0
-
-            if remove_data_loss:
-                item.data_indexes.pop('data_loss', None)
 
         # Try to reconstruct the last gap as well if left "open", but will likely raise and error due to no window
         if gap_start_i is not None:
@@ -126,7 +123,7 @@ class Reconstructor(Model):
             return reconstructed_data
 
     @Model.evaluate_function
-    def evaluate(self, series, steps='auto', limit=None, data_loss_threshold=1, metrics=['RMSE', 'MAE'], details=False):
+    def evaluate(self, series, steps='auto', limit=None, data_loss_threshold=1.0, metrics=['RMSE', 'MAE'], details=False):
         """Evaluate the reconstructor on a series.
 
         Args:
@@ -363,7 +360,7 @@ class LinearInterpolationReconstructor(Reconstructor):
 #=====================================
 
 class PeriodicAverageReconstructor(Reconstructor):
-    """A series reconstruction model based on periodic averages.
+    """A reconstruction model based on periodic averages.
 
     Args:
         path (str): a path from which to load a saved model. Will override all other init settings.
@@ -372,17 +369,17 @@ class PeriodicAverageReconstructor(Reconstructor):
     window = 1
 
     @Reconstructor.fit_function
-    def fit(self, series, data_loss_threshold=0.5, periodicity='auto', dst_affected=False, offset_method='average', verbose=False):
+    def fit(self, series, periodicity='auto', dst_affected=False, offset_method='average', data_loss_limit=1.0, verbose=False):
         # TODO: periodicity, dst_affected, offset_method -> move them in the init?
         """
         Fit the reconstructor on some data.
 
         Args:
-            data_loss_threshold(float): the threshold of the data_loss index for discarding an element from the fit.
             periodicity(int): the periodicty of the time series. If set to ``auto`` then it will be automatically detected using a FFT.
             dst_affected(bool): if the model should take into account DST effects.
-            offset_method(str): how to offset the reconstructed data in order to align it to the missing data gaps. Valuse are ``avergae``
-                                to use the average gap value, or ``extrmes`` to use its extremes.
+            offset_method(str): how to offset the reconstructed data in order to align it to the missing data gaps. Supported values
+                                are ``average`` to use the average gap value, or ``extremes`` to use its extremes.
+            data_loss_limit(float): discard from the fit elements with a data loss greater than or equal to this limit.
         """
 
         if not offset_method in ['average', 'extremes']:
@@ -414,14 +411,15 @@ class PeriodicAverageReconstructor(Reconstructor):
             totals = {}
             processed = 0
             for item in series:
-                if item.data_loss is None or item.data_loss < data_loss_threshold:
-                    periodicity_index = _get_periodicity_index(item, series.resolution, periodicity, dst_affected=dst_affected)
-                    if not periodicity_index in sums:
-                        sums[periodicity_index] = item.data[data_label]
-                        totals[periodicity_index] = 1
-                    else:
-                        sums[periodicity_index] += item.data[data_label]
-                        totals[periodicity_index] +=1
+                if data_loss_limit is not None and 'data_loss' in item.data_indexes and item.data_indexes['data_loss'] >= data_loss_limit:
+                    continue
+                periodicity_index = _get_periodicity_index(item, series.resolution, periodicity, dst_affected=dst_affected)
+                if not periodicity_index in sums:
+                    sums[periodicity_index] = item.data[data_label]
+                    totals[periodicity_index] = 1
+                else:
+                    sums[periodicity_index] += item.data[data_label]
+                    totals[periodicity_index] +=1
                 processed += 1
 
         averages={}
@@ -515,7 +513,7 @@ class ProphetReconstructor(Reconstructor, _ProphetModel):
     def predict(self, series, from_i, to_i):
 
         if verbose_debug:
-            logger.debug('Periodic Average Reconstructor predicting from_i=%s to_i=%s (included)', from_i, to_i)
+            logger.debug('Prophet reconstructor predicting from_i=%s to_i=%s (included)', from_i, to_i)
 
         if len(series.data_labels) > 1:
             raise NotImplementedError('Multivariate time series are not supported by this reconstructor')

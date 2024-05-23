@@ -155,9 +155,14 @@ class TestBaseKerasModel(unittest.TestCase):
                                              DataTimePoint(t=5, data={'label_1': 0.5, 'label_2': 5.0}),
                                              DataTimePoint(t=6, data={'label_1': 0.6, 'label_2': 6.0}),)
 
-    def test_to_window_datapoints_matrix(self):
+    def test_to_matrix_representation(self):
 
-        window_datapoints_matrix = _KerasModel._to_window_datapoints_matrix(self.test_timeseries, window=2, steps=1)
+        window_elements_matrix, _, _ = _KerasModel._to_matrix_representation(series = self.test_timeseries,
+                                                                             window = 2,
+                                                                             steps = 1,
+                                                                             context_data_labels = None,
+                                                                             target_data_labels = self.test_timeseries.data_labels,
+                                                                             data_loss_limit = None)
 
         # What to expect (using the timestamp to represent a data point):
         # 1,2
@@ -165,40 +170,55 @@ class TestBaseKerasModel(unittest.TestCase):
         # 3,4
         # 4,5
 
-        self.assertEqual(len(window_datapoints_matrix), 4)
+        self.assertEqual(len(window_elements_matrix), 4)
 
-        self.assertEqual(window_datapoints_matrix[0][0].t, 1)
-        self.assertEqual(window_datapoints_matrix[0][1].t, 2)
+        self.assertEqual(window_elements_matrix[0][0].t, 1)
+        self.assertEqual(window_elements_matrix[0][1].t, 2)
 
-        self.assertEqual(window_datapoints_matrix[1][0].t, 2)
-        self.assertEqual(window_datapoints_matrix[1][1].t, 3)
+        self.assertEqual(window_elements_matrix[1][0].t, 2)
+        self.assertEqual(window_elements_matrix[1][1].t, 3)
 
-        self.assertEqual(window_datapoints_matrix[2][0].t, 3)
-        self.assertEqual(window_datapoints_matrix[2][1].t, 4)
+        self.assertEqual(window_elements_matrix[2][0].t, 3)
+        self.assertEqual(window_elements_matrix[2][1].t, 4)
 
-        self.assertEqual(window_datapoints_matrix[-1][0].t, 4)
-        self.assertEqual(window_datapoints_matrix[-1][1].t, 5)
+        self.assertEqual(window_elements_matrix[-1][0].t, 4)
+        self.assertEqual(window_elements_matrix[-1][1].t, 5)
 
-
-    def test_to_target_values_vector(self):
+        _, target_values_vector, _ = _KerasModel._to_matrix_representation(series = self.test_timeseries,
+                                                                           window = 2,
+                                                                           steps = 1,
+                                                                           context_data_labels = None,
+                                                                           target_data_labels = ['label_1'],
+                                                                           data_loss_limit = None)
 
         # What to expect (using the data value to represent a data point):
         # [0.3], [0.4], [0.5], [0.6] Note that they are lists in order to support multi-step forecast
-        target_vector = _KerasModel._to_target_values_vector(self.test_timeseries, window=2, steps=1, target_data_labels=['label_1'])
-        self.assertEqual(target_vector, [[0.3], [0.4], [0.5], [0.6]])
+        self.assertEqual(target_values_vector, [[0.3], [0.4], [0.5], [0.6]])
 
         # Test for multivariate as well
-        target_vector = _KerasModel._to_target_values_vector(self.test_timeseries_mv, window=2, steps=1, target_data_labels=['label_1'])
-        self.assertEqual(target_vector, [[0.3], [0.4], [0.5], [0.6]])
+        _, target_values_vector, _ = _KerasModel._to_matrix_representation(series = self.test_timeseries_mv,
+                                                                           window = 2,
+                                                                           steps = 1,
+                                                                           context_data_labels = self.test_timeseries_mv.data_labels,
+                                                                           target_data_labels = ['label_1'],
+                                                                           data_loss_limit = None)
+
+
+        self.assertEqual(target_values_vector, [[0.3], [0.4], [0.5], [0.6]])
 
 
     def test_compute_window_features(self):
 
+        window_elements_matrix, _, _ = _KerasModel._to_matrix_representation(series = self.test_timeseries,
+                                                                             window = 3,
+                                                                             steps = 1,
+                                                                             context_data_labels = None,
+                                                                             target_data_labels = self.test_timeseries.data_labels,
+                                                                             data_loss_limit = None)
 
-        window_datapoints_matrix = _KerasModel._to_window_datapoints_matrix(self.test_timeseries, window=3, steps=1)
 
 
-        window_features  = _KerasModel._compute_window_features(window_datapoints_matrix[0],
+        window_features  = _KerasModel._compute_window_features(window_elements_matrix[0],
                                                                 data_labels = self.test_timeseries.data_labels,
                                                                 time_unit = self.test_timeseries.resolution,
                                                                 features = ['values'])
@@ -206,7 +226,7 @@ class TestBaseKerasModel(unittest.TestCase):
         self.assertEqual(window_features, [[0.1],[0.2],[0.3]])
 
 
-        window_features  = _KerasModel._compute_window_features(window_datapoints_matrix[0],
+        window_features  = _KerasModel._compute_window_features(window_elements_matrix[0],
                                                                 data_labels = self.test_timeseries.data_labels,
                                                                 time_unit = self.test_timeseries.resolution,
                                                                 features = ['values', 'diffs'])
@@ -218,8 +238,15 @@ class TestBaseKerasModel(unittest.TestCase):
         self.assertAlmostEqual(window_features[-1][1], 0.1)
 
         # Multivariate
-        window_datapoints_matrix_mv = _KerasModel._to_window_datapoints_matrix(self.test_timeseries_mv, window=3, steps=1)
-        window_features  = _KerasModel._compute_window_features(window_datapoints_matrix_mv[0],
+
+        window_elements_matrix, _, _ = _KerasModel._to_matrix_representation(series = self.test_timeseries_mv,
+                                                                             window = 3,
+                                                                             steps = 1,
+                                                                             context_data_labels = None,
+                                                                             target_data_labels = self.test_timeseries_mv.data_labels,
+                                                                             data_loss_limit = None)
+
+        window_features  = _KerasModel._compute_window_features(window_elements_matrix[0],
                                                                 data_labels = self.test_timeseries_mv.data_labels,
                                                                 time_unit = self.test_timeseries_mv.resolution,
                                                                 features = ['values'])
@@ -227,7 +254,7 @@ class TestBaseKerasModel(unittest.TestCase):
         self.assertEqual(window_features, [[0.1, 1.0], [0.2, 2.0], [0.3, 3.0]])
 
         # Multivariate with context
-        window_features  = _KerasModel._compute_window_features(window_datapoints_matrix_mv[0],
+        window_features  = _KerasModel._compute_window_features(window_elements_matrix[0],
                                                                 data_labels = self.test_timeseries_mv.data_labels,
                                                                 time_unit = self.test_timeseries_mv.resolution,
                                                                 features = ['values', 'diffs', 'hours'],

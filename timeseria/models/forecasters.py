@@ -509,12 +509,13 @@ class PeriodicAverageForecaster(Forecaster):
         return model
 
     @Forecaster.fit_function
-    def fit(self, series, periodicity='auto', dst_affected=False, verbose=False):
+    def fit(self, series, periodicity='auto', dst_affected=False, data_loss_limit=1.0, verbose=False):
         """Fit the model on a series.
 
         Args:
             periodicity(int): the periodicty of the series. If set to ``auto`` then it will be automatically detected using a FFT.
             dst_affected(bool): if the model should take into account DST effects.
+            data_loss_limit(float): discard from the fit elements with a data loss greater than or equal to this limit.
         """
 
         if len(series.data_labels) > 1:
@@ -540,6 +541,8 @@ class PeriodicAverageForecaster(Forecaster):
             totals = {}
             processed = 0
             for item in series:
+                if data_loss_limit is not None and 'data_loss' in item.data_indexes and item.data_indexes['data_loss'] >= data_loss_limit:
+                    continue
                 periodicity_index = _get_periodicity_index(item, series.resolution, periodicity, dst_affected)
                 if not periodicity_index in sums:
                     sums[periodicity_index] = item.data[data_label]
@@ -864,7 +867,7 @@ class LSTMForecaster(Forecaster, _KerasModel):
         self._save_keras_model(path)
 
     @Forecaster.fit_function
-    def fit(self, series, epochs=30, normalize=True, target='all', with_context=False, reproducible=False, verbose=False):
+    def fit(self, series, epochs=30, normalize=True, target='all', with_context=False, reproducible=False, data_loss_limit=1.0, verbose=False):
         """Fit the model on a series.
 
         Args:
@@ -875,6 +878,7 @@ class LSTMForecaster(Forecaster, _KerasModel):
             normalize(bool): if to normalize the data between 0 and 1 or not.
             target(str,list): what data labels to target, 'all' for all of them.
             with_context(bool): if to use context data when predicting.
+            data_loss_limit(float): discard from the fit elements with a data loss greater than or equal to this limit.
             reproducible(bool): if to make the fit deterministic.
             verbose(bool): if to print the training output in the process.
         """
@@ -937,24 +941,28 @@ class LSTMForecaster(Forecaster, _KerasModel):
             self.data['min_values'] = min_values
             self.data['max_values'] = max_values
 
-        # Move to "matrix" of windows plus "vector" of targets data representation. Or, in other words:
-        # window_datapoints is a list of lists (matrix) where each nested list (row) is a list of window datapoints.
-        window_datapoints_matrix = self._to_window_datapoints_matrix(series, window=self.data['window'], steps=1)
-        if with_context:
-            context_data_matrix = self._to_context_data_matrix(series, window=self.data['window'], context_data_labels=context_data_labels, steps=1)
-        target_values_vector = self._to_target_values_vector(series, window=self.data['window'], steps=1, target_data_labels=target_data_labels)
+        # Move to matrix representation
+        window_elements_matrix, target_values_vector, context_data_vector = self._to_matrix_representation(series = series,
+                                                                                                           window = self.data['window'],
+                                                                                                           steps = 1,
+                                                                                                           context_data_labels = context_data_labels,
+                                                                                                           target_data_labels = target_data_labels,
+                                                                                                           data_loss_limit = data_loss_limit)
+
+        if not window_elements_matrix:
+            raise ValueError('Too much data loss (not a single element below the limit), cannot fit!')
 
         # Compute window (plus context) features
-        window_features = []
-        for i in range(len(window_datapoints_matrix)):
-            window_features.append(self._compute_window_features(window_datapoints_matrix[i],
-                                                                 data_labels = data_labels,
-                                                                 time_unit = series.resolution,
-                                                                 features = self.data['features'],
-                                                                 context_data = context_data_matrix[i] if with_context else None))
+        window_features_matrix = []
+        for i in range(len(window_elements_matrix)):
+            window_features_matrix.append(self._compute_window_features(window_elements_matrix[i],
+                                                                        data_labels = data_labels,
+                                                                        time_unit = series.resolution,
+                                                                        features = self.data['features'],
+                                                                        context_data = context_data_vector[i] if with_context else None))
 
         # Obtain the number of features based on _compute_window_features() output
-        features_per_window_item = len(window_features[0][0])
+        features_per_window_item = len(window_features_matrix[0][0])
         output_dimension = len(target_values_vector[0])
 
         # Create the default model architeture if not given in the init
@@ -968,7 +976,7 @@ class LSTMForecaster(Forecaster, _KerasModel):
             self.keras_model.compile(loss='mean_squared_error', optimizer='adam')
 
         # Fit
-        self.keras_model.fit(array(window_features), array(target_values_vector), epochs=epochs, verbose=verbose)
+        self.keras_model.fit(array(window_features_matrix), array(target_values_vector), epochs=epochs, verbose=verbose)
 
     @Forecaster.predict_function
     def predict(self, series, from_i=None, steps=1, context_data=None,  verbose=False):
