@@ -348,7 +348,7 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
 
         logger.info('Anomaly detector fitted')
 
-    def inspect(self, plot=True):
+    def inspect(self, plot=True, plot_x_min='auto', plot_x_max='auto'):
         '''Inspect the model and plot the error distribution'''
 
         for data_label in self.data['error_distributions']:
@@ -367,15 +367,17 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
 
             if plot:
 
-                x_min = min(self.data['prediction_errors'][data_label])
-                x_max = max(self.data['prediction_errors'][data_label])
+                if plot_x_min == 'auto':
+                    plot_x_min = min(self.data['prediction_errors'][data_label])
+                if plot_x_max == 'auto':
+                    plot_x_max = max(self.data['prediction_errors'][data_label])
 
                 # Instantiate the error distribution function
                 distribution_function = DistributionFunction(self.data['error_distributions'][data_label],
                                                              self.data['error_distributions_params'][data_label])
 
                 # Get the error distribution function plot
-                plt = distribution_function.plot(show=False, x_min=x_min, x_max=x_max)
+                plt = distribution_function.plot(show=False, x_min=plot_x_min, x_max=plot_x_max)
 
                 # Add the histogram to the plot
                 plt.hist(self.data['prediction_errors'][data_label], bins=100, density=True, alpha=1, color='steelblue')
