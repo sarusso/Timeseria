@@ -51,6 +51,86 @@ class AnomalyDetector(Model):
         """Disabled. Anomaly detectors cannot be evaluated yet."""
         raise NotImplementedError('Anomaly detectors cannot be evaluated yet.') from None
 
+    @staticmethod
+    def mark_events(timeseries, index_treshold=1.0, min_persistence=2, max_gap=2, replace_index=False):
+        """Mark ensembles of anomalous data points as single anomalous events, with some tolerance.
+
+        Args:
+            index_treshold(float): the anomaly index above which to consider a data point anomalous.
+
+            min_persistence(int): the minimum persistence of an event, in terms of consecutive data points.
+
+            max_gap(int): the maximum gap within a signle event of data points below the index_treshold.
+
+            replace_index(bool): if to replace the existent ``anomaly`` index instead of adding a new ``anomaly_event``one.
+        """
+
+        event_timeseries = timeseries.duplicate()
+        event_start = None
+
+        for i, item in enumerate(event_timeseries):
+
+            # Set no event by default
+            item.data_indexes['anomaly_event'] = 0
+
+            # Detect new (potential) event start
+            if item.data_indexes['anomaly'] >= index_treshold:
+                if event_start is None:
+                    logger.debug('Starting to suspect event @ element #%s',i)
+                    event_start = i
+
+            # Detect event end
+            if event_start is not None:
+                if item.data_indexes['anomaly'] < index_treshold:
+                    logger.debug('Evaluating element #%s to trigger an event end', i)
+
+                    # Are we still within the max gap? If so, don't close the (potential) event yet
+                    from_i = (i - max_gap) if (i - max_gap) >= 0 else 0
+                    to_i = i
+                    event_ended = True
+                    logger.debug('  checking elements from #%s to #%s', from_i, to_i)
+                    for j in range(from_i, to_i+1):
+                        if event_timeseries[j].data_indexes['anomaly'] >= index_treshold:
+                            event_ended = False
+                    if event_ended:
+                        logger.debug('  event was ended @ element #%s', i - max_gap - 1)
+                        event_persistence =  (i - max_gap) - event_start
+                        if event_persistence < min_persistence:
+                            logger.debug('  discarding as below minimum persistence')
+                        else:
+                            # Mark it
+                            for j in range(event_start, i - max_gap):
+                                event_timeseries[j].data_indexes['anomaly_event'] = 1
+
+                        # Reset the event_start support var
+                        event_start = None
+                else:
+                    logger.debug('Element #%s is part of the event', i)
+
+        # Handle series last event, if any
+        if event_start is not None:
+
+            # When was the last event over?
+            event_end = len(event_timeseries)
+            for i in range(len(event_timeseries)-1, event_start, -1):
+                if  event_timeseries[i].data_indexes['anomaly'] >= index_treshold:
+                    event_end = i
+                    break
+            logger.debug('  event was ended @ element #%s', event_end)
+            event_persistence =  event_end - event_start
+            if event_persistence < min_persistence:
+                logger.debug('  discarding as below minimum persistence')
+            else:
+                # Mark it
+                for j in range(event_start, event_end+1):
+                    event_timeseries[j].data_indexes['anomaly_event'] = 1
+
+        if replace_index:
+            for item in event_timeseries:
+                item.data_indexes['anomaly'] = item.data_indexes.pop('anomaly_event') 
+
+        return  event_timeseries
+
 
 #===================================
 #  Model-based Anomaly Detector

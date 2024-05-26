@@ -7,7 +7,7 @@ from math import sin, cos
 from ..datastructures import TimePoint, DataTimeSlot, DataTimePoint, TimeSeries
 from ..models.forecasters import PeriodicAverageForecaster
 from ..models.reconstructors import PeriodicAverageReconstructor
-from ..models.anomaly_detectors import ModelBasedAnomalyDetector, PeriodicAverageReconstructorAnomalyDetector, PeriodicAverageAnomalyDetector, LSTMAnomalyDetector
+from ..models.anomaly_detectors import AnomalyDetector, ModelBasedAnomalyDetector, PeriodicAverageReconstructorAnomalyDetector, PeriodicAverageAnomalyDetector, LSTMAnomalyDetector
 from ..storages import CSVFileStorage
 
 # Setup logging
@@ -57,6 +57,48 @@ class TestAnomalyDetectors(unittest.TestCase):
             tensorflow_session_conf = tensorflow.compat.v1.ConfigProto(intra_op_parallelism_threads=1, inter_op_parallelism_threads=1)
             keras.backend.set_session(tensorflow.compat.v1.Session(graph=tensorflow.compat.v1.get_default_graph(), config=tensorflow_session_conf))
             tensorflow.random.set_seed(0)
+
+
+    def test_AnomalyDetector(self):
+
+        # Test mark_events
+        test_timeseries = TimeSeries()
+        test_timeseries.append(DataTimePoint(t=0, data={'value':1}, data_indexes={'anomaly': 0.0}))
+        test_timeseries.append(DataTimePoint(t=1, data={'value':1}, data_indexes={'anomaly': 0.9}))
+        test_timeseries.append(DataTimePoint(t=2, data={'value':1}, data_indexes={'anomaly': 0.0}))
+        test_timeseries.append(DataTimePoint(t=3, data={'value':1}, data_indexes={'anomaly': 0.0}))
+        test_timeseries.append(DataTimePoint(t=4, data={'value':1}, data_indexes={'anomaly': 0.0}))
+        test_timeseries.append(DataTimePoint(t=5, data={'value':1}, data_indexes={'anomaly': 0.9})) # Start simple event
+        test_timeseries.append(DataTimePoint(t=6, data={'value':1}, data_indexes={'anomaly': 0.9}))
+        test_timeseries.append(DataTimePoint(t=7, data={'value':1}, data_indexes={'anomaly': 0.0}))
+        test_timeseries.append(DataTimePoint(t=8, data={'value':1}, data_indexes={'anomaly': 0.0}))
+        test_timeseries.append(DataTimePoint(t=9, data={'value':1}, data_indexes={'anomaly': 0.0}))
+        test_timeseries.append(DataTimePoint(t=10, data={'value':1}, data_indexes={'anomaly': 0.9})) # Start less simple event
+        test_timeseries.append(DataTimePoint(t=11, data={'value':1}, data_indexes={'anomaly': 0.6}))
+        test_timeseries.append(DataTimePoint(t=12, data={'value':1}, data_indexes={'anomaly': 0.9}))
+        test_timeseries.append(DataTimePoint(t=13, data={'value':1}, data_indexes={'anomaly': 0.1}))
+        test_timeseries.append(DataTimePoint(t=14, data={'value':1}, data_indexes={'anomaly': 0.0}))
+        test_timeseries.append(DataTimePoint(t=15, data={'value':1}, data_indexes={'anomaly': 0.0}))
+        test_timeseries.append(DataTimePoint(t=16, data={'value':1}, data_indexes={'anomaly': 0.0})) 
+        test_timeseries.append(DataTimePoint(t=17, data={'value':1}, data_indexes={'anomaly': 0.9})) # Start events to be merged
+        test_timeseries.append(DataTimePoint(t=18, data={'value':1}, data_indexes={'anomaly': 0.0}))
+        test_timeseries.append(DataTimePoint(t=19, data={'value':1}, data_indexes={'anomaly': 0.9}))
+        test_timeseries.append(DataTimePoint(t=20, data={'value':1}, data_indexes={'anomaly': 0.9}))
+        test_timeseries.append(DataTimePoint(t=21, data={'value':1}, data_indexes={'anomaly': 0.0}))
+        test_timeseries.append(DataTimePoint(t=22, data={'value':1}, data_indexes={'anomaly': 0.6}))
+        test_timeseries.append(DataTimePoint(t=23, data={'value':1}, data_indexes={'anomaly': 0.9}))
+        test_timeseries.append(DataTimePoint(t=24, data={'value':1}, data_indexes={'anomaly': 0.0}))
+
+        event_timeseries = AnomalyDetector.mark_events(test_timeseries,
+                                                       index_treshold = 0.9,
+                                                       min_persistence = 3,
+                                                       max_gap = 2)
+
+        events = {}
+        for item in event_timeseries:
+            events[item.t] = item.data_indexes['anomaly_event']
+
+        self.assertEqual(events, {0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 1, 11: 1, 12: 1, 13: 0, 14: 0, 15: 0, 16: 0, 17: 1, 18: 1, 19: 1, 20: 1, 21: 1, 22: 1, 23: 1, 24: 0})
 
 
     def test_ModelBasedAnomalyDetector(self):
