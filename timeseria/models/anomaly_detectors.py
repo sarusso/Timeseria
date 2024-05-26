@@ -215,9 +215,15 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
             elif issubclass(self.model_class, Forecaster):
 
                 if with_context:
-                    prediction = self.models[data_label].predict(series.view(from_i=0, to_i=i), steps=1, context_data=series[i].data)
+                    if isinstance(self.models[data_label], LSTMForecaster):
+                        prediction = self.models[data_label].predict(series.view(from_i=0, to_i=i), steps=1, context_data=series[i].data, multiple=True)
+                    else:
+                        prediction = self.models[data_label].predict(series.view(from_i=0, to_i=i), steps=1, context_data=series[i].data)
                 else:
-                    prediction = self.model.predict(series.view(from_i=0, to_i=i), steps=1)
+                    if isinstance(self.models[data_label], LSTMForecaster):
+                        prediction = self.model.predict(series.view(from_i=0, to_i=i), steps=1, multiple=True)
+                    else:
+                        prediction = self.model.predict(series.view(from_i=0, to_i=i), steps=1)
 
             else:
                 raise TypeError('Don\'t know how to handle predictive model class "{}"'.format(self.model_class.__name__))

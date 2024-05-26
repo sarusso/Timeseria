@@ -8,7 +8,7 @@ from math import sqrt
 from propertime.utils import now_s, dt_from_s, s_from_dt
 from datetime import datetime
 
-from ..datastructures import DataTimeSlot, TimePoint, DataTimePoint, Slot, Point, TimeSeries
+from ..datastructures import DataTimeSlot, TimePoint, DataTimePoint, Slot, Point, TimeSeries, TimeSeriesView
 from ..exceptions import NonContiguityError
 from ..utilities import detect_periodicity, _get_periodicity_index, _item_is_in_range, mean_absolute_percentage_error, ensure_reproducibility
 from ..units import Unit, TimeUnit
@@ -975,10 +975,10 @@ class LSTMForecaster(Forecaster, _KerasModel):
             self.keras_model.compile(loss='mean_squared_error', optimizer='adam')
 
         # Fit
-        self.keras_model.fit(array(window_features_matrix), array(target_values_vector), epochs=epochs, verbose=verbose)
+        self.keras_model.fit(array(window_features_matrix), array(target_values_vector), epochs=epochs)
 
     @Forecaster.predict_function
-    def predict(self, series, steps=1, context_data=None,  verbose=False):
+    def predict(self, series, steps=1, context_data=None, verbose=False, multiple=False):
         """Fit the model on a series.
 
         Args:
@@ -987,7 +987,6 @@ class LSTMForecaster(Forecaster, _KerasModel):
             context_data(dict): the data to use as context for the prediction.
             verbose(bool): if to print the predict output in the process.
         """
-
 
         if len(series) < self.data['window']:
             raise ValueError('The series length ({}) is shorter than the model window ({})'.format(len(series), self.data['window']))
@@ -1001,33 +1000,76 @@ class LSTMForecaster(Forecaster, _KerasModel):
         else:
             verbose=0
 
-        # Get the window if we were given a longer series
-        window_series = series[-self.data['window']:]
-
-        # Duplicate so that we are free to normalize in-place at the next step
-        window_series = window_series.duplicate()
-
-        # Convert to list in order to be able to handle datapoints with different labels for the contex
-        window_datapoints = list(window_series)
-
-        # Normalize window and context data if we have to do so
+        # Set if to normalize
         try:
             self.data['min_values']
         except:
             normalize = False
         else:
             normalize = True
-            for datapoint in window_datapoints:
-                for data_label in datapoint.data:
-                    datapoint.data[data_label] = (datapoint.data[data_label] - self.data['min_values'][data_label]) / (self.data['max_values'][data_label] - self.data['min_values'][data_label])
 
-            if context_data:
-                context_data = {key: value for key,value in context_data.items()}
-                for data_label in context_data:
-                    context_data[data_label] = (context_data[data_label] - self.data['min_values'][data_label]) / (self.data['max_values'][data_label] - self.data['min_values'][data_label])
+        # Are features pre-computed?
+        try:
+            series_features = series.series.features
+        except AttributeError:
+            try:
+                series_features = series.features
+            except AttributeError:
+                series_features = None
+
+        if not series_features and multiple:
+            series_features = {}
+            if not isinstance(series, TimeSeriesView):
+                raise TypeError('Sorry, multiple-prediction optimizatiosn only work with TimeSeriesView')
+
+            # Pre-compute features (only normalize datapoints for now)
+            preprocessed_datapoints = []
+
+            # Convert to list in order to be able to handle datapoints with different labels for the context
+            preprocessed_datapoints = list(series.duplicate())
+
+            # Normalize window and context data if we have to do so
+            if normalize:
+                for datapoint in preprocessed_datapoints:
+                    for data_label in datapoint.data:
+                        datapoint.data[data_label] = (datapoint.data[data_label] - self.data['min_values'][data_label]) / (self.data['max_values'][data_label] - self.data['min_values'][data_label])
+
+            logger.debug('Pre-normalized features')
+            series.series.features={}
+            series.series.features['preprocessed_datapoints'] = preprocessed_datapoints
+            series_features = series.series.features
+
+        if series_features:
+            #logger.debug('Using pre-normalized features')
+            if not isinstance(series, TimeSeriesView):
+                raise TypeError('Sorry, multiple-prediction optimizatiosn only work with TimeSeriesView')
+            preprocessed_window_datapoints =  series_features['preprocessed_datapoints'][series.from_i-self.data['window']:series.to_i]
+
+        else:
+
+            # Get the window if we were given a longer series
+            window_series = series[-self.data['window']:]
+
+            # Duplicate so that we are free to normalize in-place at the next step
+            window_series = window_series.duplicate()
+
+            # Convert to list in order to be able to handle datapoints with different labels for the contex
+            preprocessed_window_datapoints = list(window_series)
+
+            # Normalize window and context data if we have to do so
+            if normalize:
+                for datapoint in preprocessed_window_datapoints:
+                    for data_label in datapoint.data:
+                        datapoint.data[data_label] = (datapoint.data[data_label] - self.data['min_values'][data_label]) / (self.data['max_values'][data_label] - self.data['min_values'][data_label])
+
+        # Normalize context data if any
+        if context_data and normalize:
+            context_data = {key: value for key,value in context_data.items()}
+            for data_label in context_data:
+                context_data[data_label] = (context_data[data_label] - self.data['min_values'][data_label]) / (self.data['max_values'][data_label] - self.data['min_values'][data_label])
 
         # Compute window (plus context) features
-        window_features = self._compute_window_features(window_datapoints, data_labels=self.data['data_labels'], time_unit=series.resolution, features=self.data['features'], context_data=context_data)
+        window_features = self._compute_window_features(preprocessed_window_datapoints, data_labels=self.data['data_labels'], time_unit=series.resolution, features=self.data['features'], context_data=context_data)
 
         # Perform the predict and set prediction data
         yhat = self.keras_model.predict(array([window_features]), verbose=verbose)
