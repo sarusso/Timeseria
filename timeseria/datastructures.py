@@ -1311,7 +1311,9 @@ class TimeSeries(Series):
             if isinstance(arg.start, int) or isinstance(arg.stop, int):
                 return self.slice(from_i=arg.start, to_i=arg.stop)
             elif isinstance(arg.start, float) or isinstance(arg.stop, float):
-                if not (isinstance(arg.start, Time) and isinstance(arg.stop, Time)):
+                if arg.start is not None and not (isinstance(arg.start, Time)):
+                    logger.warning('Slicing in the square brackets notation with a float works (as epoch) but it can be ambiguous in the code')
+                if arg.stop is not None and not (isinstance(arg.stop, Time)):
                     logger.warning('Slicing in the square brackets notation with a float works (as epoch) but it can be ambiguous in the code')
                 return self.slice(from_t=arg.start, to_t=arg.stop)
             elif isinstance(arg.start, datetime) or isinstance(arg.stop, datetime):

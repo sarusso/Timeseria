@@ -208,6 +208,9 @@ def detect_periodicity(timeseries):
             if i>10:
                 break
 
+        if not max_peak_frequency:
+            raise ValueError('Cannot detect any periodicity!')
+
         # Round max peak and return
         return int(round(max_peak_frequency))
 
