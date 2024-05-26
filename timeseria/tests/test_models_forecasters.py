@@ -78,7 +78,7 @@ class TestForecasters(unittest.TestCase):
 
         # Evaluate
         evaluation = forecaster.evaluate(self.sine_minute_timeseries, steps='auto', limit=100, details=True)
-        self.assertEqual(forecaster.data['periodicity'], 63)
+        self.assertEqual(forecaster.data['periodicities']['value'], 63)
         self.assertAlmostEqual(evaluation['RMSE_1_steps'], 0.07318673229600292)
         self.assertAlmostEqual(evaluation['MAE_1_steps'], 0.06622794526818285)
         self.assertAlmostEqual(evaluation['RMSE_63_steps'], 0.06697755802373265)
@@ -88,7 +88,7 @@ class TestForecasters(unittest.TestCase):
 
         # Evaluate
         evaluation = forecaster.evaluate(self.sine_minute_timeseries, steps=[1,3], limit=100, details=True)
-        self.assertEqual(forecaster.data['periodicity'], 63)
+        self.assertEqual(forecaster.data['periodicities']['value'], 63)
         self.assertAlmostEqual(evaluation['RMSE_1_steps'], 0.07318673229600292)
         self.assertAlmostEqual(evaluation['MAE_1_steps'], 0.06622794526818285)
         self.assertAlmostEqual(evaluation['RMSE_3_steps'], 0.07253018513852955)
@@ -105,6 +105,23 @@ class TestForecasters(unittest.TestCase):
 
         # TODO: do some actual testing.. not only that "it works"
         forecasted_timeseries  = forecaster.apply(timeseries)
+
+
+    def test_PeriodicAverageForecaster_multivariate(self):
+        try:
+            import tensorflow
+        except ImportError:
+            print('Skipping LSTM forecaster tests with multivariate time series as no tensorflow module installed')
+            return
+
+        timeseries = TimeSeries()
+        for i in range(980):
+            timeseries.append(DataTimePoint(t=i*60, data={'sin': sin(i/10.0), 'cos': cos(i/10.0)}))
+        forecaster = PeriodicAverageForecaster()
+        forecaster.fit(timeseries)
+
+        # TODO: do some actual testing.. not only that "it works"
+        timeseries_with_forecast = forecaster.apply(timeseries[0:970], steps=5)
 
 
     def test_PeriodicAverageForecaster_save_load(self):

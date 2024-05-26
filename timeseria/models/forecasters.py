@@ -505,7 +505,8 @@ class PeriodicAverageForecaster(Forecaster):
     def load(cls, path):
         model = super().load(path)
         # Convert the average dict keys back to integers
-        model.data['averages'] = {int(key):value for key, value in model.data['averages'].items()}
+        for data_label in model.data['averages']:
+            model.data['averages'][data_label] = {int(key):value for key, value in model.data['averages'][data_label].items()}
         return model
 
     @Forecaster.fit_function
@@ -518,49 +519,52 @@ class PeriodicAverageForecaster(Forecaster):
             data_loss_limit(float): discard from the fit elements with a data loss greater than or equal to this limit.
         """
 
-        if len(series.data_labels) > 1:
-            raise NotImplementedError('Multivariate time series are not yet supported')
-
-        # Set or detect periodicity
-        if periodicity == 'auto':
-            periodicity =  detect_periodicity(series)
-            logger.info('Detected periodicity: %sx %s', periodicity, series.resolution)
-
-        self.data['periodicity']  = periodicity
+        self.data['periodicities']  = {}
+        self.data['windows'] = {}
+        self.data['averages'] = {}
         self.data['dst_affected'] = dst_affected
 
-        # Set window
-        if self._window != 'auto':
-            self.data['window'] = self._window
-        else:
-            logger.info('Using a window of "{}"'.format(periodicity))
-            self.data['window'] = periodicity
-
         for data_label in series.data_labels:
-            sums   = {}
-            totals = {}
-            processed = 0
-            for item in series:
-                if data_loss_limit is not None and 'data_loss' in item.data_indexes and item.data_indexes['data_loss'] >= data_loss_limit:
-                    continue
-                periodicity_index = _get_periodicity_index(item, series.resolution, periodicity, dst_affected)
-                if not periodicity_index in sums:
-                    sums[periodicity_index] = item.data[data_label]
-                    totals[periodicity_index] = 1
-                else:
-                    sums[periodicity_index] += item.data[data_label]
-                    totals[periodicity_index] +=1
-                processed += 1
+            # Set or detect periodicity
+            if periodicity == 'auto':
+                periodicity =  detect_periodicity(series[data_label])
+                logger.info('Detected periodicity for "%s": %sx %s', data_label, periodicity, series.resolution)
 
-        if not processed:
-            raise ValueError('Too much data loss (not a single element below the limit), cannot fit!')
+            self.data['periodicities'][data_label]  = periodicity
 
-        averages={}
-        for periodicity_index in sums:
-            averages[periodicity_index] = sums[periodicity_index]/totals[periodicity_index]
-        self.data['averages'] = averages
+            # Set window
+            if self._window != 'auto':
+                self.data['windows'][data_label] = self._window
+            else:
+                logger.info('Using a window of "{}" for "{}"'.format(periodicity, data_label))
+                self.data['windows'][data_label]= periodicity
 
-        logger.debug('Processed %s items', processed)
+                sums   = {}
+                totals = {}
+                processed = 0
+                for item in series:
+                    if data_loss_limit is not None and 'data_loss' in item.data_indexes and item.data_indexes['data_loss'] >= data_loss_limit:
+                        continue
+                    periodicity_index = _get_periodicity_index(item, series.resolution, periodicity, dst_affected)
+                    if not periodicity_index in sums:
+                        sums[periodicity_index] = item.data[data_label]
+                        totals[periodicity_index] = 1
+                    else:
+                        sums[periodicity_index] += item.data[data_label]
+                        totals[periodicity_index] +=1
+                    processed += 1
+
+            if not processed:
+                raise ValueError('Too much data loss (not a single element below the limit), cannot fit!')
+
+            averages={}
+            for periodicity_index in sums:
+                averages[periodicity_index] = sums[periodicity_index]/totals[periodicity_index]
+            self.data['averages'][data_label] = averages
+
+        # Store model window as the max of the single windows
+        self.data['window'] = max([self.data['windows'][data_label] for data_label in self.data['windows']])
+
 
     @Forecaster.predict_function
     def predict(self, series, steps=1):
@@ -568,26 +572,12 @@ class PeriodicAverageForecaster(Forecaster):
         if len(series) < self.data['window']:
             raise ValueError('The series length ({}) is shorter than the model window ({})'.format(len(series), self.data['window']))
 
-        # Univariate is enforced by the fit
-        data_label = self.data['data_labels'][0]
-
         # Get forecast start item
-        forecast_start_item = series[-1]
+        predict_start_item = series[-1]
 
         # Support vars
-        forecast_timestamps = []
-        forecast_data = []
-
-        # Compute the offset (avg diff between the real values and the forecasts on the first window)
-        diffs  = 0
-        for j in range(self.data['window']):
-            series_index = len(series) - 1 - self.data['window'] + j
-            real_value = series[series_index].data[data_label]
-            forecast_value = self.data['averages'][_get_periodicity_index(series[series_index], series.resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])]
-            diffs += (real_value - forecast_value)
-
-        # Sum the avg diff between the real and the forecast on the window to the forecast (the offset)
-        offset = diffs/j
+        predict_timestamps = []
+        predict_data = []
 
         # Perform the forecast
         for i in range(steps):
@@ -596,21 +586,45 @@ class PeriodicAverageForecaster(Forecaster):
             # Set forecast timestamp
             if isinstance(series[0], Slot):
                 try:
-                    forecast_timestamp = forecast_timestamps[-1] + series.resolution
-                    forecast_timestamps.append(forecast_timestamp)
+                    predict_timestamp = predict_timestamps[-1] + series.resolution
+                    predict_timestamps.append(predict_timestamp)
                 except IndexError:
-                    forecast_timestamp = forecast_start_item.end
-                    forecast_timestamps.append(forecast_timestamp)
+                    predict_timestamp = predict_start_item.end
+                    predict_timestamps.append(predict_timestamp)
 
             else:
-                forecast_timestamp = TimePoint(t = forecast_start_item.t + (series.resolution.as_seconds()*step), tz = forecast_start_item.tz )
+                predict_timestamp = TimePoint(t = predict_start_item.t + (series.resolution.as_seconds()*step), tz = predict_start_item.tz )
 
-            # Compute the real forecast data
-            periodicity_index = _get_periodicity_index(forecast_timestamp, series.resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])
-            forecast_data.append({data_label: self.data['averages'][periodicity_index] + (offset*1.0)})
+            # Perform the forecast for each data label
+            this_step_predict_data = {}
+            for data_label in self.data['data_labels']:
+
+                # Compute the offset (avg diff between the real values and the forecasts on the first window)
+                diffs  = 0
+                for j in range(self.data['windows'][data_label]):
+                    series_index = len(series) - 1 - self.data['windows'][data_label] + j
+                    real_value = series[series_index].data[data_label]
+                    predict_value = self.data['averages'][data_label][_get_periodicity_index(series[series_index],
+                                                                                              series.resolution,
+                                                                                              self.data['periodicities'][data_label],
+                                                                                              dst_affected=self.data['dst_affected'])]
+                    diffs += (real_value - predict_value)
+
+                # Sum the avg diff between the real and the forecast on the window to the forecast (the offset)
+                offset = diffs/j
+
+                # Compute the forecast data
+                periodicity_index = _get_periodicity_index(predict_timestamp,
+                                                           series.resolution,
+                                                           self.data['periodicities'][data_label],
+                                                           dst_affected=self.data['dst_affected'])
+
+                this_step_predict_data[data_label] = self.data['averages'][data_label][periodicity_index] + (offset*1.0)
+
+            predict_data.append(this_step_predict_data)
 
         # Return
-        return forecast_data
+        return predict_data
 
     def _plot_averages(self, series, **kwargs):
         averages_series = copy.deepcopy(series)
