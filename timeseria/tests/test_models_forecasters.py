@@ -41,7 +41,7 @@ class TestForecasters(unittest.TestCase):
 
     def test_BaseForecasters(self):
 
-        # This test is done using the Linear Interpolator Reconstructor
+        # TODO: This test is done using the Periodic Average Forecaster, make a mock
 
         timeseries = TimeSeries()
         timeseries.append(DataTimePoint(t=1,  data={'a':1}, data_loss=0))

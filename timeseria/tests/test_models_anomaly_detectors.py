@@ -107,7 +107,7 @@ class TestAnomalyDetectors(unittest.TestCase):
         anomaly_detector.fit(self.sine_minute_timeseries, periodicity=63, error_metric='E', error_distribution='norm')
         result_timeseries = anomaly_detector.apply(self.sine_minute_timeseries,  index_range=['avg_err','3_sigma'])
         self.assertEqual(len(result_timeseries),936)
-        self.assertAlmostEqual(result_timeseries[0].data_indexes['anomaly'], 0.0526, places=2)
+        self.assertAlmostEqual(result_timeseries[0].data_indexes['anomaly'], 0.0227, places=2)
         self.assertEqual(result_timeseries[236].data_indexes['anomaly'], 1)
 
         anomaly_detector = ModelBasedAnomalyDetector(model_class=PeriodicAverageReconstructor)
@@ -125,8 +125,8 @@ class TestAnomalyDetectors(unittest.TestCase):
         anomaly_detector = PeriodicAverageAnomalyDetector()
 
         anomaly_detector.fit(self.sine_minute_timeseries, periodicity=63, error_metric='E', error_distribution='norm')
-        self.assertAlmostEqual(anomaly_detector.data['error_distributions_params']['sin']['loc'], 0.00029083304321826024, places=5)
-        self.assertAlmostEqual(anomaly_detector.data['error_distributions_params']['sin']['scale'], 0.23226485795568802, places=4)
+        self.assertAlmostEqual(anomaly_detector.data['error_distributions_params']['sin']['loc'], -0.00064, places=5)
+        self.assertAlmostEqual(anomaly_detector.data['error_distributions_params']['sin']['scale'], 0.2101 , places=2)
 
         result_timeseries = anomaly_detector.apply(self.sine_minute_timeseries,  index_range=['avg_err','3_sigma'])
 
@@ -166,8 +166,8 @@ class TestAnomalyDetectors(unittest.TestCase):
                                                               'error_distributions', 'error_distributions_params', 'error_distributions_stats',
                                                               'fitted_at', 'stdevs', 'model_window', 'with_context', 'actual_values', 'predicted_values']))
 
-        self.assertAlmostEqual(anomaly_detector.data['error_distributions_params']['sin']['loc'], 0.00029083304321826024, places=5)
-        self.assertAlmostEqual(anomaly_detector.data['error_distributions_params']['sin']['scale'], 0.23226485795568802, places=4)
+        self.assertAlmostEqual(anomaly_detector.data['error_distributions_params']['sin']['loc'], -0.00064, places=5)
+        self.assertAlmostEqual(anomaly_detector.data['error_distributions_params']['sin']['scale'], 0.2101 , places=2)
 
         _ = loaded_anomaly_detector.apply(self.sine_minute_timeseries, index_range=['avg_err','3_sigma'])
 

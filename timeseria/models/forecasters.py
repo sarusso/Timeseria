@@ -552,6 +552,9 @@ class PeriodicAverageForecaster(Forecaster):
                     totals[periodicity_index] +=1
                 processed += 1
 
+        if not processed:
+            raise ValueError('Too much data loss (not a single element below the limit), cannot fit!')
+
         averages={}
         for periodicity_index in sums:
             averages[periodicity_index] = sums[periodicity_index]/totals[periodicity_index]
@@ -560,7 +563,7 @@ class PeriodicAverageForecaster(Forecaster):
         logger.debug('Processed %s items', processed)
 
     @Forecaster.predict_function
-    def predict(self, series, from_i=None, steps=1):
+    def predict(self, series, steps=1):
 
         if len(series) < self.data['window']:
             raise ValueError('The series length ({}) is shorter than the model window ({})'.format(len(series), self.data['window']))
@@ -568,12 +571,8 @@ class PeriodicAverageForecaster(Forecaster):
         # Univariate is enforced by the fit
         data_label = self.data['data_labels'][0]
 
-        # Set forecast starting item
-        if from_i is None:
-            from_i = len(series) - 1
-
         # Get forecast start item
-        forecast_start_item = series[from_i]
+        forecast_start_item = series[-1]
 
         # Support vars
         forecast_timestamps = []
@@ -582,7 +581,7 @@ class PeriodicAverageForecaster(Forecaster):
         # Compute the offset (avg diff between the real values and the forecasts on the first window)
         diffs  = 0
         for j in range(self.data['window']):
-            series_index = from_i - self.data['window'] + j
+            series_index = len(series) - 1 - self.data['window'] + j
             real_value = series[series_index].data[data_label]
             forecast_value = self.data['averages'][_get_periodicity_index(series[series_index], series.resolution, self.data['periodicity'], dst_affected=self.data['dst_affected'])]
             diffs += (real_value - forecast_value)
@@ -979,18 +978,16 @@ class LSTMForecaster(Forecaster, _KerasModel):
         self.keras_model.fit(array(window_features_matrix), array(target_values_vector), epochs=epochs, verbose=verbose)
 
     @Forecaster.predict_function
-    def predict(self, series, from_i=None, steps=1, context_data=None,  verbose=False):
+    def predict(self, series, steps=1, context_data=None,  verbose=False):
         """Fit the model on a series.
 
         Args:
             series(series): the series on which to fit the model.
-            from_i(int): the start of the prediction as series position (index).
             steps(int): how may steps-haead to predict.
             context_data(dict): the data to use as context for the prediction.
             verbose(bool): if to print the predict output in the process.
         """
 
-        # TODO: from_i -> start(datetieme,float,int): the start of the prediction (float for epoch and int for an index).
 
         if len(series) < self.data['window']:
             raise ValueError('The series length ({}) is shorter than the model window ({})'.format(len(series), self.data['window']))
@@ -1005,10 +1002,7 @@ class LSTMForecaster(Forecaster, _KerasModel):
             verbose=0
 
         # Get the window if we were given a longer series
-        if from_i is not None:
-            window_series = series[from_i-self.data['window']:from_i]
-        else:
-            window_series = series[-self.data['window']:]
+        window_series = series[-self.data['window']:]
 
         # Duplicate so that we are free to normalize in-place at the next step
         window_series = window_series.duplicate()

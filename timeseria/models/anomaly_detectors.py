@@ -62,7 +62,7 @@ class AnomalyDetector(Model):
 
             max_gap(int): the maximum gap within a signle event of data points below the index_treshold.
 
-            replace_index(bool): if to replace the existent ``anomaly`` index instead of adding a new ``anomaly_event``one.
+            replace_index(bool): if to replace the existent ``anomaly`` index instead of adding a new ``anomaly_event`` one.
         """
 
         event_timeseries = timeseries.duplicate()
@@ -210,30 +210,15 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
 
             # Call model predict logic and compare with the actual data
             if issubclass(self.model_class, Reconstructor):
-                prediction = self.model.predict(series, from_i=i,to_i=i)
+                prediction = self.model.predict(series, from_i=i, to_i=i)
+
             elif issubclass(self.model_class, Forecaster):
+
                 if with_context:
-                    try:
-                        prediction = self.models[data_label].predict(series, steps=1, from_i=i, context_data=series[i].data)
-                    except TypeError as e:
-                        if "got an unexpected keyword argument 'from_i'" in str(e):
-                            raise TypeError('To use a forecaster with an anomaly detector, it must implement the "from_i" argument') from None
-                            #series_view = TimeSeriesView(series=series, from_i=0, to_i=i+1)
-                            #prediction = self.models[data_label].predict(series_view, steps=1, context_data=series[i].data)
-                        else:
-                            raise
+                    prediction = self.models[data_label].predict(series.view(from_i=0, to_i=i), steps=1, context_data=series[i].data)
                 else:
-                    # TODO: in case of forecasters without partial predictions, this is a performance hit for multivariate
-                    # time series as the same predict is called in the exact same way for each data label.
-                    try:
-                        prediction = self.model.predict(series, steps=1, from_i=i)
-                    except TypeError as e:
-                        if "got an unexpected keyword argument 'from_i'" in str(e):
-                            raise TypeError('To use a forecaster with an anomaly detector, it must implement the "from_i" argument') from None
-                            #series_view = TimeSeriesView(series=series, from_i=0, to_i=i+1)
-                            #prediction = self.model.predict(series_view, steps=1)
-                        else:
-                            raise
+                    prediction = self.model.predict(series.view(from_i=0, to_i=i), steps=1)
+
             else:
                 raise TypeError('Don\'t know how to handle predictive model class "{}"'.format(self.model_class.__name__))
 
