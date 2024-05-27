@@ -1074,47 +1074,71 @@ class Merge(Operation):
             if reference_series[i].t > min_ending_point_t:
                 break
 
-            # Support vars
-            data = None
-            data_loss = 0
-            valid_data_losses = 0
-
+            # Set reference tz and unit
             tz = seriess[0][0].tz
             if isinstance(reference_series[0], Slot):
                 unit = reference_series[0].unit
             else:
                 unit = None
 
-            # For each time series, get data in i-th position (given the offset) and merge it
+            # Support vars
+            data = {}
+            data_sum = {}
+            data_count = {}
+            data_indexes = {}
+            data_indexes_sum ={}
+            data_indexes_count = {}
+
+            # For each time series, get the item in the i-th position given the offset
             for series in seriess:
 
+                # Set the item according to the offset
+                item = series[i + offsets[series]]
+
                 # Data
-                if data is None:
-                    data = deepcopy(series[i+offsets[series]].data)
+                for data_label in item.data:
+                    if data_label not in data_count:
+                        data_count[data_label] = 1
+                    else:
+                        data_count[data_label] += 1
+                    if data_label not in data_sum:
+                        data_sum[data_label] = item.data[data_label]
+                    else:
+                        data_sum[data_label] += item.data[data_label]
+
+                # Data indexes
+                for data_index in item.data_indexes:
+                    if item.data_indexes[data_index] is not None:
+                        if data_index not in data_indexes_count:
+                            data_indexes_count[data_index] = 1
+                        else:
+                            data_indexes_count[data_index] += 1
+                        if data_index not in data_indexes_sum:
+                            data_indexes_sum[data_index] = item.data_indexes[data_index]
+                        else:
+                            data_indexes_sum[data_index] += item.data_indexes[data_index]
+
+            # Finalize data
+            for data_label in data_sum:
+                data[data_label]  = data_sum[data_label]  / data_count[data_label]
+
+            # Finalize data indexes
+            for data_index in data_indexes_sum:
+                if data_indexes_count[data_index] > 0:
+                    data_indexes[data_index]  = data_indexes_sum[data_index]  / data_indexes_count[data_index]
                 else:
-                    data.update(series[i+offsets[series]].data)
-
-                # Data loss
-                if series[i+offsets[series]].data_loss is not None:
-                    valid_data_losses += 1
-                    data_loss += series[i+offsets[series]].data_loss
-
-            # Finalize data loss if there were valid ones
-            if valid_data_losses:
-                data_loss = data_loss / valid_data_losses
-            else:
-                data_loss = None
+                    data_indexes[data_index] = None
 
             if isinstance(reference_series[0], Point):
                 result_series.append(seriess[0][0].__class__(t = reference_series[i].t,
-                                                                     tz = tz,
-                                                                     data  = data,
-                                                                     data_loss = data_loss))
+                                                             tz = tz,
+                                                             data  = data,
+                                                             data_indexes = data_indexes))
             elif isinstance(reference_series[0], Slot):
                 result_series.append(seriess[0][0].__class__(start = reference_series[i].start,
-                                                                     unit  = unit,
-                                                                     data  = data,
-                                                                     data_loss = data_loss))
+                                                             unit  = unit,
+                                                             data  = data,
+                                                             data_indexes = data_indexes))
             else:
                 raise NotImplementedError('Working on series other than slots or points not yet implemented')
 

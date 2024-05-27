@@ -569,20 +569,28 @@ class TestOpertions(unittest.TestCase):
 
         # Test data
         series1 = TimeSeries()
-        series1.append(DataTimePoint(t=0, data={'value':10}, data_loss=0.1))
-        series1.append(DataTimePoint(t=60, data={'value':12}, data_loss=0.2))
-        series1.append(DataTimePoint(t=120, data={'value':6}, data_loss=0.3))
-        series1.append(DataTimePoint(t=180, data={'value':16}, data_loss=0.4))
-        series1.append(DataTimePoint(t=240, data={'value':20}, data_loss=0.5))
+        series1.append(DataTimePoint(t=0, data={'value':10}, data_indexes={'data_loss':0.1, 'index_a':0.1}))
+        series1.append(DataTimePoint(t=60, data={'value':12}, data_indexes={'data_loss':0.2, 'index_a':0.2}))
+        series1.append(DataTimePoint(t=120, data={'value':6}, data_indexes={'data_loss':0.3, 'index_a':0.3}))
+        series1.append(DataTimePoint(t=180, data={'value':16}, data_indexes={'data_loss':0.4, 'index_a':0.4}))
+        series1.append(DataTimePoint(t=240, data={'value':20}, data_indexes={'data_loss':0.5, 'index_a':0.5}))
 
         series2 = TimeSeries()
-        series2.append(DataTimePoint(t=0, data={'another_value': 75}, data_loss=0.01))
-        series2.append(DataTimePoint(t=60, data={'another_value': 65}, data_loss=0.02))
-        series2.append(DataTimePoint(t=120, data={'another_value': 32}, data_loss=0.03))
-        series2.append(DataTimePoint(t=180, data={'another_value': 10}, data_loss=None))
-        series2.append(DataTimePoint(t=240, data={'another_value': 7}, data_loss=None))
+        series2.append(DataTimePoint(t=0, data={'another_value': 75}, data_indexes={'data_loss':0.01, 'index_b':0.01}))
+        series2.append(DataTimePoint(t=60, data={'another_value': 65}, data_indexes={'data_loss':0.02, 'index_b':0.02}))
+        series2.append(DataTimePoint(t=120, data={'another_value': 32}, data_indexes={'data_loss':0.03, 'index_b':0.03}))
+        series2.append(DataTimePoint(t=180, data={'another_value': 10}, data_indexes={'data_loss':None, 'index_b':0.04}))
+        series2.append(DataTimePoint(t=240, data={'another_value': 7}, data_indexes={'data_loss':None, 'index_b':0.05}))
 
-        # Basic merge test
+        series3 = TimeSeries()
+        series3.append(DataTimePoint(t=0, data={'another_value': 10}, data_indexes={'data_loss':0.01, 'index_b':0.01}))
+        series3.append(DataTimePoint(t=60, data={'another_value': 10}, data_indexes={'data_loss':0.02, 'index_b':0.02}))
+        series3.append(DataTimePoint(t=120, data={'another_value': 10}, data_indexes={'data_loss':0.03, 'index_b':0.03}))
+        series3.append(DataTimePoint(t=180, data={'another_value': 10}, data_indexes={'data_loss':None, 'index_b':0.04}))
+        series3.append(DataTimePoint(t=240, data={'another_value': 10}, data_indexes={'data_loss':None, 'index_b':0.05}))
+
+
+        # Basic merge
         merged = merge(series1,series2)
         self.assertEqual(len(merged), 5)
         self.assertEqual(merged[0].t, 0)
@@ -592,7 +600,7 @@ class TestOpertions(unittest.TestCase):
         self.assertEqual(merged[-1].data['value'], 20)
         self.assertEqual(merged[-1].data['another_value'], 7)
 
-        # Subset merge test
+        # Subset merge
         merged = merge(series1[2:4],series2)
         self.assertEqual(len(merged), 2)
         self.assertEqual(merged[0].t, 120)
@@ -602,12 +610,19 @@ class TestOpertions(unittest.TestCase):
         self.assertEqual(merged[-1].data['value'], 16)
         self.assertEqual(merged[-1].data['another_value'], 10)
 
-        # Coverage merge test
-        merged = merge(series1,series2)
-        self.assertEqual(merged[0].data_loss, (0.1+0.01)/2)
-        self.assertEqual(merged[1].data_loss, (0.2+0.02)/2)
-        self.assertEqual(merged[2].data_loss, (0.3+0.03)/2)
-        self.assertEqual(merged[3].data_loss, 0.4)
-        self.assertEqual(merged[4].data_loss, 0.5)
+        # Data math
+        merged = merge(series2,series3)
+        self.assertEqual(len(merged), 5)
+        self.assertEqual(merged[0].t, 0)
+        self.assertEqual(merged[-1].t, 240)
+        self.assertEqual(merged[0].data['another_value'], (75+10)/2)
+        self.assertEqual(merged[-1].data['another_value'], (7+10)/2)
 
+        # Data indexes math
+        merged = merge(series1,series2)
+        self.assertEqual(merged[0].data_indexes, {'data_loss': (0.1+0.01)/2, 'index_a': 0.1, 'index_b': 0.01})
+        self.assertEqual(merged[1].data_indexes, {'data_loss': (0.2+0.02)/2, 'index_a': 0.2, 'index_b': 0.02})
+        self.assertEqual(merged[2].data_indexes, {'data_loss': (0.3+0.03)/2, 'index_a': 0.3, 'index_b': 0.03})
+        self.assertEqual(merged[3].data_indexes, {'data_loss': 0.4, 'index_a': 0.4, 'index_b': 0.04})
+        self.assertEqual(merged[4].data_indexes, {'data_loss': 0.5, 'index_a': 0.5, 'index_b': 0.05}) 
 
