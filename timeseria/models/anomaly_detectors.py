@@ -700,11 +700,11 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
                         if 'err' in details:
                             item.data['{}_err'.format(data_label)] = prediction_error
                         if 'adh' in details:
-                            item.data['{}_adh)'.format(data_label)] = error_distribution_function(prediction_error)
+                            item.data['{}_adh)'.format(data_label)] = y/y_max
                     elif isinstance(details, bool):
                         item.data['{}_pred'.format(data_label)] = predicted
                         item.data['{}_err'.format(data_label)] = prediction_error
-                        item.data['{}_adh'.format(data_label)] = error_distribution_function(prediction_error)
+                        item.data['{}_adh'.format(data_label)] = y/y_max
                     else:
                         raise TypeError('The "details" argument accepts only True/False or a list containing what details to add, as strings.')
 
