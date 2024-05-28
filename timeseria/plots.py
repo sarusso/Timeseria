@@ -44,17 +44,58 @@ else:
 # Tab 10 colormap (https://matplotlib.org/stable/tutorials/colors/colormaps.html)
 # https://github.com/matplotlib/matplotlib/blob/f6e0ee49c598f59c6e6cf4eefe473e4dc634a58a/lib/matplotlib/_cm.py
 _tab10_colormap_norm = (
-    (0.12156862745098039, 0.4666666666666667,  0.7058823529411765  ),  # 1f77b4
-    #(1.0,                 0.4980392156862745,  0.054901960784313725),  # ff7f0e
-    (0.17254901960784313, 0.6274509803921569,  0.17254901960784313 ),  # 2ca02c
-    (0.8392156862745098,  0.15294117647058825, 0.1568627450980392  ),  # d62728
-    (0.5803921568627451,  0.403921568627451,   0.7411764705882353  ),  # 9467bd
-    (0.5490196078431373,  0.33725490196078434, 0.29411764705882354 ),  # 8c564b
-    #(0.8901960784313725,  0.4666666666666667,  0.7607843137254902  ),  # e377c2
-    (0.4980392156862745,  0.4980392156862745,  0.4980392156862745  ),  # 7f7f7f
-    (0.7372549019607844,  0.7411764705882353,  0.13333333333333333 ),  # bcbd22
-    (0.09019607843137255, 0.7450980392156863,  0.8117647058823529),    # 17becf
+    (0.12156862745098039, 0.4666666666666667,  0.7058823529411765  ),  # 1f77b4  Blue
+    #(1.0,                 0.4980392156862745,  0.054901960784313725),  # ff7f0e  Orange
+    (0.17254901960784313, 0.6274509803921569,  0.17254901960784313 ),  # 2ca02c  Green
+    (0.8392156862745098,  0.15294117647058825, 0.1568627450980392  ),  # d62728  Red
+    (0.5803921568627451,  0.403921568627451,   0.7411764705882353  ),  # 9467bd  Purple
+    (0.5490196078431373,  0.33725490196078434, 0.29411764705882354 ),  # 8c564b  Brown
+    #(0.8901960784313725,  0.4666666666666667,  0.7607843137254902  ),  # e377c2  Pink
+    (0.4980392156862745,  0.4980392156862745,  0.4980392156862745  ),  # 7f7f7f  Gray
+    (0.7372549019607844,  0.7411764705882353,  0.13333333333333333 ),  # bcbd22  Olive
+    (0.09019607843137255, 0.7450980392156863,  0.8117647058823529),    # 17becf  Cyan
 )
+
+_tab10_colormap_rgb = [
+    (31, 119, 180),   # Blue
+    (255, 127, 14),   # Orange
+    (44, 160, 44),    # Green
+    (214, 39, 40),    # Red
+    (148, 103, 189),  # Purple
+    (140, 86, 75),    # Brown
+    (227, 119, 194),  # Pink
+    (127, 127, 127),  # Gray
+    (188, 189, 34),   # Olive
+    (23, 190, 207)    # Cyan
+]
+
+_tab10reord_colormap_rgb = [
+    (148, 103, 189),  # Purple
+    (44, 160, 44),    # Green
+    (140, 86, 75),    # Brown
+    (227, 119, 194),  # Pink
+    (127, 127, 127),  # Gray
+    (188, 189, 34),   # Olive
+    (23, 190, 207),    # Cyan
+    (214, 39, 40),    # Red
+    (255, 127, 14),   # Orange
+    (31, 119, 180),   # Blue
+]
+
+_extra_colormap_rgb = [
+    (77, 175, 74),    # Green
+    #(152, 78, 163),   # Purple
+    (166, 86, 40),    # Brown
+    (0,0,0), # Black
+    (255, 255, 51),   # Yellow
+    (247, 129, 191),  # Pink
+    (153, 153, 153),   # Gray
+    (255, 127, 0),    # Orange
+    (55, 126, 184),   # Blue
+    (228, 26, 28),    # Red
+
+]
+
 
 def to_rgba_str_from_norm_rgb(rgb, a):
     return 'rgba({},{},{},{})'.format(rgb[0]*255,rgb[1]*255,rgb[2]*255,a)
@@ -824,12 +865,29 @@ animatedZooms: true,"""
     dygraphs_javascript += """
      },"""
 
-    # Force "original" Dygraph color if only one data series, or use custom color:
+    # Force "original" Dygraph color if only one data series, or use custom color.
+    # Otherwise, use the "original" Dygraph color for the first series and then the tab10 palette.
     if len(data_labels_to_plot) <=1:
         if color:
             dygraphs_javascript += """colors: ['"""+color+"""'],"""
         else:
             dygraphs_javascript += """colors: ['rgb(0,128,128)'],"""
+    else:
+        colors = "colors: ['rgb(0,128,128)'"
+        for i in range(len(data_labels_to_plot)-1):
+            try:
+                colors += ",'rgb({},{},{})'".format(_tab10reord_colormap_rgb[i][0],
+                                                    _tab10reord_colormap_rgb[i][1],
+                                                    _tab10reord_colormap_rgb[i][2])
+            except IndexError:
+                try:
+                    colors += ",'rgb({},{},{})'".format(_extra_colormap_rgb[i-len(_tab10reord_colormap_rgb)][0],
+                                                        _extra_colormap_rgb[i-len(_tab10reord_colormap_rgb)][1],
+                                                        _extra_colormap_rgb[i-len(_tab10reord_colormap_rgb)][2])
+                except IndexError:
+                    colors += ",'rgb(0,0,0)'"
+        colors += "],"
+        dygraphs_javascript += colors
 
     # Handle series mark (only if not handled as an index)
     if mark and not RENDER_MARK_AS_INDEX:
