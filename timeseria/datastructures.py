@@ -968,11 +968,12 @@ class Series(list):
         from .operations import csum as csum_operation
         return csum_operation(self, inplace=inplace, offset=offset)
 
-    def normalize(self, range=[0,1], inplace=False):
+    def normalize(self, range=[0,1], inplace=False, source_range=None):
         """Normalize the series data values. Extra parameters: ``range`` (defaulted to [0,1]) to set the normalization
-        range and ``inplace`` (defaulted to false). A series of DataPoints or DataSlots is required."""
+        target range, ``source_range`` to define a custom source range to normalize with respect to, and ``inplace``
+        (defaulted to false). A series of DataPoints or DataSlots is required."""
         from .operations import normalize as normalize_operation
-        return normalize_operation(self, inplace=inplace, range=range)
+        return normalize_operation(self, inplace=inplace, range=range, source_range=source_range)
 
     def rescale(self, value, inplace=False):
         """Rescale the series data values by a ``value``. This can be either a single number or a dictionary

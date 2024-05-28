@@ -339,12 +339,12 @@ class Derivative(Operation):
                     der_series.append(series[0].__class__(t = item.t,
                                                           tz = item.tz,
                                                           data = der_data,
-                                                          data_loss = item.data_loss))
+                                                          data_indexes = item.data_indexes))
                 elif isinstance(series[0], Slot):
                     der_series.append(series[0].__class__(start = item.start,
                                                           unit = item.unit,
                                                           data = der_data,
-                                                          data_loss = item.data_loss))
+                                                          data_indexes = item.data_indexes))
                 else:
                     raise NotImplementedError('Working on series other than slots or points not yet implemented')
 
@@ -498,12 +498,12 @@ class Integral(Operation):
                     int_series.append(series[0].__class__(t = item.t,
                                                           tz = item.tz,
                                                           data = data,
-                                                          data_loss = item.data_loss))
+                                                          data_indexes = item.data_indexes))
                 elif isinstance(series[0], Slot):
                     int_series.append(series[0].__class__(start = item.start,
                                                           unit = item.unit,
                                                           data = data,
-                                                          data_loss = item.data_loss))
+                                                          data_indexes = item.data_indexes))
                 else:
                     raise NotImplementedError('Working on series other than slots or points not yet implemented')
 
@@ -530,7 +530,7 @@ class CSum(Integral):
 class Normalize(Operation):
     """Normalization operation (callable object)"""
 
-    def _call(self, series, range=[0,1], inplace=False):
+    def _call(self, series, range=[0,1], source_range=None, inplace=False):
 
         _check_series_of_points_or_slots(series)
         _check_indexed_data(series)
@@ -545,18 +545,21 @@ class Normalize(Operation):
 
         data_labels = series.data_labels
 
-        # Get min and max for the data labels
-        for i, item in enumerate(series):
-
-            if i == 0:
-                mins = {data_label: item._data_by_label(data_label) for data_label in data_labels}
-                maxs = {data_label: item._data_by_label(data_label) for data_label in data_labels}
-            else:
-                for data_label in data_labels:
-                    if item._data_by_label(data_label) < mins[data_label]:
-                        mins[data_label] = item._data_by_label(data_label)
-                    if item._data_by_label(data_label) > maxs[data_label]:
-                        maxs[data_label] = item._data_by_label(data_label)
+        # Compute min and max for the data labels if no source raneg was provided
+        if source_range:
+            mins = {data_label: source_range[data_label][0] for data_label in data_labels}
+            maxs = {data_label: source_range[data_label][1] for data_label in data_labels}
+        else:
+            for i, item in enumerate(series):
+                if i == 0:
+                    mins = {data_label: item._data_by_label(data_label) for data_label in data_labels}
+                    maxs = {data_label: item._data_by_label(data_label) for data_label in data_labels}
+                else:
+                    for data_label in data_labels:
+                        if item._data_by_label(data_label) < mins[data_label]:
+                            mins[data_label] = item._data_by_label(data_label)
+                        if item._data_by_label(data_label) > maxs[data_label]:
+                            maxs[data_label] = item._data_by_label(data_label)
 
         try:
             # Try to access by label, if data was non key-value this raise, as labels
@@ -597,12 +600,12 @@ class Normalize(Operation):
                     normalized_series.append(series[0].__class__(t = item.t,
                                                                  tz = item.tz,
                                                                  data = normalized_data,
-                                                                 data_loss = item.data_loss))
+                                                                 data_indexes = item.data_indexes))
                 elif isinstance(series[0], Slot):
                     normalized_series.append(series[0].__class__(start = item.start,
                                                                  unit = item.unit,
                                                                  data = normalized_data,
-                                                                 data_loss = item.data_loss))
+                                                                 data_indexes = item.data_indexes))
                 else:
                     raise NotImplementedError('Working on series other than slots or points not yet implemented')
 
@@ -661,12 +664,12 @@ class Rescale(Operation):
                     rescaled_series.append(series[0].__class__(t = item.t,
                                                                tz = item.tz,
                                                                data = rescaled_data,
-                                                               data_loss = item.data_loss))
+                                                               data_indexes = item.data_indexes))
                 elif isinstance(series[0], Slot):
                     rescaled_series.append(series[0].__class__(start = item.start,
                                                                unit = item.unit,
                                                                data = rescaled_data,
-                                                               data_loss = item.data_loss))
+                                                               data_indexes = item.data_indexes))
                 else:
                     raise NotImplementedError('Working on series other than slots or points not yet implemented')
 
@@ -726,12 +729,12 @@ class Offset(Operation):
                     rescaled_series.append(series[0].__class__(t = item.t,
                                                                tz = item.tz,
                                                                data = offsetted_data,
-                                                               data_loss = item.data_loss))
+                                                               data_indexes = item.data_indexes))
                 elif isinstance(series[0], Slot):
                     rescaled_series.append(series[0].__class__(start = item.start,
                                                                unit = item.unit,
                                                                data = offsetted_data,
-                                                               data_loss = item.data_loss))
+                                                               data_indexes = item.data_indexes))
                 else:
                     raise NotImplementedError('Working on series other than slots or points not yet implemented')
 
