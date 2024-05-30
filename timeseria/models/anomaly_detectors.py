@@ -11,7 +11,7 @@ from fitter import Fitter, get_common_distributions, get_distributions
 from ..utilities import DistributionFunction
 from statistics import stdev
 import fitter as fitter_library
-from ..datastructures import TimeSeriesView
+from ..datastructures import TimeSeries, DataTimePoint
 
 
 
@@ -416,7 +416,7 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
 
         logger.info('Anomaly detector fitted')
 
-    def inspect(self, plot=True, plot_x_min='auto', plot_x_max='auto'):
+    def inspect(self, plot=True, plot_x_min='auto', plot_x_max='auto', series=False):
         '''Inspect the model and plot the error distribution'''
 
         for data_label in self.data['error_distributions']:
@@ -455,6 +455,20 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
 
                 # Show the plot
                 plt.show()
+
+            if series:
+                if not 'prediction_errors' in self.data:
+                    raise ValueError('Cannot inspect fit series if store_errors was not set.')
+                fit_series = TimeSeries()
+                first_data_label = list(self.data['actual_values'].keys())[0]
+                for i in range(len(self.data['actual_values'][first_data_label])):
+                    data = {}
+                    for data_label in self.data['actual_values']:
+                        data[data_label] = self.data['actual_values'][data_label][i]
+                        data[data_label+'_pred'] = self.data['predicted_values'][data_label][i]
+                        data[data_label+'_err'] = self.data['prediction_errors'][data_label][i]
+                    fit_series.append(DataTimePoint(t=i, data=data))
+                fit_series.plot()
 
     def preprocess(self, series, inplace=False, verbose=False):
         """Pre-process a time series for this anomaly detector so that multiple apply() calls are much faster"""
