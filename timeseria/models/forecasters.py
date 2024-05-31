@@ -226,7 +226,7 @@ class Forecaster(Model):
 
         # Check supported metrics
         for error_metric in error_metrics:
-            if error_metric not in ['RMSE', 'MAE', 'MaxAE', 'MAPE', 'MaxAPE']:
+            if error_metric not in ['RMSE', 'MAE', 'HAE', 'MAPE', 'HAPE']:
                 raise ValueError('The error metric "{}" is not supported'.format(error_metric))
 
         # Handle results series
@@ -312,8 +312,8 @@ class Forecaster(Model):
                     plt.title('MAPE error distribution for "{}"'.format(data_label))
                     plt.show()
 
-            if 'MaxAE' in error_metrics:
-                results['{}_MaxAE'.format(data_label)] = max_absolute_error(actual_values[data_label], predicted_values[data_label])
+            if 'HAE' in error_metrics:
+                results['{}_HAE'.format(data_label)] = max_absolute_error(actual_values[data_label], predicted_values[data_label])
 
             if 'MAPE' in error_metrics:
                 results['{}_MAPE'.format(data_label)] = mean_absolute_percentage_error(actual_values[data_label], predicted_values[data_label])
@@ -330,8 +330,8 @@ class Forecaster(Model):
                     plt.title('MAPE error distribution for "{}"'.format(data_label))
                     plt.show()
 
-            if 'MaxAPE' in error_metrics:
-                results['{}_MaxAPE'.format(data_label,)] = max_absolute_percentage_error(actual_values[data_label], predicted_values[data_label])
+            if 'HAPE' in error_metrics:
+                results['{}_HAPE'.format(data_label,)] = max_absolute_percentage_error(actual_values[data_label], predicted_values[data_label])
 
             if generate_results_series:
                 for i in range(len(actual_values[data_label])):
