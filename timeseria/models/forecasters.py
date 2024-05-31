@@ -215,9 +215,14 @@ class Forecaster(Model):
             raise NotImplementedError('Evaluating a forecaster on more than one step ahead forecasts is not implemented yet')
 
         try:
-            with_context = self.data['with_context']
+            context_data_labels = self.data['context_data_labels']
         except KeyError:
-            with_context = False
+            context_data_labels = None
+
+        try:
+            target_data_labels = self.data['target_data_labels']
+        except KeyError:
+            target_data_labels = None
 
         # Check supported metrics
         for error_metric in error_metrics:
@@ -260,7 +265,9 @@ class Forecaster(Model):
         # Start evaluating
         progress_step = len(series)/10
 
-        for data_label in series.data_labels:
+        evaluate_data_labels = series.data_labels if not target_data_labels else target_data_labels
+
+        for data_label in evaluate_data_labels:
 
             actual_values[data_label] = []
             predicted_values[data_label] = []
@@ -279,12 +286,12 @@ class Forecaster(Model):
 
                 # Predict
                 actual_values[data_label].append(self._get_actual_value(series, i, data_label))
-                predicted_values[data_label].append(self._get_predicted_value(series, i, data_label, with_context))
+                predicted_values[data_label].append(self._get_predicted_value(series, i, data_label, with_context= True if context_data_labels else False))
 
             if verbose:
                 print('')
 
-        for data_label in series.data_labels:
+        for data_label in evaluate_data_labels:
 
             # Compute RMSE and ME, and add to the results
             if 'RMSE' in error_metrics:
