@@ -18,6 +18,9 @@ import numpy as np
 from scipy import stats, optimize
 import scipy.stats
 import matplotlib.pyplot as plt
+from sklearn.metrics import mean_squared_error as sklearn_mean_squared_error
+from sklearn.metrics import mean_absolute_error as sklearn_mean_absolute_error
+
 
 # Setup logging
 import logging
@@ -224,6 +227,45 @@ def mean_absolute_percentage_error(list1, list2):
     for i in range(len(list1)):
         p_error_sum += abs((list1[i] - list2[i])/list1[i])
     return p_error_sum/len(list1)
+
+
+def max_absolute_percentage_error(list1, list2):
+    """Compute the MAPE, list 1 are true values, list 2 are predicted values"""
+
+    if len(list1) != len(list2):
+        raise ValueError('Lists have different lengths, cannot continue')
+    max_ape = None
+    for i in range(len(list1)):
+        ape = abs((list1[i] - list2[i])/list1[i])
+        if max_ape is None:
+            max_ape = ape
+        else:
+            if ape > max_ape:
+                max_ape = ape
+    return max_ape
+
+
+def mean_absolute_error(list1,list2):
+    return sklearn_mean_absolute_error(list1,list2)
+
+
+def max_absolute_error(list1,list2):
+    if len(list1) != len(list2):
+        raise ValueError('Lists have different lengths, cannot continue')
+    max_ae = None
+    for i in range(len(list1)):
+        ae = abs(list1[i] - list2[i])
+        if max_ae is None:
+            max_ae = ae
+        else:
+            if ae > max_ae:
+                max_ae = ae
+    return ae
+
+
+def mean_squared_error(a,b):
+    return sklearn_mean_squared_error(a,b)
+
 
 def rescale(value, source_from, source_to, target_from=0, target_to=1, how='linear'):
     """Rescale a value from one range to another"""

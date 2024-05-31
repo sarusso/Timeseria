@@ -6,16 +6,14 @@ from pandas import DataFrame
 from numpy import array
 from math import sqrt
 from propertime.utils import now_s, dt_from_s, s_from_dt
-from datetime import datetime
+import matplotlib.pyplot as plt
 
 from ..datastructures import DataTimeSlot, TimePoint, DataTimePoint, Slot, Point, TimeSeries
 from ..exceptions import NonContiguityError
-from ..utilities import detect_periodicity, _get_periodicity_index, _item_is_in_range, mean_absolute_percentage_error, ensure_reproducibility
-from ..units import Unit, TimeUnit
+from ..utilities import detect_periodicity, _get_periodicity_index, ensure_reproducibility
+from ..utilities import mean_absolute_percentage_error, max_absolute_percentage_error
+from ..utilities import mean_absolute_error, max_absolute_error, mean_squared_error
 from .base import Model, _ProphetModel, _ARIMAModel, _KerasModel
-
-# Sklearn
-from sklearn.metrics import mean_squared_error, mean_absolute_error
 
 # Setup logging
 import logging
@@ -55,6 +53,32 @@ class Forecaster(Model):
     """
 
     window = None
+
+    def _get_actual_value(self, series, i, data_label):
+        actual = series[i].data[data_label]
+        return actual
+
+    def _get_predicted_value(self, series, i, data_label, with_context):
+
+        if with_context:
+            prediction = self.predict(series.view(from_i=0, to_i=i), steps=1, context_data=series[i].data)
+        else:
+            prediction = self.predict(series.view(from_i=0, to_i=i), steps=1)
+
+        # Handle list of dicts or dict of lists (of which we have only one value here)
+        #{'value': [0.2019341593004146, 0.29462641146884005]}
+
+        if isinstance(prediction, list):
+            predicted = prediction[0][data_label]
+        elif isinstance(prediction, dict):
+            if isinstance(prediction[data_label], list):
+                predicted = prediction[data_label][0]
+            else:
+                predicted = prediction[data_label]
+        else:
+            raise TypeError('Don\'t know how to handle a prediction with of type "{}"'.format(prediction.__class__.__name__))
+
+        return predicted
 
     def forecast(self, series, steps=1, context_data=None):
         """Forecast n steps-ahead data points or slots"""
@@ -167,305 +191,150 @@ class Forecaster(Model):
             return None
 
     @Model.evaluate_function
-    def evaluate(self, series, steps='auto', limit=None, plots=False, plot=False, metrics=['RMSE', 'MAE'], details=False, evaluation_series=False):
+    def evaluate(self, series, steps=1, error_metrics=['RMSE', 'MAE'], plot_error_distribution = False,
+                 plot_results_series=False, return_results_series=False, verbose=False):
         """Evaluate the forecaster on a series.
 
         Args:
-            steps (int,list): a single value or a list of values for how many steps-ahead to forecast in the evaluation. Default to automatic detection based on the model.
-            limit(int): set a limit for the time data elements to use for the evaluation.
-            plot(bool): if to produce an overall evaluation plot, defaulted to False. If set to True, the evaluation results are not retuned.
-                        To get both the evaluation results and the overall evaluation plot, set the `evaluation_series` switch to True in
-                        order to add it to the evaluation results and plot it afterwards.
-            plots(bool): if to produce evaluation plots, defaulted to False. Beware that setting this option to True will cause to generate
-                         a plot for each evaluation point or slot of the time data: use with caution and only on small time data. Not
-                         supported with image-based plots.
-            metrics(list): the error metrics to use for the evaluation.
+            steps (int): how many steps-ahead to evaluate the forecaster on.
+            metric(list): the error metrics to use for the evaluation.
                 Supported values are:
                 ``RMSE`` (Root Mean Square Error),
                 ``MAE``  (Mean Absolute Error), and
                 ``MAPE``  (Mean Absolute percentage Error).
-            details(bool): if to add intermediate steps details to the evaluation results.
-            evaluation_series(bool): if to add to the results an evaluation timeseirs containing the eror metrics. Defaulted to false.
+            plot_error_distribution: if to plot the error distribution.
+            plot_results_series(bool): if to plot the series with the predicted values and the errors.
+            return_results_series(bool): if to add the series with the predicted values and the errors to the results.
+            verbose(bool): if to print the fit progress (one dot = 10% done).
         """
 
         if not series:
             raise ValueError('Cannot evaluate on an empty series')
 
-        if len(series.data_labels) > 1:
-            raise NotImplementedError('Sorry, evaluating models built for multivariate time series is not supported yet')
+        if steps > 1:
+            raise NotImplementedError('Evaluating a forecaster on more than one step ahead forecasts is not implemented yet')
 
-        # Set empty list if metrics were None
-        if metrics is None:
-            metrics = []
+        try:
+            with_context = self.data['with_context']
+        except KeyError:
+            with_context = False
 
         # Check supported metrics
-        for metric in metrics:
-            if metric not in ['RMSE', 'MAE', 'MAPE']:
-                raise ValueError('The metric "{}" is not supported'.format(metric))
+        for error_metric in error_metrics:
+            if error_metric not in ['RMSE', 'MAE', 'MaxAE', 'MAPE', 'MaxAPE']:
+                raise ValueError('The error metric "{}" is not supported'.format(error_metric))
 
-        # Set evaluation steps if we have to
-        if steps == 'auto':
-            try:
-                steps = [1, self.data['periodicity']]
-            except KeyError:
-                try:
-                    if not self.data['window']:
-                        steps = [1]
-                    else:
-                        steps = [1, self.data['window']]
-                except (KeyError, AttributeError):
-                    steps = [1]
-        elif isinstance(steps, list):
-            if not self.data['window']:
-                if steps != [1]:
-                    raise ValueError('Evaluating a windowless model on a multi-step forecast does not make sense (got steps={})'.format(steps))
+        # Handle results series
+        if plot_results_series or return_results_series:
+            generate_results_series = True
         else:
-            if not self.data['window']:
-                if steps != 1:
-                    raise ValueError('Evaluating a windowless model on a multi-step forecast does not make sense (got steps={})'.format(steps))
-            steps = list(range(1, steps+1))
+            generate_results_series = False
 
-        return_evaluation_series = evaluation_series
+        if generate_results_series:
 
-        if plot or evaluation_series:
+            if steps != 1:
+                raise ValueError('Returning the evaluation series is only supported with single step ahead forecasts')
 
-            if steps != [1]:
-                raise ValueError('Plotting or getting back an evaluation time series is only supported with single step ahead forecasts (steps=[1])')
-
-            evaluation_series = series.duplicate()
+            results_series = series.duplicate()
             if self.data['window']:
-                evaluation_series = evaluation_series[self.data['window']:]
-            if limit:
-                evaluation_series = evaluation_series[:limit]
+                results_series = results_series[self.data['window']:]
 
         # Support vars
         results = {}
-        warned = False
 
         # Log
-        logger.info('Will evaluate model for %s steps ahead with metrics %s', steps, metrics)
+        logger.info('Will evaluate model for %s steps ahead with metrics %s', steps, error_metrics)
 
-        for steps_round in steps:
+        # Support vars
+        actual_values = {}
+        predicted_values = {}
 
-            # Support vars
-            real_values = []
-            model_values = []
-            processed_samples = 0
+        try:
+            if not self.data['window']:
+                start_i = 0
+            else:
+                start_i = self.data['window']
+        except (KeyError, AttributeError):
+            start_i = 0
 
-            for data_label in series.data_labels:
+        # Start evaluating
+        progress_step = len(series)/10
 
-                # If the model has no window, evaluate on the entire time series
+        for data_label in series.data_labels:
 
-                try:
-                    if not self.data['window']:
-                        has_window = False
-                    else:
-                        has_window = True
-                except (KeyError, AttributeError):
-                    has_window = False
+            actual_values[data_label] = []
+            predicted_values[data_label] = []
 
-                if not has_window:
+            if verbose:
+                print('Evaluating for "{}": '.format(data_label), end='')
 
-                    # Note: steps_round is always equal to the entire test time series length in window-less model evaluation
+            for i, _ in enumerate(series):
+                if verbose:
+                    if int(i%progress_step) == 0:
+                        print('.', end='')
 
-                    # Create a time series where to apply the forecast, with only a point "in the past",
-                    # this is done in order to use the apply function as is. Since the model is not using
-                    # any window, the point data will be ignored and just used for its timestamp
-                    forecast_series = series.__class__()
+                # Skip before the window
+                if i <  start_i:
+                    continue
 
-                    # TODO: it should not be required to check .resolution type!
-                    if isinstance(series[0], Point):
-                        if isinstance(series.resolution, TimeUnit):
-                            forecast_series.append(series[0].__class__(dt = series[0].dt - series.resolution,
-                                                                               data = series[0].data))
-                        elif isinstance(series.resolution, Unit):
-                            forecast_series.append(series[0].__class__(dt = dt_from_s(series[0].t - series.resolution, tz=series[0].tz),
-                                                                               data = series[0].data))
-                        else:
-                            forecast_series.append(series[0].__class__(dt = dt_from_s(series[0].t - series.resolution, tz=series[0].tz),
-                                                                               data = series[0].data))
-                    elif isinstance(series[0], Slot):
-                        if isinstance(series.resolution, TimeUnit):
-                            forecast_series.append(series[0].__class__(dt = series[0].dt - series.resolution,
-                                                                               unit = series.resolution,
-                                                                               data = series[0].data))
-                        elif isinstance(series.resolution, Unit):
-                            forecast_series.append(series[0].__class__(dt = dt_from_s(series[0].t - series.resolution, tz=series[0].tz),
-                                                                               unit = series.resolution,
-                                                                               data = series[0].data))
-                        else:
-                            forecast_series.append(series[0].__class__(dt = dt_from_s(series[0].t - series.resolution, tz=series[0].tz),
-                                                                               unit = series.resolution,
-                                                                               data = series[0].data))
-                    else:
-                        raise TypeError('Unknown time series items type (got "{}"'.format(series[0].__class__.__name__))
+                # Predict
+                actual_values[data_label].append(self._get_actual_value(series, i, data_label))
+                predicted_values[data_label].append(self._get_predicted_value(series, i, data_label, with_context))
 
-                    # Set default evaluate samples
-                    evaluate_samples = len(series)
+            if verbose:
+                print('')
 
-                    # Do we have a limit on the evaluate sample to apply?
-                    if limit:
-                        if limit < evaluate_samples:
-                            evaluate_samples = limit
-
-                    # Warn if no limit given and we are over
-                    if not limit and evaluate_samples > 10000:
-                        logger.warning('No limit set in the evaluation with a quite long time series, this could take some time.')
-                        warned=True
-
-                    # All evaluation samples will be processed
-                    processed_samples = evaluate_samples
-
-                    # Apply the forecasting model with a length equal to the original series minus the first element
-                    self.apply(forecast_series, steps=evaluate_samples, inplace=True)
-
-                    # Save the model and the original value to be compared later on. Create the arrays by skipping the fist item
-                    # and move through the forecast time series comparing with the input time series, shifted by one since in the
-                    # forecast series we added an "artificial" first point to use the apply()
-                    for i in range(1, evaluate_samples+1):
-
-                        model_value = forecast_series[i].data[data_label]
-                        model_values.append(model_value)
-
-                        real_value = series[i-1].data[data_label]
-                        real_values.append(real_value)
-
-
-                # Else, process in streaming the series, item by item, and properly take into account the window.
-                else:
-                    for i in range(len(series)):
-
-                        # Check that we can get enough data
-                        if i < self.data['window']:
-                            continue
-                        if i > (len(series)-steps_round):
-                            continue
-
-                        # Compute the various boundaries
-                        original_series_boundaries_start = i - (self.data['window'])
-                        original_series_boundaries_end = i + steps_round
-
-                        original_forecast_series_boundaries_start = original_series_boundaries_start
-                        original_forecast_series_boundaries_end = original_series_boundaries_end-steps_round
-
-                        # Create the time series where to apply the forecast
-                        forecast_series = series.__class__()
-                        for j in range(original_forecast_series_boundaries_start, original_forecast_series_boundaries_end):
-
-                            if isinstance(series[0], Point):
-                                forecast_series.append(series[0].__class__(t = series[j].t,
-                                                                                   tz = series[j].tz,
-                                                                                   data = series[j].data))
-                            elif isinstance(series[0], Slot):
-                                forecast_series.append(series[0].__class__(start = series[j].start,
-                                                                                   end   = series[j].end,
-                                                                                   unit  = series[j].unit,
-                                                                                   data  = series[j].data))
-
-                            # This would lead to add the forecasted index to the original data (and we don't want it)
-                            #forecast_series.append(series[j])
-
-                        # Apply the forecasting model
-                        self.apply(forecast_series, steps=steps_round, inplace=True)
-
-                        # Plot results time series?
-                        if plots:
-                            forecast_series.plot()
-
-                        # Save the model and the original value to be compared later on
-                        for step in range(steps_round):
-                            original_index = original_series_boundaries_start + self.data['window'] + step
-
-                            forecast_index = self.data['window'] + step
-
-                            model_value = forecast_series[forecast_index].data[data_label]
-                            model_values.append(model_value)
-
-                            real_value = series[original_index].data[data_label]
-                            real_values.append(real_value)
-
-                        processed_samples+=1
-                        if limit is not None and processed_samples >= limit:
-                            break
-
-                        # Warn if no limit given and we are over
-                        if not limit and not warned and i > 10000:
-                            logger.warning('No limit set in the evaluation with a quite long time series, this could take some time.')
-                            warned=True
-
-            if limit is not None and processed_samples < limit:
-                logger.warning('The evaluation limit is set to "{}" but I have only "{}" samples for "{}" steps'.format(limit, processed_samples, steps_round))
-
-            if not model_values:
-                raise Exception('Could not evaluate model, maybe not enough data?')
+        for data_label in series.data_labels:
 
             # Compute RMSE and ME, and add to the results
-            if 'RMSE' in metrics:
-                results['RMSE_{}_steps'.format(steps_round)] = sqrt(mean_squared_error(real_values, model_values))
-            if 'MAE' in metrics:
-                results['MAE_{}_steps'.format(steps_round)] = mean_absolute_error(real_values, model_values)
-                if evaluation_series:
-                    for i in range(len(model_values)):
-                        evaluation_series[i].data['{}_AE'.format(data_label)] = abs(real_values[i] - model_values[i])
-            if 'MAPE' in metrics:
-                results['MAPE_{}_steps'.format(steps_round)] = mean_absolute_percentage_error(real_values, model_values)
-                if evaluation_series:
-                    for i in range(len(model_values)):
-                        evaluation_series[i].data['{}_APE'.format(data_label)] = abs(real_values[i] - model_values[i]) / real_values[i]
+            if 'RMSE' in error_metrics:
+                results['{}_RMSE'.format(data_label)] = sqrt(mean_squared_error(actual_values[data_label], predicted_values[data_label]))
 
-            if evaluation_series:
-                for i in range(len(model_values)):
-                    evaluation_series[i].data['{}_pred'.format(data_label)] = model_values[i]
+            if 'MAE' in error_metrics:
+                results['{}_MAE'.format(data_label)] = mean_absolute_error(actual_values[data_label], predicted_values[data_label])
+                if generate_results_series:
+                    for i in range(len(actual_values[data_label])):
+                        results_series[i].data['{}_AE'.format(data_label)] = abs(actual_values[data_label][i] - predicted_values[data_label][i])
+                if plot_error_distribution:
+                    errors = []
+                    for i in range(len(actual_values[data_label])):
+                        errors.append(abs(actual_values[data_label][i] - predicted_values[data_label][i]))
+                    plt.hist(errors, bins=100, density=True, alpha=1, color='steelblue', label='Error distribution for "{}"'.format(data_label))
+                    #plt.legend(loc="upper right")
+                    plt.grid()
+                    plt.title('MAPE error distribution for "{}"'.format(data_label))
+                    plt.show()
 
-        # Compute overall RMSE
-        if 'RMSE' in metrics:
-            sum_rmse = 0
-            count = 0
-            for data_label in results:
-                if data_label.startswith('RMSE_'):
-                    sum_rmse += results[data_label]
-                    count += 1
-            results['RMSE'] = sum_rmse/count
+            if 'MaxAE' in error_metrics:
+                results['{}_MaxAE'.format(data_label)] = max_absolute_error(actual_values[data_label], predicted_values[data_label])
 
-        # Compute overall MAE
-        if 'MAE' in metrics:
-            sum_me = 0
-            count = 0
-            for data_label in results:
-                if data_label.startswith('MAE_'):
-                    sum_me += results[data_label]
-                    count += 1
-            results['MAE'] = sum_me/count
+            if 'MAPE' in error_metrics:
+                results['{}_MAPE'.format(data_label)] = mean_absolute_percentage_error(actual_values[data_label], predicted_values[data_label])
+                if generate_results_series:
+                    for i in range(len(actual_values[data_label])):
+                        results_series[i].data['{}_APE'.format(data_label)] = abs((actual_values[data_label][i] - predicted_values[data_label][i])/actual_values[data_label][i])
+                if plot_error_distribution:
+                    errors = []
+                    for i in range(len(actual_values[data_label])):
+                        errors.append(abs((actual_values[data_label][i] - predicted_values[data_label][i])/actual_values[data_label][i]))
+                    plt.hist(errors, bins=100, density=True, alpha=1, color='steelblue', label='Error distribution for "{}"'.format(data_label))
+                    #plt.legend(loc="upper right")
+                    plt.grid()
+                    plt.title('MAPE error distribution for "{}"'.format(data_label))
+                    plt.show()
 
-        # Compute overall MAPE
-        if 'MAPE' in metrics:
-            sum_me = 0
-            count = 0
-            for data_label in results:
-                if data_label.startswith('MAPE_'):
-                    sum_me += results[data_label]
-                    count += 1
-            results['MAPE'] = sum_me/count
+            if 'MaxAPE' in error_metrics:
+                results['{}_MaxAPE'.format(data_label,)] = max_absolute_percentage_error(actual_values[data_label], predicted_values[data_label])
 
-        if not details:
-            simple_results = {}
-            if 'RMSE' in metrics:
-                simple_results['RMSE'] = results['RMSE']
-            if 'MAE' in metrics:
-                simple_results['MAE'] = results['MAE']
-            if 'MAPE' in metrics:
-                simple_results['MAPE'] = results['MAPE']
-            results = simple_results
+            if generate_results_series:
+                for i in range(len(actual_values[data_label])):
+                    results_series[i].data['{}_pred'.format(data_label)] = predicted_values[data_label][i]
 
-        # Do we have to plot the evaluation series?
-        if plot:
-            if results:
-                logger.info('Plotting the evaluation time series, not returning evaluation results (which are: {})'.format(results))
-            return evaluation_series.plot()
-
-        # Handle evaluation series if required
-        if return_evaluation_series:
-            results['evaluation_series'] = evaluation_series
+        # Plot or return results seriesif required
+        if plot_results_series:
+            results_series.plot()
+        if return_results_series:
+            results['series'] = results_series
 
         # Return evaluation results if any
         if results:
