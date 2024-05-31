@@ -5,13 +5,13 @@ import re
 import random
 import numpy
 import chardet
+from math import log
 from chardet.universaldetector import UniversalDetector
 from numpy import fft
 from scipy.signal import find_peaks
-from .exceptions import ConsistencyException
+from .exceptions import ConsistencyException, FloatConversionError
 from datetime import datetime
 from propertime.utils import s_from_dt
-from .exceptions import FloatConversionError
 import subprocess
 from collections import namedtuple
 import numpy as np
@@ -263,8 +263,34 @@ def max_absolute_error(list1,list2):
     return ae
 
 
+def mean_absolute_log_error(list1, list2):
+    if len(list1) != len(list2):
+        raise ValueError('Lists have different lengths, cannot continue')
+    ale_sum = 0
+    for i in range(len(list1)):
+        ale_sum += abs(log(list1[i]/list2[i]))
+    return ale_sum/len(list1)
+
+
+def max_absolute_log_error(list1,list2):
+    if len(list1) != len(list2):
+        raise ValueError('Lists have different lengths, cannot continue')
+    max_ale = None
+    for i in range(len(list1)):
+        ale = abs(log(list1[i]/list2[i]))
+        if max_ale is None:
+            max_ale = ale
+        else:
+            if ale > max_ale:
+                max_ale = ale
+    return ale
+
+
+
 def mean_squared_error(a,b):
     return sklearn_mean_squared_error(a,b)
+
+
 
 
 def rescale(value, source_from, source_to, target_from=0, target_to=1, how='linear'):
