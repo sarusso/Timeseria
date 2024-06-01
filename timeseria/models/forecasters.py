@@ -779,7 +779,7 @@ class LSTMForecaster(Forecaster, _KerasModel):
             ``values`` (use the data values),
             ``diffs``  (use the diffs between the values), and
             ``hours``  (use the hours of the timestamp).
-        neurons(int): how many neaurons to use for the LSTM neural nework hidden layer.
+        neurons(int): how many neurons to use for the LSTM neural network hidden layer.
         keras_model(keras.Model) : an optional external Keras Model architecture. Will cause the ``neurons`` argument to be discarded.
     """
 
@@ -819,17 +819,16 @@ class LSTMForecaster(Forecaster, _KerasModel):
         self._save_keras_model(path)
 
     @Forecaster.fit_function
-    def fit(self, series, epochs=30, normalize=True, target='all', with_context=False, reproducible=False, data_loss_limit=1.0, verbose=False):
+    def fit(self, series, epochs=30, normalize=True, target='all', with_context=False, error_metric='MSE', data_loss_limit=1.0, reproducible=False, verbose=False):
         """Fit the model on a series.
 
         Args:
             series(series): the series on which to fit the model.
-            start(datetieme,float): the start timestamp of the fit.
-            end(datetieme,float): the end timestamp of the fit.
             epochs(int): for how many epochs to train.
             normalize(bool): if to normalize the data between 0 and 1 or not.
             target(str,list): what data labels to target, 'all' for all of them.
             with_context(bool): if to use context data when predicting.
+            error_metric(str): the error metric to minimize while fitting. Supported values are: MSE, MAE and MAPE.
             data_loss_limit(float): discard from the fit elements with a data loss greater than or equal to this limit.
             reproducible(bool): if to make the fit deterministic.
             verbose(bool): if to print the training output in the process.
@@ -837,6 +836,16 @@ class LSTMForecaster(Forecaster, _KerasModel):
 
         if reproducible:
             ensure_reproducibility()
+
+        # Set the loss error metric in Keras notation
+        if error_metric == 'MSE':
+            loss = 'mean_squared_error'
+        elif error_metric == 'MAE':
+            loss = 'mean_absolute_error'
+        elif error_metric == 'MAPE':
+            loss = 'mean_absolute_percentage_error'
+        else:
+            raise ValueError('Unknown error metric "{}"'.format(error_metric))
 
         # Set and save the targets and context data labels
         context_data_labels = None
@@ -925,7 +934,7 @@ class LSTMForecaster(Forecaster, _KerasModel):
             self.keras_model = Sequential()
             self.keras_model.add(LSTM(self.data['neurons'], input_shape=(self.data['window'] + 1 if with_context else self.data['window'], features_per_window_item)))
             self.keras_model.add(Dense(output_dimension))
-            self.keras_model.compile(loss='mean_squared_error', optimizer='adam')
+            self.keras_model.compile(loss=loss, optimizer='adam')
 
         # Fit
         self.keras_model.fit(array(window_features_matrix), array(target_values_vector), epochs=epochs, verbose=verbose)
