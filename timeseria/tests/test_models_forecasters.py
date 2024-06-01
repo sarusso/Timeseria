@@ -278,7 +278,7 @@ class TestForecasters(unittest.TestCase):
         forecaster.fit(timeseries, epochs=50, reproducible=True)
 
         # Test the evaluation
-        evaluation_results = forecaster.evaluate(timeseries[0:10])
+        evaluation_results = forecaster.evaluate(timeseries[0:10], error_metrics=['RMSE', 'MAE'])
         self.assertAlmostEqual(evaluation_results['sin_RMSE'], 0.026, places=2)
         self.assertAlmostEqual(evaluation_results['sin_MAE'], 0.025, places=2)
 
@@ -447,8 +447,8 @@ class TestForecasters(unittest.TestCase):
             item.data_indexes['data_loss'] = 0 
         forecaster = LSTMForecaster(window=12, neurons=64, features=['values', 'diffs', 'hours'])
         cross_validation_results = forecaster.cross_validate(temperature_timeseries[0:100], rounds=3, fit_reproducible=True)
-        self.assertAlmostEqual(cross_validation_results['temperature_MAE_avg'], 0.2469, places=2)
-        self.assertAlmostEqual(cross_validation_results['temperature_MAE_stdev'], 0.1316, places=2)
+        self.assertAlmostEqual(cross_validation_results['temperature_MSE_avg'], 0.122, places=2)
+        self.assertAlmostEqual(cross_validation_results['temperature_MSE_stdev'], 0.131, places=2)
 
 
     def test_LSTMForecaster_save_load(self):

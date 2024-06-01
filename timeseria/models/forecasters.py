@@ -193,17 +193,15 @@ class Forecaster(Model):
             return None
 
     @Model.evaluate_function
-    def evaluate(self, series, steps=1, error_metrics=['RMSE', 'MAE'], plot_error_distribution = False,
+    def evaluate(self, series, steps=1, error_metrics='auto', plot_error_distribution = False,
                  plot_results_series=False, return_results_series=False, verbose=False):
         """Evaluate the forecaster on a series.
 
         Args:
             steps (int): how many steps-ahead to evaluate the forecaster on.
-            metric(list): the error metrics to use for the evaluation.
-                Supported values are:
-                ``RMSE`` (Root Mean Square Error),
-                ``MAE``  (Mean Absolute Error), and
-                ``MAPE``  (Mean Absolute percentage Error).
+            metric(list): the error metrics to use for the evaluation. Besides the value ``auto``, which uses the same
+                error metric used for the fit or defaults to ``RMSE`` and ``MAE``, other supported values (as list) are:
+                ``MSE``, ``RMSE``, ``MAE``, ``HAE``, ``MAPE``, ``HAPE``, ``MALE`` and  ``HALE``.
             plot_error_distribution: if to plot the error distribution.
             plot_results_series(bool): if to plot the series with the predicted values and the errors.
             return_results_series(bool): if to add the series with the predicted values and the errors to the results.
@@ -226,9 +224,21 @@ class Forecaster(Model):
         except KeyError:
             target_data_labels = None
 
-        # Check supported metrics
+        # Handle error metrics
+        try:
+            fit_error_metric = self.data['error_metric']
+        except (AttributeError, KeyError):
+            fit_error_metric = None
+
+        if error_metrics == 'auto':
+            if fit_error_metric:
+                error_metrics = [fit_error_metric]
+                logger.info('Using the fit error metric to evaluate: {}'.format(fit_error_metric))
+            else:
+                error_metrics = ['RMSE', 'MAE']
+
         for error_metric in error_metrics:
-            if error_metric not in ['RMSE', 'MAE', 'HAE', 'MAPE', 'HAPE', 'MALE', 'HALE', 'E', 'PE', 'LE']:
+            if error_metric not in ['MSE', 'RMSE', 'MAE', 'HAE', 'MAPE', 'HAPE', 'MALE', 'HALE', 'E', 'PE', 'LE']:
                 raise ValueError('The error metric "{}" is not supported'.format(error_metric))
 
         # Handle results series
@@ -248,9 +258,6 @@ class Forecaster(Model):
 
         # Support vars
         results = {}
-
-        # Log
-        logger.info('Will evaluate model for %s steps ahead with metrics %s', steps, error_metrics)
 
         # Support vars
         actual_values = {}
@@ -301,6 +308,9 @@ class Forecaster(Model):
                     results_series[i].data['{}_pred'.format(data_label)] = predicted_values[data_label][i]
 
             # Compute the error metrics and add to the result series or plot if requested
+            if 'MSE' in error_metrics:
+                results['{}_MSE'.format(data_label)] = mean_squared_error(actual_values[data_label], predicted_values[data_label])
+
             if 'RMSE' in error_metrics:
                 results['{}_RMSE'.format(data_label)] = sqrt(mean_squared_error(actual_values[data_label], predicted_values[data_label]))
 
@@ -793,7 +803,7 @@ class LSTMForecaster(Forecaster, _KerasModel):
             logger.info('Using default window size of 3')
 
         if features == ['values']:
-            logger.info('Using default features: values')
+            logger.info('Using default features: {}'.format(features))
 
         # Call parent init
         super(LSTMForecaster, self).__init__()
@@ -828,7 +838,7 @@ class LSTMForecaster(Forecaster, _KerasModel):
             normalize(bool): if to normalize the data between 0 and 1 or not.
             target(str,list): what data labels to target, 'all' for all of them.
             with_context(bool): if to use context data when predicting.
-            error_metric(str): the error metric to minimize while fitting. Supported values are: MSE, MAE and MAPE.
+            error_metric(str): the error metric to minimize while fitting. Supported values are: ``MSE``, ``MAE`` and ``MAPE``.
             data_loss_limit(float): discard from the fit elements with a data loss greater than or equal to this limit.
             reproducible(bool): if to make the fit deterministic.
             verbose(bool): if to print the training output in the process.
@@ -846,6 +856,7 @@ class LSTMForecaster(Forecaster, _KerasModel):
             loss = 'mean_absolute_percentage_error'
         else:
             raise ValueError('Unknown error metric "{}"'.format(error_metric))
+        self.data['error_metric'] = error_metric
 
         # Set and save the targets and context data labels
         context_data_labels = None
