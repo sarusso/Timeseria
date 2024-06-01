@@ -260,7 +260,7 @@ def max_absolute_error(list1,list2):
         else:
             if ae > max_ae:
                 max_ae = ae
-    return ae
+    return max_ae
 
 
 def mean_absolute_log_error(list1, list2):
@@ -283,14 +283,11 @@ def max_absolute_log_error(list1,list2):
         else:
             if ale > max_ale:
                 max_ale = ale
-    return ale
-
+    return max_ale
 
 
 def mean_squared_error(a,b):
     return sklearn_mean_squared_error(a,b)
-
-
 
 
 def rescale(value, source_from, source_to, target_from=0, target_to=1, how='linear'):
