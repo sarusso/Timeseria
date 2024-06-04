@@ -403,6 +403,8 @@ class DistributionFunction():
     def plot(self, x_min=-1, x_max=1, show=True):
         """Plot the distribution"""
 
+        plt.clf()
+
         # Populate data
         X = np.linspace(x_min, x_max, 1000)
         Y = [self(x) for x in X]
