@@ -52,7 +52,7 @@ class AnomalyDetector(Model):
         raise NotImplementedError('Anomaly detectors cannot be evaluated yet.') from None
 
     @staticmethod
-    def mark_events(timeseries, index_treshold=1.0, min_persistence=2, max_gap=2, replace_index=False):
+    def mark_events(timeseries, index_treshold=1.0, min_persistence=2, max_gap=2, replace_index=False, inplace=False):
         """Mark ensembles of anomalous data points as single anomalous events, with some tolerance.
 
         Args:
@@ -65,7 +65,10 @@ class AnomalyDetector(Model):
             replace_index(bool): if to replace the existent ``anomaly`` index instead of adding a new ``anomaly_event`` one.
         """
 
-        event_timeseries = timeseries.duplicate()
+        if inplace:
+            event_timeseries = timeseries
+        else:
+            event_timeseries = timeseries.duplicate()
         event_start = None
 
         for i, item in enumerate(event_timeseries):
