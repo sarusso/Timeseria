@@ -193,15 +193,19 @@ class Forecaster(Model):
             return None
 
     @Model.evaluate_function
-    def evaluate(self, series, steps=1, error_metrics='auto', plot_error_distribution = False,
+    def evaluate(self, series, steps=1, aggregate_error_metrics='auto', extra_error_metrics=None, plot_error_distribution=False,
                  plot_results_series=False, return_results_series=False, verbose=False):
         """Evaluate the forecaster on a series.
 
         Args:
             steps (int): how many steps-ahead to evaluate the forecaster on.
-            metric(list): the error metrics to use for the evaluation. Besides the value ``auto``, which uses the same
-                error metric used for the fit or defaults to ``RMSE`` and ``MAE``, other supported values (as list) are:
-                ``MSE``, ``RMSE``, ``MAE``, ``HAE``, ``MAPE``, ``HAPE``, ``MALE`` and  ``HALE``.
+            aggregate_error_metrics(list): the error metrics to use for the evaluation. Besides the value ``auto``,
+                                            which uses the same error metric used for the fit if available or defaults
+                                            to ``RMSE`` and ``MAE``, other supported values (as list) are: ``MSE``,
+                                            ``RMSE``, ``MAE``, ``HAE``, ``MAPE``, ``HAPE``, ``MALE`` and  ``HALE``.
+            extra_error_metrics(list): extra, non-aggregate error metrics. Supported values (as list) are: ``E``,
+                                       ``PE`` and ``LE``. These are only added to the results series and not use to 
+                                       compute any aggregate error value.
             plot_error_distribution: if to plot the error distribution.
             plot_results_series(bool): if to plot the series with the predicted values and the errors.
             return_results_series(bool): if to add the series with the predicted values and the errors to the results.
@@ -226,20 +230,27 @@ class Forecaster(Model):
 
         # Handle error metrics
         try:
-            fit_error_metric = self.data['error_metric']
+            fit_aggregate_error_metric = self.data['aggregate_error_metric']
         except (AttributeError, KeyError):
-            fit_error_metric = None
+            fit_aggregate_error_metric = None
 
-        if error_metrics == 'auto':
-            if fit_error_metric:
-                error_metrics = [fit_error_metric]
-                logger.info('Using the fit error metric to evaluate: {}'.format(fit_error_metric))
+        if aggregate_error_metrics == 'auto':
+            if fit_aggregate_error_metric:
+                aggregate_error_metrics = [fit_aggregate_error_metric]
+                logger.info('Using the same aggregate error metric used for the fit to evaluate: {}'.format(fit_aggregate_error_metric))
             else:
-                error_metrics = ['RMSE', 'MAE']
+                aggregate_error_metrics = ['RMSE', 'MAE']
 
-        for error_metric in error_metrics:
-            if error_metric not in ['MSE', 'RMSE', 'MAE', 'HAE', 'MAPE', 'HAPE', 'MALE', 'HALE', 'E', 'PE', 'LE']:
-                raise ValueError('The error metric "{}" is not supported'.format(error_metric))
+        for aggreagate_error_metric in aggregate_error_metrics:
+            if aggreagate_error_metric not in ['MSE', 'RMSE', 'MAE', 'HAE', 'MAPE', 'HAPE', 'MALE', 'HALE']:
+                raise ValueError('The aggregate error metric "{}" is not supported'.format(aggreagate_error_metric))
+
+        if not extra_error_metrics:
+            extra_error_metrics = []
+
+        for extra_error_metric in extra_error_metrics:
+            if extra_error_metric not in ['E', 'PE', 'LE']:
+                raise ValueError('The extra error metric "{}" is not supported'.format(extra_error_metric))
 
         # Handle results series
         if plot_results_series or return_results_series:
@@ -308,13 +319,13 @@ class Forecaster(Model):
                     results_series[i].data['{}_pred'.format(data_label)] = predicted_values[data_label][i]
 
             # Compute the error metrics and add to the result series or plot if requested
-            if 'MSE' in error_metrics:
+            if 'MSE' in aggregate_error_metrics:
                 results['{}_MSE'.format(data_label)] = mean_squared_error(actual_values[data_label], predicted_values[data_label])
 
-            if 'RMSE' in error_metrics:
+            if 'RMSE' in aggregate_error_metrics:
                 results['{}_RMSE'.format(data_label)] = sqrt(mean_squared_error(actual_values[data_label], predicted_values[data_label]))
 
-            if 'MAE' in error_metrics:
+            if 'MAE' in aggregate_error_metrics:
                 results['{}_MAE'.format(data_label)] = mean_absolute_error(actual_values[data_label], predicted_values[data_label])
                 if generate_results_series:
                     for i in range(len(actual_values[data_label])):
@@ -329,10 +340,10 @@ class Forecaster(Model):
                     plt.title('AE distribution for "{}"'.format(data_label))
                     plt.show()
 
-            if 'HAE' in error_metrics:
+            if 'HAE' in aggregate_error_metrics:
                 results['{}_HAE'.format(data_label)] = max_absolute_error(actual_values[data_label], predicted_values[data_label])
 
-            if 'MAPE' in error_metrics:
+            if 'MAPE' in aggregate_error_metrics:
                 results['{}_MAPE'.format(data_label)] = mean_absolute_percentage_error(actual_values[data_label], predicted_values[data_label])
                 if generate_results_series:
                     for i in range(len(actual_values[data_label])):
@@ -347,10 +358,10 @@ class Forecaster(Model):
                     plt.title('APE distribution for "{}"'.format(data_label))
                     plt.show()
 
-            if 'HAPE' in error_metrics:
+            if 'HAPE' in aggregate_error_metrics:
                 results['{}_HAPE'.format(data_label,)] = max_absolute_percentage_error(actual_values[data_label], predicted_values[data_label])
 
-            if 'MALE' in error_metrics:
+            if 'MALE' in aggregate_error_metrics:
                 results['{}_MALE'.format(data_label)] = mean_absolute_log_error(actual_values[data_label], predicted_values[data_label])
                 if generate_results_series:
                     for i in range(len(actual_values[data_label])):
@@ -365,10 +376,11 @@ class Forecaster(Model):
                     plt.title('ALE distribution for "{}"'.format(data_label))
                     plt.show()
 
-            if 'HALE' in error_metrics:
+            if 'HALE' in aggregate_error_metrics:
                 results['{}_HALE'.format(data_label,)] = max_absolute_log_error(actual_values[data_label], predicted_values[data_label])
 
-            if 'E' in error_metrics:
+            # Extra (non-aggregate) error metrics
+            if 'E' in extra_error_metrics:
                 if generate_results_series:
                     for i in range(len(actual_values[data_label])):
                         results_series[i].data['{}_E'.format(data_label)] = actual_values[data_label][i] - predicted_values[data_label][i]
@@ -382,7 +394,7 @@ class Forecaster(Model):
                     plt.title('E distribution for "{}"'.format(data_label))
                     plt.show()
 
-            if 'PE' in error_metrics:
+            if 'PE' in extra_error_metrics:
                 if generate_results_series:
                     for i in range(len(actual_values[data_label])):
                         results_series[i].data['{}_PE'.format(data_label)] = (actual_values[data_label][i] - predicted_values[data_label][i])/actual_values[data_label][i]
@@ -396,7 +408,7 @@ class Forecaster(Model):
                     plt.title('PE distribution for "{}"'.format(data_label))
                     plt.show()
 
-            if 'LE' in error_metrics:
+            if 'LE' in extra_error_metrics:
                 if generate_results_series:
                     for i in range(len(actual_values[data_label])):
                         results_series[i].data['{}_LE'.format(data_label)] = log(actual_values[data_label][i]/predicted_values[data_label][i])
@@ -829,34 +841,41 @@ class LSTMForecaster(Forecaster, _KerasModel):
         self._save_keras_model(path)
 
     @Forecaster.fit_function
-    def fit(self, series, epochs=30, normalize=True, target='all', with_context=False, error_metric='MSE', data_loss_limit=1.0, reproducible=False, verbose=False):
+    def fit(self, series, epochs=30, normalize=True, target='all', with_context=False, aggregate_error_metric='MSE',
+            data_loss_limit=1.0, reproducible=False, verbose=False):
         """Fit the model on a series.
 
         Args:
             series(series): the series on which to fit the model.
-            epochs(int): for how many epochs to train.
-            normalize(bool): if to normalize the data between 0 and 1 or not.
-            target(str,list): what data labels to target, 'all' for all of them.
-            with_context(bool): if to use context data when predicting.
-            error_metric(str): the error metric to minimize while fitting. Supported values are: ``MSE``, ``MAE`` and ``MAPE``.
-            data_loss_limit(float): discard from the fit elements with a data loss greater than or equal to this limit.
-            reproducible(bool): if to make the fit deterministic.
-            verbose(bool): if to print the training output in the process.
+            epochs(int): for how many epochs to train. Defaults to ``30``.
+            normalize(bool): if to normalize the data between 0 and 1 or not. Enabled by default.
+            target(str,list): what data labels to target, defaults to  ``all`` for all of them.
+            with_context(bool): if to use context data when predicting. Not enabled by default.
+            aggregate_error_metric(str): the aggreagte metric to minimize while fitting. Also known as the loss function.
+                                         Supported values are: ``MSE``, ``MSLE``, ``MAE`` and ``MAPE``. Defaults to ``MSE``.
+            data_loss_limit(float): discard from the fit elements with a data loss greater than or equal to this
+                                    limit. Defaults to ``1``.
+            reproducible(bool): if to make the fit deterministic. Not enabled by default.
+            verbose(bool): if to print the training output in the process. Not enabled by default.
         """
 
         if reproducible:
             ensure_reproducibility()
 
-        # Set the loss error metric in Keras notation
-        if error_metric == 'MSE':
+        # Set the loss error_metric metric in Keras notation
+        if aggregate_error_metric == 'MSE':
             loss = 'mean_squared_error'
-        elif error_metric == 'MAE':
+        elif aggregate_error_metric == 'MAE':
             loss = 'mean_absolute_error'
-        elif error_metric == 'MAPE':
+        elif aggregate_error_metric == 'MAPE':
             loss = 'mean_absolute_percentage_error'
+        elif aggregate_error_metric == 'MSLE':
+            loss = 'mean_squared_logarithmic_error'
+        elif callable(aggregate_error_metric):
+            loss = aggregate_error_metric
         else:
-            raise ValueError('Unknown error metric "{}"'.format(error_metric))
-        self.data['error_metric'] = error_metric
+            raise ValueError('Unknown aggregate error_metric metric "{}" nor a callable'.format(aggregate_error_metric))
+        self.data['aggregate_error_metric'] = aggregate_error_metric
 
         # Set and save the targets and context data labels
         context_data_labels = None
