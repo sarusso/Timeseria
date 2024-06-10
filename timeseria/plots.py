@@ -819,7 +819,7 @@ animatedZooms: true,"""
             data_index_fillalpha = fill_alpha_value
             data_index_color = rgba_value_yellow
 
-        elif data_index_to_plot ==  'anomaly':
+        elif data_index_to_plot in ['anomaly', 'anomaly_index']:
             data_index_fillalpha = fill_alpha_value_fixed
             data_index_color = rgba_value_darkorange
 
