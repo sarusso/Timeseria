@@ -258,9 +258,8 @@ class DataPoint(Point):
             #raise AttributeError('No data loss index set for this point')
             return None
 
-    @property
     def data_labels(self):
-        """The data labels. If data is a dictionary, then these are the dictionary keys, if data is
+        """Returns the data labels. If data is a dictionary, then these are the dictionary keys, if data is
         list-like, then these are the list indexes (as strings). Other formats are not supported."""
         try:
             return sorted(list(self.data.keys()))
@@ -558,9 +557,8 @@ class DataSlot(Slot):
             #raise AttributeError('No data loss index set for this point')
             return None
 
-    @property
     def data_labels(self):
-        """The data labels. If data is a dictionary, then these are the dictionary keys, if data is
+        """Returns the data labels. If data is a dictionary, then these are the dictionary keys, if data is
         list-like, then these are the list indexes (as strings). Other formats are not supported."""
         try:
             return sorted(list(self.data.keys()))
@@ -867,9 +865,8 @@ class Series(list):
     #  Data-related
     #=========================
 
-    @property
     def data_labels(self):
-        """The labels of the data carried by the series items. If data is a dictionary, then
+        """Returns the labels of the data carried by the series items. If data is a dictionary, then
         these are the dictionary keys, if data  is list-like, then these are the list indexes
         (as strings). Other formats are not supported."""
         if len(self) > 0 and not self._item_data_reference:
@@ -877,7 +874,7 @@ class Series(list):
         if len(self) == 0:
             return None
         else:
-            return self[0].data_labels
+            return self[0].data_labels()
 
     def rename_data_label(self, old_data_label, new_data_label):
         """Rename a data label, in-place."""
@@ -1713,7 +1710,7 @@ class TimeSeries(Series):
 
     def to_df(self):
         """Convert the time series as a Pandas data frame."""
-        data_labels = self.data_labels
+        data_labels = self.data_labels()
 
         dump_data_loss = False
         for item in self:
@@ -1884,12 +1881,11 @@ class TimeSeriesView(TimeSeries):
         else:
             return super().resolution
 
-    @property
     def data_labels(self):
         if self.series:
-            return self.series.data_labels
+            return self.series.data_labels()
         else:
-            return super().data_labels
+            return super().data_labels()
 
     def materialize(self):
         """Return a materialized series view"""

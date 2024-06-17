@@ -89,7 +89,7 @@ class Forecaster(Model):
         if not isinstance(series, TimeSeries):
             raise NotImplementedError('Models work only with TimeSeries data for now (got "{}")'.format(series.__class__.__name__))
 
-        if 'target_data_labels' in self.data and self.data['target_data_labels'] and set(self.data['target_data_labels']) != set(series.data_labels):
+        if 'target_data_labels' in self.data and self.data['target_data_labels'] and set(self.data['target_data_labels']) != set(series.data_labels()):
             if not context_data:
                 raise ValueError('Forecasting with a forecaster fit to specific target data labels requires to give context data')
 
@@ -138,7 +138,7 @@ class Forecaster(Model):
     def apply(self, series, steps=1, inplace=False, context_data=None):
         """Apply the forecast on the given series for n steps-ahead."""
 
-        if 'target_data_labels' in self.data and self.data['target_data_labels'] and set(self.data['target_data_labels']) != set(series.data_labels):
+        if 'target_data_labels' in self.data and self.data['target_data_labels'] and set(self.data['target_data_labels']) != set(series.data_labels()):
             if not context_data:
                 raise ValueError('Applying a forecaster fit to target specific data labels requires to give context data (target_data_labels={})'.format(self.data['target_data_labels']))
 
@@ -285,7 +285,7 @@ class Forecaster(Model):
         # Start evaluating
         progress_step = len(series)/10
 
-        evaluate_data_labels = series.data_labels if not target_data_labels else target_data_labels
+        evaluate_data_labels = series.data_labels() if not target_data_labels else target_data_labels
 
         for data_label in evaluate_data_labels:
 
@@ -485,7 +485,7 @@ class PeriodicAverageForecaster(Forecaster):
         self.data['averages'] = {}
         self.data['dst_affected'] = dst_affected
 
-        for data_label in series.data_labels:
+        for data_label in series.data_labels():
             # Set or detect periodicity
             if periodicity == 'auto':
                 periodicity =  detect_periodicity(series[data_label])
@@ -611,7 +611,7 @@ class ProphetForecaster(Forecaster, _ProphetModel):
     @Forecaster.fit_function
     def fit(self, series, verbose=False):
 
-        if len(series.data_labels) > 1:
+        if len(series.data_labels()) > 1:
             raise Exception('Multivariate time series are not yet supported')
 
         from prophet import Prophet
@@ -700,9 +700,9 @@ class ARIMAForecaster(Forecaster, _ARIMAModel):
 
         import statsmodels.api as sm
 
-        if len(series.data_labels) > 1:
+        if len(series.data_labels()) > 1:
             raise Exception('Multivariate time series require to have the data_label of the prediction specified')
-        data_label=series.data_labels[0]
+        data_label=series.data_labels()[0]
 
         data = array(series.to_df()[data_label])
 
@@ -747,9 +747,9 @@ class AARIMAForecaster(Forecaster, _ARIMAModel):
 
         import pmdarima as pm
 
-        if len(series.data_labels) > 1:
+        if len(series.data_labels()) > 1:
             raise Exception('Multivariate time series require to have the data_label of the prediction specified')
-        data_label=series.data_labels[0]
+        data_label=series.data_labels()[0]
 
         data = array(series.to_df()[data_label])
 
@@ -880,7 +880,7 @@ class LSTMForecaster(Forecaster, _KerasModel):
         # Set and save the targets and context data labels
         context_data_labels = None
         if target == 'all':
-            target_data_labels = series.data_labels
+            target_data_labels = series.data_labels()
             if with_context:
                 raise ValueError('Cannot use context with all data labels, choose which ones')
         else:
@@ -891,11 +891,11 @@ class LSTMForecaster(Forecaster, _KerasModel):
             else:
                 raise TypeError('Don\'t know how to target for data labels as type "{}"'.format(target_data_labels.__class__.__name__))
             for target_data_label in target_data_labels:
-                if target_data_label not in series.data_labels:
-                    raise ValueError('Cannot target data label "{}" as not found in the series labels ({})'.format(target_data_label, series.data_labels))
+                if target_data_label not in series.data_labels():
+                    raise ValueError('Cannot target data label "{}" as not found in the series labels ({})'.format(target_data_label, series.data_labels()))
             if with_context:
                 context_data_labels = []
-                for series_data_label in series.data_labels:
+                for series_data_label in series.data_labels():
                     if series_data_label not in target_data_labels:
                         context_data_labels.append(series_data_label)
 
@@ -912,7 +912,7 @@ class LSTMForecaster(Forecaster, _KerasModel):
             verbose=0
 
         # Data labels shortcut
-        data_labels = series.data_labels
+        data_labels = series.data_labels()
 
         if normalize:
 

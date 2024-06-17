@@ -768,7 +768,7 @@ class CSVFileStorage(Storage):
                 raise TypeError('Can store only time series of DataTimePoints or DataTimeSlots')
 
             # 1) Dump headers
-            data_labels_part = ','.join([str(data_label) for data_label in series.data_labels])
+            data_labels_part = ','.join([str(data_label) for data_label in series.data_labels()])
             data_indexes_part = ','.join(['__'+index for index in data_indexes])
             if data_indexes_part:
                 csv_file.write('epoch,{},{}\n'.format(data_labels_part,data_indexes_part))
@@ -778,9 +778,9 @@ class CSVFileStorage(Storage):
             # 2) Dump data (and data_indexes)
             for item in series:
                 if isinstance (series[0].data, list) or isinstance (series[0].data, tuple):
-                    data_part = ','.join([str(item.data[int(data_label)]) for data_label in series.data_labels])
+                    data_part = ','.join([str(item.data[int(data_label)]) for data_label in series.data_labels()])
                 else:
-                    data_part = ','.join([str(item.data[data_label]) for data_label in series.data_labels])
+                    data_part = ','.join([str(item.data[data_label]) for data_label in series.data_labels()])
                 data_indexes_part = ','.join([str(item.data_indexes[index]) for index in data_indexes])
                 if data_indexes_part:
                     csv_file.write('{},{},{}\n'.format(item.t, data_part, data_indexes_part))

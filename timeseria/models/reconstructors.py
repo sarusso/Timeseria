@@ -98,7 +98,7 @@ class Reconstructor(Model):
             item_data = {}
             if isinstance(predicted_data, dict):
                 # Dict of lists
-                for data_label in series.data_labels:
+                for data_label in series.data_labels():
                     item_data[data_label] = predicted_data[data_label][j-from_i]
             elif isinstance(predicted_data, list):
                 # List of dicts
@@ -139,7 +139,7 @@ class Reconstructor(Model):
             details(bool): if to add intermediate steps details to the evaluation results.
         """
 
-        if len(series.data_labels) > 1:
+        if len(series.data_labels()) > 1:
             raise NotImplementedError('Evaluating on multivariate time sries is not yet implemented')
 
         # Set evaluation_score steps if we have to
@@ -163,7 +163,7 @@ class Reconstructor(Model):
 
 
         # Find areas where to evaluate the model
-        for data_label in series.data_labels:
+        for data_label in series.data_labels():
 
             for steps_round in steps:
 
@@ -386,7 +386,7 @@ class PeriodicAverageReconstructor(Reconstructor):
             raise Exception('Unknown offset method "{}"'.format(offset_method))
         self.offset_method = offset_method
 
-        if len(series.data_labels) > 1:
+        if len(series.data_labels()) > 1:
             raise NotImplementedError('Multivariate time series are not yet supported')
 
         # This reconstructor has always a one-point window (before and after gaps)
@@ -406,7 +406,7 @@ class PeriodicAverageReconstructor(Reconstructor):
         self.data['periodicity']  = periodicity
         self.data['dst_affected'] = dst_affected
 
-        for data_label in series.data_labels:
+        for data_label in series.data_labels():
             sums   = {}
             totals = {}
             processed = 0
@@ -442,8 +442,8 @@ class PeriodicAverageReconstructor(Reconstructor):
         predictions={}
 
         # TODO: support multivariate
-        #for data_label in series.data_labels:
-        data_label = series.data_labels[0]
+        #for data_label in series.data_labels():
+        data_label = series.data_labels()[0]
 
         # Compute offset using the 1-point window. This basically compares the differences between
         # the values predicted by the model and the real ones *in the window* to compute the offset.
@@ -491,7 +491,7 @@ class ProphetReconstructor(Reconstructor, _ProphetModel):
     @Reconstructor.fit_function
     def fit(self, series, verbose=False):
 
-        if len(series.data_labels) > 1:
+        if len(series.data_labels()) > 1:
             raise NotImplementedError('Multivariate time series are not supported by this reconstructor')
 
         from prophet import Prophet
@@ -515,10 +515,10 @@ class ProphetReconstructor(Reconstructor, _ProphetModel):
         if verbose_debug:
             logger.debug('Prophet reconstructor predicting from_i=%s to_i=%s (included)', from_i, to_i)
 
-        if len(series.data_labels) > 1:
+        if len(series.data_labels()) > 1:
             raise NotImplementedError('Multivariate time series are not supported by this reconstructor')
 
-        data_label = series.data_labels[0]
+        data_label = series.data_labels()[0]
 
         # Get and prepare data to reconstruct
         # TODO: check the following..

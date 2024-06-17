@@ -161,7 +161,7 @@ class TestBaseKerasModel(unittest.TestCase):
                                                                              window = 2,
                                                                              steps = 1,
                                                                              context_data_labels = None,
-                                                                             target_data_labels = self.test_timeseries.data_labels,
+                                                                             target_data_labels = self.test_timeseries.data_labels(),
                                                                              data_loss_limit = None)
 
         # What to expect (using the timestamp to represent a data point):
@@ -199,7 +199,7 @@ class TestBaseKerasModel(unittest.TestCase):
         _, target_values_vector, _ = _KerasModel._to_matrix_representation(series = self.test_timeseries_mv,
                                                                            window = 2,
                                                                            steps = 1,
-                                                                           context_data_labels = self.test_timeseries_mv.data_labels,
+                                                                           context_data_labels = self.test_timeseries_mv.data_labels(),
                                                                            target_data_labels = ['label_1'],
                                                                            data_loss_limit = None)
 
@@ -213,13 +213,13 @@ class TestBaseKerasModel(unittest.TestCase):
                                                                              window = 3,
                                                                              steps = 1,
                                                                              context_data_labels = None,
-                                                                             target_data_labels = self.test_timeseries.data_labels,
+                                                                             target_data_labels = self.test_timeseries.data_labels(),
                                                                              data_loss_limit = None)
 
 
 
         window_features  = _KerasModel._compute_window_features(window_elements_matrix[0],
-                                                                data_labels = self.test_timeseries.data_labels,
+                                                                data_labels = self.test_timeseries.data_labels(),
                                                                 time_unit = self.test_timeseries.resolution,
                                                                 features = ['values'])
 
@@ -227,7 +227,7 @@ class TestBaseKerasModel(unittest.TestCase):
 
 
         window_features  = _KerasModel._compute_window_features(window_elements_matrix[0],
-                                                                data_labels = self.test_timeseries.data_labels,
+                                                                data_labels = self.test_timeseries.data_labels(),
                                                                 time_unit = self.test_timeseries.resolution,
                                                                 features = ['values', 'diffs'])
         self.assertAlmostEqual(window_features[0][0], 0.1)
@@ -243,11 +243,11 @@ class TestBaseKerasModel(unittest.TestCase):
                                                                              window = 3,
                                                                              steps = 1,
                                                                              context_data_labels = None,
-                                                                             target_data_labels = self.test_timeseries_mv.data_labels,
+                                                                             target_data_labels = self.test_timeseries_mv.data_labels(),
                                                                              data_loss_limit = None)
 
         window_features  = _KerasModel._compute_window_features(window_elements_matrix[0],
-                                                                data_labels = self.test_timeseries_mv.data_labels,
+                                                                data_labels = self.test_timeseries_mv.data_labels(),
                                                                 time_unit = self.test_timeseries_mv.resolution,
                                                                 features = ['values'])
 
@@ -255,7 +255,7 @@ class TestBaseKerasModel(unittest.TestCase):
 
         # Multivariate with context
         window_features  = _KerasModel._compute_window_features(window_elements_matrix[0],
-                                                                data_labels = self.test_timeseries_mv.data_labels,
+                                                                data_labels = self.test_timeseries_mv.data_labels(),
                                                                 time_unit = self.test_timeseries_mv.resolution,
                                                                 features = ['values', 'diffs', 'hours'],
                                                                 context_data = {'label_2':4.0})

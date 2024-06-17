@@ -256,13 +256,13 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
 
         # Fit the predictive model(s)
         if with_context:
-            if not len(series.data_labels) > 1:
+            if not len(series.data_labels()) > 1:
                 raise ValueError('Anomaly detection with partial predictions on univariate series does not make sense')
 
             # Fit separate models, one for each data label
             self.models = {}
             self.data['model_ids'] = {}
-            for data_label in series.data_labels:
+            for data_label in series.data_labels():
                 if verbose:
                     print('Fitting for "{}":'.format(data_label))
                 logger.debug('Fitting for "%s"...', data_label)
@@ -323,7 +323,7 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
 
         progress_step = len(series)/10
 
-        for data_label in series.data_labels:
+        for data_label in series.data_labels():
 
             actual_values[data_label] = []
             predicted_values[data_label] = []
@@ -374,7 +374,7 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
             print('Model(s) evaluated, now computing the error_metric distribution(s)')
         logger.info('Model(s) evaluated, now computing the error_metric distribution(s)...')
 
-        for data_label in series.data_labels:
+        for data_label in series.data_labels():
             #if verbose:
             #    print('Selecting error_metric distribution for "{}"'.format(data_label))
             #logger.debug('Selecting error_metric distribution for "%s"', data_label))
@@ -487,7 +487,7 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
                     break
 
             ith_predictions = {} 
-            for data_label in series.data_labels:
+            for data_label in series.data_labels():
                 ith_predictions[data_label] = self._get_predicted_value(series, i, data_label, self.data['with_context'])
 
             series.predictions[i] = ith_predictions
@@ -553,7 +553,7 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
         log_10_y_ends = {}
         y_maxes = {}
 
-        for data_label in series.data_labels:
+        for data_label in series.data_labels():
             abs_prediction_errors = [abs(prediction_error) for prediction_error in self.data['prediction_errors'][data_label]]
             y_maxes[data_label] = error_distribution_functions[data_label](self.data['error_distributions_params'][data_label]['loc'])
             this_index_range = index_range[:]
@@ -624,7 +624,7 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
 
             item_anomaly_indexes = [] 
 
-            for data_label in series.data_labels:
+            for data_label in series.data_labels():
 
                 # Shortcuts
                 error_distribution_function = error_distribution_functions[data_label]

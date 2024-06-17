@@ -113,10 +113,10 @@ class TestPoints(unittest.TestCase):
 
         # Test list and dict data labels
         data_point = DataPoint(1, 2, data=['hello', 'hola'])
-        self.assertEqual(data_point.data_labels, ['0','1'])
+        self.assertEqual(data_point.data_labels(), ['0','1'])
 
         data_point = DataPoint(1, 2, data={'label1':'hello', 'label2':'hola'})
-        self.assertEqual(data_point.data_labels, ['label1','label2'])
+        self.assertEqual(data_point.data_labels(), ['label1','label2'])
 
         # Test with data loss index
         data_point = DataPoint(1, 2, data='hello', data_loss=0.5)
@@ -286,10 +286,10 @@ class TestSlots(unittest.TestCase):
 
         # Test list and dict data labels
         data_slot = DataSlot(start=Point(1), end=Point(2), data=['hello', 'hola'])
-        self.assertEqual(data_slot.data_labels, ['0','1'])
+        self.assertEqual(data_slot.data_labels(), ['0','1'])
 
         data_slot = DataSlot(start=Point(1), end=Point(2), data={'label1':'hello', 'label2':'hola'})
-        self.assertEqual(data_slot.data_labels, ['label1','label2'])
+        self.assertEqual(data_slot.data_labels(), ['label1','label2'])
 
         # Test with data loss index
         data_slot = DataSlot(start=Point(1), end=Point(2), data='hello', data_loss=0.5)
@@ -647,15 +647,15 @@ class TestTimeSeries(unittest.TestCase):
         timeseries = TimeSeries(DataTimePoint(dt=dt(2015,10,27,0,0,0, tz='Europe/Rome'), data={'a':23.8, 'b':1}),
                                 DataTimePoint(dt=dt(2015,10,28,0,0,0, tz='Europe/Rome'), data={'a':24.1, 'b':2}),
                                 DataTimePoint(dt=dt(2015,10,29,0,0,0, tz='Europe/Rome'), data={'a':23.1, 'b':3}))
-        self.assertEqual(timeseries.data_labels, ['a','b'])
+        self.assertEqual(timeseries.data_labels(), ['a','b'])
         timeseries.rename_data_label('b','c')
-        self.assertEqual(timeseries.data_labels, ['a','c'])
+        self.assertEqual(timeseries.data_labels(), ['a','c'])
 
         with self.assertRaises(KeyError):
             timeseries.rename_data_label('notexistent_label','c')
 
         timeseries.remove_data_label('c')
-        self.assertEqual(timeseries.data_labels, ['a'])
+        self.assertEqual(timeseries.data_labels(), ['a'])
 
         # Check timezone
         timeseries = TimeSeries(DataTimePoint(dt=dt(2015,10,25,0,0,0, tz='Europe/Rome'), data={'a':23.8}),
@@ -843,9 +843,9 @@ class TestTimeSeries(unittest.TestCase):
                                 DataTimeSlot(dt=dt(2015,10,28,0,0,0), unit=TimeUnit('1D'), data={'a':24.1, 'b':2}),
                                 DataTimeSlot(dt=dt(2015,10,29,0,0,0), unit=TimeUnit('1D'), data={'a':23.1, 'b':3}))
 
-        self.assertEqual(timeseries.data_labels, ['a','b'])
+        self.assertEqual(timeseries.data_labels(), ['a','b'])
         timeseries.rename_data_label('b','c')
-        self.assertEqual(timeseries.data_labels, ['a','c'])
+        self.assertEqual(timeseries.data_labels(), ['a','c'])
 
         with self.assertRaises(KeyError):
             timeseries.rename_data_label('notexistent_label','c')
@@ -1106,7 +1106,7 @@ class TestTimeSeriesView(unittest.TestCase):
 
         # Test extra attributes
         self.assertEqual(str(timeseries_view.resolution), '1s')
-        self.assertEqual(timeseries_view.data_labels, ['value'])
+        self.assertEqual(timeseries_view.data_labels(), ['value'])
 
         # Test operations
         diff_timeseries = timeseries_view.diff()

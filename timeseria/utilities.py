@@ -145,7 +145,7 @@ def detect_periodicity(timeseries):
     _check_timeseries(timeseries)
 
     # TODO: fix me, data_loss must not belong as data_label
-    data_labels = timeseries.data_labels
+    data_labels = timeseries.data_labels()
 
     if len(data_labels) > 1:
         raise NotImplementedError()
@@ -845,7 +845,7 @@ def _check_resolution(series, resolution):
         raise ValueError('This model is fitted on "{}" resolution data, while your data has "{}" resolution.'.format(resolution, series.resolution))
 
 def _check_data_labels(series, data_labels):
-    series_data_labels = series.data_labels
+    series_data_labels = series.data_labels()
     if len(series_data_labels) != len(data_labels):
         raise ValueError('This model is fitted on {} data labels, while your data has {} data labels.'.format(len(data_labels), len(series_data_labels)))
     if series_data_labels != data_labels:
@@ -859,7 +859,7 @@ def _check_series_of_points_or_slots(series):
 
 def _check_indexed_data(series):
     try:
-        series.data_labels
+        series.data_labels()
     except TypeError:
         raise TypeError('Cannot operate on a series of "{}" with "{}" data, only series of indexed data (as lists and dicts) are supported'.format(series.item_types.__name__, series[0].data.__class__.__name__))
 
