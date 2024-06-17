@@ -2,7 +2,7 @@
 set -e
 
 # Move to project root
-cd ../../
+cd ../
 
 if [[ "x$CACHE" == "xFalse" ]]; then
     echo "Building without cache."
