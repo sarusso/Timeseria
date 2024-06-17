@@ -57,7 +57,8 @@ RUN pip install plotly==5.11.0
 #RUN pip install widgetsnbextension==4.0.5
 
 # Add code
-COPY ./ /opt/Timeseria
+RUN mkdir /opt/Timeseria
+COPY ./timeseria /opt/Timeseria/timeseria
 
 # Add the entrypoint
 COPY docker/entrypoint.sh /
