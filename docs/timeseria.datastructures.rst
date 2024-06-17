@@ -31,6 +31,7 @@
       
       Series
       TimeSeries
+      TimeSeriesView
    
 
    

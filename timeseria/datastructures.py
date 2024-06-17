@@ -1781,7 +1781,7 @@ class TimeSeries(Series):
 #==============================
 
 class TimeSeriesView(TimeSeries):
-    """A time series view. """
+    """A time series view."""
 
     def __init__(self, *items, series=None, from_i=None, to_i=None, **kwargs):
         self.series = series

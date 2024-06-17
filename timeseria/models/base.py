@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Provides base model classes."""
+"""Base model classes."""
 
 import os
 import json
@@ -36,7 +36,7 @@ class TooMuchDataLoss(Exception):
 #======================
 
 class Model():
-    """A generic model for series data. This can be either a stateless model, where all the information is coded and there are no parameters, or a
+    """A generic model. This can be either a stateless model, where all the information is coded and there are no parameters, or a
     stateful (parametric) model, where there are a number of parameters which can be both set manually or learnt (fitted) from the data.
 
     All models expose a ``predict()``, ``apply()`` and ``evaluate()`` methods, while parametric models also provide a ``save()`` method to

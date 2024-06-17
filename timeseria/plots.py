@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Plotting utilities."""
+"""Plotting engines."""
 
 #================================================================#
 #   WARNING: the code in this module needs a major refactoring!  #
@@ -1126,10 +1126,10 @@ define('"""+graph_id+"""', ['dgenv'], function (Dygraph) {
 # Matplotlib plot
 #=================
 
-def matplotlib_plot(timeseries):
-    """Plot a timeseries in Jupyter using Matplotlib."""
+def matplotlib_plot(series):
+    """Plot a time series using Matplotlib."""
     from matplotlib import pyplot
-    pyplot.plot(timeseries.df)
+    pyplot.plot(series.to_df())
     pyplot.show()
 
 

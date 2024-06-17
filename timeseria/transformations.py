@@ -377,7 +377,7 @@ def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_poi
 #==========================
 
 class Transformation(object):
-    """A generic series transformation."""
+    """A generic transformation."""
 
     @classmethod
     def __str__(cls):

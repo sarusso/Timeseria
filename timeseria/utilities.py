@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 
 def ensure_reproducibility():
-    """Ensure reproducibility by fixing seeds and initial conditions for: Random, Numpy, Keras, Tensorflow""" 
+    """Ensure reproducibility by fixing seeds and initial conditions for: Random, Numpy, Keras and Tensorflow."""
 
     random.seed(0)
     numpy.random.seed(0)
@@ -219,7 +219,7 @@ def detect_periodicity(timeseries):
 
 
 def mean_absolute_percentage_error(list1, list2):
-    """Compute the MAPE, list 1 are true values, list 2 are predicted values"""
+    """Compute the MAPE, list 1 are true values, list 2 are predicted values."""
 
     if len(list1) != len(list2):
         raise ValueError('Lists have different lengths, cannot continue')
@@ -230,7 +230,7 @@ def mean_absolute_percentage_error(list1, list2):
 
 
 def max_absolute_percentage_error(list1, list2):
-    """Compute the MAPE, list 1 are true values, list 2 are predicted values"""
+    """Compute the MaxAPE, list 1 are true values, list 2 are predicted values."""
 
     if len(list1) != len(list2):
         raise ValueError('Lists have different lengths, cannot continue')
@@ -246,10 +246,12 @@ def max_absolute_percentage_error(list1, list2):
 
 
 def mean_absolute_error(list1,list2):
+    """Compute the MAE, list 1 are true values, list 2 are predicted values."""
     return sklearn_mean_absolute_error(list1,list2)
 
 
 def max_absolute_error(list1,list2):
+    """Compute the MaxAE, list 1 are true values, list 2 are predicted values."""
     if len(list1) != len(list2):
         raise ValueError('Lists have different lengths, cannot continue')
     max_ae = None
@@ -264,6 +266,7 @@ def max_absolute_error(list1,list2):
 
 
 def mean_absolute_log_error(list1, list2):
+    """Compute the MALE, list 1 are true values, list 2 are predicted values."""
     if len(list1) != len(list2):
         raise ValueError('Lists have different lengths, cannot continue')
     ale_sum = 0
@@ -273,6 +276,7 @@ def mean_absolute_log_error(list1, list2):
 
 
 def max_absolute_log_error(list1,list2):
+    """Compute the MaxALE, list 1 are true values, list 2 are predicted values."""
     if len(list1) != len(list2):
         raise ValueError('Lists have different lengths, cannot continue')
     max_ale = None
@@ -286,12 +290,13 @@ def max_absolute_log_error(list1,list2):
     return max_ale
 
 
-def mean_squared_error(a,b):
-    return sklearn_mean_squared_error(a,b)
+def mean_squared_error(list1,list2):
+    """Compute the MSE, list 1 are true values, list 2 are predicted values."""
+    return sklearn_mean_squared_error(list1,list2)
 
 
 def rescale(value, source_from, source_to, target_from=0, target_to=1, how='linear'):
-    """Rescale a value from one range to another"""
+    """Rescale a value from one range to another."""
 
     if value < 0:
         raise ValueError('Cannot rescale negative value')
@@ -385,7 +390,7 @@ def os_shell(command, capture=False, verbose=False, interactive=False, silent=Fa
 
 
 class DistributionFunction():
-    """A class representing a statistical distribution"""
+    """A class representing a statistical distribution."""
 
     def __init__(self, dist, params):
         self.dist = dist

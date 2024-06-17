@@ -479,7 +479,7 @@ class PeriodicAverageReconstructor(Reconstructor):
 #=====================================
 
 class ProphetReconstructor(Reconstructor, _ProphetModel):
-    """A series reconstruction model based on Prophet. Prophet (from Facebook) implements a procedure for forecasting time series data based
+    """A reconstruction model based on Prophet. Prophet (from Facebook) implements a procedure for forecasting time series data based
     on an additive model where non-linear trends are fit with yearly, weekly, and daily seasonality, plus holiday effects.
 
     Args:

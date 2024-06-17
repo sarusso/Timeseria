@@ -41,7 +41,7 @@ class Storage(object):
 #======================
 
 class CSVFileStorage(Storage):
-    """A CSV file storage for time series. Supports both point and slot time series.
+    """A CSV file storage. Supports both point and slot time series.
 
     The file encoding, the series type and the timestamp columns are all auto-detect with an heuristic approach
     by default, and asked to be set manually only if the heuristics fails. In particular, whether to create point or slot

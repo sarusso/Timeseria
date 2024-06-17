@@ -43,7 +43,7 @@ except ImportError:
 #======================
 
 class Forecaster(Model):
-    """A generic series forecasting model. Besides the ``predict()`` and  ``apply()`` methods, it also has a ``forecast()``
+    """A generic forecasting model. Besides the ``predict()`` and  ``apply()`` methods, it also has a ``forecast()``
     method which, in case of nested data structures (i.e. DataPoint or DataSlot) allows to get the full forecasted points
     or slots instead of just the raw, inner data values returned by the ``predict()``. In case of plain data structures
     (e.g. a list), the ``forecast()`` method is instead equivalent to the ``predict()``.
@@ -359,7 +359,7 @@ class Forecaster(Model):
                     plt.show()
 
             if 'HAPE' in aggregate_error_metrics:
-                results['{}_HAPE'.format(data_label,)] = max_absolute_percentage_error(actual_values[data_label], predicted_values[data_label])
+                results['{}_HAPE'.format(data_label)] = max_absolute_percentage_error(actual_values[data_label], predicted_values[data_label])
 
             if 'MALE' in aggregate_error_metrics:
                 results['{}_MALE'.format(data_label)] = mean_absolute_log_error(actual_values[data_label], predicted_values[data_label])
@@ -438,7 +438,7 @@ class Forecaster(Model):
 #=========================
 
 class PeriodicAverageForecaster(Forecaster):
-    """A series forecasting model based on periodic averages.
+    """A forecasting model based on periodic averages.
 
     Args:
         path (str): a path from which to load a saved model. Will override all other init settings.
@@ -602,7 +602,7 @@ class PeriodicAverageForecaster(Forecaster):
 #=========================
 
 class ProphetForecaster(Forecaster, _ProphetModel):
-    """A series forecasting model based on Prophet. Prophet (from Facebook) implements a procedure for forecasting time series data based
+    """A forecasting model based on Prophet. Prophet (from Facebook) implements a procedure for forecasting time series data based
     on an additive model where non-linear trends are fit with yearly, weekly, and daily seasonality, plus holiday effects.
     """
 
@@ -673,7 +673,7 @@ class ProphetForecaster(Forecaster, _ProphetModel):
 #=========================
 
 class ARIMAForecaster(Forecaster, _ARIMAModel):
-    """A series forecasting model based on ARIMA. AutoRegressive Integrated Moving Average models are a generalization of an
+    """A forecasting model based on ARIMA. AutoRegressive Integrated Moving Average models are a generalization of an
     AutoRegessive Moving Average (ARMA) model, which provide a description of a (weakly) stationary stochastic process
     in terms of two polynomials, one for the autoregression (AR) and the second for the moving average (MA). The "I"
     indicates that the data values have been replaced with the difference between their values and the previous values.
@@ -736,7 +736,7 @@ class ARIMAForecaster(Forecaster, _ARIMAModel):
 #=========================
 
 class AARIMAForecaster(Forecaster, _ARIMAModel):
-    """A series forecasting model based on Auto-ARIMA. Auto-ARIMA models set automatically the best values for the
+    """A forecasting model based on Auto-ARIMA. Auto-ARIMA models set automatically the best values for the
     p, d and q parameters, trying different values and checking which ones perform better.
     """
 
@@ -793,7 +793,7 @@ class AARIMAForecaster(Forecaster, _ARIMAModel):
 #=========================
 
 class LSTMForecaster(Forecaster, _KerasModel):
-    """A series forecasting model based on a LSTM neural network. LSTMs are artificial neutral networks particularly well suited for time series forecasting tasks.
+    """A forecasting model based on a LSTM neural network. LSTMs are artificial neutral networks particularly well suited for time series forecasting tasks.
 
     Args:
         window (int): the window length.
@@ -874,7 +874,7 @@ class LSTMForecaster(Forecaster, _KerasModel):
         elif callable(aggregate_error_metric):
             loss = aggregate_error_metric
         else:
-            raise ValueError('Unknown aggregate error_metric metric "{}" nor a callable'.format(aggregate_error_metric))
+            raise ValueError('Unknown aggregate error metric "{}" nor a callable'.format(aggregate_error_metric))
         self.data['aggregate_error_metric'] = aggregate_error_metric
 
         # Set and save the targets and context data labels

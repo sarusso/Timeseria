@@ -18,10 +18,10 @@
    .. autosummary::
    
       AnomalyDetector
-      SeriesAnomalyDetector
+      ModelBasedAnomalyDetector
       
-      ForecasterAnomalyDetector
       PeriodicAverageAnomalyDetector
+      LSTMAnomalyDetector
 
       
    

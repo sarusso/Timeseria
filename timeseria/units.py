@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Units and the TimeUnit, which fully supports calendar arithmetic."""
+"""Units, including the TimeUnit, which fully supports calendar arithmetic."""
 
 from .utilities import is_numerical
 from propertime import TimeSpan
