@@ -4,11 +4,11 @@ Welcome to Timeseria reference documentation!
 
 Timeseria is an object-oriented time series processing library which aims at making it easy to manipulate time series data and to build statistical and machine learning models on top of it.
 
-Unlike common numerical and data analysis frameworks, Timeseira does not make use of low level structures as arrays and matrices for representing data. Instead, it builds up from well defined and reusable logical units (objects) which can be easily composed together, ensuring a high level of consistency.
+Unlike common numerical and data analysis frameworks, Timeseria does not make use of low level data structures as arrays and matrices to represent time series data. Instead, it builds up from well defined and reusable logical units (objects) which can be easily combined together in order to ensure an high level of consistency.
 
-Because of this approach, Timeseria addresses by design all those annoying things which are often left as an implementation detail but that actually cause wasting massive amounts of time - as handling data losses, non-uniform sampling rates, differences between aggregated data and punctual observations, timezones, DST changes, and so on.
+Thanks to this approach, Timeseria can address by design several issues often left as an implementation detail but that can actually cause significant challenges - as handling data losses, non-uniform sampling rates, differences between aggregated data and punctual observations, time zones, DST changes, and so on.
 
-Timeseria  comes with a built-in set of common operations (resampling, aggregation, differencing etc.) and models (reconstruction, forecasting and anomaly detection) which can be easily extended with custom ones, and integrates a powerful plotting engine based on Dygraphs capable of plotting even millions of data points.
+Timeseria  comes with a built-in set of common operations (such as resampling, aggregations, moving averages, derivatives etc.) along with extensible models for reconstruction, forecasting and anomaly detection; and it integrates a powerful plotting engine capable of handling even millions of data points.
 
 This is the refeerence documentations, and it is quite essential. To get started more gently, you can have a look at the
 `quickstart <https://github.com/sarusso/Timeseria-notebooks/blob/master/notebooks/Quickstart.ipynb>`_ or at the `welcome <https://github.com/sarusso/Timeseria-notebooks/blob/master/notebooks/Welcome.ipynb>`_ notebooks.

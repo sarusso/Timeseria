@@ -5,11 +5,12 @@
 
 Timeseria is an object-oriented time series processing library which aims at making it easy to manipulate time series data and to build statistical and machine learning models on top of it.
 
-Unlike common numerical and data analysis frameworks, Timeseria does not make use of low level data structures as arrays and matrices to represent time series data. Instead, it builds up from well defined and reusable logical units (objects), which can be easily combined together in order to ensure an high level of consistency.
+Unlike common numerical and data analysis frameworks, Timeseria does not make use of low level data structures as arrays and matrices to represent time series data. Instead, it builds up from well defined and reusable logical units (objects) which can be easily combined together in order to ensure an high level of consistency.
 
-Thanks to this approach, Timeseria can address by design several issues that are often left as implementation details but that are actually a great source of headaches - as handling data losses, non-uniform sampling rates, differences between aggregated data and punctual observations, timezones, DST changes, and so on.
+Thanks to this approach, Timeseria can address by design several issues often left as an implementation detail but that can actually cause significant challenges - as handling data losses, non-uniform sampling rates, differences between aggregated data and punctual observations, time zones, DST changes, and so on.
 
-Timeseria  comes with a built-in set of common operations (resampling, aggregation, moving averages, derivatives etc.) as well as extensible models (for reconstruction, forecasting and anomaly detection), and integrates a powerful plotting engine capable of plotting even millions of data points.
+Timeseria  comes with a built-in set of common operations (such as resampling, aggregations, moving averages, derivatives etc.) along with extensible models for reconstruction, forecasting and anomaly detection; and it integrates a powerful plotting engine capable of handling even millions of data points.
+
 
 ![Time series plot](docs/altogether.png?raw=true "Timeseria at work")
 
