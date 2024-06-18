@@ -1,11 +1,13 @@
-import unittest
 import os
+import unittest
+import pandas as pd
 from propertime.utils import dt, s_from_dt
 
 from ..utilities import detect_encoding, detect_periodicity, detect_sampling_interval
 from ..utilities import _compute_coverage, _compute_data_loss, _compute_validity_regions
 from ..utilities import _Gaussian
 from ..utilities import rescale
+from ..utilities import _is_index_based, _is_key_based, _has_numerical_values
 from ..datastructures import DataTimePoint, TimeSeries
 from ..storages import CSVFileStorage
 from ..units import TimeUnit
@@ -443,5 +445,64 @@ class TestRescale(unittest.TestCase):
         self.assertAlmostEqual(rescale(value=0.98, source_from=0.000016, source_to=1.0, target_from=0, target_to=1), 0.97999967)
 
 
+class TestDetectDataTypes(unittest.TestCase):
 
+    def test_detect_data_types(self):
+
+        data = [1,2,3]
+        self.assertEqual(_is_index_based(data), True)
+        self.assertEqual(_is_key_based(data), False)
+        self.assertEqual(_has_numerical_values(data), True)
+
+        data = [1,'z',3]
+        self.assertEqual(_is_index_based(data), True)
+        self.assertEqual(_is_key_based(data), False)
+        self.assertEqual(_has_numerical_values(data), False)
+
+        data = [1,2,None]
+        self.assertEqual(_is_index_based(data), True)
+        self.assertEqual(_is_key_based(data), False)
+        self.assertEqual(_has_numerical_values(data), False)
+
+
+        data = (1,2,3)
+        self.assertEqual(_is_index_based(data), True)
+        self.assertEqual(_is_key_based(data), False)
+        self.assertEqual(_has_numerical_values(data), True)
+
+        data = 'hello'
+        self.assertEqual(_is_index_based(data), True)
+        self.assertEqual(_is_key_based(data), False)
+        self.assertEqual(_has_numerical_values(data), False)
+
+        data = {'a':1, 'b':2}
+        self.assertEqual(_is_index_based(data), False)
+        self.assertEqual(_is_key_based(data), True)
+        self.assertEqual(_has_numerical_values(data), True)
+
+        data = {'a':1, 'b':'z'}
+        self.assertEqual(_is_index_based(data), False)
+        self.assertEqual(_is_key_based(data), True)
+        self.assertEqual(_has_numerical_values(data), False)
+
+        data = {'a':1, 'b':None}
+        self.assertEqual(_is_index_based(data), False)
+        self.assertEqual(_is_key_based(data), True)
+        self.assertEqual(_has_numerical_values(data), False)
+
+        data = pd.Series([4,5,6])
+        self.assertEqual(_is_index_based(data), True)
+        self.assertEqual(_is_key_based(data), False)
+        self.assertEqual(_has_numerical_values(data), True)
+
+        data = pd.Series([4,5,'z'])
+        self.assertEqual(_is_index_based(data), True)
+        self.assertEqual(_is_key_based(data), False)
+        self.assertEqual(_has_numerical_values(data), False)
+
+        data = pd.Series([4,5,6])
+        data.index = ['a','b','c']
+        self.assertEqual(_is_index_based(data), True)
+        self.assertEqual(_is_key_based(data), False)
+        self.assertEqual(_has_numerical_values(data), True)
 

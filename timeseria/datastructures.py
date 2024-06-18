@@ -1,16 +1,18 @@
 # -*- coding: utf-8 -*-
 """Base data structures as Points, Slots and Series."""
 
-from .units import Unit, TimeUnit
-from .utilities import _is_close, _to_time_unit_string
+import json
 from copy import deepcopy
 from pandas import DataFrame
 from datetime import datetime
-from .exceptions import ConsistencyException
-from propertime.utils import s_from_dt , dt_from_s, timezonize, dt_from_str, str_from_dt
 from pytz import UTC
-import json
 from propertime import Time
+from propertime.utils import s_from_dt , dt_from_s, timezonize, dt_from_str, str_from_dt
+
+from .units import Unit, TimeUnit
+from .utilities import _is_close, _to_time_unit_string
+from .utilities import _is_index_based, _is_key_based, _has_numerical_values
+from .exceptions import ConsistencyException
 
 # Setup logging
 import logging
@@ -647,6 +649,21 @@ class Series(list):
         if self.item_type:
             if not isinstance(item, self.item_type):
                 raise TypeError('Got incompatible type "{}", can only accept "{}"'.format(item.__class__.__name__, self.item_type.__name__))
+        else:
+            # First item appended to this series: check for compatible data type if any
+            try:
+                item.data
+            except AttributeError:
+                pass
+            else:
+                if _is_index_based(item.data):
+                    if not _has_numerical_values(item.data):
+                        logger.warning('You are using a data type that has no (or not only) numerical values. Support will be very limited.')
+                elif _is_key_based(item.data):
+                    if not _has_numerical_values(item.data):
+                        logger.warning('You are using a data type that has no (or not only) numerical values. Support will be very limited.')
+                else:
+                    logger.warning('You are using a data type that is neither index-based nor in key-value format. Support will be very limited.')
 
         # Check order or succession if not empty
         if self:

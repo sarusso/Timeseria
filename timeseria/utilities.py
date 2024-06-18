@@ -861,7 +861,7 @@ def _check_indexed_data(series):
     try:
         series.data_labels()
     except TypeError:
-        raise TypeError('Cannot operate on a series of "{}" with "{}" data, only series of indexed data (as lists and dicts) are supported'.format(series.item_types.__name__, series[0].data.__class__.__name__))
+        raise TypeError('Cannot operate on a series of "{}" with "{}" data, only series of indexed data (as lists and dicts) are supported'.format(series.item_type.__name__, series[0].data.__class__.__name__))
 
 def _get_periodicity_index(item, resolution, periodicity, dst_affected=False):
     """Get the periodicty index."""
@@ -1030,4 +1030,46 @@ def _detect_notebook_major_version():
     return notebook_major_version
 
 
+def _is_index_based(data):
+    try:
+        for i in range(len(data)):
+            data[i]
+    except:
+        return False
+    else:
+        return True
+
+
+def _is_key_based(data):
+    if _is_index_based(data):
+        return False
+    try:
+        for key in data:
+            data[key]
+    except:
+        return False
+    else:
+        return True
+
+
+def _has_numerical_values(data):
+
+    if _is_index_based(data):
+        for i in range(len(data)):
+            try:
+                data[i] + 1
+            except:
+                return False
+        return True
+
+    elif _is_key_based(data):
+        for key in data:
+            try:
+                data[key] + 1
+            except:
+                return False
+        return True
+
+    else:
+        raise ValueError('Don\'t know how to establish if this data type has numerical values or not (got "{}")'.format(data.__class__.__name__))
 
