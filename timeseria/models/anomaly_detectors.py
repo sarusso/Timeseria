@@ -238,9 +238,9 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
 
         Args:
             with_context(bool): if to use context for multivariate time series or not. Defaults to ``False``.
-            error_metric(str): the error metric to use for evaluating the model errors and thus nuild the anomaly detector anomaly esitimates.
+            error_metric(str): the error metric to be used for evaluating the model and to build the error distribution for the anomaly index.
                                Supported values are: ``E``, ``AE``, ``PE`` and ``APE``. Defaults to ``PE``.
-            error_distribution(str): if to use a specific error_metric distribution or find it automatically (``error_distribution='auto'``).
+            error_distribution(str): if to use a specific error distribution or find it automatically (``error_distribution='auto'``).
                                      Defaults to ``gennorm``, a generalized normal distribution.
             store_errors(float): if to store the prediction errors (together with actual and predicted values) internally for further analysis. Access
                                  them with ``model.data['prediction_errors']``, ``model.data['actual_values']`` and ``model.data['predicted_values']``.

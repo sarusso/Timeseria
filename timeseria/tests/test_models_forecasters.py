@@ -278,7 +278,7 @@ class TestForecasters(unittest.TestCase):
         forecaster.fit(timeseries, epochs=50, reproducible=True)
 
         # Test the evaluation
-        evaluation_results = forecaster.evaluate(timeseries[0:10], aggregate_error_metrics=['RMSE', 'MAE'])
+        evaluation_results = forecaster.evaluate(timeseries[0:10], error_metrics=['RMSE', 'MAE'])
         self.assertAlmostEqual(evaluation_results['sin_RMSE'], 0.026, places=2)
         self.assertAlmostEqual(evaluation_results['sin_MAE'], 0.025, places=2)
 
