@@ -496,7 +496,8 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
         return series
 
     @Model.apply_function
-    def apply(self, series, index_range=['avg_err','max_err'], index_type='log', threshold=None, multivariate_index_strategy='max', details=False, verbose=False):
+    def apply(self, series, index_range=['avg_err','max_err'], index_type='log', threshold=None, multivariate_index_strategy='max',
+              data_loss_threshold=1.0, details=False, verbose=False):
 
         """Apply the anomaly detection model on a series.
 
@@ -520,6 +521,7 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
                                                         time series items. Possible choices are "max" to use the maximum one, "avg"
                                                         for the mean and "min" for the minimum; or a callable taking as input the
                                                         list of the anomaly indexes for each data label. Defaults to "max".
+            data_loss_treshold(float): if the data loss is equal or greater than this threshold value, then the anomaly detection is not applied.
             details(bool, list): if to add details to the time series as the predicted value, the error and the
                                  model adherence probability. If set to ``True``, it adds all of them, if instead using
                                  a list only selected details can be added: ``pred`` for the predicted values, ``err`` for
@@ -622,7 +624,27 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
                 if i >  len(series)-self.data['model_window']-1:
                     break
 
-            item_anomaly_indexes = [] 
+            # Check if we are allowed to compute the anomaly index given the data loss threshold, or if we have to abort
+            abort=False
+            if series[i].data_loss is not None and series[i].data_loss >= data_loss_threshold:
+                abort=True
+            else:
+                for j in range(self.data['model_window']):
+                    if series[i-j-1].data_loss is not None and series[i-j-1].data_loss >= data_loss_threshold:
+                        abort=True
+                        break
+                if not abort:
+                    if issubclass(self.model_class, Reconstructor):
+                        if series[i-j-1].data_loss is not None and series[i+j+1].data_loss >= data_loss_threshold:
+                            abort=True
+                            break
+            if abort:
+                # Just append the item as-is and continue
+                result_series.append(item)
+                continue
+
+            # Start computing the anomaly index
+            item_anomaly_indexes = []
 
             for data_label in series.data_labels():
 
