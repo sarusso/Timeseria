@@ -1003,25 +1003,61 @@ define('"""+graph_id+"""', ['dgenv'], function (Dygraph) {
             if not image_plot_support:
                 raise ValueError('Sorry, image plots are not supported since the package "pyppeteer" could be imported')
 
-            # Get OS and architecture
-            _os = os.uname()[0]
-            _arch = os.uname()[4]
+            _chrom_executable = None
 
-            # For ARM and Linux, use system system chromium, otherwise rely on Pyppeteer
+            # Is there a system Chrome or Chromium we can use?
+            potential_chrom_executables = ['google-chromium', 'google-chrome', 'chromium-browser',
+                                           '/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome']
 
-            if (_os == 'Linux') and (_arch == 'aarch64'):
-                _chromium_executable = 'chromium-browser'
-            else:
-                # Disable logging for Pyppeteer
-                pyppeteer_logger = logging.getLogger('pyppeteer')
-                pyppeteer_logger.setLevel(logging.CRITICAL)
+            for potential_chrom_executable in potential_chrom_executables:
+                out = os_shell('{} --version'.format(potential_chrom_executable), capture=True)
+                if out.exit_code != 0:
+                    continue
+                else:
+                    version = out.stdout.replace('Google', '').replace('Chrome', '').replace('Chromium', '').strip().split(' ')[0]
+                    version_major = int(version.split('.')[0])
+                    if version_major >= 59:
+                        logger.info('Found usable Chrom* executable: "{}"'.format(potential_chrom_executable))
+                        _chrom_executable = potential_chrom_executable
+                        break
+                    else:
+                        continue
+                    logger.critical('Found {}'.format(potential_chrom_executable))
 
-                # Check we have Chromium,. if not, download
-                if False:#not chromium_executable().exists():
-                    logger.info('Downloading Chromium for rendering image-based plots...')
+            # Otherwise, rely on Pyppeteer's downloading it
+            if not _chrom_executable:
+                logger.debug('Checking Pyppeteer\'s Chromium presence for rendering image-based plots...')
+                if not chromium_executable().exists():
+                    logger.info('Downloading Pyppeteer\'s Chromium for rendering image-based plots...')
+                    # Disable logging for Pyppeteer
+                    pyppeteer_logger = logging.getLogger('pyppeteer')
+                    pyppeteer_logger.setLevel(logging.CRITICAL)
                     download_chromium()
                     logger.info('Done. Will not be required anymore on this system.')
-                _chromium_executable = chromium_executable()
+                else:
+                    logger.debug('Ok, Chromium present.')
+
+                # Convert executable path to string and handle white spaces if present
+                _chrom_executable = _chrom_executable.replace(' ', '\ ')
+
+            # Check path exists and is writable or Chrom* will risk to hang up
+            png_dest_path = '/'.join(png_dest.split('/')[0:-1])
+            if png_dest_path.strip():
+                if not os.path.exists(png_dest_path):
+                    try:
+                        os.makedirs(png_dest_path)
+                    except:
+                        raise IOError('Path "{}" does not exists and cannot create it'.format(png_dest_path))
+                try:
+                    with open(png_dest, 'a'):
+                        os.utime(png_dest, None)
+                except:
+                    raise IOError('Cannot write to "{}"'.format(png_dest))
+                finally:
+                    try:
+                        os.remove(png_dest)
+                    except:
+                        pass
 
             # Render HTML to image
             if image_resolution == 'auto':
@@ -1030,7 +1066,7 @@ define('"""+graph_id+"""', ['dgenv'], function (Dygraph) {
                 else:
                     image_resolution='1280x380'
             resolution = image_resolution.replace('x', ',')
-            command = '{} --no-sandbox --headless --disable-gpu --window-size={} --screenshot={} {}'.format(_chromium_executable, resolution, png_dest, html_dest)
+            command = '{} --no-sandbox --headless --disable-gpu --window-size={} --screenshot={} {}'.format(_chrom_executable, resolution, png_dest, html_dest)
             logger.debug('Executing "{}"'.format(command))
             out = os_shell(command, capture=True)
 
