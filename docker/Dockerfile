@@ -5,8 +5,8 @@ MAINTAINER Stefano Alberto Russo <stefano.russo@gmail.com>
 RUN apt-get update
 
 # Install Python requirements
-COPY requirements.txt /tmp
-RUN pip3 install -r /tmp/requirements.txt
+COPY requirements_pinned.txt /tmp
+RUN pip3 install -r /tmp/requirements_pinned.txt
 
 # Add headless Chromium support for rendering plots as images
 RUN apt-get install -y xdg-utils wget libxrandr2 libxkbcommon0 libxfixes3 libxext6 libxdamage1 libxcomposite1 \
