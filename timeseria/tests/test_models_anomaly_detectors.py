@@ -206,6 +206,12 @@ class TestAnomalyDetectors(unittest.TestCase):
 
     def test_LSTMAnomalyDetector_multivariate(self):
 
+        try:
+            import tensorflow
+        except ImportError:
+            print('Skipping LSTM anomlay detector tests with multivariate time series as no tensorflow module installed')
+            return
+
         timeseries_clean = TimeSeries()
         for i in range(100):
             sin_value = sin(i/10.0)
@@ -248,6 +254,12 @@ class TestAnomalyDetectors(unittest.TestCase):
 
 
     def test_LSTMAnomalyDetector_multivariate_with_context(self):
+
+        try:
+            import tensorflow
+        except ImportError:
+            print('Skipping LSTM anomlay detector tests with multivariate time series as no tensorflow module installed')
+            return
 
         timeseries_clean = TimeSeries()
         for i in range(200):
