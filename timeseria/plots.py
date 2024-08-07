@@ -1006,7 +1006,7 @@ define('"""+graph_id+"""', ['dgenv'], function (Dygraph) {
             _chrom_executable = None
 
             # Is there a system Chrome or Chromium we can use?
-            potential_chrom_executables = ['google-chromium', 'google-chrome', 'chromium-browser',
+            potential_chrom_executables = ['chromium', 'chromium-browser', 'google-chrome',
                                            '/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome']
 
             for potential_chrom_executable in potential_chrom_executables:
@@ -1017,7 +1017,7 @@ define('"""+graph_id+"""', ['dgenv'], function (Dygraph) {
                     version = out.stdout.replace('Google', '').replace('Chrome', '').replace('Chromium', '').strip().split(' ')[0]
                     version_major = int(version.split('.')[0])
                     if version_major >= 59:
-                        logger.info('Found usable Chrom* executable: "{}"'.format(potential_chrom_executable))
+                        logger.debug('Found usable Chrom* executable: "{}"'.format(potential_chrom_executable))
                         _chrom_executable = potential_chrom_executable
                         break
                     else:
@@ -1038,7 +1038,7 @@ define('"""+graph_id+"""', ['dgenv'], function (Dygraph) {
                     logger.debug('Ok, Chromium present.')
 
                 # Convert executable path to string and handle white spaces if present
-                _chrom_executable = _chrom_executable.replace(' ', '\ ')
+                _chrom_executable = str(chromium_executable()).replace(' ', '\ ')
 
             # Check path exists and is writable or Chrom* will risk to hang up
             png_dest_path = '/'.join(png_dest.split('/')[0:-1])
