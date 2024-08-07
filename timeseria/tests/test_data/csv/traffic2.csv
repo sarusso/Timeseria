@@ -1,4 +1,5 @@
 # Taken and adapted from https://data.gov.uk/dataset/9562c512-4a0b-45ee-b6ad-afc0f99b841f/highways-england-network-journey-time-and-traffic-flow-data
+# Licenced under the Open Government Licence v3 (https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/)
 epoch,Total Carriageway Flow
 1143417600,80.75
 1143418500,80.75
