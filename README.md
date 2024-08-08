@@ -9,7 +9,7 @@ Unlike common numerical and data analysis frameworks, Timeseria does not make us
 
 Thanks to this approach, Timeseria can address by design several issues often left as an implementation detail but that can actually cause significant challenges - as handling data losses, non-uniform sampling rates, differences between aggregated data and punctual observations, time zones, DST changes, and so on.
 
-Timeseria  comes with a built-in set of common operations (such as resampling, aggregations, moving averages, derivatives etc.) along with extensible models for reconstruction, forecasting and anomaly detection; and it integrates a powerful plotting engine capable of handling even millions of data points.
+Timeseria  comes with a built-in set of common operations (such as resampling, aggregations, moving averages, derivatives etc.) as well as extensible models for reconstruction, forecasting and anomaly detection, and it integrates a powerful plotting engine capable of handling even millions of data points.
 
 
 ![Time series plot](docs/altogether.png?raw=true "Timeseria at work")
