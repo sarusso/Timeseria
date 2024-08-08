@@ -1004,6 +1004,7 @@ define('"""+graph_id+"""', ['dgenv'], function (Dygraph) {
                 raise ValueError('Sorry, image plots are not supported since the package "pyppeteer" could be imported')
 
             _chrom_executable = None
+            _headless_mode_switch = ''
 
             # Is there a system Chrome or Chromium we can use?
             potential_chrom_executables = ['chromium', 'chromium-browser', 'google-chrome',
@@ -1019,6 +1020,8 @@ define('"""+graph_id+"""', ['dgenv'], function (Dygraph) {
                     if version_major >= 59:
                         logger.debug('Found usable Chrom* executable: "{}"'.format(potential_chrom_executable))
                         _chrom_executable = potential_chrom_executable
+                        if version_major >= 112:
+                            _headless_mode_switch='=new'
                         break
                     else:
                         continue
@@ -1066,7 +1069,7 @@ define('"""+graph_id+"""', ['dgenv'], function (Dygraph) {
                 else:
                     image_resolution='1280x380'
             resolution = image_resolution.replace('x', ',')
-            command = '{} --no-sandbox --headless --disable-gpu --window-size={} --screenshot={} {}'.format(_chrom_executable, resolution, png_dest, html_dest)
+            command = '{} --no-sandbox --headless{} --disable-gpu --window-size={} --screenshot={} {}'.format(_chrom_executable, _headless_mode_switch, resolution, png_dest, html_dest)
             logger.debug('Executing "{}"'.format(command))
             out = os_shell(command, capture=True)
 
