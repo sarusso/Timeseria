@@ -1,4 +1,4 @@
-Keras==2.7.0
+Keras==2.13.1
 matplotlib==3.7.2
 numpy==1.21.4
 scikit-learn==1.0.1
