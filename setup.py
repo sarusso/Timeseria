@@ -3,12 +3,11 @@
 from setuptools import setup, find_packages
 
 setup(name='timeseria',
-      version='1.0.1',
+      version='2.0.0rc0',
       description='An object-oriented time series processing library',
       long_description="""Timeseria is an object-oriented time series processing library which aims at making it easy to manipulate time series data and to build statistical 
-                          and machine learning models on top of it.\n\nCheck out the GitHub project for more info: [Timeseria on GitHub](https://github.com/sarusso/Timeseria).
-                          \n\nExample plot:
-                          ![Time series plot](https://raw.githubusercontent.com/sarusso/Timeseria/master/docs/altogether.png "Timeseria at work")""",
+and machine learning models on top of it.\n\nCheck out the GitHub project for more info: [Timeseria on GitHub](https://github.com/sarusso/Timeseria).\n\n
+![Time series plot](https://raw.githubusercontent.com/sarusso/Timeseria/master/docs/altogether.png "Timeseria at work")""",
       long_description_content_type='text/markdown',
       url="https://github.com/sarusso/timeseria",
       author='Stefano Alberto Russo',
