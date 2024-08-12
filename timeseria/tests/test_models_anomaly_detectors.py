@@ -105,14 +105,14 @@ class TestAnomalyDetectors(unittest.TestCase):
 
         anomaly_detector = ModelBasedAnomalyDetector(model_class=PeriodicAverageForecaster)
         anomaly_detector.fit(self.sine_minute_timeseries, periodicity=63, error_metric='E', error_distribution='norm')
-        result_timeseries = anomaly_detector.apply(self.sine_minute_timeseries,  index_range=['avg_err','3_sigma'])
+        result_timeseries = anomaly_detector.apply(self.sine_minute_timeseries,  index_bounds=['avg_err','3_sigma'])
         self.assertEqual(len(result_timeseries),936)
         self.assertAlmostEqual(result_timeseries[0].data_indexes['anomaly'], 0.0227, places=2)
         self.assertEqual(result_timeseries[236].data_indexes['anomaly'], 1)
 
         anomaly_detector = ModelBasedAnomalyDetector(model_class=PeriodicAverageReconstructor)
         anomaly_detector.fit(self.sine_minute_timeseries, periodicity=63, error_metric='E', error_distribution='norm')
-        result_timeseries = anomaly_detector.apply(self.sine_minute_timeseries,  index_range=['avg_err','3_sigma'])
+        result_timeseries = anomaly_detector.apply(self.sine_minute_timeseries,  index_bounds=['avg_err','3_sigma'])
         self.assertEqual(len(result_timeseries),997)
         self.assertEqual(result_timeseries[0].data_indexes['anomaly'], 0)
         self.assertAlmostEqual(result_timeseries[5].data_indexes['anomaly'], 0.00186, places=2)
@@ -128,7 +128,7 @@ class TestAnomalyDetectors(unittest.TestCase):
         self.assertAlmostEqual(anomaly_detector.data['error_distributions_params']['sin']['loc'], -0.00064, places=5)
         self.assertAlmostEqual(anomaly_detector.data['error_distributions_params']['sin']['scale'], 0.2101 , places=2)
 
-        result_timeseries = anomaly_detector.apply(self.sine_minute_timeseries,  index_range=['avg_err','3_sigma'])
+        result_timeseries = anomaly_detector.apply(self.sine_minute_timeseries,  index_bounds=['avg_err','3_sigma'])
 
         # Count how many anomalies were detected
         anomalies_count = 0
@@ -147,7 +147,7 @@ class TestAnomalyDetectors(unittest.TestCase):
         anomaly_detector.fit(timeseries, error_metric='E', error_distribution='norm')
 
         # TODO: do some actual testing.. not only that "it works"
-        _  = anomaly_detector.apply(timeseries, index_range=['avg_err','3_sigma'])
+        _  = anomaly_detector.apply(timeseries, index_bounds=['avg_err','3_sigma'])
 
 
     def test_PeriodicAverageAnomalyDetector_save_load(self):
@@ -169,7 +169,7 @@ class TestAnomalyDetectors(unittest.TestCase):
         self.assertAlmostEqual(anomaly_detector.data['error_distributions_params']['sin']['loc'], -0.00064, places=5)
         self.assertAlmostEqual(anomaly_detector.data['error_distributions_params']['sin']['scale'], 0.2101 , places=2)
 
-        _ = loaded_anomaly_detector.apply(self.sine_minute_timeseries, index_range=['avg_err','3_sigma'])
+        _ = loaded_anomaly_detector.apply(self.sine_minute_timeseries, index_bounds=['avg_err','3_sigma'])
 
 
     def test_PeriodicAverageReconstructorAnomalyDetector(self):
@@ -182,7 +182,7 @@ class TestAnomalyDetectors(unittest.TestCase):
         self.assertAlmostEqual(anomaly_detector.data['error_distributions_params']['sin']['loc'], -0.0000029020, places=7)
         self.assertAlmostEqual(anomaly_detector.data['error_distributions_params']['sin']['scale'], 0.23897, places=4)
 
-        result_timeseries = anomaly_detector.apply(self.sine_minute_timeseries, index_range=['avg_err','3_sigma'])
+        result_timeseries = anomaly_detector.apply(self.sine_minute_timeseries, index_bounds=['avg_err','3_sigma'])
 
         # Count how many anomalies were detected
         anomalies_count = 0
@@ -201,7 +201,7 @@ class TestAnomalyDetectors(unittest.TestCase):
         anomaly_detector.fit(timeseries, error_metric='E', error_distribution='norm')
 
         # TODO: do some actual testing.. not only that "it works"
-        _  = anomaly_detector.apply(timeseries, index_range=['avg_err','3_sigma'])
+        _  = anomaly_detector.apply(timeseries, index_bounds=['avg_err','3_sigma'])
 
 
     def test_LSTMAnomalyDetector_multivariate(self):
@@ -234,7 +234,7 @@ class TestAnomalyDetectors(unittest.TestCase):
         self.assertAlmostEqual(anomaly_detector.data['stdevs']['sin'], 0.060, places=2)
         self.assertAlmostEqual(anomaly_detector.data['stdevs']['cos'], 0.081, places=2)
 
-        results_timeseries = anomaly_detector.apply(timeseries_with_anomalies, index_range=['max_err','3_sigma'])
+        results_timeseries = anomaly_detector.apply(timeseries_with_anomalies, index_bounds=['max_err','3_sigma'])
         self.assertEqual(results_timeseries[0].data_indexes['anomaly'], 0)
         self.assertEqual(results_timeseries[26].data_indexes['anomaly'], 1)
         self.assertEqual(results_timeseries[56].data_indexes['anomaly'], 1)
@@ -282,7 +282,7 @@ class TestAnomalyDetectors(unittest.TestCase):
         self.assertAlmostEqual(anomaly_detector.data['stdevs']['cos'], 0.104, places=2) 
         self.assertAlmostEqual(anomaly_detector.data['stdevs']['sin'], 0.07858, places=2)
 
-        results_timeseries = anomaly_detector.apply(timeseries_with_anomalies, index_range=['max_err','10_sigma'], verbose=False, details=False)
+        results_timeseries = anomaly_detector.apply(timeseries_with_anomalies, index_bounds=['max_err','10_sigma'], verbose=False, details=False)
         self.assertEqual(results_timeseries[0].data_indexes['anomaly'], 0)
         self.assertEqual(results_timeseries[19].data_indexes['anomaly'], 1)
         self.assertEqual(results_timeseries[20].data_indexes['anomaly'], 0)
@@ -298,7 +298,7 @@ class TestAnomalyDetectors(unittest.TestCase):
         loaded_anomaly_detector = LSTMAnomalyDetector.load(model_path)
         self.assertAlmostEqual(anomaly_detector.data['stdevs']['cos'], 0.104, places=2) 
         self.assertAlmostEqual(anomaly_detector.data['stdevs']['sin'], 0.07858, places=2)
-        results_timeseries = loaded_anomaly_detector.apply(timeseries_with_anomalies, index_range=['max_err','10_sigma'], verbose=False, details=False)
+        results_timeseries = loaded_anomaly_detector.apply(timeseries_with_anomalies, index_bounds=['max_err','10_sigma'], verbose=False, details=False)
         self.assertEqual(results_timeseries[0].data_indexes['anomaly'], 0)
         self.assertEqual(results_timeseries[19].data_indexes['anomaly'], 1)
         self.assertEqual(results_timeseries[20].data_indexes['anomaly'], 0)

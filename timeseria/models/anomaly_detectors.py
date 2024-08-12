@@ -133,13 +133,32 @@ class AnomalyDetector(Model):
 #===================================
 
 class ModelBasedAnomalyDetector(AnomalyDetector):
-    """An anomaly detection model based on another model (either a forecaster or a reconstructor).
-    For each element of the series where the anomaly detection model is applied, the model is asked to make a prediction.
+    """An anomaly detection model based on another model. See the ``model_class`` property for which model is being used.
+
+    In short, for each element of the series where the anomaly detector is applied, the model is asked to make a prediction.
     The predicted and actual values are then compared, and accordingly to the model error distribution, an anomaly index
-    in the range 0-1 is computed.
+    is computed. The anomaly index is proportional to the likelihood of each element to be anomalous, and ranges form 0 to 1.
+
+    More in detail, in the fit phase the model set in the ``model_class`` is first fitted and then evaluated using the error
+    metric set in the ``error_metric`` argument, which defaults to PE (Percentage Error). All of the error values recorded in
+    the evaluation are then used to build the error distribution (one for each data label of the series), which defaults to a
+    generalized normal distribution. If the p-value is low (below 0.05), a warning is issued.
+
+    When the anomaly detector is then applied, the anomaly index is computed based on two boundaries of such error distribution,
+    which are set in the ``index_bounds`` argument of the ``apply()`` method. Error values below the lower bound will map to an
+    anomaly index of zero (no anomaly suspected at all), between the lower and the upper bound will map to anomaly indexes between
+    zero and one (some degree of anomaly is suspected) and above the upper bound will map to an anomaly index of one (certainly
+    an anomaly).
+
+    How to set such boundaries depends on many factors, the most important of which being whether the anomaly detector is used in
+    usupervised or semi-supervised mode. In unsupervised mode, a reasonable choice would be to set the lower bound to the average
+    error, and the upper bound to the maximum error. In semi-supervised mode (which is way more powerful since a notion of normality
+    is implicitly given in the fit data), a good choice would be to set the lower bound to the maximum error (which still belongs to
+    the "normal" behavior) and the upper bound to a very high error (e.g. a billion times the probability of an observation to be
+    adherent with the model). More details about how to set the boundaries are provided in the ``apply()`` method documentation.
 
     Args:
-        model_class(Forecaster,Reconstructor): the model to be used for anomaly detection, if not already set.
+        model_class(Model): the model to be used for anomaly detection, if not already set.
     """
 
     @property
@@ -496,26 +515,27 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
         return series
 
     @Model.apply_function
-    def apply(self, series, index_range=['avg_err','max_err'], index_type='log', threshold=None, multivariate_index_strategy='max',
+    def apply(self, series, index_bounds=['avg_err','max_err'], index_type='log', threshold=None, multivariate_index_strategy='max',
               data_loss_threshold=1.0, details=False, verbose=False):
 
         """Apply the anomaly detection model on a series.
 
         Args:
-            index_range(tuple): the range from which the anomaly index is computed, in terms of prediction
-                                error. Below the lower bound no anomaly will be assumed, and above always
-                                anomalous (1). In the middle it follows the error distribution. Defaults
-                                to ``['avg_err', 'max_err']`` as it is assumed to work in unsupervised mode.
-                                Other supported values are ``x_sigma`` where x is a standard deviation multiplier,
-                                ``adherence/x`` where x is a divider for the model adherence probability,
-                                or any numerical value in terms of prediction error value.
+            index_bounds(tuple): the lower an upper bounds, in terms of the prediction error, from which the anomaly index is
+                                 computed. Below the lower limit no anomaly will be assumed (``anomlay_index=0``), while errors
+                                 above the upper will always be considered as anomalous (``anomlay_index=1``). In the middle, the
+                                 anomaly index will range between 0 and 1 following the model error distribution. Defaults values
+                                 are ``('avg_err', 'max_err')``, which are reasonable values for unsupervised anomaly detection.
+                                 Other supported values are: ``x_sigma``, where x is a standard deviation multiplier;
+                                 ``adherence/x``, where x is a divider for the model adherence probability; and any other
+                                 numerical value in terms of prediction error.
             index_type(str, callable): if to use a logarithmic anomaly index ("log", the default value) which compresses
                                        the index range so that bigger anomalies stand out more than smaller ones, or if to
                                        use a linear one ("lin"). Can also support a custom anomaly index as a callable,
                                        in which case the form must be ``f(x, y, x_start, x_end, y_start, y_end)`` where x
                                        is the model error, y its value on the distribution curve, and x_start/x_end together
                                        with y_start/y_end the respective x and y range start and end values, based on the
-                                       range set by the ``index_range`` argument.
+                                       range set by the ``index_bounds`` argument.
             threshold(float): a threshold to make the anomaly index categorical (0-1) instead of continuous.
             multivariate_index_strategy(str, callable): the strategy to use when computing the overall anomaly index for multivariate
                                                         time series items. Possible choices are "max" to use the maximum one, "avg"
@@ -558,26 +578,26 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
         for data_label in series.data_labels():
             abs_prediction_errors = [abs(prediction_error) for prediction_error in self.data['prediction_errors'][data_label]]
             y_maxes[data_label] = error_distribution_functions[data_label](self.data['error_distributions_params'][data_label]['loc'])
-            this_index_range = index_range[:]
+            this_index_bounds = index_bounds[:]
 
             for i in range(2):
-                if isinstance(this_index_range[i], str):
-                    if this_index_range[i] == 'max_err':
-                        this_index_range[i] = max(abs_prediction_errors)
-                    elif this_index_range[i] == 'avg_err':
-                        this_index_range[i] = sum(abs_prediction_errors)/len(abs_prediction_errors)
-                    elif this_index_range[i].endswith('_sigma'):
-                        this_index_range[i] = float(this_index_range[i].replace('_sigma',''))*self.data['stdevs'][data_label]
-                    elif this_index_range[i].endswith('sig'):
-                        this_index_range[i] = float(this_index_range[i].replace('sig',''))*self.data['stdevs'][data_label]
-                    elif this_index_range[i].startswith('adherence/'):
-                        factor = float(this_index_range[i].split('/')[1])
-                        this_index_range[i] = error_distribution_functions[data_label].find_x(y_maxes[data_label]/factor)
+                if isinstance(this_index_bounds[i], str):
+                    if this_index_bounds[i] == 'max_err':
+                        this_index_bounds[i] = max(abs_prediction_errors)
+                    elif this_index_bounds[i] == 'avg_err':
+                        this_index_bounds[i] = sum(abs_prediction_errors)/len(abs_prediction_errors)
+                    elif this_index_bounds[i].endswith('_sigma'):
+                        this_index_bounds[i] = float(this_index_bounds[i].replace('_sigma',''))*self.data['stdevs'][data_label]
+                    elif this_index_bounds[i].endswith('sig'):
+                        this_index_bounds[i] = float(this_index_bounds[i].replace('sig',''))*self.data['stdevs'][data_label]
+                    elif this_index_bounds[i].startswith('adherence/'):
+                        factor = float(this_index_bounds[i].split('/')[1])
+                        this_index_bounds[i] = error_distribution_functions[data_label].find_x(y_maxes[data_label]/factor)
                     else:
-                        raise ValueError('Unknown index start or end value "{}"'.format(this_index_range[i]))
+                        raise ValueError('Unknown index start or end value "{}"'.format(this_index_bounds[i]))
 
-            x_starts[data_label] = this_index_range[0]
-            x_ends[data_label] = this_index_range[1]
+            x_starts[data_label] = this_index_bounds[0]
+            x_ends[data_label] = this_index_bounds[1]
 
             # Compute error distribution function values for index start/end
             y_starts[data_label] = error_distribution_functions[data_label](x_starts[data_label])
