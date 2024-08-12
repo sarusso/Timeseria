@@ -1065,9 +1065,9 @@ define('"""+graph_id+"""', ['dgenv'], function (Dygraph) {
             # Render HTML to image
             if image_resolution == 'auto':
                 if title:
-                    image_resolution='1280x430'
+                    image_resolution = '1280x490' if _headless_mode_switch else '1280x430'
                 else:
-                    image_resolution='1280x380'
+                    image_resolution = '1280x440' if _headless_mode_switch else '1280x380'
             resolution = image_resolution.replace('x', ',')
             command = '{} --no-sandbox --headless{} --disable-gpu --window-size={} --screenshot={} {}'.format(_chrom_executable, _headless_mode_switch, resolution, png_dest, html_dest)
             logger.debug('Executing "{}"'.format(command))
