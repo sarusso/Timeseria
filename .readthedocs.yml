@@ -1,14 +1,13 @@
 version: 2
 
-# Build documentation in the docs/ directory with Sphinx
 sphinx:
    configuration: docs/conf.py
 
-# Set the version of Python and requirements required to build your docs
+build:
+  os: ubuntu-20.04
+  tools:
+    python: "3.12"
+
 python:
-  version: 3.7
   install:
-    - requirements: requirements.txt
-    - method: pip
-      path: .
-  system_packages: true
+    - requirements: requirements_sphinx.txt
