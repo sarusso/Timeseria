@@ -485,6 +485,9 @@ class PeriodicAverageForecaster(Forecaster):
         self.data['dst_affected'] = dst_affected
 
         for data_label in series.data_labels():
+
+            processed = 0
+
             # Set or detect periodicity
             if periodicity == 'auto':
                 periodicity =  detect_periodicity(series[data_label])
@@ -499,20 +502,19 @@ class PeriodicAverageForecaster(Forecaster):
                 logger.info('Using a window of "{}" for "{}"'.format(periodicity, data_label))
                 self.data['windows'][data_label]= periodicity
 
-                sums   = {}
-                totals = {}
-                processed = 0
-                for item in series:
-                    if data_loss_limit is not None and 'data_loss' in item.data_indexes and item.data_indexes['data_loss'] >= data_loss_limit:
-                        continue
-                    periodicity_index = _get_periodicity_index(item, series.resolution, periodicity, dst_affected)
-                    if not periodicity_index in sums:
-                        sums[periodicity_index] = item.data[data_label]
-                        totals[periodicity_index] = 1
-                    else:
-                        sums[periodicity_index] += item.data[data_label]
-                        totals[periodicity_index] +=1
-                    processed += 1
+            sums   = {}
+            totals = {}
+            for item in series:
+                if data_loss_limit is not None and 'data_loss' in item.data_indexes and item.data_indexes['data_loss'] >= data_loss_limit:
+                    continue
+                periodicity_index = _get_periodicity_index(item, series.resolution, periodicity, dst_affected)
+                if not periodicity_index in sums:
+                    sums[periodicity_index] = item.data[data_label]
+                    totals[periodicity_index] = 1
+                else:
+                    sums[periodicity_index] += item.data[data_label]
+                    totals[periodicity_index] +=1
+                processed += 1
 
             if not processed:
                 raise ValueError('Too much data loss (not a single element below the limit), cannot fit!')
