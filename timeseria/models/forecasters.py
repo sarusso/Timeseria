@@ -193,19 +193,19 @@ class Forecaster(Model):
             return None
 
     @Model.evaluate_function
-    def evaluate(self, series, steps=1, error_metrics='auto', punctual_error_metrics=None, plot_error_distribution=False,
-                 plot_results_series=False, return_results_series=False, verbose=False):
+    def evaluate(self, series, steps=1, error_metrics=['RMSE', 'MAE'], plot_results_series=False, return_results_series=False, 
+                 series_error_metrics=['AE'], plot_error_distribution=False, error_distribution_metrics=['E'], verbose=False):
         """Evaluate the forecaster on a series.
 
         Args:
             steps (int): how many steps-ahead to evaluate the forecaster on.
-            error_metrics(list): the (aggregated) error metrics to use for the evaluation. Besides the value ``auto``, which
-                                 uses the same error metric minimized during the fit phase if available, or defaults to ``RMSE``
-                                 and ``MAE``, other supported values (as list) are: ``MSE``, ``RMSE``, ``MAE``, ``HAE``, ``MAPE``,
-                                 ``HAPE``, ``MALE`` and  ``HALE``.
-            punctual_error_metrics(list): the (punctual) error metrics to be added to the results series or to be used for plotting
-                                          the error distirbution(s). Supported values (as list) are: ``E``, ``PE`` and ``LE``.
-            plot_error_distribution: if to plot the error distribution.
+            error_metrics(list): the (aggregated) error metrics to use for the evaluation. Defaults to ``RMSE`` and ``MAE``.
+                                 Supported values are: ``MSE``, ``RMSE``, ``MAE``, ``HAE``, ``MAPE``, ``HAPE``, ``MALE`` and  ``HALE``.
+            series_error_metrics(list): the (punctual) error metrics to be added to the results series. Defaults to ``AE``.
+                                        Supported values (as list) are: ``AE``, ``APE``, ``ALE``, ``E``, ``PE`` and ``LE``.
+            error_distribution_metrics(list): the (punctual) error metrics to be used for generating the error distribution(s).
+                                              Defaults to ``E``. Supported values (as list) are: ``AE``, ``APE``, ``ALE``, ``E``,
+                                              ``PE`` and ``LE``.
             plot_results_series(bool): if to plot the series with the predicted values and the errors.
             return_results_series(bool): if to add the series with the predicted values and the errors to the results.
             verbose(bool): if to print the evaluation progress (one dot = 10% done).
@@ -215,7 +215,7 @@ class Forecaster(Model):
             raise ValueError('Cannot evaluate on an empty series')
 
         if steps > 1:
-            raise NotImplementedError('Evaluating a forecaster on more than one step ahead forecasts is not implemented yet')
+            raise NotImplementedError('Evaluating a forecaster on more than one step ahead forecasts is not yet implemented')
 
         try:
             context_data_labels = self.data['context_data_labels']
@@ -228,28 +228,23 @@ class Forecaster(Model):
             target_data_labels = None
 
         # Handle error metrics
-        try:
-            fit_minimized_error_metric = self.data['minimized_error_metric']
-        except (AttributeError, KeyError):
-            fit_minimized_error_metric = None
-
-        if error_metrics == 'auto':
-            if fit_minimized_error_metric:
-                error_metrics = [fit_minimized_error_metric]
-                logger.info('Using the same aggregate error metric minimized in the fit phase to evaluate: {}'.format(fit_minimized_error_metric))
-            else:
-                error_metrics = ['RMSE', 'MAE']
-
         for aggreagate_error_metric in error_metrics:
             if aggreagate_error_metric not in ['MSE', 'RMSE', 'MAE', 'HAE', 'MAPE', 'HAPE', 'MALE', 'HALE']:
                 raise ValueError('The aggregate error metric "{}" is not supported'.format(aggreagate_error_metric))
 
-        if not punctual_error_metrics:
-            punctual_error_metrics = []
+        if not series_error_metrics:
+            series_error_metrics = []
 
-        for punctual_error_metric in punctual_error_metrics:
-            if punctual_error_metric not in ['E', 'PE', 'LE']:
-                raise ValueError('The extra error metric "{}" is not supported'.format(punctual_error_metric))
+        if not error_distribution_metrics:
+            error_distribution_metrics = []
+
+        for error_metric in series_error_metrics:
+            if error_metric not in ['AE', 'APE', 'ALE', 'E', 'PE', 'LE']:
+                raise ValueError('The series error metric "{}" is not supported'.format(error_metric))
+
+        for error_metric in error_distribution_metrics:
+            if error_metric not in ['AE', 'APE', 'ALE', 'E', 'PE', 'LE']:
+                raise ValueError('The error distribution metric "{}" is not supported'.format(error_metric))
 
         # Handle results series
         if plot_results_series or return_results_series:
@@ -326,100 +321,100 @@ class Forecaster(Model):
 
             if 'MAE' in error_metrics:
                 results['{}_MAE'.format(data_label)] = mean_absolute_error(actual_values[data_label], predicted_values[data_label])
-                if generate_results_series:
-                    for i in range(len(actual_values[data_label])):
-                        results_series[i].data['{}_AE'.format(data_label)] = abs(actual_values[data_label][i] - predicted_values[data_label][i])
-                if plot_error_distribution:
-                    errors = []
-                    for i in range(len(actual_values[data_label])):
-                        errors.append(abs(actual_values[data_label][i] - predicted_values[data_label][i]))
-                    plt.hist(errors, bins=100, density=True, alpha=1, color='steelblue', label='Error distribution for "{}"'.format(data_label))
-                    #plt.legend(loc="upper right")
-                    plt.grid()
-                    plt.title('AE distribution for "{}"'.format(data_label))
-                    plt.show()
 
             if 'HAE' in error_metrics:
                 results['{}_HAE'.format(data_label)] = max_absolute_error(actual_values[data_label], predicted_values[data_label])
 
             if 'MAPE' in error_metrics:
                 results['{}_MAPE'.format(data_label)] = mean_absolute_percentage_error(actual_values[data_label], predicted_values[data_label])
-                if generate_results_series:
-                    for i in range(len(actual_values[data_label])):
-                        results_series[i].data['{}_APE'.format(data_label)] = abs((actual_values[data_label][i] - predicted_values[data_label][i])/actual_values[data_label][i])
-                if plot_error_distribution:
-                    errors = []
-                    for i in range(len(actual_values[data_label])):
-                        errors.append(abs((actual_values[data_label][i] - predicted_values[data_label][i])/actual_values[data_label][i]))
-                    plt.hist(errors, bins=100, density=True, alpha=1, color='steelblue', label='Error distribution for "{}"'.format(data_label))
-                    #plt.legend(loc="upper right")
-                    plt.grid()
-                    plt.title('APE distribution for "{}"'.format(data_label))
-                    plt.show()
 
             if 'HAPE' in error_metrics:
                 results['{}_HAPE'.format(data_label)] = max_absolute_percentage_error(actual_values[data_label], predicted_values[data_label])
 
             if 'MALE' in error_metrics:
                 results['{}_MALE'.format(data_label)] = mean_absolute_log_error(actual_values[data_label], predicted_values[data_label])
-                if generate_results_series:
-                    for i in range(len(actual_values[data_label])):
-                        results_series[i].data['{}_ALE'.format(data_label)] = abs(log(actual_values[data_label][i]/predicted_values[data_label][i]))
-                if plot_error_distribution:
-                    errors = []
-                    for i in range(len(actual_values[data_label])):
-                        errors.append(abs(log(actual_values[data_label][i]/predicted_values[data_label][i])))
-                    plt.hist(errors, bins=100, density=True, alpha=1, color='steelblue', label='Error distribution for "{}"'.format(data_label))
-                    #plt.legend(loc="upper right")
-                    plt.grid()
-                    plt.title('ALE distribution for "{}"'.format(data_label))
-                    plt.show()
 
             if 'HALE' in error_metrics:
                 results['{}_HALE'.format(data_label,)] = max_absolute_log_error(actual_values[data_label], predicted_values[data_label])
 
-            # Extra (non-aggregate) error metrics
-            if 'E' in punctual_error_metrics:
-                if generate_results_series:
-                    for i in range(len(actual_values[data_label])):
-                        results_series[i].data['{}_E'.format(data_label)] = actual_values[data_label][i] - predicted_values[data_label][i]
-                if plot_error_distribution:
-                    errors = []
-                    for i in range(len(actual_values[data_label])):
-                        errors.append(actual_values[data_label][i] - predicted_values[data_label][i])
-                    plt.hist(errors, bins=100, density=True, alpha=1, color='steelblue', label='Error distribution for "{}"'.format(data_label))
-                    #plt.legend(loc="upper right")
-                    plt.grid()
-                    plt.title('E distribution for "{}"'.format(data_label))
-                    plt.show()
+            # Series and distribution error metrics
+            if generate_results_series and 'AE' in series_error_metrics:
+                for i in range(len(actual_values[data_label])):
+                    results_series[i].data['{}_AE'.format(data_label)] = abs(actual_values[data_label][i] - predicted_values[data_label][i])
+            if plot_error_distribution and 'AE' in error_distribution_metrics:
+                errors = []
+                for i in range(len(actual_values[data_label])):
+                    errors.append(abs(actual_values[data_label][i] - predicted_values[data_label][i]))
+                plt.hist(errors, bins=100, density=True, alpha=1, color='steelblue', label='Error distribution for "{}"'.format(data_label))
+                #plt.legend(loc="upper right")
+                plt.grid()
+                plt.title('AE distribution for "{}"'.format(data_label))
+                plt.show()
 
-            if 'PE' in punctual_error_metrics:
-                if generate_results_series:
-                    for i in range(len(actual_values[data_label])):
-                        results_series[i].data['{}_PE'.format(data_label)] = (actual_values[data_label][i] - predicted_values[data_label][i])/actual_values[data_label][i]
-                if plot_error_distribution:
-                    errors = []
-                    for i in range(len(actual_values[data_label])):
-                        errors.append((actual_values[data_label][i] - predicted_values[data_label][i])/actual_values[data_label][i])
-                    plt.hist(errors, bins=100, density=True, alpha=1, color='steelblue', label='Error distribution for "{}"'.format(data_label))
-                    #plt.legend(loc="upper right")
-                    plt.grid()
-                    plt.title('PE distribution for "{}"'.format(data_label))
-                    plt.show()
+            if generate_results_series and 'APE' in series_error_metrics:
+                for i in range(len(actual_values[data_label])):
+                    results_series[i].data['{}_APE'.format(data_label)] = abs((actual_values[data_label][i] - predicted_values[data_label][i])/actual_values[data_label][i])
+            if plot_error_distribution and 'APE' in error_distribution_metrics:
+                errors = []
+                for i in range(len(actual_values[data_label])):
+                    errors.append(abs((actual_values[data_label][i] - predicted_values[data_label][i])/actual_values[data_label][i]))
+                plt.hist(errors, bins=100, density=True, alpha=1, color='steelblue', label='Error distribution for "{}"'.format(data_label))
+                #plt.legend(loc="upper right")
+                plt.grid()
+                plt.title('APE distribution for "{}"'.format(data_label))
+                plt.show()
 
-            if 'LE' in punctual_error_metrics:
-                if generate_results_series:
-                    for i in range(len(actual_values[data_label])):
-                        results_series[i].data['{}_LE'.format(data_label)] = log(actual_values[data_label][i]/predicted_values[data_label][i])
-                if plot_error_distribution:
-                    errors = []
-                    for i in range(len(actual_values[data_label])):
-                        errors.append(log(actual_values[data_label][i]/predicted_values[data_label][i]))
-                    plt.hist(errors, bins=100, density=True, alpha=1, color='steelblue', label='Error distribution for "{}"'.format(data_label))
-                    #plt.legend(loc="upper right")
-                    plt.grid()
-                    plt.title('LE distribution for "{}"'.format(data_label))
-                    plt.show()
+            if generate_results_series and 'ALE' in series_error_metrics:
+                for i in range(len(actual_values[data_label])):
+                    results_series[i].data['{}_ALE'.format(data_label)] = abs(log(actual_values[data_label][i]/predicted_values[data_label][i]))
+            if plot_error_distribution and 'ALE' in error_distribution_metrics:
+                errors = []
+                for i in range(len(actual_values[data_label])):
+                    errors.append(abs(log(actual_values[data_label][i]/predicted_values[data_label][i])))
+                plt.hist(errors, bins=100, density=True, alpha=1, color='steelblue', label='Error distribution for "{}"'.format(data_label))
+                #plt.legend(loc="upper right")
+                plt.grid()
+                plt.title('ALE distribution for "{}"'.format(data_label))
+                plt.show()
+
+            if generate_results_series and 'E' in series_error_metrics:
+                for i in range(len(actual_values[data_label])):
+                    results_series[i].data['{}_E'.format(data_label)] = actual_values[data_label][i] - predicted_values[data_label][i]
+            if plot_error_distribution and 'E' in error_distribution_metrics:
+                errors = []
+                for i in range(len(actual_values[data_label])):
+                    errors.append(actual_values[data_label][i] - predicted_values[data_label][i])
+                plt.hist(errors, bins=100, density=True, alpha=1, color='steelblue', label='Error distribution for "{}"'.format(data_label))
+                #plt.legend(loc="upper right")
+                plt.grid()
+                plt.title('E distribution for "{}"'.format(data_label))
+                plt.show()
+
+            if generate_results_series and 'PE' in series_error_metrics:
+                for i in range(len(actual_values[data_label])):
+                    results_series[i].data['{}_PE'.format(data_label)] = (actual_values[data_label][i] - predicted_values[data_label][i])/actual_values[data_label][i]
+            if plot_error_distribution and 'PE' in error_distribution_metrics:
+                errors = []
+                for i in range(len(actual_values[data_label])):
+                    errors.append((actual_values[data_label][i] - predicted_values[data_label][i])/actual_values[data_label][i])
+                plt.hist(errors, bins=100, density=True, alpha=1, color='steelblue', label='Error distribution for "{}"'.format(data_label))
+                #plt.legend(loc="upper right")
+                plt.grid()
+                plt.title('PE distribution for "{}"'.format(data_label))
+                plt.show()
+
+            if generate_results_series and 'LE' in series_error_metrics:
+                for i in range(len(actual_values[data_label])):
+                    results_series[i].data['{}_LE'.format(data_label)] = log(actual_values[data_label][i]/predicted_values[data_label][i])
+            if plot_error_distribution and 'LE' in error_distribution_metrics:
+                errors = []
+                for i in range(len(actual_values[data_label])):
+                    errors.append(log(actual_values[data_label][i]/predicted_values[data_label][i]))
+                plt.hist(errors, bins=100, density=True, alpha=1, color='steelblue', label='Error distribution for "{}"'.format(data_label))
+                #plt.legend(loc="upper right")
+                plt.grid()
+                plt.title('LE distribution for "{}"'.format(data_label))
+                plt.show()
 
         # Plot or return results seriesif required
         if plot_results_series:
