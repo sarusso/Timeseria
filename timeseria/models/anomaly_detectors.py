@@ -264,7 +264,7 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
             store_errors(float): if to store the prediction errors (together with actual and predicted values) internally for further analysis. Access
                                  them with ``model.data['prediction_errors']``, ``model.data['actual_values']`` and ``model.data['predicted_values']``.
             verbose(bool): if to print the fit progress (one dot = 10% done).
-            summary(bool): if to display a summary on the error_metric distribution fitting or selection.
+            summary(bool): if to display a summary on the error distribution fitting or selection.
         """
 
         # Handle the error distribution(s)
@@ -319,10 +319,9 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
         # Store if to use context or not
         self.data['with_context'] = with_context
 
-        # Check and store error_metric type
+        # Check and store error metric
         if error_metric not in ['E', 'AE', 'PE', 'APE', 'SLE']:
-            raise ValueError('Unknown error_metric metric "{}"'.format(error_metric))
-
+            raise ValueError('Unknown error metric "{}"'.format(error_metric))
         self.data['error_metric'] = error_metric
 
         # Initialize internal dictionaries
@@ -366,7 +365,7 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
                     if i > len(series)-self.data['model_window']-1:
                         break
 
-                # Predict & append the error_metric
+                # Predict & append the error
                 #logger.debug('Predicting and computing the difference (i=%s)', i)
                 actual = self._get_actual_value(series, i, data_label)
                 predicted = self._get_predicted_value(series, i, data_label, with_context)
@@ -383,20 +382,20 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
                 elif error_metric == 'APE':
                     prediction_error = abs((actual-predicted)/actual)
                 else:
-                    raise ValueError('Unknown error_metric type "{}"'.format(self.data['error_metric']))
+                    raise ValueError('Unknown error metric "{}"'.format(self.data['error_metric']))
                 prediction_errors[data_label].append(prediction_error)
 
             if verbose:
                 print('')
 
         if verbose:
-            print('Model(s) evaluated, now computing the error_metric distribution(s)')
-        logger.info('Model(s) evaluated, now computing the error_metric distribution(s)...')
+            print('Model(s) evaluated, now computing the error distribution(s)')
+        logger.info('Model(s) evaluated, now computing the error distribution(s)...')
 
         for data_label in series.data_labels():
             #if verbose:
-            #    print('Selecting error_metric distribution for "{}"'.format(data_label))
-            #logger.debug('Selecting error_metric distribution for "%s"', data_label))
+            #    print('Selecting error distribution for "{}"'.format(data_label))
+            #logger.debug('Selecting error distribution for "%s"', data_label))
 
             # Fit the distributions and select the best one
             fitter = fitter_library.fitter.Fitter(prediction_errors[data_label], distributions=error_distributions)
@@ -411,7 +410,7 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
             error_distribution_params = fitter.get_best()[best_error_distribution]
 
             if best_error_distribution_stats['ks_pvalue'] < 0.05:
-                logger.warning('The error_metric distribution for "{}" ({}) p-value is low ({}). Expect issues.'.format(data_label, best_error_distribution, best_error_distribution_stats['ks_pvalue']))
+                logger.warning('The error distribution for "{}" ({}) p-value is low: {}.'.format(data_label, best_error_distribution, best_error_distribution_stats['ks_pvalue']))
 
             self.data['error_distributions'][data_label] = best_error_distribution
             self.data['error_distributions_params'][data_label] = error_distribution_params
