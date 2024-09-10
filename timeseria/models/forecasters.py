@@ -228,9 +228,9 @@ class Forecaster(Model):
             target_data_labels = None
 
         # Handle error metrics
-        for aggreagate_error_metric in error_metrics:
-            if aggreagate_error_metric not in ['MSE', 'RMSE', 'MAE', 'HAE', 'MAPE', 'HAPE', 'MALE', 'HALE']:
-                raise ValueError('The aggregate error metric "{}" is not supported'.format(aggreagate_error_metric))
+        for error_metric in error_metrics:
+            if error_metric not in ['MSE', 'RMSE', 'MAE', 'HAE', 'MAPE', 'HAPE', 'MALE', 'HALE']:
+                raise ValueError('The error metric "{}" is not supported'.format(error_metric))
 
         if not series_error_metrics:
             series_error_metrics = []
@@ -831,7 +831,7 @@ class LSTMForecaster(Forecaster, _KerasModel):
         self._save_keras_model(path)
 
     @Forecaster.fit_function
-    def fit(self, series, epochs=30, normalize=True, target='all', with_context=False, minimize_error_metric='MSE',
+    def fit(self, series, epochs=30, normalize=True, target='all', with_context=False, loss='MSE',
             data_loss_limit=1.0, reproducible=False, verbose=False):
         """Fit the model on a series.
 
@@ -841,10 +841,11 @@ class LSTMForecaster(Forecaster, _KerasModel):
             normalize(bool): if to normalize the data between 0 and 1 or not. Enabled by default.
             target(str,list): what data labels to target, defaults to  ``all`` for all of them.
             with_context(bool): if to use context data when predicting. Not enabled by default.
-            minimize_error_metric(str): the (aggregated) error metric to minimize while fitting. Also known as the loss function.
-                                        Supported values are: ``MSE``, ``MSLE``, ``MAE`` and ``MAPE``. Defaults to ``MSE``.
-            data_loss_limit(float): discard from the fit elements with a data loss greater than or equal to this
-                                    limit. Defaults to ``1``.
+            loss(str): the error metric to minimize while fitting (a.k.a. the loss or objective function).
+                       Supported values are: ``MSE``, ``MSLE``, ``MAE`` and ``MAPE`` or any callable object.
+                       Defaults to ``MSE``.
+            data_loss_limit(float): discard from the fit elements with a data loss greater than or equal to
+                                    this limit. Defaults to ``1``.
             reproducible(bool): if to make the fit deterministic. Not enabled by default.
             verbose(bool): if to print the training output in the process. Not enabled by default.
         """
@@ -852,20 +853,19 @@ class LSTMForecaster(Forecaster, _KerasModel):
         if reproducible:
             ensure_reproducibility()
 
-        # Set the loss error_metric metric in Keras notation
-        if minimize_error_metric == 'MSE':
+        # Set the loss in Keras notation
+        if loss == 'MSE':
             loss = 'mean_squared_error'
-        elif minimize_error_metric == 'MAE':
+        elif loss == 'MAE':
             loss = 'mean_absolute_error'
-        elif minimize_error_metric == 'MAPE':
+        elif loss == 'MAPE':
             loss = 'mean_absolute_percentage_error'
-        elif minimize_error_metric == 'MSLE':
+        elif loss == 'MSLE':
             loss = 'mean_squared_logarithmic_error'
-        elif callable(minimize_error_metric):
-            loss = minimize_error_metric
+        elif callable(loss):
+            loss = loss
         else:
-            raise ValueError('Unknown aggregate error metric "{}" nor a callable'.format(minimize_error_metric))
-        self.data['minimized_error_metric'] = minimize_error_metric
+            raise ValueError('Unknown loss "{}" nor of callable type'.format(loss))
 
         # Set and save the targets and context data labels
         context_data_labels = None
