@@ -812,12 +812,6 @@ class LSTMForecaster(Forecaster, _KerasModel):
 
     def __init__(self, window=3, features=['values'], neurons=128, keras_model=None):
 
-        if window == 3:
-            logger.info('Using default window size of 3')
-
-        if features == ['values']:
-            logger.info('Using default features: {}'.format(features))
-
         # Call parent init
         super(LSTMForecaster, self).__init__()
 
