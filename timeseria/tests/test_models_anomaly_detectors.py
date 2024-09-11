@@ -247,7 +247,7 @@ class TestAnomalyDetectors(unittest.TestCase):
         self.assertAlmostEqual(anomaly_detector.data['stdevs']['cos'], 0.096, places=2)
 
         results_timeseries = anomaly_detector.apply(timeseries_with_anomalies)
-        self.assertAlmostEqual(results_timeseries[0].data_indexes['anomaly'], 0.00249, places=2)
+        self.assertAlmostEqual(results_timeseries[0].data_indexes['anomaly'], 0.04147, places=2)
         self.assertAlmostEqual(results_timeseries[26].data_indexes['anomaly'], 0.61560, places=2)
         self.assertEqual(results_timeseries[56].data_indexes['anomaly'], 1)
         self.assertAlmostEqual(results_timeseries[86].data_indexes['anomaly'], 0.4747, places=2)

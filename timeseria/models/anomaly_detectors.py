@@ -384,6 +384,8 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
                 else:
                     raise ValueError('Unknown error metric "{}"'.format(self.data['error_metric']))
                 prediction_errors[data_label].append(prediction_error)
+                if error_metric in ['AE', 'APE']:
+                    prediction_errors[data_label].append(-prediction_error)
 
             if verbose:
                 print('')
@@ -700,9 +702,13 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
                 else:
                     raise ValueError('Unknown error type "{}"'.format(self.data['error_metric']))
 
-                # Reverse values on the left side of the error distribution
-                if prediction_error < self.data['error_distributions_params'][data_label]['loc']:
-                    prediction_error =  abs(prediction_error) + self.data['error_distributions_params'][data_label]['loc']
+                if self.data['error_metric']  in ['AE', 'APE']:
+                    prediction_error = abs(prediction_error)
+                else:
+                    # Reverse values on the left side of the error distribution to simplify the math below
+                    distribution_loc= self.data['error_distributions_params'][data_label]['loc']
+                    if prediction_error < distribution_loc:
+                        prediction_error =  distribution_loc + (distribution_loc - prediction_error)
 
                 # Compute the anomaly index in the given range (which defaults to 0, max_err)
                 # Below the start it means anomaly (0), above always anomaly (1). In the middle it
