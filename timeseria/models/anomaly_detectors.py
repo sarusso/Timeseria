@@ -545,7 +545,7 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
         return series
 
     @Model.apply_function
-    def apply(self, series, index_bounds=['avg_err','max_err'], index_type='log', threshold=None, multivariate_index_strategy='max',
+    def apply(self, series, index_bounds=['avg_err','max_err'], index_type='log', multivariate_index_strategy='max',
               data_loss_threshold=1.0, details=False, verbose=False):
 
         """Apply the anomaly detection model on a series.
@@ -566,7 +566,6 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
                                        is the model error, y its value on the distribution curve, and x_start/x_end together
                                        with y_start/y_end the respective x and y range start and end values, based on the
                                        range set by the ``index_bounds`` argument.
-            threshold(float): a threshold to make the anomaly index categorical (0-1) instead of continuous.
             multivariate_index_strategy(str, callable): the strategy to use when computing the overall anomaly index for multivariate
                                                         time series items. Possible choices are "max" to use the maximum one, "avg"
                                                         for the mean and "min" for the minimum; or a callable taking as input the
@@ -778,12 +777,6 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
                             anomaly_index = index_type(x, y, x_start, x_end, y_start, y_end)
                         else:
                             raise ValueError('Unknown index type "{}"'.format(index_type))
-
-                if threshold is not None:
-                    if anomaly_index < threshold:
-                        anomaly_index = 0
-                    else:
-                        anomaly_index = 1
 
                 # Add this anomaly index for this data label to the list of the item anomaly indexes
                 item_anomaly_indexes.append(anomaly_index)
