@@ -6,7 +6,7 @@ from ..utilities import _Gaussian, rescale
 from .forecasters import Forecaster, PeriodicAverageForecaster, LSTMForecaster
 from .reconstructors import Reconstructor, PeriodicAverageReconstructor
 from .base import Model
-from math import log10
+from math import log10, prod
 from fitter import Fitter, get_common_distributions, get_distributions
 from ..utilities import DistributionFunction
 from statistics import stdev
@@ -159,6 +159,7 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
 
     Args:
         model_class(Model): the model to be used for anomaly detection, if not already set.
+        index_window(int): the (rolling) window length to be used when computing the anomaly index. Defaults to 1.
     """
 
     @property
@@ -168,7 +169,7 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
         except AttributeError:
             raise NotImplementedError('No model class set for this anomaly detector')
 
-    def __init__(self, model_class=None, *args, **kwargs):
+    def __init__(self, model_class=None, index_window=1, *args, **kwargs):
 
         # Handle the model_class
         try:
@@ -184,6 +185,7 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
 
         self.predictive_model_args = args
         self.predictive_model_kwargs = kwargs
+        self.index_window = index_window
 
         # Call parent init
         super(ModelBasedAnomalyDetector, self).__init__()
@@ -338,6 +340,7 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
         actual_values = {}
         predicted_values = {}
         prediction_errors = {}
+        cumulative_prediction_errors = {}
 
         progress_step = len(series)/10
 
@@ -346,6 +349,7 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
             actual_values[data_label] = []
             predicted_values[data_label] = []
             prediction_errors[data_label] = []
+            cumulative_prediction_errors[data_label] = []
 
             if verbose:
                 print('Computing actual vs predicted for "{}": '.format(data_label), end='')
@@ -383,12 +387,30 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
                     prediction_error = abs((actual-predicted)/actual)
                 else:
                     raise ValueError('Unknown error metric "{}"'.format(self.data['error_metric']))
+
                 prediction_errors[data_label].append(prediction_error)
                 if error_metric in ['AE', 'APE']:
                     prediction_errors[data_label].append(-prediction_error)
 
+                # Handle the index window if any
+                if (self.index_window > 1) and (i > self.data['model_window'] + self.index_window):
+                    if error_metric in ['AE', 'APE']:
+                        raise NotImplementedError('Error metrics bases on absolute values are not yet supported when using a window for the anomaly index')
+                        cumulative_error = 0
+                        for j, item in enumerate(prediction_errors[data_label][-self.index_window*2:]):
+                            if j % 2 == 0:
+                                cumulative_error += item
+                        cumulative_prediction_errors[data_label].append(cumulative_error) # Likely a bi-modal distribution
+                        #cumulative_prediction_errors[data_label].append(-cumulative_error) # Likely a gamma distribution
+                    else:
+                        cumulative_error = sum(prediction_errors[data_label][-self.index_window:])
+                        cumulative_prediction_errors[data_label].append(cumulative_error)
+
             if verbose:
                 print('')
+
+        if self.index_window > 1:
+            prediction_errors = cumulative_prediction_errors
 
         if verbose:
             print('Model(s) evaluated, now computing the error distribution(s)')
@@ -425,6 +447,8 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
             self.data['predicted_values'] = predicted_values
             self.data['prediction_errors'] = prediction_errors
 
+        self.data['index_window'] = self.index_window
+
         logger.info('Anomaly detector fitted')
 
     def inspect(self, plot=True, plot_x_min='auto', plot_x_max='auto', series=False):
@@ -436,9 +460,14 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
 
             print('\nDetails for: "{}"'.format(data_label))
 
-            print('Predictive model avg error (abs): {}'.format(sum(abs_prediction_errors)/len(abs_prediction_errors)))
-            print('Predictive model min error (abs): {}'.format(min(abs_prediction_errors)))
-            print('Predictive model max error (abs): {}'.format(max(abs_prediction_errors)))
+            if self.data['index_window']  >1:
+                print('Predictive model avg error (abs, {} items): {}'.format(self.data['index_window'], sum(abs_prediction_errors)/len(abs_prediction_errors)))
+                print('Predictive model min error (abs, {} items): {}'.format(self.data['index_window'], min(abs_prediction_errors), self.data['index_window']))
+                print('Predictive model max error (abs, {} items): {}'.format(self.data['index_window'], max(abs_prediction_errors), self.data['index_window']))
+            else:
+                print('Predictive model avg error (abs): {}'.format(sum(abs_prediction_errors)/len(abs_prediction_errors)))
+                print('Predictive model min error (abs): {}'.format(min(abs_prediction_errors)))
+                print('Predictive model max error (abs): {}'.format(max(abs_prediction_errors)))
 
             print('Error distribution: {}'.format(self.data['error_distributions'][data_label]))
             print('Error distribution params: {}'.format(self.data['error_distributions_params'][data_label]))
@@ -575,6 +604,7 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
         log_10_y_starts = {}
         log_10_y_ends = {}
         y_maxes = {}
+        rolling_prediction_errors = {}
 
         for data_label in series.data_labels():
             abs_prediction_errors = [abs(prediction_error) for prediction_error in self.data['prediction_errors'][data_label]]
@@ -619,6 +649,9 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
                         raise ValueError('Got a math domain error in computing the anomaly index end boundary for label "{}". This is likely due to extreme values and/or an error distribution badly approximating the real error distribution. Try changing the anomaly index boundaries or find a better error distribution.'.format(data_label)) from None
                     else:
                         raise
+
+            # Prepare for the rolling anomaly index
+            rolling_prediction_errors[data_label] = []
 
         # Is this series pre-processed?
         try:
@@ -710,6 +743,20 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
                     if prediction_error < distribution_loc:
                         prediction_error =  distribution_loc + (distribution_loc - prediction_error)
 
+                # Handle the rolling window for the index if any
+                if self.data['index_window'] > 1:
+                    rolling_prediction_errors[data_label].append(prediction_error)
+                    if (i >= self.data['model_window'] + self.data['index_window'] ):
+
+                        # Compute the cumulative prediction errors on the rollign errors
+                        prediction_error = sum(rolling_prediction_errors[data_label])
+
+                        # Move the window
+                        rolling_prediction_errors[data_label] = rolling_prediction_errors[data_label][1:]
+
+                    else:
+                        continue
+
                 # Compute the anomaly index in the given range (which defaults to 0, max_err)
                 # Below the start it means anomaly (0), above always anomaly (1). In the middle it
                 # follows the error distribution, and it is rescaled between 0 and 1.
@@ -743,35 +790,51 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
 
                 # Add details?
                 if details:
-                    if isinstance(details, list):
-                        if 'pred' in details:
+                    if self.data['index_window']>1:
+                        if isinstance(details, list):
+                            if 'pred' in details:
+                                item.data['{}_pred'.format(data_label)] = predicted
+                            if 'err' in details:
+                                item.data['{}_err_cum'.format(data_label)] = prediction_error
+                            if 'adh' in details:
+                                item.data['{}_adh_cum)'.format(data_label)] = y/y_max
+                        elif isinstance(details, bool):
                             item.data['{}_pred'.format(data_label)] = predicted
-                        if 'err' in details:
-                            item.data['{}_err'.format(data_label)] = prediction_error
-                        if 'adh' in details:
-                            item.data['{}_adh)'.format(data_label)] = y/y_max
-                    elif isinstance(details, bool):
-                        item.data['{}_pred'.format(data_label)] = predicted
-                        item.data['{}_err'.format(data_label)] = prediction_error
-                        item.data['{}_adh'.format(data_label)] = y/y_max
+                            item.data['{}_err_cum'.format(data_label)] = prediction_error
+                            item.data['{}_adh_cum'.format(data_label)] = y/y_max
+                        else:
+                            raise TypeError('The "details" argument accepts only True/False or a list containing what details to add, as strings.')
                     else:
-                        raise TypeError('The "details" argument accepts only True/False or a list containing what details to add, as strings.')
+                        if isinstance(details, list):
+                            if 'pred' in details:
+                                item.data['{}_pred'.format(data_label)] = predicted
+                            if 'err' in details:
+                                item.data['{}_err'.format(data_label)] = prediction_error
+                            if 'adh' in details:
+                                item.data['{}_adh)'.format(data_label)] = y/y_max
+                        elif isinstance(details, bool):
+                            item.data['{}_pred'.format(data_label)] = predicted
+                            item.data['{}_err'.format(data_label)] = prediction_error
+                            item.data['{}_adh'.format(data_label)] = y/y_max
+                        else:
+                            raise TypeError('The "details" argument accepts only True/False or a list containing what details to add, as strings.')
 
             # Set anomaly index & append
-            if len(item_anomaly_indexes) == 1:
-                item.data_indexes['anomaly'] = item_anomaly_indexes[0]
-            else:
-                if multivariate_index_strategy == 'min':
-                    item.data_indexes['anomaly'] = min(item_anomaly_indexes)
-                elif multivariate_index_strategy == 'max':
-                    item.data_indexes['anomaly'] = max(item_anomaly_indexes)
-                elif multivariate_index_strategy == 'avg':
-                    item.data_indexes['anomaly'] = sum(item_anomaly_indexes)/len(item_anomaly_indexes)
+            if item_anomaly_indexes:
+                if len(item_anomaly_indexes) == 1:
+                    item.data_indexes['anomaly'] = item_anomaly_indexes[0]
                 else:
-                    item.data_indexes['anomaly'] = multivariate_index_strategy(item_anomaly_indexes)
+                    if multivariate_index_strategy == 'min':
+                        item.data_indexes['anomaly'] = min(item_anomaly_indexes)
+                    elif multivariate_index_strategy == 'max':
+                        item.data_indexes['anomaly'] = max(item_anomaly_indexes)
+                    elif multivariate_index_strategy == 'avg':
+                        item.data_indexes['anomaly'] = sum(item_anomaly_indexes)/len(item_anomaly_indexes)
+                    else:
+                        item.data_indexes['anomaly'] = multivariate_index_strategy(item_anomaly_indexes)
 
-            # Append
-            result_series.append(item)
+                # Append
+                result_series.append(item)
 
         if verbose:
             print('')
