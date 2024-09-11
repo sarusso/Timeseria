@@ -842,8 +842,8 @@ class LSTMForecaster(Forecaster, _KerasModel):
             target(str,list): what data labels to target, defaults to  ``all`` for all of them.
             with_context(bool): if to use context data when predicting. Not enabled by default.
             loss(str): the error metric to minimize while fitting (a.k.a. the loss or objective function).
-                       Supported values are: ``MSE``, ``MSLE``, ``MAE`` and ``MAPE`` or any callable object.
-                       Defaults to ``MSE``.
+                       Supported values are: ``MSE``, ``RMSE``, ``MSLE``, ``MAE`` and ``MAPE``, any other value
+                       supported by Keras as loss function or any callable object. Defaults to ``MSE``.
             data_loss_limit(float): discard from the fit elements with a data loss greater than or equal to
                                     this limit. Defaults to ``1``.
             reproducible(bool): if to make the fit deterministic. Not enabled by default.
@@ -862,10 +862,13 @@ class LSTMForecaster(Forecaster, _KerasModel):
             loss = 'mean_absolute_percentage_error'
         elif loss == 'MSLE':
             loss = 'mean_squared_logarithmic_error'
-        elif callable(loss):
-            loss = loss
+        elif loss == 'RMSE':
+            from keras import backend as keras_backend
+            def root_mean_squared_error(y_true, y_pred):
+                return keras_backend.sqrt(keras_backend.mean(keras_backend.square(y_pred - y_true)))
+            loss = root_mean_squared_error
         else:
-            raise ValueError('Unknown loss "{}" nor of callable type'.format(loss))
+            loss = loss
 
         # Set and save the targets and context data labels
         context_data_labels = None
