@@ -373,6 +373,7 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
                 #logger.debug('Predicting and computing the difference (i=%s)', i)
                 actual = self._get_actual_value(series, i, data_label)
                 predicted = self._get_predicted_value(series, i, data_label, with_context)
+
                 if store_errors:
                     actual_values[data_label].append(actual)
                     predicted_values[data_label].append(predicted)
@@ -393,7 +394,7 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
                     prediction_errors[data_label].append(-prediction_error)
 
                 # Handle the index window if any
-                if (self.index_window > 1) and (i > self.data['model_window'] + self.index_window):
+                if (self.index_window > 1) and (i >= self.data['model_window'] + self.index_window):
                     if error_metric in ['AE', 'APE']:
                         raise NotImplementedError('Error metrics bases on absolute values are not yet supported when using a window for the anomaly index')
                         cumulative_error = 0
@@ -736,18 +737,14 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
 
                 if self.data['error_metric']  in ['AE', 'APE']:
                     prediction_error = abs(prediction_error)
-                else:
-                    # Reverse values on the left side of the error distribution to simplify the math below
-                    distribution_loc= self.data['error_distributions_params'][data_label]['loc']
-                    if prediction_error < distribution_loc:
-                        prediction_error =  distribution_loc + (distribution_loc - prediction_error)
 
                 # Handle the rolling window for the index if any
                 if self.data['index_window'] > 1:
+                    punctual_prediction_error = prediction_error
                     rolling_prediction_errors[data_label].append(prediction_error)
                     if (i >= self.data['model_window'] + self.data['index_window'] ):
 
-                        # Compute the cumulative prediction errors on the rollign errors
+                        # Compute the cumulative prediction errors on the rolling errors
                         prediction_error = sum(rolling_prediction_errors[data_label])
 
                         # Move the window
@@ -755,6 +752,11 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
 
                     else:
                         continue
+
+                # Reverse values on the left side of the error distribution to simplify the math below
+                distribution_loc= self.data['error_distributions_params'][data_label]['loc']
+                if prediction_error < distribution_loc:
+                    prediction_error =  distribution_loc + (distribution_loc - prediction_error)
 
                 # Compute the anomaly index in the given range (which defaults to 0, max_err)
                 # Below the start it means anomaly (0), above always anomaly (1). In the middle it
@@ -794,6 +796,7 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
                         elif isinstance(details, bool):
                             item.data['{}_pred'.format(data_label)] = predicted
                             item.data['{}_err_cum'.format(data_label)] = prediction_error
+                            item.data['{}_err'.format(data_label)] = punctual_prediction_error
                             item.data['{}_adh_cum'.format(data_label)] = y/y_max
                         else:
                             raise TypeError('The "details" argument accepts only True/False or a list containing what details to add, as strings.')

@@ -332,11 +332,12 @@ class TestAnomalyDetectors(unittest.TestCase):
         anomaly_detector = PeriodicAverageAnomalyDetector(index_window=3)
         anomaly_detector.fit(self.sine_minute_timeseries, periodicity=63, error_metric='E', error_distribution='norm')
 
-        self.assertAlmostEqual(anomaly_detector.data['error_distributions_params']['sin']['loc'], -0.00164, places=5)
+        self.assertAlmostEqual(anomaly_detector.data['error_distributions_params']['sin']['loc'], -0.001946, places=5)
         self.assertAlmostEqual(anomaly_detector.data['error_distributions_params']['sin']['scale'], 0.3921, places=2)
 
         result_timeseries = anomaly_detector.apply(self.sine_minute_timeseries[0:70],  index_bounds=['avg_err','3_sigma'])
 
-        self.assertAlmostEqual(result_timeseries[0].data_indexes['anomaly'], 0.0274, places=3)
-        self.assertAlmostEqual(result_timeseries[1].data_indexes['anomaly'], 0.0112, places=3)
-        self.assertAlmostEqual(result_timeseries[-1].data_indexes['anomaly'], 0.00151, places=4)
+        self.assertAlmostEqual(result_timeseries[0].data_indexes['anomaly'], 0.0299, places=3)
+        self.assertAlmostEqual(result_timeseries[1].data_indexes['anomaly'], 0.0133, places=3)
+        self.assertAlmostEqual(result_timeseries[-1].data_indexes['anomaly'], 0.00333, places=4)
+
