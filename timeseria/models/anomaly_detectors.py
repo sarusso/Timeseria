@@ -3,7 +3,7 @@
 
 from copy import deepcopy
 from ..utilities import _Gaussian, rescale
-from .forecasters import Forecaster, PeriodicAverageForecaster, LSTMForecaster
+from .forecasters import Forecaster, PeriodicAverageForecaster, LSTMForecaster, LinearRegressionForecaster
 from .reconstructors import Reconstructor, PeriodicAverageReconstructor
 from .base import Model
 from math import log10, prod
@@ -874,4 +874,13 @@ class LSTMAnomalyDetector(ModelBasedAnomalyDetector):
     """An anomaly detection model based on a LSTM neural network forecaster."""
 
     model_class = LSTMForecaster
+
+#===================================
+# Linear Regression Anomaly Detector
+#===================================
+
+class LinearRegressionAnomalyDetector(ModelBasedAnomalyDetector):
+    """An anomaly detection model based on a linear regression forecaster."""
+
+    model_class = LinearRegressionForecaster
 

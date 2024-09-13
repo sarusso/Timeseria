@@ -25,6 +25,7 @@
       LSTMForecaster
       PeriodicAverageForecaster
       ProphetForecaster
+      LinearRegressionForecaster
    
    
 

@@ -605,7 +605,7 @@ class _KerasModel(Model):
 
 
     @staticmethod
-    def _compute_window_features(window_datapoints, data_labels, time_unit, features, context_data=None):
+    def _compute_window_features(window_datapoints, data_labels, time_unit, features, context_data=None, flatten=False):
         """Compute features from a list of window data points (or slots).
 
         Args:
@@ -616,6 +616,7 @@ class _KerasModel(Model):
                 ``values`` (use the data values),
                 ``diffs``  (use the diffs between the values), and
                 ``hours``  (use the hours of the timestamp).
+            flatten(bool): if to flatten the features as a signle list.
         """
 
         available_features = ['values', 'diffs', 'hours']
@@ -664,10 +665,11 @@ class _KerasModel(Model):
             if 'hours' in features:
                 datapoint_features.append(window_datapoints[i].dt.hour/24)
 
-            # Now append to the window features
-            window_features.append(datapoint_features)
-
-
+            # Now add to the window features
+            if flatten:
+                window_features += datapoint_features
+            else:
+                window_features.append(datapoint_features)
 
         return window_features
 

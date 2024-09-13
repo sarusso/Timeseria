@@ -22,6 +22,7 @@
       
       PeriodicAverageAnomalyDetector
       LSTMAnomalyDetector
+      LinearRegressionAnomalyDetector
 
       
    

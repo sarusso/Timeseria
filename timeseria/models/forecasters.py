@@ -2,10 +2,13 @@
 """Forecasting models."""
 
 import copy
+import pickle
+import shutil
 from pandas import DataFrame
 from numpy import array
 from math import sqrt, log
 from propertime.utils import now_s, dt_from_s, s_from_dt
+from sklearn.linear_model import LinearRegression
 import matplotlib.pyplot as plt
 
 from ..datastructures import DataTimeSlot, TimePoint, DataTimePoint, Slot, Point, TimeSeries
@@ -949,7 +952,7 @@ class LSTMForecaster(Forecaster, _KerasModel):
         features_per_window_item = len(window_features_matrix[0][0])
         output_dimension = len(target_values_vector[0])
 
-        # Create the default model architeture if not given in the init
+        # Create the default model architecture if not given in the init
         if not self.keras_model:
             from keras.models import Sequential
             from keras.layers import Dense
@@ -1035,4 +1038,141 @@ class LSTMForecaster(Forecaster, _KerasModel):
         # Return
         return predicted_data
 
+
+#=========================
+#   Linear Regression
+#      Forecaster
+#=========================
+
+class LinearRegressionForecaster(Forecaster, _KerasModel):
+    """A forecasting model based on linear regression.
+
+    Args:
+        window (int): the window length.
+        features(list): which features to use. Supported values are:
+            ``values`` (use the data values),
+            ``diffs``  (use the diffs between the values), and
+            ``hours``  (use the hours of the timestamp).
+    """
+
+    @property
+    def window(self):
+        return self.data['window']
+
+    def __init__(self, window=3, features=['values']):
+
+        # Call parent init
+        super(LinearRegressionForecaster, self).__init__()
+
+        # Set window and features
+        self.data['window'] = window
+        self.data['features'] = features
+
+    @classmethod
+    def load(cls, path):
+
+        # Override the load method to load the Keras model as well
+        model = super().load(path)
+
+        # Load the sklearn model
+        with open('{}/sklearn_model.pkl'.format(path),'rb') as f:
+            model.sklearn_model = pickle.load(f)
+
+        return model
+
+    def save(self, path):
+
+        # Override the save method to load the sklearn model as well
+        super(LinearRegressionForecaster, self).save(path)
+
+        # Save the sklearn model
+        try:
+            with open('{}/sklearn_model.pkl'.format(path),'wb') as f:
+                pickle.dump(self.sklearn_model,f)
+        except Exception as e:
+            shutil.rmtree(path)
+            raise e
+
+    @Forecaster.fit_function
+    def fit(self, series, data_loss_limit=1.0, verbose=False):
+        """Fit the model on a series.
+
+        Args:
+            series(series): the series on which to fit the model.
+            data_loss_limit(float): discard from the fit elements with a data loss greater than or equal to
+                                    this limit. Defaults to ``1``.
+            verbose(bool): not supported, has no effect.
+        """
+
+        # Data labels shortcut
+        data_labels = series.data_labels()
+
+        if len(data_labels) > 1:
+            raise NotImplementedError('Multivariate time series are not supported')
+
+        # Move to matrix representation
+        window_elements_matrix, target_values_vector, _ = self._to_matrix_representation(series = series,
+                                                                                         window = self.data['window'],
+                                                                                         steps = 1,
+                                                                                         context_data_labels = data_labels,
+                                                                                         target_data_labels = data_labels,
+                                                                                         data_loss_limit = data_loss_limit)
+
+        if not window_elements_matrix:
+            raise ValueError('Too much data loss (not a single element below the limit), cannot fit!')
+
+        # Compute window (plus context) features
+        window_features_matrix = []
+        for i in range(len(window_elements_matrix)):
+            window_features_matrix.append(self._compute_window_features(window_elements_matrix[i],
+                                                                        data_labels = data_labels,
+                                                                        time_unit = series.resolution,
+                                                                        features = self.data['features'],
+                                                                        context_data = None,
+                                                                        flatten = True))
+
+        sklearn_model = LinearRegression()
+        sklearn_model.fit(array(window_features_matrix), array(target_values_vector))
+
+        self.sklearn_model = sklearn_model
+
+    @Forecaster.predict_function
+    def predict(self, series, steps=1, verbose=False):
+        """Fit the model on a series.
+
+        Args:
+            series(series): the series on which to fit the model.
+            steps(int): how may steps-haead to predict.
+            verbose(bool): not supported, has no effect.
+        """
+
+        if len(series) < self.data['window']:
+            raise ValueError('The series length ({}) is shorter than the model window ({})'.format(len(series), self.data['window']))
+
+        if steps>1:
+            raise NotImplementedError('This forecaster does not support multi-step predictions.')
+
+        # Get the window if we were given a longer series
+        window_series = series[-self.data['window']:]
+
+        # Convert to list in order to be able to handle datapoints with different labels for the contex
+        window_datapoints = list(window_series)
+
+
+        # Compute window features
+        window_features = self._compute_window_features(window_datapoints,
+                                                        data_labels=self.data['data_labels'],
+                                                        time_unit=series.resolution,
+                                                        features=self.data['features'],
+                                                        context_data=None,
+                                                        flatten = True)
+
+        # Perform the predict and set prediction data
+        yhat = self.sklearn_model.predict(array([window_features]))
+
+        # Create the prediction data
+        predicted_data = {self.data['data_labels'][0]: yhat[0][0]}
+
+        # Return
+        return predicted_data
 

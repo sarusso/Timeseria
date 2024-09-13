@@ -486,3 +486,28 @@ class TestForecasters(unittest.TestCase):
         self.assertTrue('cos' in predicted_data)
 
 
+    def test_LinearRegressionForecaster(self):
+
+        # Create a hour-resolution test DataTimeSlotSeries
+        sine_hour_timeseries = TimeSeries()
+        for i in range(1000):
+            sine_hour_timeseries.append(DataTimePoint(t=i*3600, data={'value':sin(i/10.0)}))
+
+        from ..models import LinearRegressionForecaster
+        forecaster = LinearRegressionForecaster(features=['values','hours'])
+
+        # Fit
+        forecaster.fit(sine_hour_timeseries)
+
+        # Predict and check
+        self.assertAlmostEqual(forecaster.apply(sine_hour_timeseries)[-1].data['value'], -0.5063, places=3)
+
+        # Save
+        forecaster.save(TEMP_MODELS_DIR+'/test_lr_model')
+
+        # Load
+        loaded_forecaster = LinearRegressionForecaster.load(TEMP_MODELS_DIR+'/test_lr_model')
+
+        # Re-predict and re-check
+        self.assertAlmostEqual(loaded_forecaster.apply(sine_hour_timeseries)[-1].data['value'], -0.5063, places=3)
+
