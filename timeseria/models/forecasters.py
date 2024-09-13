@@ -196,21 +196,21 @@ class Forecaster(Model):
             return None
 
     @Model.evaluate_function
-    def evaluate(self, series, steps=1, error_metrics=['RMSE', 'MAE'], plot_results_series=False, return_results_series=False, 
+    def evaluate(self, series, steps=1, error_metrics=['RMSE', 'MAE'], return_results_series=False, plot_results_series=False,
                  series_error_metrics=['AE'], plot_error_distribution=False, error_distribution_metrics=['E'], verbose=False):
         """Evaluate the forecaster on a series.
 
         Args:
             steps (int): how many steps-ahead to evaluate the forecaster on.
-            error_metrics(list): the (aggregated) error metrics to use for the evaluation. Defaults to ``RMSE`` and ``MAE``.
-                                 Supported values are: ``MSE``, ``RMSE``, ``MAE``, ``HAE``, ``MAPE``, ``HAPE``, ``MALE`` and  ``HALE``.
+            error_metrics(list): the (aggregated) error metrics to use for the evaluation. Defaults to ``RMSE`` and ``MAE``. Supported
+                                 values (as list)  are: ``MSE``, ``RMSE``, ``MAE``, ``HAE``, ``MAPE``, ``HAPE``, ``MALE`` and  ``HALE``.
+            return_results_series(bool): if to add the series with the predicted values and the errors to the results.
+            plot_results_series(bool): if to plot the series with the predicted values and the errors.
             series_error_metrics(list): the (punctual) error metrics to be added to the results series. Defaults to ``AE``.
                                         Supported values (as list) are: ``AE``, ``APE``, ``ALE``, ``E``, ``PE`` and ``LE``.
-            error_distribution_metrics(list): the (punctual) error metrics to be used for generating the error distribution(s).
-                                              Defaults to ``E``. Supported values (as list) are: ``AE``, ``APE``, ``ALE``, ``E``,
-                                              ``PE`` and ``LE``.
-            plot_results_series(bool): if to plot the series with the predicted values and the errors.
-            return_results_series(bool): if to add the series with the predicted values and the errors to the results.
+            plot_error_distribution(bool): if to plot the error distribution.
+            error_distribution_metrics(list): the (punctual) error metrics to be used for generating the error distribution(s). Defaults
+                                               to ``E``. Supported values (as list) are: ``AE``, ``APE``, ``ALE``, ``E``, ``PE`` and ``LE``.
             verbose(bool): if to print the evaluation progress (one dot = 10% done).
         """
 
