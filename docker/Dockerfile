@@ -17,7 +17,8 @@ RUN groupadd -g 1000 timeseria
 # Add timeseria user using UID 1000
 RUN useradd timeseria -d /home/timeseria -u 1000 -g 1000 -m -s /bin/bash
 
-# Add timeseria user to sudoers, allow nopass sode, and disable sudo message
+# Install sudo, add the timeseria user to sudoers, allow nopass and disable sudo message
+RUN apt-get install -y sudo
 RUN adduser timeseria sudo
 COPY docker/sudoers /etc/sudoers
 RUN touch /home/timeseria/.sudo_as_admin_successful
