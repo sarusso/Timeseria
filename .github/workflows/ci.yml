@@ -23,9 +23,9 @@ jobs:
           pip install -r requirements_pinned.txt
           pip install protobuf==3.20.3
           pip install tensorflow==2.7.0
-          pip install statsmodels==0.12.1
-          pip install pmdarima==1.8
+          pip install statsmodels==0.14.1
+          pip install pmdarima==2.0.4
           pip install pystan==2.19.1.1
-          pip install prophet==1.1.4
+          pip install prophet==1.1.5
       - name: Run tests with unittest
         run: python3 -m unittest discover

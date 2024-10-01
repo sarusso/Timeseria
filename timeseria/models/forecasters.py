@@ -706,8 +706,8 @@ class ARIMAForecaster(Forecaster, _ARIMAModel):
         data = array(series.to_df()[data_label])
 
         # Save model and fit
-        self.model = sm.tsa.ARIMA(data, (self.p,self.d,self.q))
-        self.model_res = self.model.fit(disp=verbose)
+        self.model = sm.tsa.ARIMA(data, order=(self.p,self.d,self.q))
+        self.model_res = self.model.fit()
 
         # Save the series we used for the fit.
         self.fit_series = series
@@ -726,8 +726,8 @@ class ARIMAForecaster(Forecaster, _ARIMAModel):
         if self.fit_series[-1].t != series[-1].t:
             raise NonContiguityError('Sorry, this model can be applied only on a time series ending with the same timestamp as the time series used for the fit.')
 
-        # Return the predicion. We need the [0] to access yhat, other indexes are erorrs etc.
-        return [{data_label: value} for value in self.model_res.forecast(steps)[0]]
+        # Return the prediction
+        return [{data_label: value} for value in self.model_res.forecast(steps)]
 
 
 #=========================

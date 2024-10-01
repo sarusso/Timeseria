@@ -40,7 +40,7 @@ and machine learning models on top of it.\n\nCheck out the GitHub project for mo
                         'tensorflow-macos': ['tensorflow-macos >=1.15.2, <3.0.0'],
                         'tensorflow-aarch64': ['tensorflow-aarch64 >=1.15.2, <3.0.0'],
                         'prophet':['prophet >=1.1.1, <2.0.0'],
-                        'arima': ['pmdarima >=1.8, <2.0.0', 'statsmodels >=0.12.1, <1.0.0']
+                        'arima': ['pmdarima >=1.8, <3.0.0', 'statsmodels >=0.14.0, <1.0.0']
                        },
       license='Apache License 2.0',
       license_files = ('LICENSE',),

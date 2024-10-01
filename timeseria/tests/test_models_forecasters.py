@@ -176,6 +176,10 @@ class TestForecasters(unittest.TestCase):
             print('Skipping ARIMA tests as no statsmodels module installed')
             return
 
+        import warnings
+        from statsmodels.tools.sm_exceptions import ConvergenceWarning
+        warnings.simplefilter('ignore', ConvergenceWarning)
+
         # Basic ARIMA
         forecaster = ARIMAForecaster(p=1,d=1,q=0)
 
