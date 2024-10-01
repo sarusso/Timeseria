@@ -967,10 +967,10 @@ class LSTMForecaster(Forecaster, _KerasModel):
 
     @Forecaster.predict_function
     def predict(self, series, steps=1, context_data=None,  verbose=False):
-        """Fit the model on a series.
+        """Call the model predict logic on a series.
 
         Args:
-            series(series): the series on which to fit the model.
+            series(series): the series on which to perform the predict.
             steps(int): how may steps-haead to predict.
             context_data(dict): the data to use as context for the prediction.
             verbose(bool): if to print the predict output in the process.
@@ -1138,10 +1138,10 @@ class LinearRegressionForecaster(Forecaster, _KerasModel):
 
     @Forecaster.predict_function
     def predict(self, series, steps=1, verbose=False):
-        """Fit the model on a series.
+        """Call the model predict logic on a series.
 
         Args:
-            series(series): the series on which to fit the model.
+            series(series): the series on which to perform the predict.
             steps(int): how may steps-haead to predict.
             verbose(bool): not supported, has no effect.
         """
