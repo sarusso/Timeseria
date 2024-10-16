@@ -435,7 +435,7 @@ class Forecaster(Model):
 #=========================
 
 class PeriodicAverageForecaster(Forecaster):
-    """A forecasting model based on periodic averages.
+    """A forecasting model based on periodic averages, offsetted with respect to a given window.
 
     Args:
         path (str): a path from which to load a saved model. Will override all other init settings.
@@ -463,8 +463,8 @@ class PeriodicAverageForecaster(Forecaster):
     def load(cls, path):
         model = super().load(path)
         # Convert the average dict keys back to integers
-        for data_label in model.data['averages']:
-            model.data['averages'][data_label] = {int(key):value for key, value in model.data['averages'][data_label].items()}
+        for data_label in model.data['offsets_averages']:
+            model.data['offsets_averages'][data_label] = {int(key):value for key, value in model.data['offsets_averages'][data_label].items()}
         return model
 
     @Forecaster.fit_function
@@ -479,7 +479,7 @@ class PeriodicAverageForecaster(Forecaster):
 
         self.data['periodicities']  = {}
         self.data['windows'] = {}
-        self.data['averages'] = {}
+        self.data['offsets_averages'] = {}
         self.data['dst_affected'] = dst_affected
 
         for data_label in series.data_labels():
@@ -498,36 +498,67 @@ class PeriodicAverageForecaster(Forecaster):
                 self.data['windows'][data_label] = self._window
             else:
                 logger.info('Using a window of "{}" for "{}"'.format(periodicity, data_label))
-                self.data['windows'][data_label]= periodicity
+                self.data['windows'][data_label] = periodicity
 
-            sums   = {}
-            totals = {}
-            for item in series:
+            offsets_sums = {}
+            offsets_totals = {}
+
+            for i, item in enumerate(series):
                 if data_loss_limit is not None and 'data_loss' in item.data_indexes and item.data_indexes['data_loss'] >= data_loss_limit:
                     continue
+
+                if i <= self.data['windows'][data_label]:
+                    continue
+
                 periodicity_index = _get_periodicity_index(item, series.resolution, periodicity, dst_affected)
-                if not periodicity_index in sums:
-                    sums[periodicity_index] = item.data[data_label]
-                    totals[periodicity_index] = 1
+
+                # Compute the average value of the window (if not of zero elements)
+                if self.data['windows'][data_label] != 0:
+                    sum_total = 0
+                    for j in range(self.data['windows'][data_label]):
+                        series_index = i - j
+                        sum_total += series[series_index].data[data_label]
+                    window_avg = sum_total/self.data['windows'][data_label]
                 else:
-                    sums[periodicity_index] += item.data[data_label]
-                    totals[periodicity_index] +=1
+                    window_avg = 0
+
+                # Compute the offset w.r.t. the window average value. If the window has zero elements, this
+                # will just be the value of the item itself and the model will use pure periodic averages.
+                offset = item.data[data_label] - window_avg
+
+                # Add to the offsets sum
+                if periodicity_index not in offsets_sums:
+                    offsets_sums[periodicity_index] = offset
+                else:
+                    offsets_sums[periodicity_index] += offset
+
+                # Increase the offsets total
+                if periodicity_index not in offsets_totals:
+                    offsets_totals[periodicity_index] = 1
+                else:
+                    offsets_totals[periodicity_index] += 1
+
+                # Increase the processed count
                 processed += 1
 
             if not processed:
                 raise ValueError('Too much data loss (not a single element below the limit), cannot fit!')
 
-            averages={}
-            for periodicity_index in sums:
-                averages[periodicity_index] = sums[periodicity_index]/totals[periodicity_index]
-            self.data['averages'][data_label] = averages
+            # Compute the periodic average offset for each periodicity index
+            offsets_averages = {}
+            for periodicity_index in offsets_sums:
+                offsets_averages[periodicity_index] = offsets_sums[periodicity_index]/offsets_totals[periodicity_index]
+            self.data['offsets_averages'][data_label] = offsets_averages
 
         # Store model window as the max of the single windows
         self.data['window'] = max([self.data['windows'][data_label] for data_label in self.data['windows']])
 
 
     @Forecaster.predict_function
-    def predict(self, series, steps=1):
+    def predict(self, series, steps=1, probabilistic=False):
+
+        if probabilistic and not self.data['probabilistic']:
+            raise ValueError('This model was not fitted to allow for probabilistic predictions')
 
         if len(series) < self.data['window']:
             raise ValueError('The series length ({}) is shorter than the model window ({})'.format(len(series), self.data['window']))
@@ -559,27 +590,24 @@ class PeriodicAverageForecaster(Forecaster):
             this_step_predict_data = {}
             for data_label in self.data['data_labels']:
 
-                # Compute the offset (avg diff between the real values and the forecasts on the first window)
-                diffs  = 0
-                for j in range(self.data['windows'][data_label]):
-                    series_index = len(series) - 1 - self.data['windows'][data_label] + j
-                    real_value = series[series_index].data[data_label]
-                    predict_value = self.data['averages'][data_label][_get_periodicity_index(series[series_index],
-                                                                                              series.resolution,
-                                                                                              self.data['periodicities'][data_label],
-                                                                                              dst_affected=self.data['dst_affected'])]
-                    diffs += (real_value - predict_value)
+                # Compute the average value of the window (if not of zero elements)
+                if self.data['windows'][data_label] != 0:
+                    window_sum = 0
+                    for j in range(self.data['windows'][data_label]):
+                        series_index = len(series) - 1 - self.data['windows'][data_label] + j
+                        window_sum += series[series_index].data[data_label]
+                    window_avg = window_sum/self.data['windows'][data_label]
+                else:
+                    window_avg = 0
 
-                # Sum the avg diff between the real and the forecast on the window to the forecast (the offset)
-                offset = diffs/j
-
-                # Compute the forecast data
+                # Get the periodicity index
                 periodicity_index = _get_periodicity_index(predict_timestamp,
                                                            series.resolution,
                                                            self.data['periodicities'][data_label],
                                                            dst_affected=self.data['dst_affected'])
 
-                this_step_predict_data[data_label] = self.data['averages'][data_label][periodicity_index] + (offset*1.0)
+                # Apply the periodic average offset on the window average to get the prediction
+                this_step_predict_data[data_label] = window_avg + self.data['offsets_averages'][data_label][periodicity_index]
 
             predict_data.append(this_step_predict_data)
 

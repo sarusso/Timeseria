@@ -79,8 +79,8 @@ class TestForecasters(unittest.TestCase):
         # Evaluate
         evaluation = forecaster.evaluate(self.sine_minute_timeseries[0:100], steps=1)
         self.assertEqual(forecaster.data['periodicities']['value'], 63)
-        self.assertAlmostEqual(evaluation['value_RMSE'], 0.081, places=2)
-        self.assertAlmostEqual(evaluation['value_MAE'], 0.074, places=2)
+        self.assertAlmostEqual(evaluation['value_RMSE'], 0.0873, places=2)
+        self.assertAlmostEqual(evaluation['value_MAE'], 0.0797, places=2)
 
         # Test on Points as well
         timeseries = CSVFileStorage(TEST_DATA_PATH + '/csv/temperature.csv').get(limit=200)
@@ -124,7 +124,7 @@ class TestForecasters(unittest.TestCase):
 
         loaded_forecaster = PeriodicAverageForecaster.load(model_path)
 
-        self.assertEqual(forecaster.data['averages'], loaded_forecaster.data['averages'])
+        self.assertEqual(forecaster.data['offsets_averages'], loaded_forecaster.data['offsets_averages'])
 
         # TODO: do some actual testing.. not only that "it works"
         forecasted_timeseries = loaded_forecaster.apply(self.sine_minute_timeseries)
