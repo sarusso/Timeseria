@@ -203,7 +203,7 @@ class Forecaster(Model):
         Args:
             steps (int): how many steps-ahead to evaluate the forecaster on.
             error_metrics(list): the (aggregated) error metrics to use for the evaluation. Defaults to ``RMSE`` and ``MAE``. Supported
-                                 values (as list)  are: ``MSE``, ``RMSE``, ``MAE``, ``HAE``, ``MAPE``, ``HAPE``, ``MALE`` and  ``HALE``.
+                                 values (as list)  are: ``MSE``, ``RMSE``, ``MAE``, ``MaxAE``, ``MAPE``, ``MaxAPE``, ``MALE`` and  ``MaxALE``.
             return_results_series(bool): if to add the series with the predicted values and the errors to the results.
             plot_results_series(bool): if to plot the series with the predicted values and the errors.
             results_series_error_metrics(list): the (punctual) error metrics to be added to the results series. Defaults to ``None``.
@@ -232,7 +232,7 @@ class Forecaster(Model):
 
         # Handle error metrics
         for error_metric in error_metrics:
-            if error_metric not in ['MSE', 'RMSE', 'MAE', 'HAE', 'MAPE', 'HAPE', 'MALE', 'HALE']:
+            if error_metric not in ['MSE', 'RMSE', 'MAE', 'MaxAE', 'MAPE', 'MaxAPE', 'MALE', 'MaxALE']:
                 raise ValueError('The error metric "{}" is not supported'.format(error_metric))
 
         if not results_series_error_metrics:
@@ -325,20 +325,20 @@ class Forecaster(Model):
             if 'MAE' in error_metrics:
                 results['{}_MAE'.format(data_label)] = mean_absolute_error(actual_values[data_label], predicted_values[data_label])
 
-            if 'HAE' in error_metrics:
-                results['{}_HAE'.format(data_label)] = max_absolute_error(actual_values[data_label], predicted_values[data_label])
+            if 'MaxAE' in error_metrics:
+                results['{}_MaxAE'.format(data_label)] = max_absolute_error(actual_values[data_label], predicted_values[data_label])
 
             if 'MAPE' in error_metrics:
                 results['{}_MAPE'.format(data_label)] = mean_absolute_percentage_error(actual_values[data_label], predicted_values[data_label])
 
-            if 'HAPE' in error_metrics:
-                results['{}_HAPE'.format(data_label)] = max_absolute_percentage_error(actual_values[data_label], predicted_values[data_label])
+            if 'MaxAPE' in error_metrics:
+                results['{}_MaxAPE'.format(data_label)] = max_absolute_percentage_error(actual_values[data_label], predicted_values[data_label])
 
             if 'MALE' in error_metrics:
                 results['{}_MALE'.format(data_label)] = mean_absolute_log_error(actual_values[data_label], predicted_values[data_label])
 
-            if 'HALE' in error_metrics:
-                results['{}_HALE'.format(data_label,)] = max_absolute_log_error(actual_values[data_label], predicted_values[data_label])
+            if 'MaxALE' in error_metrics:
+                results['{}_MaxALE'.format(data_label,)] = max_absolute_log_error(actual_values[data_label], predicted_values[data_label])
 
             # Series and distribution error metrics
             if generate_results_series and 'AE' in results_series_error_metrics:
