@@ -10,7 +10,7 @@ import uuid
 import datetime
 from propertime.utils import dt_from_s, str_from_dt, dt_from_str, s_from_dt
 from .units import TimeUnit
-from .utilities import is_numerical, os_shell
+from .utils import is_numerical, os_shell, pfloat
 try:
     from pyppeteer.chromium_downloader import download_chromium,chromium_executable
     image_plot_support=True
@@ -1102,7 +1102,7 @@ define('"""+graph_id+"""', ['dgenv'], function (Dygraph) {
 
             legacy = False
 
-            from .utilities import _detect_notebook_major_version
+            from .utils import _detect_notebook_major_version
             if _detect_notebook_major_version() < 7:
                 logger.warning('A Jupyter Notebook < 7 installation has been detect on this system. ' +
                                'If the plot does not show, enable the legacy plotting mode with legacy=True and restart the Kernel. ' +

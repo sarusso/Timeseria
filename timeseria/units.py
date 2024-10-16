@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Units, including the TimeUnit, which fully supports calendar arithmetic."""
 
-from .utilities import is_numerical
+from .utils import is_numerical
 from propertime import TimeSpan
 
 # Setup logging

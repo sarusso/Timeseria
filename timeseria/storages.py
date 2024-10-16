@@ -4,7 +4,7 @@
 import os
 import pytz
 import datetime
-from .utilities import detect_encoding, _sanitize_string, _is_list_of_integers, _to_float
+from .utils import detect_encoding, _sanitize_string, _is_list_of_integers, _to_float
 from .units import TimeUnit
 from .datastructures import TimePoint, DataTimePoint, DataTimeSlot, TimeSeries
 from propertime.utils import dt_from_str, dt_from_s, s_from_dt, timezonize, now_dt
@@ -567,7 +567,7 @@ class CSVFileStorage(Storage):
             autodetect_series_type = True
 
             # Detect sampling interval to create right item type (points or slots)
-            from .utilities import detect_sampling_interval
+            from .utils import detect_sampling_interval
 
             # Add first ten elements max and then detect sampling interval.
             # Use a try-execpt as this can lead to errors due to duplicates,

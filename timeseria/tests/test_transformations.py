@@ -27,7 +27,7 @@ class TestTimeSeriesDenseView(unittest.TestCase):
         series.append(DataTimePoint(t = 8, data = {'value': 8}))
         series.append(DataTimePoint(t = 9, data = {'value': 9}))
 
-        from ..utilities import _compute_validity_regions
+        from ..utils import _compute_validity_regions
         validity_regions = _compute_validity_regions(series)
         for point in series:
             point.valid_from=validity_regions[point.t][0]

@@ -1,7 +1,7 @@
-﻿timeseria.utilities
+﻿timeseriautilss
 ===================
 
-.. automodule:: timeseria.utilities
+.. automodule:: timeseriautilss
 
    
    

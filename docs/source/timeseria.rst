@@ -93,10 +93,10 @@ timeseria.units module
    :undoc-members:
    :show-inheritance:
 
-timeseria.utilities module
+timeseria.utils module
 --------------------------
 
-.. automodule:: timeseria.utilities
+.. automodule:: timeseria.utils
    :members:
    :inherited-members:
    :undoc-members:

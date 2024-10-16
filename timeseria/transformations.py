@@ -4,7 +4,7 @@
 from propertime.utils import dt_from_s, s_from_dt, as_tz
 from datetime import datetime
 from .datastructures import Point, Slot, DataTimeSlot, TimePoint, DataTimePoint, TimeSeries, TimeSeriesView
-from .utilities import _compute_data_loss, _compute_validity_regions
+from .utils import _compute_data_loss, _compute_validity_regions
 from .operations import avg
 from .units import TimeUnit
 from .exceptions import ConsistencyException

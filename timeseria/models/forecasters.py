@@ -13,11 +13,11 @@ import matplotlib.pyplot as plt
 
 from ..datastructures import DataTimeSlot, TimePoint, DataTimePoint, Slot, Point, TimeSeries
 from ..exceptions import NonContiguityError
-from ..utilities import detect_periodicity, _get_periodicity_index, ensure_reproducibility
-from ..utilities import mean_squared_error
-from ..utilities import mean_absolute_error, max_absolute_error
-from ..utilities import mean_absolute_percentage_error, max_absolute_percentage_error
-from ..utilities import mean_absolute_log_error, max_absolute_log_error
+from ..utils import detect_periodicity, _get_periodicity_index, ensure_reproducibility
+from ..utils import mean_squared_error
+from ..utils import mean_absolute_error, max_absolute_error
+from ..utils import mean_absolute_percentage_error, max_absolute_percentage_error
+from ..utils import mean_absolute_log_error, max_absolute_log_error
 from .base import Model, _ProphetModel, _ARIMAModel, _KerasModel
 
 # Setup logging

@@ -10,8 +10,8 @@ from propertime import Time
 from propertime.utils import s_from_dt , dt_from_s, timezonize, dt_from_str, str_from_dt
 
 from .units import Unit, TimeUnit
-from .utilities import _is_close, _to_time_unit_string
-from .utilities import _is_index_based, _is_key_based, _has_numerical_values
+from .utils import _is_close, _to_time_unit_string
+from .utils import _is_index_based, _is_key_based, _has_numerical_values
 from .exceptions import ConsistencyException
 
 # Setup logging
@@ -1398,7 +1398,7 @@ class TimeSeries(Series):
         try:
             return self.__autodetected_sampling_interval
         except AttributeError:
-            from .utilities import detect_sampling_interval
+            from .utils import detect_sampling_interval
             self.__autodetected_sampling_interval, self.__autodetected_sampling_interval_confidence = detect_sampling_interval(self, confidence=True)
             return self.__autodetected_sampling_interval
 
@@ -1409,7 +1409,7 @@ class TimeSeries(Series):
         try:
             return self.__autodetected_sampling_interval_confidence
         except AttributeError:
-            from .utilities import detect_sampling_interval
+            from .utils import detect_sampling_interval
             self.__autodetected_sampling_interval, self.__autodetected_sampling_interval_confidence = detect_sampling_interval(self, confidence=True)
             return self.__autodetected_sampling_interval_confidence
 

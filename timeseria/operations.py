@@ -5,7 +5,7 @@ from datetime import datetime
 from copy import copy, deepcopy
 from propertime.utils import s_from_dt
 from .datastructures import Series, Slot, Point, TimePoint
-from .utilities import _is_close, _check_series_of_points_or_slots,_check_indexed_data
+from .utils import _is_close, _check_series_of_points_or_slots,_check_indexed_data
 from .units import TimeUnit, Unit
 from .exceptions import ConsistencyException
 

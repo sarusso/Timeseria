@@ -44,7 +44,7 @@ Main modules and submodules
      storages
      plots
      exceptions
-     utilities
+     utils
 
 |
 

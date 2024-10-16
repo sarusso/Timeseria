@@ -12,7 +12,7 @@ from pandas import DataFrame
 import shutil
 
 from ..exceptions import NotFittedError
-from ..utilities import _check_timeseries, _check_resolution, _check_data_labels, _item_is_in_range
+from ..utils import _check_timeseries, _check_resolution, _check_data_labels, _item_is_in_range
 from ..units import TimeUnit
 from ..datastructures import Point, Series, TimeSeries, TimeSeriesView
 

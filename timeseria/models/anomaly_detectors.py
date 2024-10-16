@@ -2,13 +2,13 @@
 """Anomaly detection models."""
 
 from copy import deepcopy
-from ..utilities import _Gaussian, rescale
+from ..utils import _Gaussian, rescale
 from .forecasters import Forecaster, PeriodicAverageForecaster, LSTMForecaster, LinearRegressionForecaster
 from .reconstructors import Reconstructor, PeriodicAverageReconstructor
 from .base import Model
 from math import log10, prod
 from fitter import Fitter, get_common_distributions, get_distributions
-from ..utilities import DistributionFunction
+from ..utils import DistributionFunction
 from statistics import stdev
 import fitter as fitter_library
 from ..datastructures import TimeSeries, DataTimePoint

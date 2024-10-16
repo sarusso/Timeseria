@@ -7,7 +7,7 @@ from pandas import DataFrame
 from math import sqrt
 from propertime.utils import dt_from_s
 
-from ..utilities import detect_periodicity, _get_periodicity_index, mean_absolute_percentage_error
+from ..utils import detect_periodicity, _get_periodicity_index, mean_absolute_percentage_error
 from ..units import TimeUnit
 from ..exceptions import NotEnoughDataError
 from .base import Model, _ProphetModel

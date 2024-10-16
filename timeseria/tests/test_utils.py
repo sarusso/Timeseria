@@ -3,11 +3,11 @@ import unittest
 import pandas as pd
 from propertime.utils import dt, s_from_dt
 
-from ..utilities import detect_encoding, detect_periodicity, detect_sampling_interval
-from ..utilities import _compute_coverage, _compute_data_loss, _compute_validity_regions
-from ..utilities import _Gaussian
-from ..utilities import rescale
-from ..utilities import _is_index_based, _is_key_based, _has_numerical_values
+from ..utils import detect_encoding, detect_periodicity, detect_sampling_interval
+from ..utils import _compute_coverage, _compute_data_loss, _compute_validity_regions
+from ..utils import _Gaussian
+from ..utils import rescale
+from ..utils import _is_index_based, _is_key_based, _has_numerical_values
 from ..datastructures import DataTimePoint, TimeSeries
 from ..storages import CSVFileStorage
 from ..units import TimeUnit
