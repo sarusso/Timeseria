@@ -313,7 +313,7 @@ class Model():
         """Call the model evaluate logic on a series."""
         raise NotImplementedError('Evaluating this model is not implemented')
 
-    def cross_validate(self, series, rounds=10, **kwargs):
+    def cross_validate(self, series, rounds=10, return_full_evaluations=False, **kwargs):
         """Cross validate the model on a series, by default with 10 fit/evaluate rounds.
 
         All the parameters starting with the ``fit_`` prefix are forwarded to the model ``fit()`` method (without the prefix), and
@@ -321,10 +321,11 @@ class Model():
 
         Args:
             rounds(int): how many rounds of cross validation to run.
+            return_full_evaluations(bool): if to return the full evaluation, one for each round.
         """
 
         if self.fitted:
-            raise NotImplementedError('You are trying to cross-validate a model already fitted, this is not supported yet')
+            raise NotImplementedError('You are trying to cross-validate a model already fitted, this is not supported.')
 
         # Check data
         if not isinstance(series, TimeSeries):
@@ -417,14 +418,15 @@ class Model():
                         try:
                                 logger.debug('Now trying to fit also from the beginning to {}'.format(validate_from_t))
                                 series_view = TimeSeriesView(series=series, from_i=0, to_i=validate_from_i)
-                                self.fit_update(series_view, **fit_kwargs)
+                                model.fit_update(series_view, **fit_kwargs)
                         except (AttributeError, NotImplementedError):
-                            # TODO: Log a warning?
-                            logger.debug('Not supported')
+                            if not fit_update_unaivalable_warned:
+                                logger.warning('This model does not support updating the fit, cross validation results will be approximate for intermediate chunks.')
+                                fit_update_unaivalable_warned = True
 
             # Evaluate & append
-            evaluations.append(self.evaluate(TimeSeriesView(series=series, from_i=validate_from_i, to_i=validate_to_i), **evaluate_kwargs))
             self.fitted = False
+            evaluations.append(model.evaluate(TimeSeriesView(series=series, from_i=validate_from_i, to_i=validate_to_i), **evaluate_kwargs))
 
         # Regroup evaluations
         evaluation_metrics = list(evaluations[0].keys())
@@ -444,6 +446,8 @@ class Model():
         for evaluation_metric in scores_by_evaluation_metric:
             results[evaluation_metric+'_avg'] = statistics.mean(scores_by_evaluation_metric[evaluation_metric])
             results[evaluation_metric+'_stdev'] = statistics.stdev(scores_by_evaluation_metric[evaluation_metric])
+        if return_full_evaluations:
+            results['evaluations'] = evaluations
         return results
 
 
