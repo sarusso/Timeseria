@@ -1123,7 +1123,10 @@ class Merge(Operation):
 
             # Finalize data
             for data_label in data_sum:
-                data[data_label]  = data_sum[data_label]  / data_count[data_label]
+                if data_count[data_label] == 1:
+                    data[data_label]  = data_sum[data_label]
+                else:
+                    data[data_label]  = data_sum[data_label]  / data_count[data_label]
 
             # Finalize data indexes
             for data_index in data_indexes_sum:

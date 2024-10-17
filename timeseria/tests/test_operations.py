@@ -589,6 +589,12 @@ class TestOpertions(unittest.TestCase):
         series3.append(DataTimePoint(t=180, data={'another_value': 10}, data_indexes={'data_loss':None, 'index_b':0.04}))
         series3.append(DataTimePoint(t=240, data={'another_value': 10}, data_indexes={'data_loss':None, 'index_b':0.05}))
 
+        series4 = TimeSeries()
+        series4.append(DataTimePoint(t=0, data={'value': 10}))
+        series4.append(DataTimePoint(t=60, data={'value': 11}))
+        series4.append(DataTimePoint(t=120, data={'value': 12}))
+        series4.append(DataTimePoint(t=180, data={'value': 13}))
+        series4.append(DataTimePoint(t=240, data={'value': 14}))
 
         # Basic merge
         merged = merge(series1,series2)
@@ -624,5 +630,12 @@ class TestOpertions(unittest.TestCase):
         self.assertEqual(merged[1].data_indexes, {'data_loss': (0.2+0.02)/2, 'index_a': 0.2, 'index_b': 0.02})
         self.assertEqual(merged[2].data_indexes, {'data_loss': (0.3+0.03)/2, 'index_a': 0.3, 'index_b': 0.03})
         self.assertEqual(merged[3].data_indexes, {'data_loss': 0.4, 'index_a': 0.4, 'index_b': 0.04})
-        self.assertEqual(merged[4].data_indexes, {'data_loss': 0.5, 'index_a': 0.5, 'index_b': 0.05}) 
+        self.assertEqual(merged[4].data_indexes, {'data_loss': 0.5, 'index_a': 0.5, 'index_b': 0.05})
 
+        # Merge different data types preserving them
+        merged = merge(series3,series4)
+        self.assertTrue(isinstance(merged[0].data['value'], int))
+        self.assertTrue(isinstance(merged[1].data['value'], int))
+        self.assertTrue(isinstance(merged[2].data['value'], int))
+        self.assertTrue(isinstance(merged[3].data['value'], int))
+        self.assertTrue(isinstance(merged[4].data['value'], int))
