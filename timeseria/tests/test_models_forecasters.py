@@ -452,10 +452,10 @@ class TestForecasters(unittest.TestCase):
         forecaster = LSTMForecaster(window=12, neurons=64, features=['values', 'diffs', 'hours'])
         cross_validation_results = forecaster.cross_validate(temperature_timeseries[0:100], rounds=3, fit_reproducible=True)
 
-        self.assertAlmostEqual(cross_validation_results['temperature_RMSE_avg'], 0.3202, places=2)
-        self.assertAlmostEqual(cross_validation_results['temperature_RMSE_stdev'], 0.1735, places=2)
-        self.assertAlmostEqual(cross_validation_results['temperature_MAE_avg'], 0.2469, places=2)
-        self.assertAlmostEqual(cross_validation_results['temperature_MAE_stdev'], 0.1316, places=2)
+        self.assertAlmostEqual(cross_validation_results['temperature_RMSE_avg'], 0.4524, places=2)
+        self.assertAlmostEqual(cross_validation_results['temperature_RMSE_stdev'], 0.3291, places=2)
+        self.assertAlmostEqual(cross_validation_results['temperature_MAE_avg'], 0.3641, places=2)
+        self.assertAlmostEqual(cross_validation_results['temperature_MAE_stdev'], 0.2884, places=2)
 
 
     def test_LSTMForecaster_save_load(self):

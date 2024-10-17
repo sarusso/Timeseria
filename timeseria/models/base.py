@@ -10,8 +10,9 @@ from propertime.utils import now_s, dt_from_s, s_from_dt
 from datetime import datetime
 from pandas import DataFrame
 import shutil
+import copy
 
-from ..exceptions import NotFittedError
+from ..exceptions import NotFittedError, AlreadyFittedError
 from ..utils import _check_timeseries, _check_resolution, _check_data_labels, _item_is_in_range
 from ..units import TimeUnit
 from ..datastructures import Point, Series, TimeSeries, TimeSeriesView
@@ -171,6 +172,10 @@ class Model():
         @functools.wraps(fit_function)
         def do_fit(self, series, *args, **kwargs):
 
+            if self.fitted:
+                raise AlreadyFittedError('This model is already fitted. Use the fit_update() method if you want to update it with '
+                                         + 'new data (where implemented). If you instead want to re-fit it, create a new instance.')
+
             # Check data
             if not isinstance(series, TimeSeries):
                 raise TypeError('Models work only with TimeSeries data for now (got "{}")'.format(series.__class__.__name__))
@@ -204,6 +209,47 @@ class Model():
     def fit(self, series, verbose=False):
         """Fit the model on a series."""
         raise NotImplementedError('Fitting this model is not implemented')
+
+
+    @staticmethod
+    def fit_update_function(fit_update_function):
+        """:meta private:"""
+        @functools.wraps(fit_update_function)
+        def do_fit_update(self, series, *args, **kwargs):
+
+            if not self.fitted:
+                raise NotFittedError('Cannot update the fit for a non-fitted model')
+
+            # Check data
+            if not isinstance(series, TimeSeries):
+                raise TypeError('Models work only with TimeSeries data for now (got "{}")'.format(series.__class__.__name__))
+
+            # If TimeSeries data, check it
+            if isinstance(series, TimeSeries):
+                _check_timeseries(series)
+
+            # Check resolution
+            if 'resolution' in self.data:
+                _check_resolution(series, self.data['resolution'])
+
+            # Check data labels
+            if 'data_labels' in self.data:
+                _check_data_labels(series, self.data['data_labels'])
+
+            # Call update fit logic
+            fit_update_output = fit_update_function(self, series, *args, **kwargs)
+
+            # Update fitted at and model id
+            self.data['fitted_at'] = now_s()
+            self.data['id'] = str(uuid.uuid4())
+
+            return fit_update_output
+
+        return do_fit_update
+
+    def fit_update(self, series, verbose=False, **kwargs):
+        """Update the model fit on a series."""
+        raise NotImplementedError('Updating the fit is not implemented for this model')
 
     @staticmethod
     def predict_function(predict_function):
@@ -321,7 +367,7 @@ class Model():
 
         Args:
             rounds(int): how many rounds of cross validation to run.
-            return_full_evaluations(bool): if to return the full evaluation, one for each round.
+            return_full_evaluations(bool): if to return the full evaluations, one for each round.
         """
 
         if self.fitted:
@@ -359,6 +405,7 @@ class Model():
 
         # Start the fit / evaluate loop
         evaluations = []
+        fit_update_unaivalable_warned = False
         for i in range(rounds):
             validate_from_i = round_items*i
             validate_to_i =   (round_items*i)+round_items
@@ -370,62 +417,70 @@ class Model():
             validate_from_dt = dt_from_s(validate_from_t)
             validate_to_dt   = dt_from_s(validate_to_t)
 
+            # Deep-copy the model
+            model = copy.deepcopy(self)
+
+            # Perform the cross validation
             logger.info('Cross validation round {}/{}: validate from {} ({}) to {} ({}), fit on the rest.'.format(i+1, rounds, validate_from_t, validate_from_dt, validate_to_t, validate_to_dt))
 
             if validate_from_i == 0:
+                # First chunk
                 logger.debug('Fitting from {} to the end'.format(validate_to_t))
                 series_view = TimeSeriesView(series=series, from_i=validate_to_i, to_i=len(series))
-                self.fit(series_view, **fit_kwargs)
+                model.fit(series_view, **fit_kwargs)
+
             elif validate_to_i >= len(series):
+                # Last chunk
                 logger.debug('Fitting from the beginning to {}'.format(validate_from_t))
                 series_view = TimeSeriesView(series=series, from_i=0, to_i=validate_from_i)
-                self.fit(series_view, **fit_kwargs)
+                model.fit(series_view, **fit_kwargs)
+
             else:
-                # Find the bigger chunk and fit first on that:
+                # Find the bigger chunk and fit on that
                 if validate_from_i > len(series)-validate_to_i:
                     logger.debug('Fitting from the beginning to {}'.format(validate_from_t))
                     series_view = TimeSeriesView(series=series, from_i=0, to_i=validate_from_i)
-                    self.fit(series_view, **fit_kwargs)
-                    # Now try to fit on the other chunk as well:
+                    model.fit(series_view, **fit_kwargs)
                     model_window = None 
                     try:
-                        model_window = self.window
+                        model_window = model.window
                     except AttributeError:
                         pass
                     if model_window and (len(series)-validate_to_i) < model_window:
                         pass
                     else:
+                        # Try to fit on the other chunk as well:
                         try:
                             logger.debug('Now trying to fit also from {} to the end'.format(validate_to_t))
                             series_view = TimeSeriesView(series=series, from_i=validate_to_i, to_i=len(series))
-                            self.fit_update(series_view, **fit_kwargs)
-                        except (AttributeError, NotImplementedError):
-                            # TODO: Log a warning?
-                            logger.debug('Not supported')
+                            model.fit_update(series_view, **fit_kwargs)
+                        except NotImplementedError:
+                            if not fit_update_unaivalable_warned:
+                                logger.warning('This model does not support updating the fit, cross validation results will be approximate for the intermediate chunks')
+                                fit_update_unaivalable_warned = True
                 else:
                     logger.debug('Fitting from {} to the end'.format(validate_to_t))
                     series_view = TimeSeriesView(series=series, from_i=validate_to_i, to_i=len(series))
-                    self.fit(series_view, **fit_kwargs)
+                    model.fit(series_view, **fit_kwargs)
                     model_window = None 
                     try:
-                        model_window = self.window
+                        model_window = model.window
                     except AttributeError:
                         pass
                     if model_window and validate_from_i < model_window:
                         pass
                     else:
-                        # Now try to fit on the other chunk as well:
+                        # Try to fit on the other chunk as well:
                         try:
-                                logger.debug('Now trying to fit also from the beginning to {}'.format(validate_from_t))
-                                series_view = TimeSeriesView(series=series, from_i=0, to_i=validate_from_i)
-                                model.fit_update(series_view, **fit_kwargs)
-                        except (AttributeError, NotImplementedError):
+                            logger.debug('Now trying to fit also from the beginning to {}'.format(validate_from_t))
+                            series_view = TimeSeriesView(series=series, from_i=0, to_i=validate_from_i)
+                            model.fit_update(series_view, **fit_kwargs)
+                        except NotImplementedError:
                             if not fit_update_unaivalable_warned:
-                                logger.warning('This model does not support updating the fit, cross validation results will be approximate for intermediate chunks.')
+                                logger.warning('This model does not support updating the fit, cross validation results will be approximate for the intermediate chunks')
                                 fit_update_unaivalable_warned = True
 
             # Evaluate & append
-            self.fitted = False
             evaluations.append(model.evaluate(TimeSeriesView(series=series, from_i=validate_from_i, to_i=validate_to_i), **evaluate_kwargs))
 
         # Regroup evaluations

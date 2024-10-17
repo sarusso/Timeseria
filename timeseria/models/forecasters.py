@@ -12,7 +12,7 @@ from sklearn.linear_model import LinearRegression
 import matplotlib.pyplot as plt
 
 from ..datastructures import DataTimeSlot, TimePoint, DataTimePoint, Slot, Point, TimeSeries
-from ..exceptions import NonContiguityError
+from ..exceptions import NonContiguityError, NotFittedError
 from ..utils import detect_periodicity, _get_periodicity_index, ensure_reproducibility
 from ..utils import mean_squared_error
 from ..utils import mean_absolute_error, max_absolute_error
@@ -861,25 +861,9 @@ class LSTMForecaster(Forecaster, _KerasModel):
         super(LSTMForecaster, self).save(path)
         self._save_keras_model(path)
 
-    @Forecaster.fit_function
-    def fit(self, series, epochs=30, normalize=True, target='all', with_context=False, loss='MSE',
-            data_loss_limit=1.0, reproducible=False, verbose=False):
-        """Fit the model on a series.
 
-        Args:
-            series(series): the series on which to fit the model.
-            epochs(int): for how many epochs to train. Defaults to ``30``.
-            normalize(bool): if to normalize the data between 0 and 1 or not. Enabled by default.
-            target(str,list): what data labels to target, defaults to  ``all`` for all of them.
-            with_context(bool): if to use context data when predicting. Not enabled by default.
-            loss(str): the error metric to minimize while fitting (a.k.a. the loss or objective function).
-                       Supported values are: ``MSE``, ``RMSE``, ``MSLE``, ``MAE`` and ``MAPE``, any other value
-                       supported by Keras as loss function or any callable object. Defaults to ``MSE``.
-            data_loss_limit(float): discard from the fit elements with a data loss greater than or equal to
-                                    this limit. Defaults to ``1``.
-            reproducible(bool): if to make the fit deterministic. Not enabled by default.
-            verbose(bool): if to print the training output in the process. Not enabled by default.
-        """
+    def _fit(self, series, epochs=30, normalize=True, target='all', with_context=False, loss='MSE',
+             data_loss_limit=1.0, reproducible=False, verbose=False, update=False):
 
         if reproducible:
             ensure_reproducibility()
@@ -901,7 +885,7 @@ class LSTMForecaster(Forecaster, _KerasModel):
         else:
             loss = loss
 
-        # Set and save the targets and context data labels
+        # Set the targets and context data labels
         context_data_labels = None
         if target == 'all':
             target_data_labels = series.data_labels()
@@ -923,11 +907,17 @@ class LSTMForecaster(Forecaster, _KerasModel):
                     if series_data_label not in target_data_labels:
                         context_data_labels.append(series_data_label)
 
-        #logger.debug('target_data_labels: {}'.format(target_data_labels))
-        #logger.series_with_forecast('context_data_labels: {}'.format(context_data_labels))
-
-        self.data['target_data_labels'] = target_data_labels
-        self.data['context_data_labels'] = context_data_labels
+        if update:
+            # Check consistency
+            if target_data_labels != self.data['target_data_labels']:
+                raise ValueError('This model was originally fitted on target data labels "{}", cannot use target data labels "{}" (got target="{}")'.format(self.data['target_data_labels'], target_data_labels, target))
+            if self.data['context_data_labels'] is not None and not with_context:
+                raise ValueError('This model was originally fitted with context, cannot update the fit without (got with_context="{}")'.format(with_context))
+        else:
+            # Save the data labels
+            self.data['data_labels'] = series.data_labels()
+            self.data['target_data_labels'] = target_data_labels
+            self.data['context_data_labels'] = context_data_labels
 
         # Set verbose switch
         if verbose:
@@ -935,26 +925,29 @@ class LSTMForecaster(Forecaster, _KerasModel):
         else:
             verbose=0
 
-        # Data labels shortcut
-        data_labels = series.data_labels()
+        if update:
+            if 'min_values' in self.data and not normalize:
+                raise ValueError('This model was originally fitted with normalization enabled and must be updated in the same way')
 
         if normalize:
 
+            # Compute and store, or load, min and max values (for each label)
+            if update:
+                min_values = self.data['min_values']
+                max_values = self.data['max_values']
+            else:
+                min_values = series.min()
+                max_values = series.max()
+                self.data['min_values'] = min_values
+                self.data['max_values'] = max_values
+
             # We need this to in order not to modify original data
             series = series.duplicate()
-
-            # Set min and max (for each label)
-            min_values = series.min()
-            max_values = series.max()
 
             # Normalize series
             for datapoint in series:
                 for data_label in datapoint.data:
                     datapoint.data[data_label] = (datapoint.data[data_label] - min_values[data_label]) / (max_values[data_label] - min_values[data_label])
-
-            # Store normalization factors
-            self.data['min_values'] = min_values
-            self.data['max_values'] = max_values
 
         # Move to matrix representation
         window_elements_matrix, target_values_vector, context_data_vector = self._to_matrix_representation(series = series,
@@ -971,7 +964,7 @@ class LSTMForecaster(Forecaster, _KerasModel):
         window_features_matrix = []
         for i in range(len(window_elements_matrix)):
             window_features_matrix.append(self._compute_window_features(window_elements_matrix[i],
-                                                                        data_labels = data_labels,
+                                                                        data_labels = self.data['data_labels'],
                                                                         time_unit = series.resolution,
                                                                         features = self.data['features'],
                                                                         context_data = context_data_vector[i] if with_context else None))
@@ -980,7 +973,7 @@ class LSTMForecaster(Forecaster, _KerasModel):
         features_per_window_item = len(window_features_matrix[0][0])
         output_dimension = len(target_values_vector[0])
 
-        # Create the default model architecture if not given in the init
+        # Create the default model architecture if not already set (either because we are updating or because it was provided in the init)
         if not self.keras_model:
             from keras.models import Sequential
             from keras.layers import Dense
@@ -993,6 +986,54 @@ class LSTMForecaster(Forecaster, _KerasModel):
         # Fit
         self.keras_model.fit(array(window_features_matrix), array(target_values_vector), epochs=epochs, verbose=verbose)
 
+    @Forecaster.fit_function
+    def fit(self, series, epochs=30, normalize=True, target='all', with_context=False,
+            loss='MSE', data_loss_limit=1.0, reproducible=False, verbose=False):
+        """Fit the model on a series.
+
+        Args:
+            series(series): the series on which to fit the model.
+            epochs(int): for how many epochs to train. Defaults to ``30``.
+            normalize(bool): if to normalize the data between 0 and 1 or not. Enabled by default.
+            target(str,list): what data labels to target, defaults to  ``all`` for all of them.
+            with_context(bool): if to use context data when predicting. Not enabled by default.
+            loss(str): the error metric to minimize while fitting (a.k.a. the loss or objective function).
+                       Supported values are: ``MSE``, ``RMSE``, ``MSLE``, ``MAE`` and ``MAPE``, any other value
+                       supported by Keras as loss function or any callable object. Defaults to ``MSE``.
+            data_loss_limit(float): discard from the fit elements with a data loss greater than or equal to
+                                    this limit. Defaults to ``1``.
+            reproducible(bool): if to make the fit deterministic. Not enabled by default.
+            verbose(bool): if to print the training output in the process. Not enabled by default.
+        """
+
+        # Call fit logic
+        return self._fit(series, epochs=epochs, normalize=normalize, target=target, with_context=with_context,
+                         loss=loss, data_loss_limit=data_loss_limit, reproducible=reproducible, verbose=verbose)
+
+    @Forecaster.fit_update_function
+    def fit_update(self, series, epochs=30, normalize=True, target='all', with_context=False,
+            loss='MSE', data_loss_limit=1.0, reproducible=False, verbose=False):
+        """Update the model fit on a series.
+
+        Args:
+            series(series): the series on which to fit the model.
+            epochs(int): for how many epochs to train. Defaults to ``30``.
+            normalize(bool): if to normalize the data between 0 and 1 or not. Enabled by default.
+            target(str,list): what data labels to target, defaults to  ``all`` for all of them.
+            with_context(bool): if to use context data when predicting. Not enabled by default.
+            loss(str): the error metric to minimize while fitting (a.k.a. the loss or objective function).
+                       Supported values are: ``MSE``, ``RMSE``, ``MSLE``, ``MAE`` and ``MAPE``, any other value
+                       supported by Keras as loss function or any callable object. Defaults to ``MSE``.
+            data_loss_limit(float): discard from the fit elements with a data loss greater than or equal to
+                                    this limit. Defaults to ``1``.
+            reproducible(bool): if to make the fit deterministic. Not enabled by default.
+            verbose(bool): if to print the training output in the process. Not enabled by default.
+        """
+
+        # Call fit logic
+        return self._fit(series, epochs=epochs, normalize=normalize, target=target, with_context=with_context, loss=loss,
+                         data_loss_limit=data_loss_limit, reproducible=reproducible, verbose=verbose, update=True)
+
     @Forecaster.predict_function
     def predict(self, series, steps=1, context_data=None,  verbose=False):
         """Call the model predict logic on a series.
@@ -1003,7 +1044,6 @@ class LSTMForecaster(Forecaster, _KerasModel):
             context_data(dict): the data to use as context for the prediction.
             verbose(bool): if to print the predict output in the process.
         """
-
 
         if len(series) < self.data['window']:
             raise ValueError('The series length ({}) is shorter than the model window ({})'.format(len(series), self.data['window']))
