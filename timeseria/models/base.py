@@ -167,9 +167,9 @@ class Model():
             return False
 
     @staticmethod
-    def fit_function(fit_function):
+    def fit_method(fit_method):
         """:meta private:"""
-        @functools.wraps(fit_function)
+        @functools.wraps(fit_method)
         def do_fit(self, series, *args, **kwargs):
 
             if self.fitted:
@@ -197,7 +197,7 @@ class Model():
                     pass
 
             # Call fit logic
-            fit_output = fit_function(self, series, *args, **kwargs)
+            fit_output = fit_method(self, series, *args, **kwargs)
 
             self.data['fitted_at'] = now_s()
             self.fitted = True
@@ -212,9 +212,9 @@ class Model():
 
 
     @staticmethod
-    def fit_update_function(fit_update_function):
+    def fit_update_method(fit_update_method):
         """:meta private:"""
-        @functools.wraps(fit_update_function)
+        @functools.wraps(fit_update_method)
         def do_fit_update(self, series, *args, **kwargs):
 
             if not self.fitted:
@@ -237,7 +237,7 @@ class Model():
                 _check_data_labels(series, self.data['data_labels'])
 
             # Call update fit logic
-            fit_update_output = fit_update_function(self, series, *args, **kwargs)
+            fit_update_output = fit_update_method(self, series, *args, **kwargs)
 
             # Update fitted at and model id
             self.data['fitted_at'] = now_s()
@@ -252,9 +252,9 @@ class Model():
         raise NotImplementedError('Updating the fit is not implemented for this model')
 
     @staticmethod
-    def predict_function(predict_function):
+    def predict_method(predict_method):
         """:meta private:"""
-        @functools.wraps(predict_function)
+        @functools.wraps(predict_method)
         def do_predict(self, series, *args, **kwargs):
 
             # Ensure the model is fitted if it has to.
@@ -283,7 +283,7 @@ class Model():
                 raise ValueError('This model requires context data ({})'.format(self.data['context_data_labels']))
 
             # Call predict logic
-            return predict_function(self, series, *args, **kwargs)
+            return predict_method(self, series, *args, **kwargs)
 
         return do_predict
 
@@ -292,9 +292,9 @@ class Model():
         raise NotImplementedError('Predicting with this model is not implemented')
 
     @staticmethod
-    def apply_function(apply_function):
+    def apply_method(apply_method):
         """:meta private:"""
-        @functools.wraps(apply_function)
+        @functools.wraps(apply_method)
         def do_apply(self, series, *args, **kwargs):
 
             # Ensure the model is fitted if it has to.
@@ -317,7 +317,7 @@ class Model():
                     _check_data_labels(series, self.data['data_labels'])
 
             # Call apply logic
-            return apply_function(self, series, *args, **kwargs)
+            return apply_method(self, series, *args, **kwargs)
 
         return do_apply
 
@@ -326,9 +326,9 @@ class Model():
         raise NotImplementedError('Applying this model is not implemented')
 
     @staticmethod
-    def evaluate_function(evaluate_function):
+    def evaluate_method(evaluate_method):
         """:meta private:"""
-        @functools.wraps(evaluate_function)
+        @functools.wraps(evaluate_method)
         def do_evaluate(self, series, *args, **kwargs):
 
             # Ensure the model is fitted if it has to.
@@ -351,7 +351,7 @@ class Model():
                     _check_data_labels(series, self.data['data_labels'])
 
             # Call evaluate logic
-            return evaluate_function(self, series, *args, **kwargs)
+            return evaluate_method(self, series, *args, **kwargs)
 
         return do_evaluate
 

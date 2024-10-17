@@ -69,16 +69,16 @@ class TestBaseBaseModel(unittest.TestCase):
 
         # Define a fittable parametric model mock
         class FittableParametricModelMock(Model):
-            @Model.fit_function
+            @Model.fit_method
             def fit(self, series):
                 self.data['param1'] = 1
-            @Model.predict_function
+            @Model.predict_method
             def predict(self, series):
                 return series
-            @Model.apply_function
+            @Model.apply_method
             def apply(self, series):
                 return series
-            @Model.evaluate_function
+            @Model.evaluate_method
             def evaluate(self, series):
                 return {'grade': 'A'}
 

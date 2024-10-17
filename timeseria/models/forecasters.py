@@ -137,7 +137,7 @@ class Forecaster(Model):
 
         return forecast
 
-    @Model.apply_function
+    @Model.apply_method
     def apply(self, series, steps=1, inplace=False, context_data=None, **kwargs):
         """Apply the forecast on the given series for n steps-ahead."""
 
@@ -195,7 +195,7 @@ class Forecaster(Model):
         else:
             return None
 
-    @Model.evaluate_function
+    @Model.evaluate_method
     def evaluate(self, series, steps=1, error_metrics=['RMSE', 'MAE'], return_results_series=False, plot_results_series=False,
                  results_series_error_metrics=None, plot_error_distribution=False, error_distribution_metrics=['E'], verbose=False, **kwargs):
         """Evaluate the forecaster on a series.
@@ -467,7 +467,7 @@ class PeriodicAverageForecaster(Forecaster):
             model.data['offsets_averages'][data_label] = {int(key):value for key, value in model.data['offsets_averages'][data_label].items()}
         return model
 
-    @Forecaster.fit_function
+    @Forecaster.fit_method
     def fit(self, series, periodicity='auto', dst_affected=False, data_loss_limit=1.0, verbose=False):
         """Fit the model on a series.
 
@@ -554,7 +554,7 @@ class PeriodicAverageForecaster(Forecaster):
         self.data['window'] = max([self.data['windows'][data_label] for data_label in self.data['windows']])
 
 
-    @Forecaster.predict_function
+    @Forecaster.predict_method
     def predict(self, series, steps=1, probabilistic=False):
 
         if probabilistic and not self.data['probabilistic']:
@@ -635,7 +635,7 @@ class ProphetForecaster(Forecaster, _ProphetModel):
 
     window = None
 
-    @Forecaster.fit_function
+    @Forecaster.fit_method
     def fit(self, series, verbose=False):
 
         if len(series.data_labels()) > 1:
@@ -662,7 +662,7 @@ class ProphetForecaster(Forecaster, _ProphetModel):
         # Prophet, as the ARIMA models, has no window
         self.data['window'] = 0
 
-    @Forecaster.predict_function
+    @Forecaster.predict_method
     def predict(self, data, steps=1):
 
         series = data
@@ -722,7 +722,7 @@ class ARIMAForecaster(Forecaster, _ARIMAModel):
         # TODO: save the above in data[]?
         super(ARIMAForecaster, self).__init__()
 
-    @Forecaster.fit_function
+    @Forecaster.fit_method
     def fit(self, series, verbose=False):
 
         import statsmodels.api as sm
@@ -743,7 +743,7 @@ class ARIMAForecaster(Forecaster, _ARIMAModel):
         # The ARIMA models, as Prophet, have no window
         self.data['window'] = 0
 
-    @Forecaster.predict_function
+    @Forecaster.predict_method
     def predict(self, data, steps=1):
 
         series = data
@@ -769,7 +769,7 @@ class AARIMAForecaster(Forecaster, _ARIMAModel):
 
     window = 0
 
-    @Forecaster.fit_function
+    @Forecaster.fit_method
     def fit(self, series, verbose=False, **kwargs):
 
         import pmdarima as pm
@@ -802,7 +802,7 @@ class AARIMAForecaster(Forecaster, _ARIMAModel):
         # The ARIMA models, as Prophet, have no window
         self.data['window'] = 0
 
-    @Forecaster.predict_function
+    @Forecaster.predict_method
     def predict(self, series, steps=1):
 
         data_label = self.data['data_labels'][0]
@@ -986,7 +986,7 @@ class LSTMForecaster(Forecaster, _KerasModel):
         # Fit
         self.keras_model.fit(array(window_features_matrix), array(target_values_vector), epochs=epochs, verbose=verbose)
 
-    @Forecaster.fit_function
+    @Forecaster.fit_method
     def fit(self, series, epochs=30, normalize=True, target='all', with_context=False,
             loss='MSE', data_loss_limit=1.0, reproducible=False, verbose=False):
         """Fit the model on a series.
@@ -1010,7 +1010,7 @@ class LSTMForecaster(Forecaster, _KerasModel):
         return self._fit(series, epochs=epochs, normalize=normalize, target=target, with_context=with_context,
                          loss=loss, data_loss_limit=data_loss_limit, reproducible=reproducible, verbose=verbose)
 
-    @Forecaster.fit_update_function
+    @Forecaster.fit_update_method
     def fit_update(self, series, epochs=30, normalize=True, target='all', with_context=False,
             loss='MSE', data_loss_limit=1.0, reproducible=False, verbose=False):
         """Update the model fit on a series.
@@ -1034,7 +1034,7 @@ class LSTMForecaster(Forecaster, _KerasModel):
         return self._fit(series, epochs=epochs, normalize=normalize, target=target, with_context=with_context, loss=loss,
                          data_loss_limit=data_loss_limit, reproducible=reproducible, verbose=verbose, update=True)
 
-    @Forecaster.predict_function
+    @Forecaster.predict_method
     def predict(self, series, steps=1, context_data=None,  verbose=False):
         """Call the model predict logic on a series.
 
@@ -1161,7 +1161,7 @@ class LinearRegressionForecaster(Forecaster, _KerasModel):
             shutil.rmtree(path)
             raise e
 
-    @Forecaster.fit_function
+    @Forecaster.fit_method
     def fit(self, series, data_loss_limit=1.0, verbose=False):
         """Fit the model on a series.
 
@@ -1204,7 +1204,7 @@ class LinearRegressionForecaster(Forecaster, _KerasModel):
 
         self.sklearn_model = sklearn_model
 
-    @Forecaster.predict_function
+    @Forecaster.predict_method
     def predict(self, series, steps=1, verbose=False):
         """Call the model predict logic on a series.
 

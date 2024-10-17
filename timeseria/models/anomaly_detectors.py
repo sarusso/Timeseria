@@ -253,7 +253,7 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
 
             return predicted
 
-    @AnomalyDetector.fit_function
+    @AnomalyDetector.fit_method
     def fit(self, series, with_context=False, error_metric='PE', error_distribution='gennorm', store_errors=True, verbose=False, summary=False, **kwargs):
         """Fit the anomaly detection model on a series.
 
@@ -545,7 +545,7 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
         series.preprocessed_by = self.id
         return series
 
-    @Model.apply_function
+    @Model.apply_method
     def apply(self, series, index_bounds=['avg_err','max_err'], index_type='log', multivariate_index_strategy='max',
               data_loss_threshold=1.0, details=False, verbose=False):
 

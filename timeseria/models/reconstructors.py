@@ -41,7 +41,7 @@ class Reconstructor(Model):
 
     window = None
 
-    @Model.apply_function
+    @Model.apply_method
     def apply(self, series, data_loss_threshold=1.0, inplace=False):
 
         logger.debug('Using data_loss_threshold="%s"', data_loss_threshold)
@@ -122,7 +122,7 @@ class Reconstructor(Model):
         if not inplace:
             return reconstructed_data
 
-    @Model.evaluate_function
+    @Model.evaluate_method
     def evaluate(self, series, steps='auto', limit=None, data_loss_threshold=1.0, metrics=['RMSE', 'MAE'], details=False):
         """Evaluate the reconstructor on a series.
 
@@ -327,7 +327,7 @@ class LinearInterpolationReconstructor(Reconstructor):
 
     window = 1
 
-    @Reconstructor.predict_function
+    @Reconstructor.predict_method
     def predict(self, series, from_i, to_i):
 
         if from_i - self.window < 0:
@@ -368,7 +368,7 @@ class PeriodicAverageReconstructor(Reconstructor):
 
     window = 1
 
-    @Reconstructor.fit_function
+    @Reconstructor.fit_method
     def fit(self, series, periodicity='auto', dst_affected=False, offset_method='average', data_loss_limit=1.0, verbose=False):
         # TODO: periodicity, dst_affected, offset_method -> move them in the init?
         """
@@ -429,7 +429,7 @@ class PeriodicAverageReconstructor(Reconstructor):
 
         logger.debug('Processed "%s" items', processed)
 
-    @Reconstructor.predict_function
+    @Reconstructor.predict_method
     def predict(self, series, from_i, to_i):
 
         if from_i - self.window < 0:
@@ -488,7 +488,7 @@ class ProphetReconstructor(Reconstructor, _ProphetModel):
 
     window = 0
 
-    @Reconstructor.fit_function
+    @Reconstructor.fit_method
     def fit(self, series, verbose=False):
 
         if len(series.data_labels()) > 1:
@@ -509,7 +509,7 @@ class ProphetReconstructor(Reconstructor, _ProphetModel):
         # Fit tjhe Prophet model
         self.prophet_model.fit(data)
 
-    @Reconstructor.predict_function
+    @Reconstructor.predict_method
     def predict(self, series, from_i, to_i):
 
         if verbose_debug:
