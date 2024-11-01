@@ -10,7 +10,7 @@ import uuid
 import datetime
 from propertime.utils import dt_from_s, str_from_dt, dt_from_str, s_from_dt
 from .units import TimeUnit
-from .utils import is_numerical, os_shell, pfloat
+from .utils import is_numerical, os_shell
 try:
     from pyppeteer.chromium_downloader import download_chromium,chromium_executable
     image_plot_support=True
