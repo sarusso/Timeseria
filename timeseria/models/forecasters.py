@@ -196,21 +196,21 @@ class Forecaster(Model):
             return None
 
     @Model.evaluate_method
-    def evaluate(self, series, steps=1, error_metrics=['RMSE', 'MAE'], return_results_series=False, plot_results_series=False,
-                 results_series_error_metrics=None, plot_error_distribution=False, error_distribution_metrics=['E'], verbose=False, **kwargs):
+    def evaluate(self, series, steps=1, error_metrics=['RMSE', 'MAE'], return_evaluation_series=False, plot_evaluation_series=False,
+                 evaluation_series_error_metrics='auto', plot_error_distribution=False, error_distribution_metrics='auto', verbose=False, **kwargs):
         """Evaluate the forecaster on a series.
 
         Args:
             steps (int): how many steps-ahead to evaluate the forecaster on.
             error_metrics(list): the (aggregated) error metrics to use for the evaluation. Defaults to ``RMSE`` and ``MAE``. Supported
                                  values (as list)  are: ``MSE``, ``RMSE``, ``MAE``, ``MaxAE``, ``MAPE``, ``MaxAPE``, ``MALE`` and  ``MaxALE``.
-            return_results_series(bool): if to add the series with the predicted values and the errors to the results.
-            plot_results_series(bool): if to plot the series with the predicted values and the errors.
-            results_series_error_metrics(list): the (punctual) error metrics to be added to the results series. Defaults to ``None``.
-                                                Supported values (as list) are: ``AE``, ``APE``, ``ALE``, ``E``, ``PE`` and ``LE``.
+            return_evaluation_series(bool): if to return the series used for the evaluation, with the  the predicted values and the punctual errors.
+            plot_evaluation_series(bool): if to plot the series used for the evaluation, with the  the predicted values and the punctual errors.
+            evaluation_series_error_metrics(list): the (punctual) error metrics to be included in the evaluation series. Defaults to ``auto``.
+                                                   Supported values (as list) are: ``SE``, ``AE``, ``APE``, ``ALE``, ``E``, ``PE`` and ``LE``, or ``None``.
             plot_error_distribution(bool): if to plot the error distribution.
             error_distribution_metrics(list): the (punctual) error metrics to be used for generating the error distribution(s). Defaults
-                                               to ``E``. Supported values (as list) are: ``AE``, ``APE``, ``ALE``, ``E``, ``PE`` and ``LE``.
+                                               to ``auto``. Supported values (as list) are: ``SE``, ``AE``, ``APE``, ``ALE``, ``E``, ``PE`` and ``LE``.
             verbose(bool): if to print the evaluation progress (one dot = 10% done).
         """
 
@@ -230,39 +230,79 @@ class Forecaster(Model):
         except KeyError:
             target_data_labels = None
 
-        # Handle error metrics
+        # Handle (aggregated) error metrics
         for error_metric in error_metrics:
             if error_metric not in ['MSE', 'RMSE', 'MAE', 'MaxAE', 'MAPE', 'MaxAPE', 'MALE', 'MaxALE']:
                 raise ValueError('The error metric "{}" is not supported'.format(error_metric))
 
-        if not results_series_error_metrics:
-            results_series_error_metrics = []
+        # Handle evaluation series error metrics
+        if evaluation_series_error_metrics is None:
+            evaluation_series_error_metrics = []
 
-        if not error_distribution_metrics:
+        if evaluation_series_error_metrics != 'auto':
+            for error_metric in evaluation_series_error_metrics:
+                if error_metric not in ['SE', 'AE', 'APE', 'ALE', 'E', 'PE', 'LE']:
+                    raise ValueError('The series error metric "{}" is not supported'.format(error_metric))
+        else:
+            evaluation_series_error_metrics = []
+            for error_metric in error_metrics:
+                if 'MSE' in error_metrics:
+                    evaluation_series_error_metrics.append('SE')
+                if 'MAE' in error_metrics:
+                    evaluation_series_error_metrics.append('AE')
+                if 'MAPE' in error_metrics:
+                    evaluation_series_error_metrics.append('APE')
+                if 'MALE' in error_metrics:
+                    evaluation_series_error_metrics.append('ALE')
+                if 'MaxAE' in error_metrics:
+                    evaluation_series_error_metrics.append('AE')
+                if 'MaxAPE' in error_metrics:
+                    evaluation_series_error_metrics.append('APE')
+                if 'MaxALE' in error_metrics:
+                    evaluation_series_error_metrics.append('ALE')
+                evaluation_series_error_metrics = list(set(evaluation_series_error_metrics))
+
+        # Handle error distribution metrics
+        if error_distribution_metrics is None:
             error_distribution_metrics = []
 
-        for error_metric in results_series_error_metrics:
-            if error_metric not in ['AE', 'APE', 'ALE', 'E', 'PE', 'LE']:
-                raise ValueError('The series error metric "{}" is not supported'.format(error_metric))
-
-        for error_metric in error_distribution_metrics:
-            if error_metric not in ['AE', 'APE', 'ALE', 'E', 'PE', 'LE']:
-                raise ValueError('The error distribution metric "{}" is not supported'.format(error_metric))
-
-        # Handle results series
-        if plot_results_series or return_results_series:
-            generate_results_series = True
+        if error_distribution_metrics != 'auto':
+            for error_metric in error_distribution_metrics:
+                if error_metric not in ['AE', 'APE', 'ALE', 'E', 'PE', 'LE']:
+                    raise ValueError('The error distribution metric "{}" is not supported'.format(error_metric))
         else:
-            generate_results_series = False
+            error_distribution_metrics = []
+            for error_metric in error_metrics:
+                if 'MSE' in error_metrics:
+                    error_distribution_metrics.append('SE')
+                if 'MAE' in error_metrics:
+                    error_distribution_metrics.append('AE')
+                if 'MAPE' in error_metrics:
+                    error_distribution_metrics.append('APE')
+                if 'MALE' in error_metrics:
+                    error_distribution_metrics.append('ALE')
+                if 'MaxE' in error_metrics:
+                    error_distribution_metrics.append('AE')
+                if 'MaxPE' in error_metrics:
+                    error_distribution_metrics.append('APE')
+                if 'MaxLE' in error_metrics:
+                    error_distribution_metrics.append('ALE')
+                error_distribution_metrics = list(set(error_distribution_metrics))
 
-        if generate_results_series:
+        # Handle prediction series
+        if plot_evaluation_series or return_evaluation_series:
+            generate_evaluation_series = True
+        else:
+            generate_evaluation_series = False
+
+        if generate_evaluation_series:
 
             if steps != 1:
                 raise ValueError('Returning the evaluation series is only supported with single step ahead forecasts')
 
-            results_series = series.duplicate()
+            evaluation_series = series.duplicate()
             if self.data['window']:
-                results_series = results_series[self.data['window']:]
+                evaluation_series = evaluation_series[self.data['window']:]
 
         # Support vars
         results = {}
@@ -310,12 +350,12 @@ class Forecaster(Model):
 
         for data_label in evaluate_data_labels:
 
-            # Add the prediction to the result series if requested
-            if generate_results_series:
+            # Add the prediction to the prediction series if requested
+            if generate_evaluation_series:
                 for i in range(len(actual_values[data_label])):
-                    results_series[i].data['{}_pred'.format(data_label)] = predicted_values[data_label][i]
+                    evaluation_series[i].data['{}_pred'.format(data_label)] = predicted_values[data_label][i]
 
-            # Compute the error metrics and add to the result series or plot if requested
+            # Compute the error metrics
             if 'MSE' in error_metrics:
                 results['{}_MSE'.format(data_label)] = mean_squared_error(actual_values[data_label], predicted_values[data_label])
 
@@ -340,10 +380,23 @@ class Forecaster(Model):
             if 'MaxALE' in error_metrics:
                 results['{}_MaxALE'.format(data_label,)] = max_absolute_log_error(actual_values[data_label], predicted_values[data_label])
 
-            # Series and distribution error metrics
-            if generate_results_series and 'AE' in results_series_error_metrics:
+            # Compute evaluation series and distribution error metrics if requested
+            if generate_evaluation_series and 'SE' in evaluation_series_error_metrics:
                 for i in range(len(actual_values[data_label])):
-                    results_series[i].data['{}_AE'.format(data_label)] = abs(actual_values[data_label][i] - predicted_values[data_label][i])
+                    evaluation_series[i].data['{}_SE'.format(data_label)] = pow((actual_values[data_label][i] - predicted_values[data_label][i]),2)
+            if plot_error_distribution and 'SE' in error_distribution_metrics:
+                errors = []
+                for i in range(len(actual_values[data_label])):
+                    errors.append(pow((actual_values[data_label][i] - predicted_values[data_label][i]),2))
+                plt.hist(errors, bins=100, density=True, alpha=1, color='steelblue', label='Error distribution for "{}"'.format(data_label))
+                #plt.legend(loc="upper right")
+                plt.grid()
+                plt.title('SE distribution for "{}"'.format(data_label))
+                plt.show()
+
+            if generate_evaluation_series and 'AE' in evaluation_series_error_metrics:
+                for i in range(len(actual_values[data_label])):
+                    evaluation_series[i].data['{}_AE'.format(data_label)] = abs(actual_values[data_label][i] - predicted_values[data_label][i])
             if plot_error_distribution and 'AE' in error_distribution_metrics:
                 errors = []
                 for i in range(len(actual_values[data_label])):
@@ -354,9 +407,9 @@ class Forecaster(Model):
                 plt.title('AE distribution for "{}"'.format(data_label))
                 plt.show()
 
-            if generate_results_series and 'APE' in results_series_error_metrics:
+            if generate_evaluation_series and 'APE' in evaluation_series_error_metrics:
                 for i in range(len(actual_values[data_label])):
-                    results_series[i].data['{}_APE'.format(data_label)] = abs((actual_values[data_label][i] - predicted_values[data_label][i])/actual_values[data_label][i])
+                    evaluation_series[i].data['{}_APE'.format(data_label)] = abs((actual_values[data_label][i] - predicted_values[data_label][i])/actual_values[data_label][i])
             if plot_error_distribution and 'APE' in error_distribution_metrics:
                 errors = []
                 for i in range(len(actual_values[data_label])):
@@ -367,9 +420,9 @@ class Forecaster(Model):
                 plt.title('APE distribution for "{}"'.format(data_label))
                 plt.show()
 
-            if generate_results_series and 'ALE' in results_series_error_metrics:
+            if generate_evaluation_series and 'ALE' in evaluation_series_error_metrics:
                 for i in range(len(actual_values[data_label])):
-                    results_series[i].data['{}_ALE'.format(data_label)] = abs(log(actual_values[data_label][i]/predicted_values[data_label][i]))
+                    evaluation_series[i].data['{}_ALE'.format(data_label)] = abs(log(actual_values[data_label][i]/predicted_values[data_label][i]))
             if plot_error_distribution and 'ALE' in error_distribution_metrics:
                 errors = []
                 for i in range(len(actual_values[data_label])):
@@ -380,9 +433,9 @@ class Forecaster(Model):
                 plt.title('ALE distribution for "{}"'.format(data_label))
                 plt.show()
 
-            if generate_results_series and 'E' in results_series_error_metrics:
+            if generate_evaluation_series and 'E' in evaluation_series_error_metrics:
                 for i in range(len(actual_values[data_label])):
-                    results_series[i].data['{}_E'.format(data_label)] = actual_values[data_label][i] - predicted_values[data_label][i]
+                    evaluation_series[i].data['{}_E'.format(data_label)] = actual_values[data_label][i] - predicted_values[data_label][i]
             if plot_error_distribution and 'E' in error_distribution_metrics:
                 errors = []
                 for i in range(len(actual_values[data_label])):
@@ -393,9 +446,9 @@ class Forecaster(Model):
                 plt.title('E distribution for "{}"'.format(data_label))
                 plt.show()
 
-            if generate_results_series and 'PE' in results_series_error_metrics:
+            if generate_evaluation_series and 'PE' in evaluation_series_error_metrics:
                 for i in range(len(actual_values[data_label])):
-                    results_series[i].data['{}_PE'.format(data_label)] = (actual_values[data_label][i] - predicted_values[data_label][i])/actual_values[data_label][i]
+                    evaluation_series[i].data['{}_PE'.format(data_label)] = (actual_values[data_label][i] - predicted_values[data_label][i])/actual_values[data_label][i]
             if plot_error_distribution and 'PE' in error_distribution_metrics:
                 errors = []
                 for i in range(len(actual_values[data_label])):
@@ -406,9 +459,9 @@ class Forecaster(Model):
                 plt.title('PE distribution for "{}"'.format(data_label))
                 plt.show()
 
-            if generate_results_series and 'LE' in results_series_error_metrics:
+            if generate_evaluation_series and 'LE' in evaluation_series_error_metrics:
                 for i in range(len(actual_values[data_label])):
-                    results_series[i].data['{}_LE'.format(data_label)] = log(actual_values[data_label][i]/predicted_values[data_label][i])
+                    evaluation_series[i].data['{}_LE'.format(data_label)] = log(actual_values[data_label][i]/predicted_values[data_label][i])
             if plot_error_distribution and 'LE' in error_distribution_metrics:
                 errors = []
                 for i in range(len(actual_values[data_label])):
@@ -419,13 +472,13 @@ class Forecaster(Model):
                 plt.title('LE distribution for "{}"'.format(data_label))
                 plt.show()
 
-        # Plot or return results seriesif required
-        if plot_results_series:
-            results_series.plot()
-        if return_results_series:
-            results['series'] = results_series
+        # Plot or return prediction series if required
+        if plot_evaluation_series:
+            evaluation_series.plot()
+        if return_evaluation_series:
+            results['series'] = evaluation_series
 
-        # Return evaluation results if any
+        # Return evaluation results, if any
         if results:
             return results
 
