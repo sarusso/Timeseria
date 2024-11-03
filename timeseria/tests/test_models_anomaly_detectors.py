@@ -227,7 +227,7 @@ class TestAnomalyDetectors(unittest.TestCase):
         self.assertEqual(results_timeseries[49].data_indexes['anomaly'], 1)
         self.assertEqual(results_timeseries[79].data_indexes['anomaly'], 1)
         self.assertEqual(results_timeseries[109].data_indexes['anomaly'], 1)
-        #self.assertEqual(results_timeseries[139].data_indexes['anomaly'], 1)
+        self.assertGreater(results_timeseries[139].data_indexes['anomaly'], 0.5)
         self.assertEqual(results_timeseries[169].data_indexes['anomaly'], 1)
 
         # Save & load
@@ -241,26 +241,8 @@ class TestAnomalyDetectors(unittest.TestCase):
         self.assertEqual(results_timeseries[49].data_indexes['anomaly'], 1)
         self.assertEqual(results_timeseries[79].data_indexes['anomaly'], 1)
         self.assertEqual(results_timeseries[109].data_indexes['anomaly'], 1)
-        #self.assertEqual(results_timeseries[139].data_indexes['anomaly'], 1)
+        self.assertGreater(results_timeseries[139].data_indexes['anomaly'], 0.5)
         self.assertEqual(results_timeseries[169].data_indexes['anomaly'], 1)
-
-        # Unsupervised TODO: Does not really work...
-        # anomaly_detector = LSTMAnomalyDetector()
-        # anomaly_detector.fit(timeseries_with_anomalies, error='E', error_distribution='norm', epochs=20, with_context=True, reproducible=True)
-        # self.assertAlmostEqual(anomaly_detector.data['stdevs']['cos'], 0.059, places=2)
-        # self.assertAlmostEqual(anomaly_detector.data['stdevs']['sin'], 0.357, places=2)
-        #
-        # results_timeseries = anomaly_detector.apply(timeseries_with_anomalies)
-        #for i, item in enumerate(results_timeseries):
-        #    print(i, item.dt, item.data, item.data_indexes['anomaly'])
-        # self.assertAlmostEqual(results_timeseries[0].data_indexes['anomaly'], 0.687, places=2) # TODO: Meh...
-        # self.assertEqual(results_timeseries[19].data_indexes['anomaly'], 1)
-        # self.assertEqual(results_timeseries[23].data_indexes['anomaly'], 0)
-        # self.assertEqual(results_timeseries[49].data_indexes['anomaly'], 1)
-        # self.assertEqual(results_timeseries[79].data_indexes['anomaly'], 1)
-        # self.assertEqual(results_timeseries[109].data_indexes['anomaly'], 1)
-        # self.assertEqual(results_timeseries[139].data_indexes['anomaly'], 1)
-        # self.assertEqual(results_timeseries[169].data_indexes['anomaly'], 1)
 
 
     def test_PeriodicAverageAnomalyDetector_with_index_window(self):
