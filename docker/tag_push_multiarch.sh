@@ -2,7 +2,7 @@
 set -e
 
 USER="sarusso"
-VERSION="v2.0.0"
+VERSION="v2.0.1"
 
 # Images are also tagged and pushed as "latest" below
 
