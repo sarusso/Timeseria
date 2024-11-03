@@ -3,7 +3,7 @@
 
 import json
 from copy import deepcopy
-from pandas import DataFrame
+from pandas import DataFrame, concat
 from datetime import datetime
 from pytz import UTC
 from propertime import Time
@@ -1744,9 +1744,9 @@ class TimeSeries(Series):
         for item in self:
             values = [item.data[data_label] for data_label in data_labels]
             if dump_data_loss:
-                df = df.append(DataFrame([[item.dt]+values+[item.data_loss]], columns=columns))
+                df = concat([df, DataFrame([[item.dt]+values+[item.data_loss]], columns=columns)])
             else:
-                df = df.append(DataFrame([[item.dt]+values], columns=columns))
+                df = concat([df, DataFrame([[item.dt]+values], columns=columns)])
         df = df.set_index('Timestamp')
 
         return df
