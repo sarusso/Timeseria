@@ -1026,13 +1026,16 @@ class LSTMForecaster(Forecaster, _KerasModel):
         features_per_window_item = len(window_features_matrix[0][0])
         output_dimension = len(target_values_vector[0])
 
+        # Set the input shape
+        input_shape=(self.data['window'] + 1 if with_context else self.data['window'], features_per_window_item)
+
         # Create the default model architecture if not already set (either because we are updating or because it was provided in the init)
         if not self.keras_model:
             from tensorflow.keras.models import Sequential
-            from tensorflow.keras.layers import Dense
-            from tensorflow.keras.layers import LSTM
+            from tensorflow.keras.layers import Input, LSTM, Dense
             self.keras_model = Sequential()
-            self.keras_model.add(LSTM(self.data['neurons'], input_shape=(self.data['window'] + 1 if with_context else self.data['window'], features_per_window_item)))
+            self.keras_model.add(Input(input_shape))
+            self.keras_model.add(LSTM(self.data['neurons'], ))
             self.keras_model.add(Dense(output_dimension))
             self.keras_model.compile(loss=loss, optimizer='adam')
 
