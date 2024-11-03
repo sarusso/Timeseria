@@ -27,7 +27,6 @@ and machine learning models on top of it.\n\nCheck out the GitHub project for mo
                           'lunarcalendar >=0.0.9, <1.0.0',
                           'cython >=0.29.17, <1.0.0',
                           'requests >=2.20.0, <3.0.0',
-                          'h5py >=2.10.0, <4.0.0',
                           'scipy >=1.5.4, <2.0.0',
                           'pyppeteer>=0.2.6, <1.0.0',
                           'fitter==1.7.0',

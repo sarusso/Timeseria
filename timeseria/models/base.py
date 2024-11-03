@@ -603,13 +603,13 @@ class _KerasModel(Model):
         # Load the Keras model
         if path:
             from tensorflow.keras.models import load_model as load_keras_model
-            self.keras_model = load_keras_model('{}/keras_model.h5'.format(path))
+            self.keras_model = load_keras_model('{}/model.keras'.format(path))
 
     def _save_keras_model(self, path):
 
         # Save the Keras model
         try:
-            self.keras_model.save('{}/keras_model.h5'.format(path))
+            self.keras_model.save('{}/model.keras'.format(path))
         except Exception as e:
             shutil.rmtree(path)
             raise e
