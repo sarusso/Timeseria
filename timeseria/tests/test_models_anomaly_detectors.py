@@ -9,6 +9,7 @@ from ..models.forecasters import PeriodicAverageForecaster
 from ..models.reconstructors import PeriodicAverageReconstructor
 from ..models.anomaly_detectors import AnomalyDetector, ModelBasedAnomalyDetector, PeriodicAverageReconstructorAnomalyDetector, PeriodicAverageAnomalyDetector, LSTMAnomalyDetector
 from ..storages import CSVFileStorage
+from ..utils import ensure_reproducibility
 
 # Setup logging
 from .. import logger
@@ -44,19 +45,7 @@ class TestAnomalyDetectors(unittest.TestCase):
             self.sine_cosine_minute_timeseries.append(DataTimePoint(t=i*60, data={'sin':sin_value, 'cos':cos_value}))
 
         # Ensure reproducibility
-        random.seed(0)
-        numpy.random.seed(0)
-        try:
-            import tensorflow
-            import keras
-        except ImportError:
-            pass
-        else:
-            # Ensure reproducibility for Keras and Tensorflow as well
-            # https://stackoverflow.com/questions/45230448/how-to-get-reproducible-result-when-running-keras-with-tensorflow-backend
-            tensorflow_session_conf = tensorflow.compat.v1.ConfigProto(intra_op_parallelism_threads=1, inter_op_parallelism_threads=1)
-            keras.backend.set_session(tensorflow.compat.v1.Session(graph=tensorflow.compat.v1.get_default_graph(), config=tensorflow_session_conf))
-            tensorflow.random.set_seed(0)
+        ensure_reproducibility()
 
 
     def test_AnomalyDetector(self):
