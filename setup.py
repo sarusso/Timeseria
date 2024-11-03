@@ -18,7 +18,6 @@ and machine learning models on top of it.\n\nCheck out the GitHub project for mo
           'timeseria.tests': ['test_data/csv/*.csv']
        },
       install_requires = [
-                          'Keras >=2.1.3, <3.0.0',
                           'matplotlib >=2.1.2, <4.0.0',
                           'numpy >=1.19.5, <2.0.0',
                           'scikit-learn >=0.2.2, <2.0.0',
@@ -35,10 +34,10 @@ and machine learning models on top of it.\n\nCheck out the GitHub project for mo
                           'propertime>=1.0.0, <2.0.0'
                           ],
       extras_require = {
-                        'tensorflow': ['tensorflow >=1.15.2, <3.0.0'],
-                        'tensorflow-gpu': ['tensorflow-gpu >=1.15.2, <3.0.0'],
-                        'tensorflow-macos': ['tensorflow-macos >=1.15.2, <3.0.0'],
-                        'tensorflow-aarch64': ['tensorflow-aarch64 >=1.15.2, <3.0.0'],
+                        'tensorflow': ['tensorflow >=2.0.0, <3.0.0'],
+                        'tensorflow-gpu': ['tensorflow-gpu >=2.0.0, <3.0.0'],
+                        'tensorflow-macos': ['tensorflow-macos >=2.0.0, <3.0.0'],
+                        'tensorflow-aarch64': ['tensorflow-aarch64 >=2.0.0, <3.0.0'],
                         'prophet':['prophet >=1.1.1, <2.0.0'],
                         'arima': ['pmdarima >=1.8, <3.0.0', 'statsmodels >=0.14.0, <1.0.0']
                        },

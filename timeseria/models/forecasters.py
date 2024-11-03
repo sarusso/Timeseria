@@ -931,7 +931,7 @@ class LSTMForecaster(Forecaster, _KerasModel):
         elif loss == 'MSLE':
             loss = 'mean_squared_logarithmic_error'
         elif loss == 'RMSE':
-            from keras import backend as keras_backend
+            from tensorflow.keras import backend as keras_backend
             def root_mean_squared_error(y_true, y_pred):
                 return keras_backend.sqrt(keras_backend.mean(keras_backend.square(y_pred - y_true)))
             loss = root_mean_squared_error
@@ -1028,9 +1028,9 @@ class LSTMForecaster(Forecaster, _KerasModel):
 
         # Create the default model architecture if not already set (either because we are updating or because it was provided in the init)
         if not self.keras_model:
-            from keras.models import Sequential
-            from keras.layers import Dense
-            from keras.layers import LSTM
+            from tensorflow.keras.models import Sequential
+            from tensorflow.keras.layers import Dense
+            from tensorflow.keras.layers import LSTM
             self.keras_model = Sequential()
             self.keras_model.add(LSTM(self.data['neurons'], input_shape=(self.data['window'] + 1 if with_context else self.data['window'], features_per_window_item)))
             self.keras_model.add(Dense(output_dimension))

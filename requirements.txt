@@ -1,4 +1,3 @@
-Keras >=2.1.3, <3.0.0
 matplotlib >=2.1.2, <4.0.0
 numpy >=1.19.5, <2.0.0
 scikit-learn >=0.2.2, <2.0.0
@@ -15,7 +14,7 @@ propertime>=1.0.0, < 2.0.0
 fitter==1.7.0
 
 # Optional
-#tensorflow >=1.15.2, <3.0.0   # TensorFlow (also -gpu, -macos or -aarch64 variants)
+#tensorflow >=2.0.0, <3.0.0    # TensorFlow (also -gpu, -macos or -aarch64 variants)
 #prophet >=1.1.4, <2.0.0       # Facebook's Prophet
 #pmdarima >=1.8, <3.0.0        # AARIMA
 #statsmodels >=0.14.0, <1.0.0  # ARIMA, SARIMAX

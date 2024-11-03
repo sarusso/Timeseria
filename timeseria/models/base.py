@@ -602,7 +602,7 @@ class _KerasModel(Model):
 
         # Load the Keras model
         if path:
-            from keras.models import load_model as load_keras_model
+            from tensorflow.keras.models import load_model as load_keras_model
             self.keras_model = load_keras_model('{}/keras_model.h5'.format(path))
 
     def _save_keras_model(self, path):
