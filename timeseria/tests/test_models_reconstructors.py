@@ -1,15 +1,10 @@
 import unittest
 import os
 import tempfile
-from math import sin, cos
 from propertime.utils import dt
 
 from ..datastructures import TimePoint, DataTimeSlot, DataTimePoint, TimeSeries
-from ..models.base import Model, _KerasModel
 from ..models.reconstructors import PeriodicAverageReconstructor, ProphetReconstructor, LinearInterpolationReconstructor
-from ..models.forecasters import ProphetForecaster, PeriodicAverageForecaster, ARIMAForecaster, AARIMAForecaster, LSTMForecaster
-from ..models.anomaly_detectors import PeriodicAverageAnomalyDetector
-from ..exceptions import NotFittedError, NonContiguityError
 from ..storages import CSVFileStorage
 
 # Setup logging

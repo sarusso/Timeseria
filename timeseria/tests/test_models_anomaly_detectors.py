@@ -2,8 +2,8 @@ import unittest
 import os
 import tempfile
 import random
-import numpy
 from math import sin, cos
+
 from ..datastructures import TimePoint, DataTimeSlot, DataTimePoint, TimeSeries
 from ..models.forecasters import PeriodicAverageForecaster
 from ..models.reconstructors import PeriodicAverageReconstructor
