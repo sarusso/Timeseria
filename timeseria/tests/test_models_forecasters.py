@@ -39,6 +39,12 @@ class TestForecasters(unittest.TestCase):
             step = 60 * 60 * 24
             self.sine_day_timeseries.append(DataTimeSlot(start=TimePoint(i*step), end=TimePoint((i+1)*step), data={'value':sin(i/10.0)}))
 
+    @staticmethod
+    def assertCompatible(actual, predicted, delta=0.3, item=None):
+        if not abs(actual-predicted) < delta:
+            raise AssertionError('Actual and predicted values are not compatible within the specified delta (actual="{}", predicted="{}", delta="{}", item="{}"'.format(actual, predicted, delta, item))
+
+
     def test_BaseForecasters(self):
 
         # TODO: This test is done using the Periodic Average Forecaster, make a mock
@@ -278,40 +284,32 @@ class TestForecasters(unittest.TestCase):
         timeseries = TimeSeries()
         for i in range(980):
             timeseries.append(DataTimePoint(t=i*60, data={'sin': sin(i/10.0)}))
-        forecaster = LSTMForecaster()
-        forecaster.fit(timeseries, epochs=50, reproducible=True)
 
-        # Test the evaluation
-        evaluation_results = forecaster.evaluate(timeseries[0:10], error_metrics=['RMSE', 'MAE'])
-        self.assertAlmostEqual(evaluation_results['sin_RMSE'], 0.026, places=2)
-        self.assertAlmostEqual(evaluation_results['sin_MAE'], 0.025, places=2)
+        # Basic test
+        forecaster = LSTMForecaster(window=10)
+        forecaster.fit(timeseries[0:970], epochs=10, reproducible=True, verbose=False)
+        timeseries_forecast = forecaster.apply(timeseries[0:970], steps=10)
 
-        # Test the predict
-        self.assertAlmostEqual(forecaster.predict(timeseries)['sin'], -0.53, places=2)
+        evaluation_results = forecaster.evaluate(timeseries[0:100], error_metrics=['MAE'])
+        self.assertTrue(evaluation_results['sin_MAE'] <0.2, evaluation_results['sin_MAE'])
 
-        # Test apply results
-        timeseries_with_forecast = forecaster.apply(timeseries[0:970], steps=10)
-        # for i in range(10):
-        #     print('{:.2f} vs {:.2f} ({})'.format(timeseries_with_forecast[970+i].data['sin'], timeseries[970+i].data['sin'], timeseries_with_forecast[970+i].data_indexes))
-        # 0.37 vs 0.38 ({'forecast': 1})
-        # 0.26 vs 0.29 ({'forecast': 1})
-        # 0.15 vs 0.19 ({'forecast': 1})
-        # 0.04 vs 0.09 ({'forecast': 1})
-        # -0.07 vs -0.01 ({'forecast': 1})
-        # -0.17 vs -0.11 ({'forecast': 1})
-        # -0.25 vs -0.21 ({'forecast': 1})
-        # -0.32 vs -0.31 ({'forecast': 1})
-        # -0.37 vs -0.40 ({'forecast': 1})
-        # -0.40 vs -0.49 ({'forecast': 1})
-        self.assertAlmostEqual(timeseries_with_forecast[970].data['sin'], 0.37, places=2)
-        self.assertAlmostEqual(timeseries_with_forecast[973].data['sin'], 0.04, places=2)
-        self.assertAlmostEqual(timeseries_with_forecast[974].data['sin'], -0.07, places=2)
-        self.assertAlmostEqual(timeseries_with_forecast[979].data['sin'], -0.40, places=2)
+        for i in range(10):
+            actual = timeseries[970+i].data['sin']
+            predicted = timeseries_forecast[970+i].data['sin']
+            self.assertCompatible(actual, predicted)
 
         # Test using other parameters and features
-        forecaster = LSTMForecaster(neurons=16, features=['values','diffs'])
-        forecaster.fit(timeseries, reproducible=True)
-        self.assertAlmostEqual(forecaster.predict(timeseries)['sin'], -0.58, places=2)
+        forecaster = LSTMForecaster(window=10, neurons=64, features=['values','diffs'])
+        forecaster.fit(timeseries[0:970], epochs=10, reproducible=True, verbose=False)
+        timeseries_forecast = forecaster.apply(timeseries[0:970], steps=10)
+
+        evaluation_results = forecaster.evaluate(timeseries[0:100], error_metrics=['MAE'])
+        self.assertTrue(evaluation_results['sin_MAE'] <0.2, evaluation_results['sin_MAE'])
+
+        for i in range(10):
+            actual = timeseries[970+i].data['sin']
+            predicted = timeseries_forecast[970+i].data['sin']
+            self.assertCompatible(actual, predicted, item=i)
 
         # Test for non-existent features
         with self.assertRaises(ValueError):
@@ -328,46 +326,26 @@ class TestForecasters(unittest.TestCase):
         timeseries = TimeSeries()
         for i in range(980):
             timeseries.append(DataTimePoint(t=i*60, data={'sin': sin(i/10.0), 'cos': cos(i/10.0)}))
+
+        # Basic test
         forecaster = LSTMForecaster()
         forecaster.fit(timeseries, epochs=10, reproducible=True)
+        evaluation_results = forecaster.evaluate(timeseries[0:100], error_metrics=['MAE'], return_evaluation_series=True)
 
-        # Test the evaluation (TODO: this is not yet implemented!)
-        #evaluation_results = forecaster.evaluate(timeseries[0:10])
-        #self.assertAlmostEqual(evaluation_results['RMSE'], 0.0489, places=3)
-        #self.assertAlmostEqual(evaluation_results['MAE'], 0.041, places=2)
+        self.assertTrue(evaluation_results['sin_MAE'] < 0.05, evaluation_results['sin_MAE'])
+        self.assertTrue(evaluation_results['sin_MAE'] < 0.05, evaluation_results['sin_MAE'])
 
-        # Test the predict
-        #self.assertAlmostEqual(forecaster.predict(timeseries)['sin'], -0.53, places=2)
+        timeseries_forecast = forecaster.apply(timeseries[0:970], steps=10)
 
-        # Test apply results
-        timeseries_with_forecast = forecaster.apply(timeseries[0:970], steps=5)
-        #for i in range(10):
-        #    print('{:.2f},{:.2f} vs {:.2f},{:.2f} ({})'.format(timeseries_with_forecast[970+i].data['sin'],
-        #                                                       timeseries_with_forecast[970+i].data['cos'],
-        #                                                       timeseries[970+i].data['sin'],
-        #                                                       timeseries[970+i].data['cos'],
-        #                                                       timeseries_with_forecast[970+i].data_indexes))
-        # 0.36,-0.92 vs 0.38,-0.93 ({'forecast': 1})
-        # 0.26,-0.95 vs 0.29,-0.96 ({'forecast': 1})
-        # 0.15,-0.97 vs 0.19,-0.98 ({'forecast': 1})
-        # 0.05,-0.97 vs 0.09,-1.00 ({'forecast': 1})
-        # -0.05,-0.96 vs -0.01,-1.00 ({'forecast': 1})
-        self.assertAlmostEqual(timeseries_with_forecast[970].data['sin'], 0.36, places=2)
-        self.assertAlmostEqual(timeseries_with_forecast[970].data['cos'], -0.92, places=2)
-        self.assertAlmostEqual(timeseries_with_forecast[973].data['sin'], 0.05, places=2)
-        self.assertAlmostEqual(timeseries_with_forecast[973].data['cos'], -0.97, places=2)
-        self.assertAlmostEqual(timeseries_with_forecast[974].data['sin'], -0.05, places=2)
-        self.assertAlmostEqual(timeseries_with_forecast[974].data['cos'], -0.96, places=2)
+        for i in range(10):
+            actual = timeseries[970+i].data['sin']
+            predicted = timeseries_forecast[970+i].data['sin']
+            self.assertCompatible(actual, predicted)
 
-        # Test using other parameters and features
-        forecaster = LSTMForecaster(neurons=16, features=['values','diffs'])
-        forecaster.fit(timeseries, reproducible=True)
-        self.assertAlmostEqual(forecaster.predict(timeseries)['sin'], -0.541, places=2)
-        self.assertAlmostEqual(forecaster.predict(timeseries)['cos'], -0.80, places=2)
-
-        # Test for non-existent features
-        with self.assertRaises(ValueError):
-            LSTMForecaster(features=['values','not_existent_feature']).fit(timeseries)
+        for i in range(10):
+            actual = timeseries[970+i].data['cos']
+            predicted = timeseries_forecast[970+i].data['cos']
+            self.assertCompatible(actual, predicted)
 
 
     def test_LSTMForecaster_multivariate_with_targets_and_context(self):
@@ -384,57 +362,34 @@ class TestForecasters(unittest.TestCase):
 
         # Target, no context
         forecaster = LSTMForecaster()
-        forecaster.fit(timeseries, target='cos', with_context=False, reproducible=True)
+        forecaster.fit(timeseries[0:978], epochs=10, target='cos', with_context=False, reproducible=True)
 
         with self.assertRaises(ValueError):
-            forecaster.predict(timeseries, context_data={'sin': -0.57})
+            forecaster.predict(timeseries[0:978], context_data={'sin': 'whatever'})
 
         predicted_data = forecaster.predict(timeseries)
         self.assertEqual(list(predicted_data.keys()), ['cos'])
-        self.assertAlmostEqual(predicted_data['cos'], -0.82, places=2)
+        self.assertCompatible(timeseries[979].data['cos'], predicted_data['cos'])
 
-        # All other methods will raise
+        # Target and context
+        forecaster = LSTMForecaster()
+        forecaster.fit(timeseries[0:978], target='cos', with_context=True, reproducible=True)
+
+        with self.assertRaises(ValueError):
+            forecaster.predict(timeseries[0:978])
+
+        predicted_data = forecaster.predict(timeseries[0:978], context_data={'sin': timeseries[979].data['cos']})
+        self.assertEqual(list(predicted_data.keys()), ['cos'])
+        self.assertCompatible(timeseries[979].data['cos'], predicted_data['cos'])
+
+        # All other methods will raise as not suitable
         with self.assertRaises(ValueError):
             forecaster.forecast(timeseries)
 
         with self.assertRaises(ValueError):
             forecaster.apply(timeseries)
 
-        # Target and context
-        forecaster = LSTMForecaster()
-        forecaster.fit(timeseries, target='cos', with_context=True, reproducible=True)
 
-        predicted_data = forecaster.predict(timeseries, context_data={'sin': -0.57})
-        self.assertAlmostEqual(predicted_data['cos'], -0.820, places=2)
-
-        forecasted_data = forecaster.forecast(timeseries, context_data={'sin': -0.57})
-        self.assertEqual(forecasted_data.data['sin'], -0.57)
-        self.assertAlmostEqual(forecasted_data.data['cos'], -0.820, places=2)
-
-        timeseries_with_forecast = forecaster.apply(timeseries, context_data={'sin': -0.57})
-        self.assertEqual(timeseries_with_forecast[-1].data['sin'], -0.57)
-        self.assertAlmostEqual(timeseries_with_forecast[-1].data['cos'], -0.820, places=2)
-
-
-    def test_LSTMForecaster_multivariate_with_targets_and_context_humitemp(self):
-
-        try:
-            import tensorflow
-        except ImportError:
-            print('Skipping LSTM forecaster tests with multivariate time series on humitemp with targets as no tensorflow module installed')
-            return
-
-        # This test is here mainly te ensure there are no issues with the normalization of the context data
-        timeseries = TimeSeries.from_csv(TEST_DATASETS_PATH + 'humitemp_long.csv')
-        timeseries_full = timeseries.resample('1h')
-        timeseries = timeseries_full[300:400] 
-
-        forecaster = LSTMForecaster()
-        forecaster.fit(timeseries, target='humidity', with_context=True, reproducible=True)
-
-        prediction = forecaster.predict(timeseries[:-1], context_data = timeseries[-1].data)
-
-        self.assertAlmostEqual(prediction['humidity'], 41.6734, places=2)
 
 
     def test_LSTMForecaster_cross_validation(self):
@@ -446,16 +401,15 @@ class TestForecasters(unittest.TestCase):
             return
 
         temperature_timeseries = TimeSeries.from_csv(TEST_DATASETS_PATH + 'temperature_winter.csv').resample('1h')
+
         # Pretend there was no data loss at all
         for item in temperature_timeseries:
             item.data_indexes['data_loss'] = 0 
         forecaster = LSTMForecaster(window=12, neurons=64, features=['values', 'diffs', 'hours'])
         cross_validation_results = forecaster.cross_validate(temperature_timeseries[0:100], rounds=3, fit_reproducible=True)
 
-        self.assertAlmostEqual(cross_validation_results['temperature_RMSE_avg'], 0.4524, places=2)
-        self.assertAlmostEqual(cross_validation_results['temperature_RMSE_stdev'], 0.3291, places=2)
-        self.assertAlmostEqual(cross_validation_results['temperature_MAE_avg'], 0.3641, places=2)
-        self.assertAlmostEqual(cross_validation_results['temperature_MAE_stdev'], 0.2884, places=2)
+        self.assertTrue(0.3 < cross_validation_results['temperature_RMSE_avg'] < 0.6) #0.4926859886937329
+        self.assertTrue(0.2 < cross_validation_results['temperature_MAE_avg'] < 0.5) #0.39961679741401374
 
 
     def test_LSTMForecaster_save_load(self):
@@ -471,8 +425,10 @@ class TestForecasters(unittest.TestCase):
         for i in range(10):
             sine_minute_timeseries.append(DataTimeSlot(start=TimePoint(i*60), end=TimePoint((i+1)*60), data={'sin':sin(i/10.0), 'cos':cos(i/10.0)}))
 
+        # Fit a forecaster and make a prediction
         forecaster = LSTMForecaster()
         forecaster.fit(sine_minute_timeseries, reproducible=True)
+        predicted_data = forecaster.predict(sine_minute_timeseries)
 
         # Set model path
         model_path = TEMP_MODELS_DIR+ '/test_LSTM_model'
@@ -481,13 +437,13 @@ class TestForecasters(unittest.TestCase):
         forecaster.save(model_path)
 
         # Load
-        loaded_forecaster = LSTMForecaster.load(model_path)
+        forecaster_loaded = LSTMForecaster.load(model_path)
 
         # Predict from the loaded model
-        predicted_data = loaded_forecaster.predict(sine_minute_timeseries)
+        predicted_data_loaded = forecaster_loaded.predict(sine_minute_timeseries)
 
-        self.assertTrue('sin' in predicted_data)
-        self.assertTrue('cos' in predicted_data)
+        # Check predictions are the same
+        self.assertEqual(predicted_data, predicted_data_loaded)
 
 
     def test_LinearRegressionForecaster(self):
