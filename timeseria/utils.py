@@ -422,10 +422,6 @@ class DistributionFunction():
         else:
             return plt
 
-    def adherence(self, x):
-        """Compute the "adherence" of a value x with respect to the distribution (in a 0-1 range)"""
-        return 2 * (1-self.dist_obj.cdf(abs(x), **self.params))
-
     def find_x(self, y, wideness=1000, side='right'):
         # Note: "self" can be any function, we use this class as a callable here
 
@@ -466,10 +462,7 @@ class _Gaussian():
         mu, sigma = stats.norm.fit(data)
         return cls(mu,sigma,data)
 
-    def adherence(self, x):
-        return 2 * (1-stats.norm.cdf(abs(x), self.mu, self.sigma))
-
-    def plot(self, cumulative=False, adherence=False, bins=20):
+    def plot(self, cumulative=False, bins=20):
 
         # Plot the histogram.
         if self.data:
@@ -482,9 +475,6 @@ class _Gaussian():
         if cumulative:
             title = 'Gasussian (mu={:.3f}, sigma={:.3f}) - cumulative'.format(self.mu, self.sigma)
             p = stats.norm.cdf(x, self.mu, self.sigma)
-        elif adherence:
-            title = 'Gasussian (mu={:.3f}, sigma={:.3f}) - adherence'.format(self.mu, self.sigma)
-            p = self.adherence(x)
         else:
             title = 'Gasussian (mu={:.3f}, sigma={:.3f})'.format(self.mu, self.sigma)
             p = stats.norm.pdf(x, self.mu, self.sigma)
