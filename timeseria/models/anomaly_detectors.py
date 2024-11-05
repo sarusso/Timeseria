@@ -226,31 +226,38 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
 
             # Call model predict logic and compare with the actual data
             if issubclass(self.model_class, Reconstructor):
+
+                # Reconstructors
                 prediction = self.model.predict(series, from_i=i, to_i=i)
+                if isinstance(prediction, list):
+                    predicted = prediction[0][data_label]
+                elif isinstance(prediction, dict):
+                    if isinstance(prediction[data_label], list):
+                        predicted = prediction[data_label][0]
+                    else:
+                        predicted = prediction[data_label]
+                else:
+                    raise TypeError('Don\'t know how to handle a prediction with of type "{}"'.format(prediction.__class__.__name__))
 
             elif issubclass(self.model_class, Forecaster):
 
-                if with_context:
-                    prediction = self.models[data_label].predict(series.view(from_i=0, to_i=i), steps=1, context_data=series[i].data)
-                else:
-                    prediction = self.model.predict(series.view(from_i=0, to_i=i), steps=1)
-
+                # Forecasters
+                try:
+                    # Try performing a bulk-optimized predict call
+                    if with_context:
+                        predicted = self.models[data_label]._get_predicted_value_bulk(series, i, data_label, with_context=True)
+                    else:
+                        predicted = self.model._get_predicted_value_bulk(series, i, data_label, with_context=True)
+                except (AttributeError, NotImplementedError):
+                    # Perform a standard predict call
+                    if with_context:
+                        predicted = self.models[data_label]._get_predicted_value(series, i, data_label, with_context=True)
+                    else:
+                        predicted = self.model._get_predicted_value(series, i, data_label, with_context=with_context)
             else:
                 raise TypeError('Don\'t know how to handle predictive model class "{}"'.format(self.model_class.__name__))
 
-            # Handle list of dicts or dict of lists (of which we have only one value here)
-            #{'value': [0.2019341593004146, 0.29462641146884005]}
-
-            if isinstance(prediction, list):
-                predicted = prediction[0][data_label]
-            elif isinstance(prediction, dict):
-                if isinstance(prediction[data_label], list):
-                    predicted = prediction[data_label][0]
-                else:
-                    predicted = prediction[data_label]
-            else:
-                raise TypeError('Don\'t know how to handle a prediction with of type "{}"'.format(prediction.__class__.__name__))
-
+            # TODO: unify the above (e.g. add a _get_predicted_value to the recostrctors of or simialr)
             return predicted
 
     @AnomalyDetector.fit_method

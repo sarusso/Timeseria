@@ -343,7 +343,12 @@ class Forecaster(Model):
 
                 # Predict
                 actual_values[data_label].append(self._get_actual_value(series, i, data_label))
-                predicted_values[data_label].append(self._get_predicted_value(series, i, data_label, with_context= True if context_data_labels else False, **kwargs))
+                try:
+                    # Try performing a bulk-optimized predict call
+                    predicted_values[data_label].append(self._get_predicted_value_bulk(series, i, data_label, with_context= True if context_data_labels else False, **kwargs))
+                except (AttributeError, NotImplementedError):
+                    # Perform a standard predict call
+                    predicted_values[data_label].append(self._get_predicted_value(series, i, data_label, with_context= True if context_data_labels else False, **kwargs))
 
             if verbose:
                 print('')
@@ -1161,6 +1166,92 @@ class LSTMForecaster(Forecaster, _KerasModel):
 
         # Return
         return predicted_data
+
+    def _bulk_predict(self, series):
+
+        target_data_labels =  self.data['target_data_labels']
+        context_data_labels = self.data['context_data_labels']
+        with_context = True if context_data_labels else False
+
+        if 'min_values' in self.data:
+
+            # We need this to in order not to modify original data
+            series = series.duplicate()
+
+            # Normalize series
+            for datapoint in series:
+                for data_label in datapoint.data:
+                    datapoint.data[data_label] = (datapoint.data[data_label] - self.data['min_values'][data_label]) / (self.data['max_values'][data_label] - self.data['min_values'][data_label])
+
+        # Move to matrix representation
+        window_elements_matrix, target_values_vector, context_data_vector = self._to_matrix_representation(series = series,
+                                                                                                           window = self.data['window'],
+                                                                                                           steps = 1,
+                                                                                                           context_data_labels = context_data_labels,
+                                                                                                           target_data_labels = target_data_labels,
+                                                                                                           data_loss_limit = None)
+
+        # Compute window (plus context) features
+        window_features_matrix = []
+        for i in range(len(window_elements_matrix)):
+            window_features_matrix.append(self._compute_window_features(window_elements_matrix[i],
+                                                                        data_labels = self.data['data_labels'],
+                                                                        time_unit = series.resolution,
+                                                                        features = self.data['features'],
+                                                                        context_data = context_data_vector[i] if with_context else None))
+
+        X = array(window_features_matrix)
+        #y = array(target_values_vector)
+        yhat = self.keras_model.predict(X)
+
+        # Prepare bulk-predicted data 
+        bulk_predicted_data = {data_label: [] for data_label in self.data['target_data_labels']}
+
+        # For each data label
+        for i, data_label in enumerate(self.data['target_data_labels']):
+
+            # For each predicted value
+            for j in range(len(yhat)):
+
+                # Get the prediction
+                predicted_value_normalized = yhat[j][i]
+
+                if 'min_values' in self.data:
+                    predicted_value = (predicted_value_normalized*(self.data['max_values'][data_label] - self.data['min_values'][data_label])) + self.data['min_values'][data_label]
+                else:
+                    predicted_value = predicted_value_normalized
+
+                # Append to prediction data
+                bulk_predicted_data[data_label].append(predicted_value)
+
+        # Return by {label: [value_1, value_2, ... vanuel_n]}
+        return bulk_predicted_data
+
+    def _get_predicted_value_bulk(self, series, i, data_label, with_context, **kwargs):
+        if i < self.window:
+            raise ValueError()
+        try:
+            self._precomputed[series]
+        except:
+            try:
+                self._precomputed
+            except AttributeError:
+                logger.debug('Will pre-compute bulk predictions for optimized operation. ')
+                self._precomputed = {}
+
+            # Store, for each series, the bulk-predicted values 
+            self._precomputed[series] = {}
+            self._precomputed[series] = self._bulk_predict(series)
+
+        prediction = float(self._precomputed[series][data_label][i-self.window])
+
+        # Last item and last data label reached? If so, clear the precomputed cache
+        if i == len(series)-1 and data_label == self.data['target_data_labels'][-1]:
+            logger.debug('Last item reached, clearing bulk-predicted cache.')
+            self._precomputed[series] = {}
+
+        # Always convert to float.. TODO: can we avoid this? i.e. checking for np.floating in the anomaly detectors _get_predicted_value()?
+        return prediction
 
 
 #=========================
