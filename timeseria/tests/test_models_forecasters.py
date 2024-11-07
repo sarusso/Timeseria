@@ -403,8 +403,8 @@ class TestForecasters(unittest.TestCase):
         forecaster = LSTMForecaster(window=12, neurons=64, features=['values', 'diffs', 'hours'])
         cross_validation_results = forecaster.cross_validate(temperature_timeseries[0:100], rounds=3, fit_reproducible=True)
 
-        self.assertTrue(0.3 < cross_validation_results['temperature_RMSE_avg'] < 0.6) #0.4926859886937329
-        self.assertTrue(0.2 < cross_validation_results['temperature_MAE_avg'] < 0.5) #0.39961679741401374
+        self.assertTrue(0.3 < cross_validation_results['temperature_RMSE_avg'] < 0.6) # Expected: 0.45243811980703913
+        self.assertTrue(0.2 < cross_validation_results['temperature_MAE_avg'] < 0.5) # Expected: 0.36419170510171595
 
 
     def test_LSTMForecaster_save_load(self):
