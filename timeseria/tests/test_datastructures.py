@@ -1052,8 +1052,28 @@ class TestTimeSeriesView(unittest.TestCase):
         self.assertEqual(len(timeseries_view), 5)
 
         # Test iterator
+        count = 0
         for i, point in enumerate(timeseries_view):
             self.assertEqual(point, expected_timeseries_view[i])
+            count +=1
+        self.assertEqual(count,5)
+
+        # Test iterator (again)
+        count = 0
+        for i, point in enumerate(timeseries_view):
+            self.assertEqual(point, expected_timeseries_view[i])
+            count +=1
+        self.assertEqual(count,5)
+
+        # TODO: fix me! In the time series as well (and in general wherever iterators are used within Timeseria)
+        # Test iterator (while iterating)
+        #count = 0
+        #for i, point in enumerate(timeseries_view):
+        #    for _, _ in enumerate(timeseries_view):
+        #        pass
+        #    self.assertEqual(point, expected_timeseries_view[i])
+        #    count +=1
+        #self.assertEqual(count,5)
 
         # Test accessing by item (an view items)
         self.assertEqual(timeseries_view[0].t, 2)

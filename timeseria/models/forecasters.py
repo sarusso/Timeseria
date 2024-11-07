@@ -332,7 +332,7 @@ class Forecaster(Model):
             if verbose:
                 print('Evaluating for "{}": '.format(data_label), end='')
 
-            for i, _ in enumerate(series):
+            for i in range(len(series)):
                 if verbose:
                     if int(i%progress_step) == 0:
                         print('.', end='')
