@@ -385,8 +385,6 @@ class TestForecasters(unittest.TestCase):
             forecaster.apply(timeseries)
 
 
-
-
     def test_LSTMForecaster_cross_validation(self):
 
         try:
@@ -400,11 +398,19 @@ class TestForecasters(unittest.TestCase):
         # Pretend there was no data loss at all
         for item in temperature_timeseries:
             item.data_indexes['data_loss'] = 0 
+
+        # Initialize and cross validate the forecaster
         forecaster = LSTMForecaster(window=12, neurons=64, features=['values', 'diffs', 'hours'])
-        cross_validation_results = forecaster.cross_validate(temperature_timeseries[0:100], rounds=3, fit_reproducible=True)
+        cross_validation_results = forecaster.cross_validate(temperature_timeseries[0:100], rounds=3, fit_reproducible=True,
+                                                             evaluate_return_evaluation_series=True, return_full_evaluations=True)
 
         self.assertTrue(0.3 < cross_validation_results['temperature_RMSE_avg'] < 0.6) # Expected: 0.45243811980703913
         self.assertTrue(0.2 < cross_validation_results['temperature_MAE_avg'] < 0.5) # Expected: 0.36419170510171595
+        self.assertEqual(len(cross_validation_results['evaluations']),3)
+        for evaluation in cross_validation_results['evaluations']:
+            self.assertTrue('temperature_RMSE' in evaluation)
+            self.assertTrue('temperature_MAE' in evaluation)
+            self.assertTrue('series' in evaluation)
 
 
     def test_LSTMForecaster_save_load(self):

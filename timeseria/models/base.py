@@ -499,8 +499,11 @@ class Model():
         # Prepare and return results
         results = {}
         for evaluation_metric in scores_by_evaluation_metric:
-            results[evaluation_metric+'_avg'] = statistics.mean(scores_by_evaluation_metric[evaluation_metric])
-            results[evaluation_metric+'_stdev'] = statistics.stdev(scores_by_evaluation_metric[evaluation_metric])
+            try:
+                results[evaluation_metric+'_avg'] = statistics.mean(scores_by_evaluation_metric[evaluation_metric])
+                results[evaluation_metric+'_stdev'] = statistics.stdev(scores_by_evaluation_metric[evaluation_metric])
+            except TypeError:
+                pass
         if return_full_evaluations:
             results['evaluations'] = evaluations
         return results
