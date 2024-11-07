@@ -12,7 +12,7 @@ from sklearn.linear_model import LinearRegression
 import matplotlib.pyplot as plt
 
 from ..datastructures import DataTimeSlot, TimePoint, DataTimePoint, Slot, Point, TimeSeries
-from ..exceptions import NonContiguityError, NotFittedError
+from ..exceptions import NonContiguityError, NotFittedError, ConsistencyException
 from ..utils import detect_periodicity, _get_periodicity_index, ensure_reproducibility
 from ..utils import mean_squared_error
 from ..utils import mean_absolute_error, max_absolute_error
@@ -912,6 +912,13 @@ class LSTMForecaster(Forecaster, _KerasModel):
         # Override the load method to load the Keras model as well
         model = super().load(path)
         model._load_keras_model(path)
+
+        # Back-compatibility for new normalization handling
+        if 'normalization' not in model.data:
+            if 'min_values' in model.data:
+                model['normalize'] = True
+                model['normalization'] = 'minmax'
+
         return model
 
     def save(self, path):
@@ -920,7 +927,7 @@ class LSTMForecaster(Forecaster, _KerasModel):
         self._save_keras_model(path)
 
 
-    def _fit(self, series, epochs=30, normalize=True, target='all', with_context=False, loss='MSE',
+    def _fit(self, series, epochs=30, normalize=True, normalization='minmax', target='all', with_context=False, loss='MSE',
              data_loss_limit=1.0, reproducible=False, verbose=False, update=False):
 
         if reproducible:
@@ -984,20 +991,31 @@ class LSTMForecaster(Forecaster, _KerasModel):
             verbose=0
 
         if update:
-            if 'min_values' in self.data and not normalize:
+            if normalize != self.data['normalize']:
                 raise ValueError('This model was originally fitted with normalization enabled and must be updated in the same way')
+            if normalization and  normalization != self.data['normalization']:
+                raise ValueError('This model was originally fitted with normalization "{}" and must be updated in the same way (got normalization="{}")'.format(self.data['normalization'], normalization))
 
         if normalize:
 
-            # Compute and store, or load, min and max values (for each label)
             if update:
-                min_values = self.data['min_values']
-                max_values = self.data['max_values']
+                # Load normalization parameters
+                if normalization == 'minmax':
+                    min_values = self.data['min_values']
+                    max_values = self.data['max_values']
+                elif normalization== 'max':
+                    max_values = self.data['max_values']
+                else:
+                    raise ConsistencyException('Unknown normalization "{}"'.format(self.data['normalization']))
             else:
-                min_values = series.min()
-                max_values = series.max()
-                self.data['min_values'] = min_values
-                self.data['max_values'] = max_values
+                # Compute normalization parameters
+                if normalization == 'minmax':
+                    min_values = series.min()
+                    max_values = series.max()
+                elif normalization== 'max':
+                    max_values = series.max()
+                else:
+                    raise ValueError('Unknown normalization "{}"'.format(normalization))
 
             # We need this to in order not to modify original data
             series = series.duplicate()
@@ -1005,7 +1023,27 @@ class LSTMForecaster(Forecaster, _KerasModel):
             # Normalize series
             for datapoint in series:
                 for data_label in datapoint.data:
-                    datapoint.data[data_label] = (datapoint.data[data_label] - min_values[data_label]) / (max_values[data_label] - min_values[data_label])
+                    if normalization=='minmax':
+                        datapoint.data[data_label] = (datapoint.data[data_label] - min_values[data_label]) / (max_values[data_label] - min_values[data_label])
+                    elif normalization=='max':
+                        datapoint.data[data_label] = datapoint.data[data_label] / max_values[data_label]
+                    else:
+                        raise ConsistencyException('Unknown normalization "{}"'.format(self.data['normalization']))
+
+            if not update:
+                # Store normalization info and parameters
+                self.data['normalize'] = normalize
+                self.data['normalization'] = normalization
+                if normalization == 'minmax':
+                    self.data['min_values'] = min_values
+                    self.data['max_values'] = max_values
+                elif normalization== 'max':
+                    self.data['max_values'] = max_values
+                else:
+                    raise ConsistencyException('Unknown normalization "{}"'.format(normalization))
+
+        else:
+            self.data['normalization'] = None
 
         # Move to matrix representation
         window_elements_matrix, target_values_vector, context_data_vector = self._to_matrix_representation(series = series,
@@ -1047,8 +1085,11 @@ class LSTMForecaster(Forecaster, _KerasModel):
         # Fit
         self.keras_model.fit(array(window_features_matrix), array(target_values_vector), epochs=epochs, verbose=verbose)
 
+
+
+
     @Forecaster.fit_method
-    def fit(self, series, epochs=30, normalize=True, target='all', with_context=False,
+    def fit(self, series, epochs=30, normalize=True, normalization='minmax', target='all', with_context=False,
             loss='MSE', data_loss_limit=1.0, reproducible=False, verbose=False):
         """Fit the model on a series.
 
@@ -1068,12 +1109,12 @@ class LSTMForecaster(Forecaster, _KerasModel):
         """
 
         # Call fit logic
-        return self._fit(series, epochs=epochs, normalize=normalize, target=target, with_context=with_context,
+        return self._fit(series, epochs=epochs, normalize=normalize, normalization=normalization, target=target, with_context=with_context,
                          loss=loss, data_loss_limit=data_loss_limit, reproducible=reproducible, verbose=verbose)
 
     @Forecaster.fit_update_method
-    def fit_update(self, series, epochs=30, normalize=True, target='all', with_context=False,
-            loss='MSE', data_loss_limit=1.0, reproducible=False, verbose=False):
+    def fit_update(self, series, epochs=30, normalize=True, normalization='minmax', target='all', with_context=False,
+                   loss='MSE', data_loss_limit=1.0, reproducible=False, verbose=False):
         """Update the model fit on a series.
 
         Args:
@@ -1092,8 +1133,8 @@ class LSTMForecaster(Forecaster, _KerasModel):
         """
 
         # Call fit logic
-        return self._fit(series, epochs=epochs, normalize=normalize, target=target, with_context=with_context, loss=loss,
-                         data_loss_limit=data_loss_limit, reproducible=reproducible, verbose=verbose, update=True)
+        return self._fit(series, epochs=epochs, normalize=normalize, normalization=normalization, target=target, with_context=with_context,
+                         loss=loss, data_loss_limit=data_loss_limit, reproducible=reproducible, verbose=verbose, update=True)
 
     @Forecaster.predict_method
     def predict(self, series, steps=1, context_data=None,  verbose=False):
@@ -1128,12 +1169,7 @@ class LSTMForecaster(Forecaster, _KerasModel):
         window_datapoints = list(window_series)
 
         # Normalize window and context data if we have to do so
-        try:
-            self.data['min_values']
-        except:
-            normalize = False
-        else:
-            normalize = True
+        if self.data['normalization'] and self.data['normalization'] == 'minmax':
             for datapoint in window_datapoints:
                 for data_label in datapoint.data:
                     datapoint.data[data_label] = (datapoint.data[data_label] - self.data['min_values'][data_label]) / (self.data['max_values'][data_label] - self.data['min_values'][data_label])
@@ -1142,6 +1178,19 @@ class LSTMForecaster(Forecaster, _KerasModel):
                 context_data = {key: value for key,value in context_data.items()}
                 for data_label in context_data:
                     context_data[data_label] = (context_data[data_label] - self.data['min_values'][data_label]) / (self.data['max_values'][data_label] - self.data['min_values'][data_label])
+
+        elif self.data['normalization'] and self.data['normalization'] == 'max':
+            for datapoint in window_datapoints:
+                for data_label in datapoint.data:
+                    datapoint.data[data_label] = datapoint.data[data_label] / self.data['max_values'][data_label]
+
+            if context_data:
+                context_data = {key: value for key,value in context_data.items()}
+                for data_label in context_data:
+                    context_data[data_label] = context_data[data_label] / self.data['max_values'][data_label]
+        else:
+            raise ConsistencyException('Unknown normalization "{}"'.format(self.data['normalization']))
+
 
         # Compute window (plus context) features
         window_features = self._compute_window_features(window_datapoints, data_labels=self.data['data_labels'], time_unit=series.resolution, features=self.data['features'], context_data=context_data)
@@ -1153,13 +1202,16 @@ class LSTMForecaster(Forecaster, _KerasModel):
         for i, data_label in enumerate(self.data['target_data_labels']):
 
             # Get the prediction
-            predicted_value_normalized = yhat[0][i]
+            predicted_value = yhat[0][i]
 
             # De-normalize if we have to
-            if normalize:
-                predicted_value = (predicted_value_normalized*(self.data['max_values'][data_label] - self.data['min_values'][data_label])) + self.data['min_values'][data_label]
-            else:
-                predicted_value = predicted_value_normalized
+            if self.data['normalization']:
+                if self.data['normalization'] == 'minmax':
+                    predicted_value = (predicted_value*(self.data['max_values'][data_label] - self.data['min_values'][data_label])) + self.data['min_values'][data_label]
+                elif self.data['normalization'] == 'max':
+                    predicted_value = predicted_value*self.data['max_values'][data_label]
+                else:
+                    raise ConsistencyException('Unknown normalization "{}"'.format(self.data['normalization']))
 
             # Append to prediction data
             predicted_data[data_label] = predicted_value
@@ -1167,13 +1219,14 @@ class LSTMForecaster(Forecaster, _KerasModel):
         # Return
         return predicted_data
 
+
     def _bulk_predict(self, series):
 
         target_data_labels =  self.data['target_data_labels']
         context_data_labels = self.data['context_data_labels']
         with_context = True if context_data_labels else False
 
-        if 'min_values' in self.data:
+        if self.data['normalization']:
 
             # We need this to in order not to modify original data
             series = series.duplicate()
@@ -1181,7 +1234,12 @@ class LSTMForecaster(Forecaster, _KerasModel):
             # Normalize series
             for datapoint in series:
                 for data_label in datapoint.data:
-                    datapoint.data[data_label] = (datapoint.data[data_label] - self.data['min_values'][data_label]) / (self.data['max_values'][data_label] - self.data['min_values'][data_label])
+                    if self.data['normalization'] == 'minmax':
+                        datapoint.data[data_label] = (datapoint.data[data_label] - self.data['min_values'][data_label]) / (self.data['max_values'][data_label] - self.data['min_values'][data_label])
+                    elif self.data['normalization'] == 'max':
+                        datapoint.data[data_label] = datapoint.data[data_label] / self.data['max_values'][data_label]
+                    else:
+                        raise ConsistencyException('Unknown normalization "{}"'.format(self.data['normalization']))
 
         # Move to matrix representation
         window_elements_matrix, target_values_vector, context_data_vector = self._to_matrix_representation(series = series,
@@ -1214,18 +1272,22 @@ class LSTMForecaster(Forecaster, _KerasModel):
             for j in range(len(yhat)):
 
                 # Get the prediction
-                predicted_value_normalized = yhat[j][i]
+                predicted_value = yhat[j][i]
 
-                if 'min_values' in self.data:
-                    predicted_value = (predicted_value_normalized*(self.data['max_values'][data_label] - self.data['min_values'][data_label])) + self.data['min_values'][data_label]
+                # De-normalize if we have to
+                if self.data['normalization'] == 'minmax':
+                    predicted_value = (predicted_value*(self.data['max_values'][data_label] - self.data['min_values'][data_label])) + self.data['min_values'][data_label]
+                elif self.data['normalization'] == 'max':
+                    predicted_value = predicted_value*self.data['max_values'][data_label]
                 else:
-                    predicted_value = predicted_value_normalized
+                    raise ConsistencyException('Unknown normalization "{}"'.format(self.data['normalization']))
 
                 # Append to prediction data
                 bulk_predicted_data[data_label].append(predicted_value)
 
         # Return by {label: [value_1, value_2, ... vanuel_n]}
         return bulk_predicted_data
+
 
     def _get_predicted_value_bulk(self, series, i, data_label, with_context, **kwargs):
         if i < self.window:
