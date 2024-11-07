@@ -1795,7 +1795,7 @@ class TimeSeries(Series):
 #==============================
 
 class TimeSeriesView(TimeSeries):
-    """A time series view."""
+    """A TimeSeries created as a view of another one."""
 
     def __init__(self, *items, series=None, from_i=None, to_i=None, **kwargs):
         self.series = series
@@ -1846,14 +1846,14 @@ class TimeSeriesView(TimeSeries):
 
     def __iter__(self):
         if self.series:
-            self.count = 0
+            self.iter_count = 0
             return self
         else:
             return super().__iter__()
 
     def __next__(self):
         if self.series:
-            this_i = self.count + self.from_i
+            this_i = self.iter_count + self.from_i
 
             if this_i >= self.to_i:
                 # If reached the end stop
@@ -1861,7 +1861,7 @@ class TimeSeriesView(TimeSeries):
 
             else:
                 # Otherwise return the corresponding item
-                self.count += 1
+                self.iter_count += 1
                 return self.series[this_i]
         else:
             return super().__next__()
@@ -1874,7 +1874,7 @@ class TimeSeriesView(TimeSeries):
 
     def __repr__(self):
         if self.series:
-            return 'View from element #{} to element #{} of: {}'.format(self.from_i, self.to_i, self.series)
+            return 'TimeSeriesView from element #{} to element #{} of: {}'.format(self.from_i, self.to_i, self.series)
         else:
             return super().__repr__()
 
