@@ -12,6 +12,7 @@ from ..utils import DistributionFunction
 from statistics import stdev
 import fitter as fitter_library
 from ..datastructures import TimeSeries, DataTimePoint
+from ..exceptions import ConsistencyException
 
 # Setup logging
 import logging
@@ -158,7 +159,9 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
     adherent with the model). More details about how to set the boundaries are provided in the ``apply()`` method documentation.
 
     Args:
-        model_class(Model): the model to be used for anomaly detection, if not already set.
+        model(Forecaster, Reconstructor): the model instance to be used for the anomaly detection.
+        models(dict): the model instances by data label, if using different ones, to be used for the anomaly detection.
+        model_class(Forecaster type, Reconstructor type): the model class to be used for anomaly detection, if not already set.
         index_window(int): the (rolling) window length to be used when computing the anomaly index. Defaults to 1.
     """
 
@@ -169,20 +172,47 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
         except AttributeError:
             raise NotImplementedError('No model class set for this anomaly detector')
 
-    def __init__(self, model_class=None, index_window=1, *args, **kwargs):
+    def __init__(self, model=None, models=None, model_class=None, index_window=1, *args, **kwargs):
 
-        # Handle the model_class
+        # Check model-related arguments
         try:
             self.model_class
         except NotImplementedError:
-            if not model_class:
-                raise ValueError('The model_class is not set in the anomaly detector nor given in the init') from None
-            else:
-                self._model_class = model_class
-        else:
+            # Model class is not set in the anomaly detector
+            if sum(arg is not None for arg in [model, models, model_class]) > 1:
+                raise ValueError('Please set only one between the model, models, and model_class arguments') from None
             if model_class:
-                raise ValueError('The model_class was given in the init but it is already set in the anomaly detector')
+                self._model_class = model_class
+            elif model:
+                self._model_class = model.__class__
+            elif models:
+                for i, data_label in enumerate(models):
+                    if i == 0:
+                        self._model_class = models[data_label].__class__
+                    else:
+                        if not isinstance(models[data_label], self.model_class):
+                            raise TypeError('Inconsistent model classes: "{}" vs "{}". Please provide models all of the same class.'.format(self.model_class.__name__, models[data_label].__class__.__name__))
+            else:
+                raise ValueError('Please provide one of model_class, model or models arguments') from None
+        else:
+            # Model class is already set in the anomaly detector
+            if model_class:
+                raise ValueError('This model has a model class already set, redefining it via the model_class argument is not supported')
+            if sum(arg is not None for arg in [model, models]) >1 :
+                raise ValueError('Please set only one between the model and models arguments')
+            if model:
+                if not isinstance(model, model_class):
+                    raise TypeError('This anomaly detector is designed to work with models of class "{}" but a model of class "{}" was provided'.format(self.model_class, model.__class__.__name__))
+            if models:
+                for data_label in models:
+                    if not isinstance(models[data_label], model_class):
+                        raise TypeError('This anomaly detector is designed to work with models of class "{}" but a model of class "{}" was provided'.format(self.model_class, model.__class__.__name__))
+ 
+        # Set models in both cases
+        self.model = model
+        self.models = models
 
+        # Set other arguments
         self.predictive_model_args = args
         self.predictive_model_kwargs = kwargs
         self.index_window = index_window
@@ -194,19 +224,26 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
     def load(cls, path):
 
         # Load the anomaly detection model
-        model = super().load(path)
+        anomaly_detector = super().load(path)
 
         # ..and load the inner model(s) as nested model
-        if model.data['with_context']:
-            model.models = {}
-            for data_label in model.data['data_labels']:
-                model.models[data_label] = model.model_class.load('{}/{}_model'.format(path, data_label))
+        if anomaly_detector.data['with_context']:
+            anomaly_detector.models = {}
+            for data_label in anomaly_detector.data['data_labels']:
+                anomaly_detector.models[data_label] = anomaly_detector.model_class.load('{}/{}_model'.format(path, data_label))
         else:
-            model.model= model.model_class.load('{}/model'.format(path))
+            anomaly_detector.model = anomaly_detector.model_class.load('{}/model'.format(path))
 
-        return model
+        return anomaly_detector
 
     def save(self, path):
+
+        try:
+            self._model_class
+        except:
+            pass
+        else:
+            raise NotImplementedError('Saving generic model-based anomaly detectors is not supported. Please create a custom class setting the model_class attribute.')
 
         # Save the anomaly detection model
         super(ModelBasedAnomalyDetector, self).save(path)
@@ -247,17 +284,23 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
                     if with_context:
                         predicted = self.models[data_label]._get_predicted_value_bulk(series, i, data_label, with_context=True)
                     else:
-                        predicted = self.model._get_predicted_value_bulk(series, i, data_label, with_context=True)
+                        if self.models:
+                            predicted = self.models[data_label]._get_predicted_value_bulk(series, i, data_label, with_context=True)
+                        else:
+                            predicted = self.model._get_predicted_value_bulk(series, i, data_label, with_context=True)
                 except (AttributeError, NotImplementedError):
                     # Perform a standard predict call
                     if with_context:
                         predicted = self.models[data_label]._get_predicted_value(series, i, data_label, with_context=True)
                     else:
-                        predicted = self.model._get_predicted_value(series, i, data_label, with_context=with_context)
+                        if self.models:
+                            predicted = self.models[data_label]._get_predicted_value(series, i, data_label, with_context=with_context)
+                        else:
+                            predicted = self.model._get_predicted_value(series, i, data_label, with_context=with_context)
             else:
                 raise TypeError('Don\'t know how to handle predictive model class "{}"'.format(self.model_class.__name__))
 
-            # TODO: unify the above (e.g. add a _get_predicted_value to the recostrctors of or simialr)
+            # TODO: unify the above (e.g. add a _get_predicted_value to the reconstrctors of or simialr)
             return predicted
 
     @AnomalyDetector.fit_method
@@ -282,44 +325,56 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
         else:
             error_distributions = [error_distribution]
 
-        # Fit the predictive model(s)
+        # Handle predictive models
         if with_context:
+
+            # With context, use separate models, one for each data label
             if not len(series.data_labels()) > 1:
-                raise ValueError('Anomaly detection with partial predictions on univariate series does not make sense')
+                raise ValueError('Anomaly detection with context on univariate series does not make sense')
+            if self.model:
+                raise ValueError('Cannot fit with context with a single model, please provide a model for each data label')
 
-            # Fit separate models, one for each data label
-            self.models = {}
+            if not self.models:
+                self.models = {}
             self.data['model_ids'] = {}
+
             for data_label in series.data_labels():
-                if verbose:
-                    print('Fitting for "{}":'.format(data_label))
-                logger.debug('Fitting for "%s"...', data_label)
-
-                # Initialize the internal model for this label
-                self.models[data_label] = self.model_class(*self.predictive_model_args, **self.predictive_model_kwargs)
-
-                # Set the id of the internal model in the data
-                self.data['model_ids'][data_label] = self.models[data_label].data['id']
-
-                # Fit it
-                self.models[data_label].fit(series, **kwargs, target=data_label, with_context=True, verbose=verbose)
-
-                # Set the model window if not already done:
-                if 'model_window' not in self.data:
-                    self.data['model_window'] = self.models[data_label].window
+                if self.models and data_label in self.models:
+                    if verbose:
+                        print('Predictive model for {} already fitted, not re-fitting.'.format(data_label))
+                    logger.debug('Predictive model for %s already fitted, not re-fitting.', data_label)
+                else:
+                    if verbose:
+                        print('Fitting for "{}":'.format(data_label))
+                    logger.debug('Fitting for "%s"...', data_label)
+                    self.models[data_label] = self.model_class(*self.predictive_model_args, **self.predictive_model_kwargs)
+                    self.models[data_label].fit(series, **kwargs, target=data_label, with_context=True, verbose=verbose)
 
         else:
-            # Initialize the internal model
-            self.model = self.model_class(*self.predictive_model_args, **self.predictive_model_kwargs)
 
-            # Set the id of the internal model in the data
+            # Without context, use a single model, unless otherwise set with the "models" argument
+            if self.model or self.models:
+                if verbose:
+                    print('Predictive model already fitted, not re-fitting.')
+                logger.debug('Predictive model for already fitted, not re-fitting.')
+            else:
+                if verbose:
+                    print('Fitting model'.format(data_label))
+                logger.debug('Fitting model...')
+                self.model = self.model_class(*self.predictive_model_args, **self.predictive_model_kwargs)
+                self.model.fit(series, **kwargs, verbose=verbose)
+
+        # Set the id of the internal model and the window in the data
+        if self.model:
             self.data['model_id'] = self.model.data['id']
-
-            # Fit it
-            self.model.fit(series, **kwargs, verbose=verbose)
-
-            # Set the model window
             self.data['model_window'] = self.model.window
+        elif self.models:
+            for data_label in self.models:
+                self.data['model_ids'][data_label] = self.models[data_label].data['id']
+                if 'model_window' not in self.data:
+                    self.data['model_window'] = self.models[data_label].window
+        else:
+            raise ConsistencyException('No model nor models set?')
 
         if verbose:
             print('Predictive model(s) fitted, now evaluating')
@@ -484,16 +539,20 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
             if plot:
 
                 if plot_x_min == 'auto':
-                    plot_x_min = min(self.data['prediction_errors'][data_label])
+                    this_plot_x_min = min(self.data['prediction_errors'][data_label])
+                else:
+                    this_plot_x_min = plot_x_min
                 if plot_x_max == 'auto':
-                    plot_x_max = max(self.data['prediction_errors'][data_label])
+                    this_plot_x_max = max(self.data['prediction_errors'][data_label])
+                else:
+                    this_plot_x_max = plot_x_max
 
                 # Instantiate the error distribution function
                 distribution_function = DistributionFunction(self.data['error_distributions'][data_label],
                                                              self.data['error_distributions_params'][data_label])
 
                 # Get the error distribution function plot
-                plt = distribution_function.plot(show=False, x_min=plot_x_min, x_max=plot_x_max)
+                plt = distribution_function.plot(show=False, x_min=this_plot_x_min, x_max=this_plot_x_max)
 
                 # Add the histogram to the plot
                 plt.hist(self.data['prediction_errors'][data_label], bins=100, density=True, alpha=1, color='steelblue')
