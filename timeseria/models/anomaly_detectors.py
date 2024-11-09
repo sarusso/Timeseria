@@ -625,7 +625,8 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
                                  are ``('avg_err', 'max_err')``, which are reasonable values for unsupervised anomaly detection.
                                  Other supported values are: ``x_sigma``, where x is a standard deviation multiplier;
                                  ``adherence/x``, where x is a divider for the model adherence probability; and any other
-                                 numerical value in terms of prediction error.
+                                 numerical value in terms of prediction error. Can be also set as a tuple of dictionaries, to
+                                 set the bounds on a per-data label basis.
             index_type(str, callable): if to use a logarithmic anomaly index ("log", the default value) which compresses
                                        the index range so that bigger anomalies stand out more than smaller ones, or if to
                                        use a linear one ("lin"). Can also support a custom anomaly index as a callable,
@@ -677,21 +678,27 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
             y_maxes[data_label] = error_distribution_functions[data_label](self.data['error_distributions_params'][data_label]['loc'])
             this_index_bounds = index_bounds[:]
 
-            for i in range(2):
-                if isinstance(this_index_bounds[i], str):
-                    if this_index_bounds[i] == 'max_err':
-                        this_index_bounds[i] = max(abs_prediction_errors)
-                    elif this_index_bounds[i] == 'avg_err':
-                        this_index_bounds[i] = sum(abs_prediction_errors)/len(abs_prediction_errors)
-                    elif this_index_bounds[i].endswith('_sigma'):
-                        this_index_bounds[i] = float(this_index_bounds[i].replace('_sigma',''))*self.data['stdevs'][data_label]
-                    elif this_index_bounds[i].endswith('sig'):
-                        this_index_bounds[i] = float(this_index_bounds[i].replace('sig',''))*self.data['stdevs'][data_label]
-                    elif this_index_bounds[i].startswith('adherence/'):
-                        factor = float(this_index_bounds[i].split('/')[1])
-                        this_index_bounds[i] = error_distribution_functions[data_label].find_x(y_maxes[data_label]/factor)
-                    else:
-                        raise ValueError('Unknown index start or end value "{}"'.format(this_index_bounds[i]))
+            if isinstance(this_index_bounds[0], dict):
+                if not isinstance(this_index_bounds[1], dict):
+                    raise ValueError('Cannot mix label-specific boudaries and not')
+                this_index_bounds[0] = this_index_bounds[0][data_label]
+                this_index_bounds[1] = this_index_bounds[1][data_label]
+            else:
+                for i in range(2):
+                    if isinstance(this_index_bounds[i], str):
+                        if this_index_bounds[i] == 'max_err':
+                            this_index_bounds[i] = max(abs_prediction_errors)
+                        elif this_index_bounds[i] == 'avg_err':
+                            this_index_bounds[i] = sum(abs_prediction_errors)/len(abs_prediction_errors)
+                        elif this_index_bounds[i].endswith('_sigma'):
+                            this_index_bounds[i] = float(this_index_bounds[i].replace('_sigma',''))*self.data['stdevs'][data_label]
+                        elif this_index_bounds[i].endswith('sig'):
+                            this_index_bounds[i] = float(this_index_bounds[i].replace('sig',''))*self.data['stdevs'][data_label]
+                        elif this_index_bounds[i].startswith('adherence/'):
+                            factor = float(this_index_bounds[i].split('/')[1])
+                            this_index_bounds[i] = error_distribution_functions[data_label].find_x(y_maxes[data_label]/factor)
+                        else:
+                            raise ValueError('Unknown index start or end value "{}"'.format(this_index_bounds[i]))
 
             x_starts[data_label] = this_index_bounds[0]
             x_ends[data_label] = this_index_bounds[1]
