@@ -1,10 +1,6 @@
 # -*- coding: utf-8 -*-
 """Plotting engines."""
 
-#================================================================#
-#   WARNING: the code in this module needs a major refactoring!  #
-#================================================================#
-
 import os
 import uuid
 import datetime
@@ -23,7 +19,6 @@ logger = logging.getLogger(__name__)
 
 # Setup come configuration
 AGGREGATE_THRESHOLD = int(os.environ.get('AGGREGATE_THRESHOLD', 10000))
-RENDER_MARK_AS_INDEX = False
 DEFAULT_PLOT_TYPE = os.environ.get('DEFAULT_PLOT_TYPE', None)
 if DEFAULT_PLOT_TYPE:
     if DEFAULT_PLOT_TYPE == 'interactive':
@@ -41,64 +36,42 @@ else:
 #   Utilities
 #=================
 
-# Tab 10 colormap (https://matplotlib.org/stable/tutorials/colors/colormaps.html)
-# https://github.com/matplotlib/matplotlib/blob/f6e0ee49c598f59c6e6cf4eefe473e4dc634a58a/lib/matplotlib/_cm.py
-_tab10_colormap_norm = (
-    (0.12156862745098039, 0.4666666666666667,  0.7058823529411765  ),  # 1f77b4  Blue
-    #(1.0,                 0.4980392156862745,  0.054901960784313725),  # ff7f0e  Orange
-    (0.17254901960784313, 0.6274509803921569,  0.17254901960784313 ),  # 2ca02c  Green
-    (0.8392156862745098,  0.15294117647058825, 0.1568627450980392  ),  # d62728  Red
-    (0.5803921568627451,  0.403921568627451,   0.7411764705882353  ),  # 9467bd  Purple
-    (0.5490196078431373,  0.33725490196078434, 0.29411764705882354 ),  # 8c564b  Brown
-    #(0.8901960784313725,  0.4666666666666667,  0.7607843137254902  ),  # e377c2  Pink
-    (0.4980392156862745,  0.4980392156862745,  0.4980392156862745  ),  # 7f7f7f  Gray
-    (0.7372549019607844,  0.7411764705882353,  0.13333333333333333 ),  # bcbd22  Olive
-    (0.09019607843137255, 0.7450980392156863,  0.8117647058823529),    # 17becf  Cyan
-)
+# Colors are based on the Tab 10 colormap (https://matplotlib.org/stable/users/explain/colors/colormaps.html#qualitative)
 
-_tab10_colormap_rgb = [
-    (31, 119, 180),   # Blue
-    (255, 127, 14),   # Orange
-    (44, 160, 44),    # Green
-    (214, 39, 40),    # Red
-    (148, 103, 189),  # Purple
-    (140, 86, 75),    # Brown
-    (227, 119, 194),  # Pink
-    (127, 127, 127),  # Gray
-    (188, 189, 34),   # Olive
-    (23, 190, 207)    # Cyan
+_data_index_colors = [
+    (31, 119, 180),  # Blue
+    (44, 160, 44),   # Green
+    (214, 39, 40),   # Red
+    (148, 103, 189), # Purple
+    (140, 86, 75),   # Brown
+    (127, 127, 127), # Gray
+    (188, 189, 34),  # Olive
+    (23, 190, 207)   # Cyan
 ]
 
-_tab10reord_colormap_rgb = [
+_data_label_colors = [
+    (0,128,128),      # Dygraphs green
     (148, 103, 189),  # Purple
     (44, 160, 44),    # Green
     (140, 86, 75),    # Brown
     (227, 119, 194),  # Pink
     (127, 127, 127),  # Gray
     (188, 189, 34),   # Olive
-    (23, 190, 207),    # Cyan
+    (23, 190, 207),   # Cyan
     (214, 39, 40),    # Red
     (255, 127, 14),   # Orange
     (31, 119, 180),   # Blue
-]
-
-_extra_colormap_rgb = [
+    # Extra colors (non-tab10) follows
     (77, 175, 74),    # Green
-    #(152, 78, 163),   # Purple
     (166, 86, 40),    # Brown
-    (0,0,0), # Black
+    (0,0,0),          # Black
     (255, 255, 51),   # Yellow
     (247, 129, 191),  # Pink
-    (153, 153, 153),   # Gray
+    (153, 153, 153),  # Gray
     (255, 127, 0),    # Orange
     (55, 126, 184),   # Blue
     (228, 26, 28),    # Red
-
 ]
-
-
-def to_rgba_str_from_norm_rgb(rgb, a):
-    return 'rgba({},{},{},{})'.format(rgb[0]*255,rgb[1]*255,rgb[2]*255,a)
 
 def _utc_fake_s_from_dt(dt):
     dt_str = str_from_dt(dt)
@@ -124,42 +97,29 @@ def _check_data_for_plot(data):
     else:
         raise Exception('Don\'t know how to plot data "{}" of type "{}"'.format(data, data.__class__.__name__))
 
-
 def _to_dg_time(dt):
-    '''Get Dygraphs time form datetime'''
-    #return '{}{:02d}-{:02d}T{:02d}:{:02d}:{:02d}+00:00'.format(dt.year, dt.month, dt.day, dt.hour, dt.minute,dt.second)
-    #return s_from_dt(dt)*1000
     if dt.microsecond:
         return 'new Date(Date.UTC({}, {}, {}, {}, {}, {}, {}))'.format(dt.year, dt.month-1, dt.day, dt.hour, dt.minute, dt.second, dt.microsecond/1000)
     else:
         return 'new Date(Date.UTC({}, {}, {}, {}, {}, {}))'.format(dt.year, dt.month-1, dt.day, dt.hour, dt.minute, dt.second)
 
 def _to_dg_data(serie, data_labels_to_plot, data_indexes_to_plot, full_precision, aggregate_by=0, mark=None):
-    '''{% for timestamp,value in metric_data.items %}{{timestamp}},{{value}}\n{%endfor%}}'''
-
     from .datastructures import DataTimePoint, DataTimeSlot
 
     dg_data=''
     first_t  = None
     last_t   = None
-
+    labels = None
     global_min = None
     global_max = None
-
-    if mark:
-        series_mark_start_t = s_from_dt(mark[0])
-        series_mark_end_t = s_from_dt(mark[1])
 
     for i, item in enumerate(serie):
 
         # Offset
         i=i+1
 
-        # Prepare a dict for every piece of data
-        try:
-            labels
-        except UnboundLocalError:
-            # Set labels and support vars
+        # Set labels and support vars
+        if not labels:
             labels = data_labels_to_plot
             if not labels:
                 labels = [None]
@@ -167,7 +127,6 @@ def _to_dg_data(serie, data_labels_to_plot, data_indexes_to_plot, full_precision
             data_mins = [None for label in labels]
             data_maxs = [None for label in labels]
             index_sums = [0 for index in data_indexes_to_plot]
-
 
         #====================
         #  Aggregation
@@ -249,7 +208,7 @@ def _to_dg_data(serie, data_labels_to_plot, data_indexes_to_plot, full_precision
                     else:
                         data_part+='[{:.2f},{:.2f},{:.2f}],'.format(data_mins[i], avg, data_maxs[i])
 
-                # data_indexes
+                # Data indexes
                 for i, index in enumerate(data_indexes_to_plot):
                     if index_sums[i] is not None:
                         aggregated_index_value = index_sums[i]/aggregate_by
@@ -259,15 +218,6 @@ def _to_dg_data(serie, data_labels_to_plot, data_indexes_to_plot, full_precision
                             data_part+='[0,{:.4f},{:.4f}],'.format(aggregated_index_value,aggregated_index_value)
                     else:
                         data_part+='[null,null,null],'
-
-                # Do we have a mark?
-                if mark and RENDER_MARK_AS_INDEX:
-                    if item.start.t >= series_mark_start_t and item.end.t < series_mark_end_t:
-                        # Add the (active) mark
-                        data_part+='[0,1,1],'
-                    else:
-                        # Add the (inactive) mark
-                        data_part+='[0,0,0],'
 
                 # Remove last comma
                 data_part = data_part[0:-1]
@@ -328,15 +278,6 @@ def _to_dg_data(serie, data_labels_to_plot, data_indexes_to_plot, full_precision
                 except KeyError:
                     data_part+='null,'
 
-            # Do we have a mark?
-            if mark and RENDER_MARK_AS_INDEX:
-                if item.t >= series_mark_start_t and item.t < series_mark_end_t:
-                    # Add the (active) mark
-                    data_part+='1,'
-                else:
-                    # Add the (inactive) mark
-                    data_part+='0,'
-
             # Remove last comma
             data_part = data_part[0:-1]
 
@@ -354,9 +295,9 @@ def _to_dg_data(serie, data_labels_to_plot, data_indexes_to_plot, full_precision
 #=================
 
 def dygraphs_plot(series, data_labels='all', data_indexes='all', aggregate=None, aggregate_by=None, full_precision=False,
-                  color=None, height=None, image=DEFAULT_PLOT_AS_IMAGE, image_resolution='auto', html=False, save_to=None,
-                  mini_plot='auto', value_range='auto', minimal_legend=False, title=None, mark=None, mark_title=None,
-                  mark_color='auto', legacy=None):
+                  color=None, data_label_colors='auto', data_index_colors='auto', height=None, image=DEFAULT_PLOT_AS_IMAGE,
+                  image_resolution='auto', html=False, save_to=None, mini_plot='auto', value_range='auto', minimal_legend=False,
+                  title=None, mark=None, mark_title=None, mark_color='auto', legacy='auto'):
     """Plot a time series using Dygraphs interactive plots.
 
        Args:
@@ -371,7 +312,13 @@ def dygraphs_plot(series, data_labels='all', data_indexes='all', aggregate=None,
            aggregate_by(int): a custom aggregation factor.
            full_precision(bool): if to use (nearly) full precision using 6 significant figures instead of the
                                  automatic rounding. Defaulted to false.
-           color(str): the color of the time series in the plot. Only supported for univariate time series.
+           color(str): the (HTML) color of the time series in the plot (for univariate time series).
+           data_label_colors(list,dict): the (HTML) colors of the time series in the plot. If provided as list, mapping follows
+                                         the ordering of the data labels, while if provided as a dictionary then the mapping can
+                                         be explicit (as {"data label": "color"}).
+           data_index_colors(list,dict): the (HTML) colors of the time series data indexes in the plot. If provided as list,
+                                         mapping follows the ordering of the data labels, while if provided as a dictionary then
+                                         the mapping can be explicit (as {"data label": "color"}).
            height(int): force a plot height, in the time series data units.
            image(bool): if to generate an image rendering of the plot instead of the default interactive one.
                         To generate the image rendering, a headless Chromium web browser is downloaded on the
@@ -427,7 +374,6 @@ def dygraphs_plot(series, data_labels='all', data_indexes='all', aggregate=None,
 
     if aggregate is not None:
         # Handle the case where we are required not to aggregate
-
         if not aggregate:
             aggregate_by = None
 
@@ -436,9 +382,6 @@ def dygraphs_plot(series, data_labels='all', data_indexes='all', aggregate=None,
             mini_plot=False
         else:
             mini_plot=True
-
-    #if show_data_reconstructed:
-    #    show_data_loss=False
 
     # Handle series data_lables
     if data_labels == 'all':
@@ -476,6 +419,15 @@ def dygraphs_plot(series, data_labels='all', data_indexes='all', aggregate=None,
                 raise ValueError('The data index "{}" is not present in the series data indexes (choices are: {})'.format(index, series._all_data_indexes()))
             data_indexes_to_plot.append(index)
 
+    # Handle colors
+    if data_label_colors == 'auto':
+        data_label_colors = _data_label_colors
+    if data_index_colors == 'auto':
+        data_index_colors = _data_index_colors
+        custom_data_index_colors = False
+    else:
+        custom_data_index_colors = True
+
     # Checks
     from .datastructures import DataTimePoint, DataTimeSlot
     if issubclass(series.item_type, DataTimePoint):
@@ -490,12 +442,9 @@ def dygraphs_plot(series, data_labels='all', data_indexes='all', aggregate=None,
             series_unit_string = str(series.resolution)
         else:
             series_unit_string = str(series.resolution) #.split('.')[0]+'s'
-        #if aggregate_by:
-        #    raise NotImplementedError('Plotting slots with a plot-level aggregation is not yet supported')
         stepPlot_value   = 'true'
         drawPoints_value = 'false'
         if aggregate_by:
-            # TODO: "Slot of {} unit" ?
             legend_pre = 'Slot of {}x{} (aggregated) starting at '.format(aggregate_by, series_unit_string)
         else:
             legend_pre = 'Slot of {} starting at '.format(series_unit_string)
@@ -507,8 +456,8 @@ def dygraphs_plot(series, data_labels='all', data_indexes='all', aggregate=None,
     legend_tz = ' ({})'.format(series.tz)
 
     if minimal_legend:
-        legend_pre=''
-        legend_tz=''
+        legend_pre = ''
+        legend_tz = ''
 
     # Set series description
     if issubclass(series.item_type, DataTimePoint):
@@ -519,10 +468,8 @@ def dygraphs_plot(series, data_labels='all', data_indexes='all', aggregate=None,
 
     elif issubclass(series.item_type, DataTimeSlot):
         if aggregate_by:
-            # TODO: "slots of unit" ?
             series_desc = 'Time series of #{} slots of {}, aggregated by {}'.format(len(series), series_unit_string, aggregate_by)
         else:
-            # TODO: "slots of unit" ?
             series_desc = 'Time series of #{} slots of {}'.format(len(series), series_unit_string)
 
     else:
@@ -547,15 +494,13 @@ def dygraphs_plot(series, data_labels='all', data_indexes='all', aggregate=None,
         if not mark_title:
             mark_title = 'mark'
         series_mark_html = '<span style="background:{};">&nbsp;{}&nbsp;</span>'.format(mark_color_legend, mark_title)
-        series_mark_html_off = '<span style="background:rgba(255, 255, 102, .2);">&nbsp;{}&nbsp;</span>'.format(mark_title)
     else:
         series_mark_html=''
-        series_mark_html_off = ''
 
     # Dygraphs Javascript
     dygraphs_javascript = """
 
-// Clone the interaction model so we don't mess up with the original dblclick mehtod that might cause a recursive call
+// Clone the interaction model so that we do not interfere with the original dblclick method that might cause a recursive call
 var touchFriendlyInteractionModel = Object.assign({}, Dygraph.defaultInteractionModel);
 
 // Disable touch interaction (moves by default, we don't want that)
@@ -579,11 +524,12 @@ function legendFormatter(data) {
         if (g.getOption('legend') != 'always') {
           return '';
         }
-        // We are here when there's no selection and {legend: 'always'} is set.
+        // We are here when there's no selection and {legend: 'always'} is set
         html = '"""+series_desc+""": ';
         for (var i = 0; i < data.series.length; i++) {
           var series = data.series[i];
-          // Skip not visible series
+
+          // Skip series not visible
           if (!series.isVisible) continue;
 
           // Also skip Timeseria-specific series
@@ -593,11 +539,6 @@ function legendFormatter(data) {
           if (html !== '') html += sepLines ? '<br/>' : ' ';
 
           if (data_indexes.includes(series.label)){
-              // The following was used to inlcude the "indexes" word in the legend
-              /* if (first_data_index){
-                  html += "<span style='margin-left:15px'>indexes:</span>"
-                  first_data_index=false
-              }*/
               html += "<span style='margin-left:15px; background: " + series.color + ";'>&nbsp;" + series.labelHTML + "&nbsp</span>, ";
           }
           else {
@@ -619,7 +560,6 @@ function legendFormatter(data) {
         }
       }
 
-
       html = '""" + legend_pre + """' + data.xHTML + '""" + legend_tz + """:';
       for (var i = 0; i < data.series.length; i++) {
 
@@ -631,37 +571,17 @@ function legendFormatter(data) {
 
         var series = data.series[i];
 
-        // Skip not visible series
+        // Skip series not visible
         if (!series.isVisible) continue;
 
         // Also skip Timeseria-specific series
         if (series.label=='data_mark') continue;
 
         if (sepLines) html += '<br>';
-        //var decoration = series.isHighlighted ? ' class="highlight"' : '';
         var decoration = series.isHighlighted ? ' style="background-color: #000000"' : '';
 
-        /*
-        if (series.isHighlighted) {
-            decoration = ' style="background-color: #fcf8b0"'
-          }
-        else{
-            decoration = ' style="background-color: #ffffff"'
-        }
-        console.log(decoration)
-        */
-
-        //decoration = ' style="background-color: #fcf8b0"'
         if (data_indexes.includes(series.label)){
-            // The following was used to inlcude the "indexes" word in the legend
-            /*if (first_data_index){
-                // Remove last comma and space
-                html = html.substring(0, html.length - 2);
-                html += "<span style='margin-left:15px'>indexes:</span>"
-                first_data_index=false
-            }*/
             html += "<span" + decoration + "> <span style='background: " + series.color + ";'>&nbsp" + series.labelHTML + "&nbsp</span>:&#160;" + """+ ('series.yHTML*100' if full_precision else '(Math.round(series.yHTML *100 * 100) / 100)')  +""" + "%</span>, ";
-
         }
         else {
             html += "<span" + decoration + "> <b><span style='color: " + series.color + ";'>" + series.labelHTML + "</span></b>:&#160;" + series.yHTML + "</span>, ";
@@ -674,13 +594,12 @@ function legendFormatter(data) {
       if (mark_active) {
           html += ' &nbsp;"""+ series_mark_html +"""'
       }
-      //else {
-      //    html += ' &nbsp;"""+ series_mark_html_off +"""'
-      //}
+
       return html;
     };
 """
-    dygraphs_javascript += 'new Dygraph('
+
+    dygraphs_javascript += '\nnew Dygraph('
     dygraphs_javascript += 'document.getElementById("{}"),'.format(graph_div_id)
 
     # Check data for plot.
@@ -706,10 +625,6 @@ function legendFormatter(data) {
     for index in data_indexes_to_plot:
         labels+=',{}'.format(index)
 
-    # Handle series mark (as index)
-    if mark and RENDER_MARK_AS_INDEX:
-        labels+=',data_mark'
-
     # Prepare labels string list for Dygraphs
     labels_list = ['Timestamp'] + labels.split(',')
 
@@ -730,10 +645,8 @@ function legendFormatter(data) {
         plot_min = str(value_range[0]*0.99)
         plot_max = str(value_range[1]*1.01)
 
-    #dygraphs_javascript += '"Timestamp,{}\\n{}",'.format(labels, dg_data)
+    # Add data in dg (Dygraphs) format
     dygraphs_javascript += '{},'.format(dg_data)
-
-#dateWindow: [0,"""+str(_utc_fake_s_from_dt(series[-1].end.dt)*1000)+"""],
 
     dygraphs_javascript += """{\
 labels: """+str(labels_list)+""",
@@ -747,7 +660,6 @@ fillGraph: false,
 fillAlpha: 0.5,
 colorValue: 0.5,
 showRangeSelector: """+('true' if mini_plot else 'false')+""",
-//rangeSelectorHeight: 30,
 hideOverlayOnMouseOut: true,
 interactionModel: touchFriendlyInteractionModel,
 includeZero: false,
@@ -763,96 +675,84 @@ zoomCallback: function() {
     this.updateOptions({zoomRange: ["""+plot_min+""", """+plot_max+"""]});
 },
 axes: {
-  /*y: {
-    // set axis-related properties here
-    drawGrid: false,
-    independentTicks: true
-  },*/
   y2: {
     drawGrid: false,
     drawAxis: false,
     axisLabelWidth:0,
     independentTicks: true,
     valueRange: [0,1.01],
-    //customBars: false, // Does not work?
-  }/*,
-  x : {
-                    valueFormatter: Dygraph.dateString_,
-                    valueParser: function(x) { return new Date(x); },
- }*/
+  }
 },
 animatedZooms: true,"""
 
     # Variable fill alpha in case of aggregated plot or not (for the area)
     # They have to be differentiated due different transparency policies in Dygraphs
     if aggregate_by:
-        fill_alpha_value  = 0.31
+        default_area_alpha_value  = 0.21
     else:
-        fill_alpha_value  = 0.5
-
-    # Fixed fill alpha value, used for some colors
-    fill_alpha_value_fixed = 0.6
-
-    # Fixed colors (alpha is for the lgend)
-    rgba_value_red    = 'rgba(255,128,128,0.4)'
-    rgba_alpha_violet = 'rgba(227, 168, 237, 0.5)'
-    rgba_value_yellow = 'rgba(255, 255, 102, 0.6)'
-    rgba_value_darkorange = 'rgba(255, 140, 0, 0.7)'
+        default_area_alpha_value  = 0.4
 
     # Data indexes series start
     dygraphs_javascript += """
      series: {"""
 
-    colormap_count = 0
+    data_index_colors_count = 0
     for i, data_index_to_plot in enumerate(data_indexes_to_plot):
-
-        # Special data indexes
-        if data_index_to_plot == 'data_reconstructed':
-            data_index_fillalpha = fill_alpha_value_fixed
-            data_index_color = rgba_alpha_violet
-
-        elif data_index_to_plot == 'data_loss':
-            data_index_fillalpha = fill_alpha_value
-            data_index_color = rgba_value_red
-
-        elif data_index_to_plot == 'forecast':
-            data_index_fillalpha = fill_alpha_value
-            data_index_color = rgba_value_yellow
-
-        elif data_index_to_plot in ['anomaly', 'anomaly_index']:
-            data_index_fillalpha = fill_alpha_value_fixed
-            data_index_color = rgba_value_darkorange
-
-        # Standard data indexes
+        if custom_data_index_colors:
+            if isinstance(data_index_colors, list):
+                data_index_color = data_index_colors[i%len(data_index_colors)]
+            else:
+                data_index_color = data_index_colors[data_index_to_plot]
+            legend_alpha_value = 0.4
+            area_alpha_value = default_area_alpha_value
         else:
-            data_index_fillalpha = fill_alpha_value-0.1
-            data_index_color = to_rgba_str_from_norm_rgb(_tab10_colormap_norm[colormap_count%len(_tab10_colormap_norm)], fill_alpha_value+0.1 if aggregate_by else fill_alpha_value-0.1)
-            colormap_count += 1
+            # Special data indexes
+            if data_index_to_plot == 'data_reconstructed':
+                data_index_color = (227, 168, 237) # Violet
+                legend_alpha_value = 0.5
+                area_alpha_value = 0.6 # Fixed in this case
+
+            elif data_index_to_plot == 'data_loss':
+                data_index_color = (255,128,128) # Red
+                legend_alpha_value = 0.4
+                area_alpha_value = default_area_alpha_value + 0.1 # Denser in this case
+
+            elif data_index_to_plot == 'forecast':
+                data_index_color = (255, 255, 102) # Yellow
+                legend_alpha_value = 0.6
+                area_alpha_value = default_area_alpha_value + 0.1 # Denser in this case
+
+            elif data_index_to_plot in ['anomaly', 'anomaly_index']:
+                data_index_color = (255, 140, 0) # Dark orange
+                legend_alpha_value = 0.7
+                area_alpha_value = 0.6 # Fixed in this case
+
+            # Standard data indexes
+            else:
+                data_index_color = data_index_colors[data_index_colors_count%len(data_index_colors)]
+                legend_alpha_value = 0.4
+                area_alpha_value = default_area_alpha_value
+                data_index_colors_count += 1
+
+        # Assemble the color
+        if isinstance(data_index_color, str):
+            html_data_index_color = data_index_color
+        else:
+            html_data_index_color = 'rgba({},{},{},{})'.format(data_index_color[0],
+                                                               data_index_color[1],
+                                                               data_index_color[2],
+                                                               legend_alpha_value)
 
         # Now create the entry for this data index
         dygraphs_javascript += """
         '"""+data_index_to_plot+"""': {
-         //customBars: false, // Does not work?
          axis: 'y2',
          drawPoints: false,
          strokeWidth: 0,
          highlightCircleSize:0,
          fillGraph: true,
-         fillAlpha: """+str(data_index_fillalpha)+""", // This alpha is used for the area
-         color: '"""+data_index_color+"""'             // Alpha here is used for the legend
-       },"""
-
-    # Add data mark index series
-    dygraphs_javascript += """
-       'data_mark': {
-         //customBars: false, // Does not work?
-         axis: 'y2',
-         drawPoints: false,
-         strokeWidth: 0,
-         highlightCircleSize:0,
-         fillGraph: true,
-         fillAlpha: """+str(fill_alpha_value)+""",  // This alpha is used for the area
-         color: '"""+rgba_value_yellow+"""'         // Alpha here is used for the legend
+         fillAlpha: """+str(area_alpha_value)+""", // Alpha here is used for the area
+         color: '"""+html_data_index_color+"""' // Alpha here is used for the legend
        },"""
 
     # Add all non-index series to be included in the miniplot
@@ -862,36 +762,32 @@ animatedZooms: true,"""
              showInRangeSelector:true
            },"""
 
-    # Special series end
+    # Data indexes series end
     dygraphs_javascript += """
      },"""
 
-    # Force "original" Dygraph color if only one data series, or use custom color.
-    # Otherwise, use the "original" Dygraph color for the first series and then the tab10 palette.
-    if len(data_labels_to_plot) <=1:
-        if color:
-            dygraphs_javascript += """colors: ['"""+color+"""'],"""
+    # Set data label colors
+    colors = "colors: ["
+    for i, data_label_to_plot in enumerate(data_labels_to_plot):
+        if i==0 and color:
+            colors += "'{}',".format(color)
         else:
-            dygraphs_javascript += """colors: ['rgb(0,128,128)'],"""
-    else:
-        colors = "colors: ['rgb(0,128,128)'"
-        for i in range(len(data_labels_to_plot)-1):
-            try:
-                colors += ",'rgb({},{},{})'".format(_tab10reord_colormap_rgb[i][0],
-                                                    _tab10reord_colormap_rgb[i][1],
-                                                    _tab10reord_colormap_rgb[i][2])
-            except IndexError:
-                try:
-                    colors += ",'rgb({},{},{})'".format(_extra_colormap_rgb[i-len(_tab10reord_colormap_rgb)][0],
-                                                        _extra_colormap_rgb[i-len(_tab10reord_colormap_rgb)][1],
-                                                        _extra_colormap_rgb[i-len(_tab10reord_colormap_rgb)][2])
-                except IndexError:
-                    colors += ",'rgb(0,0,0)'"
-        colors += "],"
-        dygraphs_javascript += colors
+            if isinstance(data_label_colors, list):
+                data_label_color = data_label_colors[i%len(data_label_colors)]
+            else:
+                data_label_color = data_label_colors[data_label_to_plot]
+            if isinstance(data_label_color, str):
+                colors += "'{}',".format(data_label_color)
+            else:
+                colors += "'rgb({},{},{})',".format(data_label_color[0],
+                                                    data_label_color[1],
+                                                    data_label_color[2])
+    colors = colors[:-1] # Remove trailing comma
+    colors += "],"
+    dygraphs_javascript += colors
 
-    # Handle series mark (only if not handled as an index)
-    if mark and not RENDER_MARK_AS_INDEX:
+    # Handle series mark if set
+    if mark:
 
         # Check that we know how to use this mark
         if not isinstance(mark[0], datetime.datetime):
@@ -914,14 +810,11 @@ animatedZooms: true,"""
         dygraphs_javascript += '}'
 
     if aggregate_by:
-        # Add a cooma. Just if the previosu section kiked-in
+        # Add a comma, just if the previous section kicked-in
         if dygraphs_javascript[-1] != ',':
             dygraphs_javascript += ','
         dygraphs_javascript += 'customBars: true'
     dygraphs_javascript += '})'
-
-    #if log_js:
-    #    logger.info(dygraphs_javascript)
 
     rendering_javascript = """
 require.undef('"""+graph_id+"""'); // Helps to reload in Jupyter
@@ -988,7 +881,7 @@ define('"""+graph_id+"""', ['dgenv'], function (Dygraph) {
         html_content += '<div id="{}" style="width:100%; margin-right:0px"></div>\n'.format(graph_div_id)
         if not return_html_code:
             html_content += '</body>\n</html>\n'
-        html_content += '<script>{}</script>\n'.format(dygraphs_javascript)
+        html_content += '<script>{}\n</script>\n'.format(dygraphs_javascript)
 
         # Dump html to file
         try:
@@ -1025,7 +918,7 @@ define('"""+graph_id+"""', ['dgenv'], function (Dygraph) {
                         break
                     else:
                         continue
-                    logger.critical('Found {}'.format(potential_chrom_executable))
+                    logger.debug('Found {}'.format(potential_chrom_executable))
 
             # Otherwise, rely on Pyppeteer's downloading it
             if not _chrom_executable:
@@ -1098,7 +991,7 @@ define('"""+graph_id+"""', ['dgenv'], function (Dygraph) {
         # Jupyetr lab 3: normal mode
         # Jupyter Lab 4: normal mode
 
-        if legacy is None:
+        if legacy=='auto':
 
             legacy = False
 
@@ -1106,14 +999,15 @@ define('"""+graph_id+"""', ['dgenv'], function (Dygraph) {
             if _detect_notebook_major_version() < 7:
                 logger.warning('A Jupyter Notebook < 7 installation has been detect on this system. ' +
                                'If the plot does not show, enable the legacy plotting mode with legacy=True and restart the Kernel. ' +
-                               'This is required for Jupyter Notebook < 7, but not for older versions of Jupyer Lab. However, it is not possible to detect ' + 
+                               'This is required for Jupyter Notebook < 7, but not for older versions of Jupyer Lab. However, it is not possible to detect ' +
                                'if running on Jupyter Notebook or Jupyter Lab, hence this warning. To suppress it, explicitly set legacy to True or False.')
 
         if legacy:
-            # Require Dygraphs Javascript library
+            # Load Dygraphs Javascript library
             # https://raw.githubusercontent.com/sarusso/Timeseria/develop/timeseria/static/js/dygraph-2.1.0.min
             display(Javascript("require.config({paths: {dgenv: 'https://cdnjs.cloudflare.com/ajax/libs/dygraph/2.1.0/dygraph.min'}});"))
-            # TODO: load it locally, maybe with something like:
+
+            # TODO: load the Dygraphs Javascript locally, maybe with something like:
             #with open(STATIC_DATA_PATH+'js/dygraph-2.1.0.min.js') as dy_js_file:
             #    display(Javascript(dy_js_file.read()))
 
@@ -1155,7 +1049,7 @@ define('"""+graph_id+"""', ['dgenv'], function (Dygraph) {
             display_html += '<div style="height:36px; padding:0; margin-left:0px; margin-top:10px">\n'
             display_html += '<div id="{}" style="width:100%"></div>\n'.format(legend_div_id)
             display_html += '<div id="{}" style="width:100%; margin-right:0px"></div>\n'.format(graph_div_id)
-            display_html += '<script>{}</script>\n'.format(dygraphs_javascript)
+            display_html += '<script>{}\n</script>\n'.format(dygraphs_javascript)
             display_html += '</div>'
             display(HTML(display_html))
 
