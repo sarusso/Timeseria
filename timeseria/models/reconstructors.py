@@ -12,7 +12,6 @@ from ..units import TimeUnit
 from ..exceptions import NotEnoughDataError
 from .base import Model, _ProphetModel
 
-
 # Setup logging
 import logging
 logger = logging.getLogger(__name__)
@@ -25,6 +24,7 @@ except (ImportError,AttributeError):
     pass
 
 verbose_debug=False
+
 
 #=====================================
 #  Generic Reconstructor
@@ -90,8 +90,7 @@ class Reconstructor(Model):
 
         for j in range(from_i, to_i+1):
 
-            # Get the predicted value of each data label for
-            # this step and compose the new item data
+            # Get the predicted value of each data label for this step and compose the new item data
             if verbose_debug:
                 logger.debug('Processing index #%s and relative index #%s', j, j-from_i)
 
@@ -114,8 +113,8 @@ class Reconstructor(Model):
             else:
                 # Create an entire new item
                 reconstructed_item = series.item_type.__class__(t=series[j].t,
-                                                                 data=item_data,
-                                                                 data_indexes=copy.deepcopy(series[j].data_indexes))
+                                                                data=item_data,
+                                                                data_indexes=copy.deepcopy(series[j].data_indexes))
                 reconstructed_item.data_indexes['data_reconstructed'] = 1
                 reconstructed_data.append(reconstructed_item)
 
@@ -128,7 +127,7 @@ class Reconstructor(Model):
 
         Args:
             steps (int, list): a single value or a list of values for how many steps (intended as missing data points or slots)
-                               to reconstruct in the evaluation. Default to automatic detection based on the model.
+                               to reconstruct in the evaluation. Defaults to automatic detection based on the model.
             limit(int): set a limit for the time data elements to use for the evaluation.
             data_loss_threshold(float): the data_loss index threshold required for the reconstructor to kick-in.
             metrics(list): the error metrics to use for the evaluation.
@@ -140,11 +139,10 @@ class Reconstructor(Model):
         """
 
         if len(series.data_labels()) > 1:
-            raise NotImplementedError('Evaluating on multivariate time sries is not yet implemented')
+            raise NotImplementedError('Evaluating on multivariate time series is not yet implemented')
 
         # Set evaluation_score steps if we have to
         if steps == 'auto':
-            # TODO: move the "auto" concept as a function that can be overwritten by child classes
             try:
                 steps = [1, self.data['periodicity']]
             except KeyError:
@@ -160,7 +158,6 @@ class Reconstructor(Model):
 
         # Log
         logger.info('Will evaluate model for %s steps with metrics %s', steps, metrics)
-
 
         # Find areas where to evaluate the model
         for data_label in series.data_labels():
@@ -310,7 +307,7 @@ class Reconstructor(Model):
 class LinearInterpolationReconstructor(Reconstructor):
     """A reconstruction model based on linear interpolation.
 
-    The main difference between an intepolator and a reconstructor is that interpolators are used in the transformations, *before*
+    The main difference between an interpolator and a reconstructor is that interpolators are used in the transformations, *before*
     resampling or aggregating and thus must support variable-resolution time series, while reconstructors are applied *after* resampling
     or aggregating, when data has been made already uniform.
 
@@ -441,8 +438,6 @@ class PeriodicAverageReconstructor(Reconstructor):
             logger.debug('Periodic Average Reconstructor predicting from_i=%s to_i=%s (included)', from_i, to_i)
         predictions={}
 
-        # TODO: support multivariate
-        #for data_label in series.data_labels():
         data_label = series.data_labels()[0]
 
         # Compute offset using the 1-point window. This basically compares the differences between
@@ -521,7 +516,6 @@ class ProphetReconstructor(Reconstructor, _ProphetModel):
         data_label = series.data_labels()[0]
 
         # Get and prepare data to reconstruct
-        # TODO: check the following..
         items_to_reconstruct = []
         for j in range(from_i, to_i+1):
             items_to_reconstruct.append(series[j])
@@ -537,5 +531,4 @@ class ProphetReconstructor(Reconstructor, _ProphetModel):
             predicted_data[data_label].append(forecast['yhat'][j])
 
         return predicted_data
-
 

@@ -61,20 +61,13 @@ class LinearInterpolator(Interpolator):
 
         for label in self.series.data_labels():
 
-            if False:
-                # TODO: check the math here, this should be a better approach but tests fail...
-                coordinate_increment = at - prev_point.t
-                value_diff = next_point.data[label] - prev_point.data[label]
-                interpolated_data[label] = prev_point.data[label] + (value_diff * coordinate_increment)
+            # Compute the "growth" ratio
+            diff = next_point.data[label] - prev_point.data[label]
+            delta_t = next_point.t - prev_point.t
+            ratio = diff / delta_t
 
-            else:
-                # Compute the "growth" ratio
-                diff = next_point.data[label] - prev_point.data[label]
-                delta_t = next_point.t - prev_point.t
-                ratio = diff / delta_t
-
-                # Compute the value of the data for the new point
-                interpolated_data[label] = prev_point.data[label] + ((at-prev_point.t)*ratio)
+            # Compute the value of the data for the new point
+            interpolated_data[label] = prev_point.data[label] + ((at-prev_point.t)*ratio)
 
 
         return interpolated_data

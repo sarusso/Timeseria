@@ -14,8 +14,6 @@ from .exceptions import NoDataException, FloatConversionError, ConsistencyExcept
 import logging
 logger = logging.getLogger(__name__)
 
-HARD_DEBUG = False
-
 POSSIBLE_TIMESTAMP_labelS = ['timestamp', 'epoch']
 NO_DATA_PLACEHOLDERS = ['na', 'nan', 'null', 'nd', 'undef']
 DEFAULT_SLOT_DATA_LOSS = None

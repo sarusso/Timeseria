@@ -68,7 +68,7 @@ class TestResampler(unittest.TestCase):
         series.append(DataTimePoint(t=3,  data={'value':3}))
         series.append(DataTimePoint(t=4,  data={'value':4}))
 
-        # Since by default the resample does not include extremes, we onlu expect the point
+        # Since by default the resample does not include extremes, we only expect the point
         # at t=0, covering from -2 to +2. Other points would be at t=-4 and t=+4
         resampled_series = series.resample(4)
 
@@ -80,19 +80,6 @@ class TestResampler(unittest.TestCase):
         self.assertEqual(resampled_series[0].t,0)
         self.assertEqual(resampled_series[0].data['value'],1)
         self.assertEqual(resampled_series[0].data_loss,0)
-
-        # Now include extremes as well -> dropped support for this
-        #resampled_series = series.resample(4, include_extremes=True)
-        #self.assertEqual(len(resampled_series),3)
-        #self.assertEqual(resampled_series[0].t,-4)
-        #self.assertEqual(resampled_series[0].data['value'],3.2)
-        #self.assertEqual(resampled_series[0].data_loss,0.375)
-        #self.assertEqual(resampled_series[1].t,0)
-        #self.assertEqual(resampled_series[1].data['value'],1)
-        #self.assertEqual(resampled_series[1].data_loss,0)
-        #self.assertEqual(resampled_series[2].t,4)
-        #self.assertEqual(resampled_series[2].data['value'],3.2)
-        #self.assertEqual(resampled_series[2].data_loss,0.375)
 
 
     def test_resample_basic(self):
@@ -222,32 +209,32 @@ class TestResampler(unittest.TestCase):
 
         # Check for t = 0
         self.assertEqual(resampled_series[0].t, 0)
-        self.assertAlmostEqual(resampled_series[0].data['value'], 0.6666666666)  # Expected: 0.66..
+        self.assertAlmostEqual(resampled_series[0].data['value'], 0.6666666666)
         self.assertEqual(resampled_series[0].data_loss, 0)
 
         # Check for t = 3
         self.assertEqual(resampled_series[1].t, 3)
-        self.assertEqual(resampled_series[1].data['value'], 3)  # Expected: 3
+        self.assertEqual(resampled_series[1].data['value'], 3)
         self.assertEqual(resampled_series[1].data_loss, 0)
 
         # Check for t = 6
         self.assertEqual(resampled_series[2].t, 6)
-        self.assertEqual(resampled_series[2].data['value'], 6)  # Expected: 6
+        self.assertEqual(resampled_series[2].data['value'], 6)
         self.assertEqual(resampled_series[2].data_loss, 0)
 
         # Check for t = 9
         self.assertEqual(resampled_series[3].t, 9)
-        self.assertEqual(resampled_series[3].data['value'], 11.5)  # Expected: 11.5 (fully reconstructed)
+        self.assertEqual(resampled_series[3].data['value'], 11.5)
         self.assertEqual(resampled_series[3].data_loss, 1)
 
         # Check for t = 12
         self.assertEqual(resampled_series[4].t, 12)
-        self.assertEqual(resampled_series[4].data['value'], 11.5)  # Expected: 11.5 (fully reconstructed)
+        self.assertEqual(resampled_series[4].data['value'], 11.5)
         self.assertEqual(resampled_series[4].data_loss, 1)
 
         # Check for t = 15
         self.assertEqual(resampled_series[5].t, 15)
-        self.assertEqual(resampled_series[5].data['value'], 13)  # Expected: 13 TODO: sure? Check math
+        self.assertEqual(resampled_series[5].data['value'], 13)
         self.assertAlmostEqual(resampled_series[5].data_loss, 0.6666666666)
 
 
@@ -270,7 +257,7 @@ class TestResampler(unittest.TestCase):
         series.append(DataTimePoint(t=17, data={'value':17}))
         series.append(DataTimePoint(t=18, data={'value':18}))
 
-        # Resample (upsampling) for 4 seconds
+        # Resample (upsample) for 0.5 seconds
         upsampled_series = series.resample(0.5)
 
         # Check start/end timestamps
@@ -281,7 +268,8 @@ class TestResampler(unittest.TestCase):
         self.assertEqual(upsampled_series[19].data['value'], 7)
         self.assertEqual(upsampled_series[19].data_loss, 0)
 
-        self.assertEqual(upsampled_series[20].data['value'], 7.3125) # TODO: this should be 7.5..
+        self.assertEqual(upsampled_series[20].data['value'], 7.3125)
+        # TODO: the above should be 7.5, fix me! See also test_upgragate
         self.assertEqual(upsampled_series[20].data_loss, 0.5)
 
         self.assertEqual(upsampled_series[21].data['value'], 8)
@@ -295,10 +283,8 @@ class TestResampler(unittest.TestCase):
         series.append(DataTimePoint(t = (60*20), data = {'value': 1.55}))
         series.append(DataTimePoint(t = (60*25), data = {'value': 1.58}))
         series.append(DataTimePoint(t = (60*30), data = {'value': 1.61}))
-        #series.append(DataTimePoint(t = (60*35), data = {'value': 1.64}))
-        #series.append(DataTimePoint(t = (60*40), data = {'value': 1.67}))
-        series.append(DataTimePoint(t = (60*45), data = {'value': 1.70}))   # Try also 71? Will be imprecise...
-        series.append(DataTimePoint(t = (60*50), data = {'value': 1.73}))   # Try also 74? Will be imprecise...
+        series.append(DataTimePoint(t = (60*45), data = {'value': 1.70}))
+        series.append(DataTimePoint(t = (60*50), data = {'value': 1.73}))
 
         # Resample
         resampled_series = Resampler('300s').process(series)
@@ -310,27 +296,27 @@ class TestResampler(unittest.TestCase):
 
         # Check for t = 25
         self.assertEqual(resampled_series[0].t, (60*25))
-        self.assertAlmostEqual(resampled_series[0].data['value'], 1.58)  # Expected: 1.58 (original)
+        self.assertAlmostEqual(resampled_series[0].data['value'], 1.58)
         self.assertEqual(resampled_series[0].data_loss, 0)
 
         # Check for t = 30
         self.assertEqual(resampled_series[1].t, (60*30))
-        self.assertEqual(resampled_series[1].data['value'], 1.61)  # Expected: 1.61 (original)
+        self.assertEqual(resampled_series[1].data['value'], 1.61)
         self.assertEqual(resampled_series[1].data_loss, 0)
 
         # Check for t = 35
         self.assertEqual(resampled_series[2].t, (60*35))
-        self.assertAlmostEqual(resampled_series[2].data['value'], 1.64)  # Expected: 1.64 (reconstructed)
+        self.assertAlmostEqual(resampled_series[2].data['value'], 1.64)
         self.assertEqual(resampled_series[2].data_loss, 1)
 
         # Check for t = 40
         self.assertEqual(resampled_series[3].t, (60*40))
-        self.assertAlmostEqual(resampled_series[3].data['value'], 1.67)  # Expected: 1.67 (reconstructed)
+        self.assertAlmostEqual(resampled_series[3].data['value'], 1.67)
         self.assertEqual(resampled_series[3].data_loss, 1)
 
         # Check for t = 45
         self.assertEqual(resampled_series[4].t, (60*45))
-        self.assertAlmostEqual(resampled_series[4].data['value'], 1.70)  # Expected: 1.70 (original)
+        self.assertAlmostEqual(resampled_series[4].data['value'], 1.70)
         self.assertEqual(resampled_series[4].data_loss, 0)
 
         # Do not check for t = 50 as extremes are not included
@@ -343,8 +329,6 @@ class TestResampler(unittest.TestCase):
         series.append(DataTimePoint(t = (60*20)+10, data = {'value': 1.55}))
         series.append(DataTimePoint(t = (60*25)+10, data = {'value': 1.58}))
         series.append(DataTimePoint(t = (60*30)+10, data = {'value': 1.61}))
-        #series.append(DataTimePoint(t = (60*35)+10, data = {'value': 1.64}))
-        #series.append(DataTimePoint(t = (60*40)+10, data = {'value': 1.68}))
         series.append(DataTimePoint(t = (60*45)+10, data = {'value': 1.71}))
         series.append(DataTimePoint(t = (60*50)+10, data = {'value': 1.74}))
 
@@ -382,9 +366,6 @@ class TestResampler(unittest.TestCase):
         self.assertAlmostEqual(resampled_series[4].data_loss, 10/300)
 
         # Do not check for t = 50 as extremes are not included
-        # Note: a point after the right extreme here would mean
-        # to have it after its validity, i.e. (60*50) + 150
-        # TODO: is that what we want for the extremes?
 
 
     def test_resampler_data_indexes(self):
@@ -424,29 +405,24 @@ class TestResampler(unittest.TestCase):
             # Append
             series.append(point)
 
-        # This is an indirect test of the series data_indexes. TODO: move it away.
-        self.assertEqual(series._all_data_indexes(), ['data_reconstructed', 'data_loss', 'anomaly', 'forecast'])
-
         # Resample the time series
         resampled_series = Resampler('600s').process(series)
 
-        # Check that we have all the data_indexes
+        # Check that we still have all of  the data_indexes
         self.assertEqual(resampled_series._all_data_indexes(), ['data_reconstructed', 'data_loss', 'anomaly', 'forecast'])
 
         # Check data_indexes math
         self.assertAlmostEqual(resampled_series[0].data_indexes['data_reconstructed'], 0.4)
         self.assertAlmostEqual(resampled_series[0].data_indexes['anomaly'], 0.275)
         self.assertAlmostEqual(resampled_series[0].data_indexes['forecast'], 0)
-        # TODO: data loss is computed by compute_data_loss and not exact. expected 0.46 --> now corrected!
         self.assertAlmostEqual(resampled_series[0].data_loss, 0.46)
 
         self.assertAlmostEqual(resampled_series[1].data_indexes['data_reconstructed'], 0)
         self.assertAlmostEqual(resampled_series[1].data_indexes['anomaly'], 0.7)
         self.assertAlmostEqual(resampled_series[1].data_indexes['forecast'], 0.65)
-        # TODO: data loss is computed by compute_data_loss. Data losses not present are treated as zero. Are we sure?
         self.assertAlmostEqual(resampled_series[1].data_loss, 0.035)
 
-        # Now resample at the same sampling interval and check data_indexes are still there
+        # Lastly, resample at the same sampling interval and check that all data_indexes are still there as well
         same_resampled_series = series[0:5].resample(60)
         self.assertEqual(same_resampled_series._all_data_indexes(), ['data_reconstructed', 'data_loss', 'anomaly', 'forecast'])
 
@@ -531,7 +507,7 @@ class TestAggregator(unittest.TestCase):
             count += 1
 
 
-    def test_slot(self):
+    def test_aggregate(self):
 
         # Time series at 1m resolution from 14:58:00 to 15:32:00 (UTC), no from/to
         series = Aggregator('600s').process(self.series_1)
@@ -539,38 +515,6 @@ class TestAggregator(unittest.TestCase):
         self.assertEqual(series[0].start.dt, dt_from_str('2015-07-04 15:00:00+00:00'))
         self.assertEqual(series[1].start.dt, dt_from_str('2015-07-04 15:10:00+00:00'))
         self.assertEqual(series[2].start.dt, dt_from_str('2015-07-04 15:20:00+00:00'))
-
-        # Time series at 1m resolution from 14:58:00 to 15:32:00 (UTC), no from/to, extremes included.
-        # Disabled as extremes included is at the moment not implemented
-        #series = Aggregator('10m').process(self.series_1, include_extremes=True)
-        #self.assertEqual(len(series), 5)
-        #self.assertEqual(series[0].start.dt, dt_from_str('2015-07-04 14:50:00+00:00'))
-        #self.assertEqual(series[1].start.dt, dt_from_str('2015-07-04 15:00:00+00:00'))
-        #self.assertEqual(series[2].start.dt, dt_from_str('2015-07-04 15:10:00+00:00'))
-        #self.assertEqual(series[3].start.dt, dt_from_str('2015-07-04 15:20:00+00:00'))
-        #self.assertEqual(series[4].start.dt, dt_from_str('2015-07-04 15:30:00+00:00'))
-        #self.assertEqual(series[4].data_loss, 0.75)
-
-        # Time series at 1m resolution from 14:58:00 to 17:32:00 (Europe/Rome), from 15:50 to 17:40
-        # Disabled as it would require to include the extremes which is at the moment not implemented
-        #series = Aggregator('10m').process(self.series_1,
-        #                            from_t = s_from_dt(dt_from_str('2015-07-04 14:50:00+00:00')),
-        #                            to_t   = s_from_dt(dt_from_str('2015-07-04 15:40:00+00:00')))
-        #self.assertEqual(len(series), 5)
-        #self.assertEqual(series[0].start.dt, dt_from_str('2015-07-04 14:50:00+00:00'))
-        #self.assertEqual(series[1].start.dt, dt_from_str('2015-07-04 15:00:00+00:00'))
-        #self.assertEqual(series[2].start.dt, dt_from_str('2015-07-04 15:10:00+00:00'))
-        #self.assertEqual(series[3].start.dt, dt_from_str('2015-07-04 15:20:00+00:00'))
-        #self.assertEqual(series[4].start.dt, dt_from_str('2015-07-04 15:30:00+00:00'))
-
-        # Time series at 1m resolution from 14:58:00 to 15:32:00 (UTC), from 13:00 to 16:00
-        # Disabled as it would require to include the extremes which is at the moment not implemented
-        #series = Aggregator('10m').process(self.series_1,
-        #                            from_t = s_from_dt(dt_from_str('2015-07-04 13:00:00+00:00')),
-        #                            to_t   = s_from_dt(dt_from_str('2015-07-04 16:00:00+00:00')))
-        # Here from and to are capped with the time series data points
-        #self.assertEqual(str(series[0].start.dt), str('2015-07-04 14:50:00+00:00'))
-        #self.assertEqual(str(series[-1].start.dt), str('2015-07-04 15:30:00+00:00'))
 
         # Time series at 15m resolution from 01:00 to 06:00 (Europe/Rome), slot in 1h
         series = Aggregator('1h').process(self.series_6)
@@ -605,34 +549,22 @@ class TestAggregator(unittest.TestCase):
         self.assertEqual(str(series[-1].start.dt), str('2019-10-29 00:00:00+01:00')) # Last one not included as right excluded
 
 
-    def test_upslot(self):
+    def test_upgregate(self):
 
         series = TimeSeries()
         series.append(DataTimePoint(t = 0, data = {'value': 0}))
         series.append(DataTimePoint(t = 3600, data = {'value': 3600}))
         series.append(DataTimePoint(t = 7200, data = {'value': 7200}))
 
-        # This is a uplsotting (upsampling), and there are data losses and strange values that should not be there.
+        # This is an upgregate (similar to an upsamplig)
         aggregator = Aggregator('10m')
         aggregated_series = aggregator.process(series)
         self.assertEqual(len(aggregated_series), 12)
 
-        # TODO: this is all wrong...
-        # 0 DataTimeSlot @ [0.0,600.0] ([1970-01-01 00:00:00+00:00,1970-01-01 00:10:00+00:00]) with data={'value_avg': 0.0} and data_loss=0.0
-        # 1 DataTimeSlot @ [600.0,1200.0] ([1970-01-01 00:10:00+00:00,1970-01-01 00:20:00+00:00]) with data={'value_avg': 0.0} and data_loss=0.0
-        # 2 DataTimeSlot @ [1200.0,1800.0] ([1970-01-01 00:20:00+00:00,1970-01-01 00:30:00+00:00]) with data={'value_avg': 0.0} and data_loss=0.0
-        # 3 DataTimeSlot @ [1800.0,2400.0] ([1970-01-01 00:30:00+00:00,1970-01-01 00:40:00+00:00]) with data={'value_avg': 7200.0} and data_loss=0.0
-        # 4 DataTimeSlot @ [2400.0,3000.0] ([1970-01-01 00:40:00+00:00,1970-01-01 00:50:00+00:00]) with data={'value_avg': 14400.0} and data_loss=0.0
-        # 5 DataTimeSlot @ [3000.0,3600.0] ([1970-01-01 00:50:00+00:00,1970-01-01 01:00:00+00:00]) with data={'value_avg': 28800.0} and data_loss=0.0
-        # 6 DataTimeSlot @ [3600.0,4200.0] ([1970-01-01 01:00:00+00:00,1970-01-01 01:10:00+00:00]) with data={'value_avg': 28800.0} and data_loss=0.0
-        # 7 DataTimeSlot @ [4200.0,4800.0] ([1970-01-01 01:10:00+00:00,1970-01-01 01:20:00+00:00]) with data={'value_avg': 57600.0} and data_loss=0.0
-        # 8 DataTimeSlot @ [4800.0,5400.0] ([1970-01-01 01:20:00+00:00,1970-01-01 01:30:00+00:00]) with data={'value_avg': 115200.0} and data_loss=0.0
-        # 9 DataTimeSlot @ [5400.0,6000.0] ([1970-01-01 01:30:00+00:00,1970-01-01 01:40:00+00:00]) with data={'value_avg': 14400.0} and data_loss=0.0
-        # 10 DataTimeSlot @ [6000.0,6600.0] ([1970-01-01 01:40:00+00:00,1970-01-01 01:50:00+00:00]) with data={'value_avg': 28800.0} and data_loss=0.0
-        # 11 DataTimeSlot @ [6600.0,7200.0] ([1970-01-01 01:50:00+00:00,1970-01-01 02:00:00+00:00]) with data={'value_avg': 57600.0} and data_loss=0.0
+        # TODO: check the values and the math. See also test_upsample
 
 
-    def test_slot_operations_and_losses(self):
+    def test_aggregate_operations_and_losses(self):
 
         # Import (overloaded) operations
         from ..operations import min, max, avg, sum
@@ -646,7 +578,7 @@ class TestAggregator(unittest.TestCase):
             series.append(point)
 
         # Add extra operations
-        slotted_series = Aggregator('600s', operations=[avg, min,max]).process(series)
+        slotted_series = Aggregator('600s', operations=[avg,min,max]).process(series)
         self.assertAlmostEqual(slotted_series[0].data['temperature_min'], 156)
         self.assertAlmostEqual(slotted_series[0].data['temperature_max'], 165)
         self.assertAlmostEqual(slotted_series[0].data['temperature_avg'], 161)
@@ -656,16 +588,12 @@ class TestAggregator(unittest.TestCase):
 
         # Entirely change the operation
         slotted_series = Aggregator('600s', operations=[sum]).process(series)
-        # >>> (156*0.5)+157+158+159+160+161+162+163+164+165+(166*0.5)
-        #1610.0
-        #>>> 156+157+158+159+160+161+162+163+164+165
-        #1605
-        self.assertEqual(slotted_series[0].data['temperature_sum'], 1605)
+        self.assertEqual(slotted_series[0].data['temperature_sum'], 1605) # 156+157+158+159+160+161+162+163+164+165
         self.assertEqual(slotted_series[0].data['humidity_sum'], 50)
         self.assertEqual(slotted_series[1].data['temperature_sum'], 1705)
         self.assertEqual(slotted_series[1].data['humidity_sum'], 50)
 
-        # Operations as string
+        # Operations as strings
         slotted_series = Aggregator('600s', operations=['avg','min',max]).process(series)
         self.assertAlmostEqual(slotted_series[0].data['temperature_min'], 156)
         self.assertAlmostEqual(slotted_series[0].data['temperature_max'], 165)
@@ -683,7 +611,7 @@ class TestAggregator(unittest.TestCase):
                                       data = {'temperature': 154+i, 'humidity': 5})
                 series.append(point)
 
-        slotted_series = Aggregator('600s', operations=[avg, min,max]).process(series)
+        slotted_series = Aggregator('600s', operations=[avg,min,max]).process(series)
         self.assertEqual(len(slotted_series), 3)
 
         self.assertAlmostEqual(slotted_series[0].data['humidity_min'], 5)
@@ -709,7 +637,7 @@ class TestAggregator(unittest.TestCase):
                                       data = {'temperature': 154+i, 'humidity': 5})
                 series.append(point)
 
-        slotted_series = Aggregator('600s', operations=[avg, min,max]).process(series)
+        slotted_series = Aggregator('600s', operations=[avg,min,max]).process(series)
         self.assertEqual(len(slotted_series), 5)
 
         self.assertEqual(slotted_series[0].data['temperature_min'], 156)
@@ -719,20 +647,8 @@ class TestAggregator(unittest.TestCase):
         self.assertEqual(slotted_series[3].data['temperature_min'], 191.0)
         self.assertEqual(slotted_series[3].data['temperature_avg'], 191.0)
 
-        # Re-slotting with the same time unit as the original points
-        slotted_series = Aggregator('60s').process(series)
-        # TODO: well.. tests it?
 
-        # TODO: directly load a day-resolution time series in this test
-        slotted_series = Resampler(86400).process(self.series_7)
-        # TODO: well.. tests it?
-
-        # TODO: upsampling (upslotting) not supported yet if missing data
-        #slotted_series = Aggregator('60s').process(series)
-        #slotted_series = Aggregator('30s').process(series)
-
-
-    def test_slot_data_indexes(self):
+    def test_aggregate_data_indexes(self):
 
         # Time series from 16:58:00 to 17:32:00 (Europe/Rome)
         series = TimeSeries()
@@ -768,9 +684,6 @@ class TestAggregator(unittest.TestCase):
 
             # Append
             series.append(point)
-
-        # This is an indirect test of the series data_indexes. TODO: move it away.
-        self.assertEqual(series._all_data_indexes(), ['data_reconstructed', 'data_loss', 'anomaly', 'forecast'])
 
         # Slot the time series
         slotted_series = Aggregator('600s').process(series)

@@ -36,7 +36,7 @@ class _TimeSeriesDenseView(TimeSeriesView):
         self.dense=dense
         if self.dense:
             if not interpolator_class:
-                raise ValueError('If requesting a dense view you must provide an interpolator')
+                raise ValueError('If requesting a dense view, you must provide an interpolator')
             self.interpolator = interpolator_class(series)
         else:
             self.interpolator = None
@@ -60,34 +60,35 @@ class _TimeSeriesDenseView(TimeSeriesView):
         this_i = self.count + self.from_i
 
         if this_i >= self.to_i:
-            # If reached the end stop
+
+            # If reached the end, stop
             raise StopIteration
 
         elif self.count == 0 or not self.dense:
-            # If first point or not dense just return
+
+            # If first point or not dense, just return
             self.count += 1
             return self.series[this_i]
 
         else:
-            # Otherwise check if we have to add new missing points
 
+            # Otherwise check if we have to add new missing points
             if self.prev_was_new:
-                # If we just created a new missing point, return
+
+                # If we just created a new missing point, simply return it
                 self.prev_was_new = False
                 self.count += 1
                 return self.series[this_i]
 
             else:
-                # Check if we have to add a new missing point: do we have a gap?
+
+                # Check if we have a gap and thus have to add a new missing point
                 prev_point = self.series[this_i-1]
                 this_point = self.series[this_i]
 
-
                 if prev_point.valid_to < this_point.valid_from:
 
-                    # yes, we do have a gap. Add a missing point by interpolation
-
-                    # Compute new point validity
+                    # We have a gap, compute the new point validity
                     if self.from_t is not None and prev_point.valid_to < self.from_t:
                         new_point_valid_from = self.from_t
                     else:
@@ -98,7 +99,7 @@ class _TimeSeriesDenseView(TimeSeriesView):
                     else:
                         new_point_valid_to = this_point.valid_from
 
-                    # Compute new point timestamp
+                    # Compute the new point timestamp
                     new_point_t = new_point_valid_from + (new_point_valid_to-new_point_valid_from)/2
 
                     # Can we use cache?
@@ -162,15 +163,15 @@ class _TimeSeriesDenseView(TimeSeriesView):
 
 
 def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_point_i, slot_prev_point_i, slot_next_point_i,
-                 unit, point_validity, timezone, fill_with, force_data_loss, fill_gaps, series_data_indexes, series_resolution,
-                 force_compute_data_loss, interpolator_class, operations=None):
+                 unit, point_validity, timezone, fill_with, force_data_loss, series_data_indexes, force_compute_data_loss,
+                 interpolator_class, operations=None):
     """Support function for computing new items.
 
     :meta private:
     """
 
-    # Log. Note: if slot_first_point_i < slot_last_point_i, this means that the prev and next are outside the slot.
-    # It is not a bug, it is how the system works. perhaps we could pass here the slot_prev_i and sòlot_next_i
+    # Note: if slot_first_point_i < slot_last_point_i, this means that the prev and next are outside the slot.
+    # It is not a bug, it is how the system works. Perhaps we could pass here the slot_prev_i and sòlot_next_i
     # to make it more clear to avoid some confusion.
     logger.debug('Called compute new')
     logger.debug('slot_first_point_i=%s, slot_last_point_i=%s, ', slot_first_point_i, slot_last_point_i)
@@ -185,12 +186,12 @@ def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_poi
     if slot_prev_point_i is None:
         slot_prev_point_i = slot_first_point_i
 
-    # Create a view of the series containing the slot datapoints plus the prev and next,
-    series_dense_view_extended  = _TimeSeriesDenseView(series, from_i=slot_prev_point_i, to_i=slot_next_point_i+1,  # Slicing exclude the right
+    # Create a view of the series containing the slot datapoints plus the prev and next.
+    # Note that the "+1" in the "to_i" argument below is because the right is excluded.
+    series_dense_view_extended  = _TimeSeriesDenseView(series, from_i=slot_prev_point_i, to_i=slot_next_point_i+1,
                                                        from_t=from_t, to_t=to_t, dense=True, interpolator_class=interpolator_class)
 
-    # Compute the data loss for the new element. This is forced
-    # by the resampler or slotter if first or last point
+    # Compute the data loss for the new element. This is forced if first or last point
     data_loss = _compute_data_loss(series_dense_view_extended,
                                   from_t = from_t,
                                   to_t = to_t,
@@ -198,7 +199,7 @@ def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_poi
                                   force = force_compute_data_loss)
     logger.debug('Computed data loss: "{}"'.format(data_loss))
 
-    # For each point, attach the "weight"/"contirbution
+    # For each point, attach the "weight": how much it contributes to the new point or slot
     for point in series_dense_view_extended:
 
         # Weight zero if completely outside the interval, which is required if in the operation
@@ -210,17 +211,17 @@ def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_poi
             point.weight = 0
             continue
 
-        # Set this point valid from/to accoring to the interval boundaries
+        # Set this point valid from/to according to the interval boundaries
         this_point_valid_from = point.valid_from if point.valid_from >= from_t else from_t
         this_point_valid_to = point.valid_to if point.valid_to < to_t else to_t
 
-        # Set weigth
+        # Set weight
         point.weight = (this_point_valid_to-this_point_valid_from)/interval_duration
 
         # Log
         logger.debug('Set series point @ %s weight: %s (data: %s)', point.dt, point.weight, point.data)
 
-    # If creating slots, create also the slice of the series series containing only the slot datapoints
+    # If creating slots, create also the slice of the series containing only the slot datapoints
     if target == 'slot':
 
         if slot_first_point_i is None and slot_last_point_i is None:
@@ -251,12 +252,10 @@ def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_poi
                 series_dense_view = TimeSeries(DataTimePoint(t=new_point_t, data=new_point_data, tz=series.tz))
 
         else:
-            # Create a view of the original series to provide only the datapoints belonging to the slot
-            #logger.critical('Slicing dense series from {} to {}'.format(slot_first_point_i, slot_last_point_i+1))
-            series_dense_view = _TimeSeriesDenseView(series, from_i=slot_first_point_i, to_i=slot_last_point_i+1, # Slicing exclude the right
+            # Create a view of the original series to provide only the datapoints belonging to the slot.
+            # Note that the "+1" in the "to_i" argument below is because the right is excluded.
+            series_dense_view = _TimeSeriesDenseView(series, from_i=slot_first_point_i, to_i=slot_last_point_i+1,
                                                      from_t=from_t, to_t=to_t, dense=True, interpolator_class=interpolator_class)
-
-
 
     # Compute point data
     if target=='point':
@@ -306,9 +305,7 @@ def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_poi
     else:
         raise ValueError('No idea how to compute a new "{}"'.format(target))
 
-
     # Do we have a force data_loss?
-    #TODO: do not compute data_loss if fill_with not present and force_data_loss
     if force_data_loss is not None:
         data_loss = force_data_loss
 
@@ -328,7 +325,7 @@ def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_poi
     else:
         raise ValueError('No idea how to create a new "{}"'.format(target))
 
-    # Handle data_indexes TODO: check math and everything here
+    # Handle data_indexes
     for index in series_data_indexes:
 
         # Skip the data loss as it is recomputed with different logics
@@ -349,14 +346,12 @@ def _compute_new(target, series, from_t, to_t, slot_first_point_i, slot_last_poi
                     if index_value is not None:
                         index_total_weights += point.weight
                         index_total += index_value * point.weight
-                        #logger.critical('%s@%s: %s * %s', index, point.dt, index_value, point.weight)
 
             # Compute the new index value (if there were data_indexes not None)
             if index_total_weights > 0:
 
-                # Project (rescale/normalize), because we could have some points without the index at all
+                # Rescale with respect to the total_weights (note: some points could have no index at all)
                 new_element_index_value = index_total/index_total_weights
-                #logger.debug('%s/%s', index_total, index_total_weights)
 
             else:
                 new_element_index_value = None
@@ -382,8 +377,7 @@ class Transformation(object):
     def __str__(cls):
         return '{} transformation'.format(cls.__name__.replace('Transformation',''))
 
-    def process(self, series, target, start=None, end=None, validity=None, include_extremes=False,
-                fill_with=None,  force_data_loss=None, fill_gaps=True, **kwargs):
+    def process(self, series, target, start=None, end=None, validity=None, include_extremes=False, fill_with=None, force_data_loss=None,):
         """Start the transformation process. If start and/or end are not set, they are set automatically
         based on first and last points of the series"""
 
@@ -498,7 +492,7 @@ class Transformation(object):
             validity = series._autodetected_sampling_interval
             logger.info('Using auto-detected sampling interval: %ss', validity)
 
-        # Check if upsamplimg (with some tolearance):
+        # Check if upsamplimg (with some tolerance):
         if validity > (self.time_unit.as_seconds(series[0].dt) * 1.10):
             logger.warning('You are upsampling, which is not well tested yet. Expect potential issues.')
 
@@ -525,9 +519,8 @@ class Transformation(object):
         count = 0
         first = True
 
-        # data_indexes & resolution shortcuts
+        # Data_indexes shortcut
         series_data_indexes = series._all_data_indexes()
-        series_resolution = series.resolution
 
         # Set operations if slots
         if target == 'slots':
@@ -548,7 +541,7 @@ class Transformation(object):
             point.valid_to = validity_regions[point.t][1]
             logger.debug('Attached validity to %s', point.t)
 
-            # Pretend there was a slot before if we are at the beginning. TOOD: improve me.
+            # Pretend there was a slot before if we are at the beginning.
             if slot_end_t is None:
                 slot_end_t = from_t
 
@@ -561,7 +554,7 @@ class Transformation(object):
                 continue
 
             # Similar concept for the end
-            # TODO: what if we are in streaming mode? add if to_t is not None?
+            # TODO: handle streaming mode, perhaps add and check on to_t not None?
             if point.t >= to_t:
                 if process_ended:
                     logger.debug('Discarding as after end')
@@ -578,8 +571,6 @@ class Transformation(object):
                 # Keep spinning new slots until the current data point falls in one of them.
                 # NOTE: Read the following "while" more as an "if" which can also lead to spin multiple
                 # slot if there are empty slots between the one being closed and the point.dt.
-                # TODO: leave or remove the above if for code readability?
-
                 while slot_end_t <= point.t:
                     logger.debug('Checking for end %s with point %s', slot_end_t, point.t)
 
@@ -598,7 +589,7 @@ class Transformation(object):
                         logger.debug('Got slot_prev_point_i as %s',slot_prev_point_i)
                         logger.debug('Got slot_next_point_i as %s',slot_next_point_i)
 
-                        # Now set slot first and last point, but beware boundaries.
+                        # Now set slot first and last point, but beware boundaries
                         if slot_prev_point_i is not None and abs(slot_next_point_i - slot_prev_point_i) == 1:
 
                             # No points for the slot at all
@@ -628,8 +619,6 @@ class Transformation(object):
                         logger.debug('Set slot_first_point_i to %s',slot_first_point_i)
                         logger.debug('Set slot_last_point_i to %s',slot_last_point_i)
 
-
-
                         # Log the new slot
                         # slot_first_point_i-1 is the "prev"
                         # slot_last_point_i+1 is the "next" (and the index where we are at the moment)
@@ -649,9 +638,7 @@ class Transformation(object):
                                                 timezone = timezone,
                                                 fill_with = fill_with,
                                                 force_data_loss = force_data_loss,
-                                                fill_gaps = fill_gaps,
                                                 series_data_indexes = series_data_indexes,
-                                                series_resolution = series_resolution,
                                                 force_compute_data_loss = True if first else False,
                                                 interpolator_class=self.interpolator_class,
                                                 operations = operations)
@@ -713,8 +700,8 @@ class Resampler(Transformation):
         if unit_type in ['Y', 'M', 'D']:
             raise ValueError('Sorry, time units involving calendar components are not supported by the Resampler (got "{}"). Use the Slotter instead.'.format(self.time_unit))
 
-        # Set interpolator
-        self.interpolator_class=interpolator_class
+        # Set the interpolator
+        self.interpolator_class = interpolator_class
 
     def process(self, series, *args, **kwargs):
         kwargs['target'] = 'points'
@@ -751,13 +738,10 @@ class Aggregator(Transformation):
             operations.append(operation)
         self.operations = operations
 
-        # Set interpolator
-        self.interpolator_class=interpolator_class
+        # Set the interpolator
+        self.interpolator_class = interpolator_class
 
     def process(self, series, *args, **kwargs):
         kwargs['target'] = 'slots'
         return super(Aggregator, self).process(series, *args, **kwargs)
-
-
-
 

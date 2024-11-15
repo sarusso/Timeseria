@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-# This script will build the Timeseria container and start it with Jupyter.
+# This script will build the Timeseria container and start it with Jupyter
 
 # Build
 if [[ "x$BUILD" != "xFalse" ]]; then

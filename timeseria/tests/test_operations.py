@@ -23,7 +23,7 @@ class TestOpertions(unittest.TestCase):
 
     def test_diff_csum(self):
 
-        # Test on empty, single point or variable resolution time serie
+        # Test on empty, single point or variable resolution time series
         series = TimeSeries()
         with self.assertRaises(ValueError):
             diff(series)
@@ -160,7 +160,7 @@ class TestOpertions(unittest.TestCase):
         series.append(DataTimeSlot(start=TimePoint(20), end=TimePoint(30), data={'value':15}))
         series.append(DataTimeSlot(start=TimePoint(30), end=TimePoint(40), data={'value':16}))
 
-        # Test standard derivativeative behavior, from the series
+        # Test standard derivative behavior, from the series
         derivative_series = derivative(series)
         self.assertEqual(len(derivative_series), 4)
         self.assertAlmostEqual(derivative_series[0].data['value_derivative'],0.2)
@@ -202,7 +202,6 @@ class TestOpertions(unittest.TestCase):
         series.append(DataTimePoint(t=0,  data={'value':0}))
         series.append(DataTimePoint(t=1,  data={'value':0.5}))
         series.append(DataTimePoint(t=2,  data={'value':1}))
-        #series.append(DataTimePoint(t=3,  data={'value':1.5}))
         series.append(DataTimePoint(t=4,  data={'value':2.5}))
         series.append(DataTimePoint(t=5,  data={'value':3.5}))
 
@@ -365,9 +364,6 @@ class TestOpertions(unittest.TestCase):
                             DataTimePoint(t=120, data=[2.0,-2.0]),
                             DataTimePoint(t=180, data=[3.0,-1.0]))
         self.assertEqual(len(series.mavg(2)),2)
-        #self.assertEqual(series.mavg(2)[0].data, {'0_mavg_2': 1.5, '1_mavg_2': -2.5})
-        #self.assertEqual(series.mavg(2)[1].data, {'0_mavg_2': 2.5, '1_mavg_2': -1.5})
-
         self.assertEqual(series.mavg(2)[0].data, [1.5, -2.5])
         self.assertEqual(series.mavg(2)[1].data, [2.5, -1.5])
 
@@ -485,7 +481,7 @@ class TestOpertions(unittest.TestCase):
 
     def test_filter(self):
 
-        # Test  data
+        # Test data
         series =  TimeSeries(DataTimePoint(t=60, data={'a':1, 'b':2, 'c':3}),
                              DataTimePoint(t=120, data={'a':2, 'b':4, 'c':4}),
                              DataTimePoint(t=180, data={'a':3, 'b':8, 'c':5}))
@@ -639,3 +635,4 @@ class TestOpertions(unittest.TestCase):
         self.assertTrue(isinstance(merged[2].data['value'], int))
         self.assertTrue(isinstance(merged[3].data['value'], int))
         self.assertTrue(isinstance(merged[4].data['value'], int))
+

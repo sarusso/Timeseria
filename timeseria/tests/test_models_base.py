@@ -15,13 +15,6 @@ logger.setup()
 TEST_DATA_PATH = '/'.join(os.path.realpath(__file__).split('/')[0:-1]) + '/test_data/'
 TEMP_MODELS_DIR = tempfile.TemporaryDirectory().name
 
-# Ensure reproducibility
-import random
-import numpy as np
-random.seed(0)
-np.random.seed(0)
-
-
 
 class TestBaseBaseModel(unittest.TestCase):
 

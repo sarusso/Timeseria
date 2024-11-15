@@ -8,9 +8,6 @@ from propertime import TimeSpan
 import logging
 logger = logging.getLogger(__name__)
 
-# Hard debug switch
-HARD_DEBUG = False
-
 
 class Unit(object):
     """A generic unit.
@@ -20,7 +17,6 @@ class Unit(object):
     """
 
     def __init__(self, value):
-        # TODO: check numerical or list? An perhaps support string representations?
         self.value = value
 
     def __repr__(self):
@@ -157,7 +153,7 @@ class TimeUnit(TimeSpan, Unit):
     # Support for TimePoints and this TimeUnit class
     def __radd__(self, other):
 
-        # This import has to stay here or a circular import will start. TODO: maybe refactor it?
+        # Import here to avoid cyclic imports
         from .datastructures import TimePoint
         if isinstance(other, TimePoint):
             return TimePoint(dt=self.shift(other.dt, times=1))
@@ -174,7 +170,7 @@ class TimeUnit(TimeSpan, Unit):
 
     def __rsub__(self, other):
 
-        # This import has to stay here or a circular import will start. TODO: maybe refactor it?
+        # Import here to avoid cyclic imports
         from .datastructures import TimePoint
         if isinstance(other, TimePoint):
             return TimePoint(dt=self.shift(other.dt, times=-1))

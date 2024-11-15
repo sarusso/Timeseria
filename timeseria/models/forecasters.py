@@ -11,8 +11,8 @@ from propertime.utils import now_s, dt_from_s, s_from_dt
 from sklearn.linear_model import LinearRegression
 import matplotlib.pyplot as plt
 
-from ..datastructures import DataTimeSlot, TimePoint, DataTimePoint, Slot, Point, TimeSeries
-from ..exceptions import NonContiguityError, NotFittedError, ConsistencyException
+from ..datastructures import DataTimeSlot, TimePoint, DataTimePoint, Slot, TimeSeries
+from ..exceptions import NonContiguityError, ConsistencyException
 from ..utils import detect_periodicity, _get_periodicity_index, ensure_reproducibility
 from ..utils import mean_squared_error
 from ..utils import mean_absolute_error, max_absolute_error
@@ -114,7 +114,6 @@ class Forecaster(Model):
                     forecast.append(DataTimeSlot(start = last_item.end,
                                                  unit  = series.resolution,
                                                  data_loss = None,
-                                                 #tz = series.tz,
                                                  data = data))
                 else:
                     forecast.append(DataTimePoint(t = last_item.t + series.resolution,
@@ -128,7 +127,6 @@ class Forecaster(Model):
                 forecast = DataTimeSlot(start = forecast_start_item.end,
                                         unit  = series.resolution,
                                         data_loss = None,
-                                        #tz = series.tz,
                                         data  = predicted_data)
             else:
                 forecast = DataTimePoint(t = forecast_start_item.t + self.data['resolution'],
@@ -394,7 +392,6 @@ class Forecaster(Model):
                 for i in range(len(actual_values[data_label])):
                     errors.append(pow((actual_values[data_label][i] - predicted_values[data_label][i]),2))
                 plt.hist(errors, bins=100, density=True, alpha=1, color='steelblue', label='Error distribution for "{}"'.format(data_label))
-                #plt.legend(loc="upper right")
                 plt.grid()
                 plt.title('SE distribution for "{}"'.format(data_label))
                 plt.show()
@@ -407,7 +404,6 @@ class Forecaster(Model):
                 for i in range(len(actual_values[data_label])):
                     errors.append(abs(actual_values[data_label][i] - predicted_values[data_label][i]))
                 plt.hist(errors, bins=100, density=True, alpha=1, color='steelblue', label='Error distribution for "{}"'.format(data_label))
-                #plt.legend(loc="upper right")
                 plt.grid()
                 plt.title('AE distribution for "{}"'.format(data_label))
                 plt.show()
@@ -420,7 +416,6 @@ class Forecaster(Model):
                 for i in range(len(actual_values[data_label])):
                     errors.append(abs((actual_values[data_label][i] - predicted_values[data_label][i])/actual_values[data_label][i]))
                 plt.hist(errors, bins=100, density=True, alpha=1, color='steelblue', label='Error distribution for "{}"'.format(data_label))
-                #plt.legend(loc="upper right")
                 plt.grid()
                 plt.title('APE distribution for "{}"'.format(data_label))
                 plt.show()
@@ -433,7 +428,6 @@ class Forecaster(Model):
                 for i in range(len(actual_values[data_label])):
                     errors.append(abs(log(actual_values[data_label][i]/predicted_values[data_label][i])))
                 plt.hist(errors, bins=100, density=True, alpha=1, color='steelblue', label='Error distribution for "{}"'.format(data_label))
-                #plt.legend(loc="upper right")
                 plt.grid()
                 plt.title('ALE distribution for "{}"'.format(data_label))
                 plt.show()
@@ -446,7 +440,6 @@ class Forecaster(Model):
                 for i in range(len(actual_values[data_label])):
                     errors.append(actual_values[data_label][i] - predicted_values[data_label][i])
                 plt.hist(errors, bins=100, density=True, alpha=1, color='steelblue', label='Error distribution for "{}"'.format(data_label))
-                #plt.legend(loc="upper right")
                 plt.grid()
                 plt.title('E distribution for "{}"'.format(data_label))
                 plt.show()
@@ -459,7 +452,6 @@ class Forecaster(Model):
                 for i in range(len(actual_values[data_label])):
                     errors.append((actual_values[data_label][i] - predicted_values[data_label][i])/actual_values[data_label][i])
                 plt.hist(errors, bins=100, density=True, alpha=1, color='steelblue', label='Error distribution for "{}"'.format(data_label))
-                #plt.legend(loc="upper right")
                 plt.grid()
                 plt.title('PE distribution for "{}"'.format(data_label))
                 plt.show()
@@ -472,7 +464,6 @@ class Forecaster(Model):
                 for i in range(len(actual_values[data_label])):
                     errors.append(log(actual_values[data_label][i]/predicted_values[data_label][i]))
                 plt.hist(errors, bins=100, density=True, alpha=1, color='steelblue', label='Error distribution for "{}"'.format(data_label))
-                #plt.legend(loc="upper right")
                 plt.grid()
                 plt.title('LE distribution for "{}"'.format(data_label))
                 plt.show()
@@ -611,7 +602,6 @@ class PeriodicAverageForecaster(Forecaster):
         # Store model window as the max of the single windows
         self.data['window'] = max([self.data['windows'][data_label] for data_label in self.data['windows']])
 
-
     @Forecaster.predict_method
     def predict(self, series, steps=1, probabilistic=False):
 
@@ -729,7 +719,6 @@ class ProphetForecaster(Forecaster, _ProphetModel):
 
         # Prepare a dataframe with all the timestamps to forecast
         last_item    = series[-1]
-        last_item_t  = last_item.t
         last_item_dt = last_item.dt
         data_to_forecast = []
 
@@ -771,13 +760,13 @@ class ARIMAForecaster(Forecaster, _ARIMAModel):
 
     window = 0
 
-    def __init__(self, p=1,d=1,q=0): #p=5,d=2,q=5
+    def __init__(self, p=1, d=1, q=0):
         if (p,d,q) == (1,1,0):
             logger.info('You are using ARIMA\'s defaults of p=1, d=1, q=0. You might want to set them to more suitable values when initializing the model.')
-        self.p = p
-        self.d = d
-        self.q = q
-        # TODO: save the above in data[]?
+        self.data = {}
+        self.data['p'] = p
+        self.data['d'] = d
+        self.data['q'] = q
         super(ARIMAForecaster, self).__init__()
 
     @Forecaster.fit_method
@@ -792,7 +781,7 @@ class ARIMAForecaster(Forecaster, _ARIMAModel):
         data = array(series.to_df()[data_label])
 
         # Save model and fit
-        self.model = sm.tsa.ARIMA(data, order=(self.p,self.d,self.q))
+        self.model = sm.tsa.ARIMA(data, order=(self.data['p'],self.data['d'],self.data['q']))
         self.model_res = self.model.fit()
 
         # Save the series we used for the fit.
@@ -802,9 +791,7 @@ class ARIMAForecaster(Forecaster, _ARIMAModel):
         self.data['window'] = 0
 
     @Forecaster.predict_method
-    def predict(self, data, steps=1):
-
-        series = data
+    def predict(self, series, steps=1):
 
         data_label = self.data['data_labels'][0]
 
@@ -838,7 +825,7 @@ class AARIMAForecaster(Forecaster, _ARIMAModel):
 
         data = array(series.to_df()[data_label])
 
-        # Change some defaults # TODO: just set them and remove them as optional kwargs?
+        # Change some defaults
         error_action = kwargs.pop('error_action', 'ignore')
         suppress_warnings = kwargs.pop('suppress_warnings', True)
         stepwise = kwargs.pop('stepwise', True)
@@ -865,11 +852,11 @@ class AARIMAForecaster(Forecaster, _ARIMAModel):
 
         data_label = self.data['data_labels'][0]
 
-        # Chack that we are applying on a time series ending with the same datapoint where the fit series was
+        # Check that we are applying on a time series ending with the same datapoint where the fit series was
         if self.fit_series[-1].t != series[-1].t:
             raise NonContiguityError('Sorry, this model can be applied only on a time series ending with the same timestamp as the time series used for the fit.')
 
-        # Return the predicion. We need the [0] to access yhat, other indexes are erorrs etc.
+        # Return the prediction. We need the [0] to access yhat, other indexes are errors etc.
         return [{data_label: value} for value in self.model.predict(steps)]
 
 
@@ -925,7 +912,6 @@ class LSTMForecaster(Forecaster, _KerasModel):
         # Override the save method to load the Keras model as well
         super(LSTMForecaster, self).save(path)
         self._save_keras_model(path)
-
 
     def _fit(self, series, epochs=30, normalize=True, normalization='minmax', target='all', with_context=False, loss='MSE',
              data_loss_limit=1.0, reproducible=False, verbose=False, update=False):
@@ -1085,9 +1071,6 @@ class LSTMForecaster(Forecaster, _KerasModel):
         # Fit
         self.keras_model.fit(array(window_features_matrix), array(target_values_vector), epochs=epochs, verbose=verbose)
 
-
-
-
     @Forecaster.fit_method
     def fit(self, series, epochs=30, normalize=True, normalization='minmax', target='all', with_context=False,
             loss='MSE', data_loss_limit=1.0, reproducible=False, verbose=False):
@@ -1219,7 +1202,6 @@ class LSTMForecaster(Forecaster, _KerasModel):
         # Return
         return predicted_data
 
-
     def _bulk_predict(self, series):
 
         target_data_labels =  self.data['target_data_labels']
@@ -1288,7 +1270,6 @@ class LSTMForecaster(Forecaster, _KerasModel):
         # Return by {label: [value_1, value_2, ... vanuel_n]}
         return bulk_predicted_data
 
-
     def _get_predicted_value_bulk(self, series, i, data_label, with_context, **kwargs):
         if i < self.window:
             raise ValueError()
@@ -1348,7 +1329,7 @@ class LinearRegressionForecaster(Forecaster, _KerasModel):
     @classmethod
     def load(cls, path):
 
-        # Override the load method to load the Keras model as well
+        # Override the load method to load the sklearn model as well
         model = super().load(path)
 
         # Load the sklearn model
@@ -1435,13 +1416,12 @@ class LinearRegressionForecaster(Forecaster, _KerasModel):
         # Convert to list in order to be able to handle datapoints with different labels for the contex
         window_datapoints = list(window_series)
 
-
         # Compute window features
         window_features = self._compute_window_features(window_datapoints,
-                                                        data_labels=self.data['data_labels'],
-                                                        time_unit=series.resolution,
-                                                        features=self.data['features'],
-                                                        context_data=None,
+                                                        data_labels = self.data['data_labels'],
+                                                        time_unit = series.resolution,
+                                                        features = self.data['features'],
+                                                        context_data = None,
                                                         flatten = True)
 
         # Perform the predict and set prediction data

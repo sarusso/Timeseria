@@ -2,11 +2,10 @@
 """Anomaly detection models."""
 
 from copy import deepcopy
-from ..utils import _Gaussian, rescale
 from .forecasters import Forecaster, PeriodicAverageForecaster, LSTMForecaster, LinearRegressionForecaster
 from .reconstructors import Reconstructor, PeriodicAverageReconstructor
 from .base import Model
-from math import log10, prod
+from math import log10
 from fitter import Fitter, get_common_distributions, get_distributions
 from ..utils import DistributionFunction
 from statistics import stdev
@@ -219,7 +218,7 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
 
         # Call parent init
         super(ModelBasedAnomalyDetector, self).__init__()
- 
+
     @classmethod
     def load(cls, path):
 
@@ -300,7 +299,7 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
             else:
                 raise TypeError('Don\'t know how to handle predictive model class "{}"'.format(self.model_class.__name__))
 
-            # TODO: unify the above (e.g. add a _get_predicted_value to the reconstrctors of or simialr)
+            # TODO: unify the above (e.g. add a _get_predicted_value to the reconstructors)
             return predicted
 
     @AnomalyDetector.fit_method
@@ -480,9 +479,6 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
         logger.info('Model(s) evaluated, now computing the error distribution(s)...')
 
         for data_label in series.data_labels():
-            #if verbose:
-            #    print('Selecting error distribution for "{}"'.format(data_label))
-            #logger.debug('Selecting error distribution for "%s"', data_label))
 
             # Fit the distributions and select the best one
             fitter = fitter_library.fitter.Fitter(prediction_errors[data_label], distributions=error_distributions)
@@ -587,7 +583,8 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
         progress_step = len(series)/10
         if verbose:
             print('Pre-computing model predictions: ', end='')
-        for i, item in enumerate(series):
+
+        for i in range(series):
 
             if verbose:
                 if int(i%progress_step) == 0:

@@ -2,9 +2,9 @@
 """Operations on the series."""
 
 from datetime import datetime
-from copy import copy, deepcopy
+from copy import copy
 from propertime.utils import s_from_dt
-from .datastructures import Series, Slot, Point, TimePoint
+from .datastructures import Series, Slot, Point
 from .utils import _is_close, _check_series_of_points_or_slots,_check_indexed_data
 from .units import TimeUnit, Unit
 from .exceptions import ConsistencyException
@@ -97,7 +97,6 @@ class Max(Operation):
             return maxs
 
 
-
 class Min(Operation):
     """Minimum operation (callable object)."""
 
@@ -181,7 +180,7 @@ class Avg(Operation):
             for _data_label in sums:
                 avgs[_data_label] = sums[_data_label] / len(series)
 
-        # FInalize and return
+        # Finalize and return
         if data_label is not None:
             return avgs[data_label]
         else:
@@ -951,10 +950,6 @@ class Slice(Operation):
         # Instantiate the new, sliced series
         sliced_series = series.__class__()
 
-        # Loop over the series in order to support series views as well.
-        # TODO: use the original slicing if not a series view?
-        # TODO: use a time-based index if slicing based on time?
-
         # A) Select sliced series items based on from_t and/or to_t
         if from_t is not None or to_t is not None:
             for item in series:
@@ -1193,8 +1188,6 @@ class Select(Operation):
 #========================
 # Instantiate operations
 #========================
-
-# TODO: just abandon the callable object thing and convert them to functions?
 
 # Scalar operations
 min = Min()

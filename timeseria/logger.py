@@ -14,7 +14,6 @@ levels_mapping = { 50: 'CRITICAL',
 def setup(level=LOGLEVEL, force=False):
     timeseria_logger = logging.getLogger('timeseria')
     timeseria_logger.propagate = False
-    #print('Setting log level to "{}"'.format(level))
     try:
         configured = False
         for handler in timeseria_logger.handlers:

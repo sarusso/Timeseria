@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Base data structures as Points, Slots and Series."""
+"""Base data structures as Points, Slots, and Series."""
 
 import json
 from copy import deepcopy
@@ -95,7 +95,7 @@ class TimePoint(Point):
 
     def __init__(self, *args, **kwargs):
 
-        # Handle timezone if any (removing it from kwargs)
+        # Handle time zone if any (removing it from kwargs)
         tz = kwargs.pop('tz', None)
         if tz:
             self._tz = timezonize(tz)
@@ -112,21 +112,17 @@ class TimePoint(Point):
                 # Ok, will convert the datetime to epoch and then create the point in the standard way
                 t = s_from_dt(kwargs['dt'])
 
-                # If we do not have a timezone, can we use the one from the dt used to initialize this TimePoint?
+                # If we do not have a time zone, can we use the one from the dt used to initialize this TimePoint?
                 try:
                     self._tz
                 except AttributeError:
                     if kwargs['dt'].tzinfo:
 
-                        #Do not set it if it is UTC, it is the default
+                        # Do not set it if it is UTC, it is the default
                         if kwargs['dt'].tzinfo == UTC:
                             pass
                         else:
                             self._tz = kwargs['dt'].tzinfo
-                            #raise NotImplementedError('Not yet tz from dt ("{}")'.format(kwargs['dt']))
-
-            #else:
-            #    raise Exception('Don\'t know how to handle all kwargs (got "{}")'.format(kwargs))
 
         # Cast or create in the standard way
         elif args:
@@ -155,7 +151,7 @@ class TimePoint(Point):
 
     @property
     def tz(self):
-        """The timezone."""
+        """The time zone."""
         try:
             return self._tz
         except AttributeError:
@@ -202,9 +198,6 @@ class DataPoint(Point):
                     raise ValueError('Got type "{}" for data_indexes, was expecitng a dict'.format(data_indexes.__class__.__name__))
         except KeyError:
             data_indexes = {}
-        #else:
-        #    if None in data_indexes.values():
-        #        raise ValueError('Cannot have an index set to None: do not set it at all ({})'.format(data_indexes))
 
         # Special data loss index
         try:
@@ -237,9 +230,9 @@ class DataPoint(Point):
     @property
     def data(self):
         """The data."""
-        # Data is set like this as it cannot be set if not in the init (read: changed after created)
-        # to prevent this to happend when the point is in a series where they are all supposed
-        # to carry the same data type and with the same number of elements. TODO: check!
+        # Data is implemented using a property to enforce that it cannot be changed after being set
+        # via the init, in particular with respect to the series, where data points are checked, upon
+        # insertion, to carry the same data type and with the same number of elements.
         return self._data
 
     @property
@@ -257,7 +250,6 @@ class DataPoint(Point):
         try:
             return self.data_indexes['data_loss']
         except KeyError:
-            #raise AttributeError('No data loss index set for this point')
             return None
 
     def data_labels(self):
@@ -295,7 +287,6 @@ class DataTimePoint(DataPoint, TimePoint):
             return 'Time point @ {} ({}) with data "{}" and data_loss="{}"'.format(self.t, self.dt, self.data, self.data_loss)
         else:
             return 'Time point @ {} ({}) with data "{}"'.format(self.t, self.dt, self.data)
-
 
 
 #======================
@@ -420,14 +411,10 @@ class TimeSlot(Slot):
         # Extra time zone checks
         if start and end:
             if start.tz != end.tz:
-                raise ValueError('{} start and end must have the same timezone (got start.tz="{}", end.tz="{}")'.format(self.__class__.__name__, start.tz, end.tz))
+                raise ValueError('{} start and end must have the same time zone (got start.tz="{}", end.tz="{}")'.format(self.__class__.__name__, start.tz, end.tz))
 
         # Call parent init
         super(TimeSlot, self).__init__(start=start, end=end, unit=unit)
-
-        # If we did not have the end, set its timezone now:
-        #if end is None:
-        #    self.end.change_tz(self.start.tz)
 
         # Store time zone
         self.tz = start.tz
@@ -504,9 +491,6 @@ class DataSlot(Slot):
                     raise ValueError('Got type "{}" for data_indexes, was expecitng a dict'.format(data_indexes.__class__.__name__))
         except KeyError:
             data_indexes = {}
-        #else:
-        #    if None in data_indexes.values():
-        #        raise ValueError('Cannot have an index set to None: do not set it at all ({})'.format(data_indexes))
 
         # Special data loss index
         try:
@@ -536,9 +520,9 @@ class DataSlot(Slot):
     @property
     def data(self):
         """The data."""
-        # Data is set like this as it cannot be set if not in the init (read: changed after created)
-        # to prevent this to happened when the point is in a series where they are all supposed
-        # to carry the same data type and with the same number of elements. TODO: check me!
+        # Data is implemented using a property to enforce that it cannot be changed after being set
+        # via the init, in particular with respect to the series, where data slots are checked, upon
+        # insertion, to carry the same data type and with the same number of elements.
         return self._data
 
     @property
@@ -556,7 +540,6 @@ class DataSlot(Slot):
         try:
             return self.data_indexes['data_loss']
         except KeyError:
-            #raise AttributeError('No data loss index set for this point')
             return None
 
     def data_labels(self):
@@ -643,8 +626,6 @@ class Series(list):
         """Append an item to the series. Accepts only items of the same
         type of the items already present in the series (unless empty)"""
 
-        # TODO: move to use the insert?
-
         # Check type
         if self.item_type:
             if not isinstance(item, self.item_type):
@@ -714,7 +695,6 @@ class Series(list):
         """Return all the data_indexes of the series, to be intended as custom
         defined indicators (i.e. data_loss, anomaly_index, etc.)."""
 
-        # TODO: move this to the Data*Series...?
         data_index_names = []
         for item in self:
             for index_name in item.data_indexes:
@@ -874,7 +854,6 @@ class Series(list):
             # Try filtering on this data label only
             return self.filter(key)
         else:
-            # TOOD: this will not work for SeriesView if ever implemented
             return super(Series, self).__getitem__(key)
 
 
@@ -898,7 +877,6 @@ class Series(list):
         if len(self) > 0 and not self._item_data_reference:
             raise TypeError('Series items have no data, cannot rename a label')
         for item in self:
-            # TODO: move to the DataPoint/DataSlot?
             item.data[new_data_label] = item.data.pop(old_data_label)
 
     def remove_data_label(self, data_label):
@@ -906,7 +884,6 @@ class Series(list):
         if len(self) > 0 and not self._item_data_reference:
             raise TypeError('Series items have no data, cannot rename a label')
         for item in self:
-            # TODO: move to the DataPoint/DataSlot?
             item.data.pop(data_label, None)
 
     def remove_data_index(self, data_index):
@@ -922,9 +899,6 @@ class Series(list):
             raise TypeError('Series items have no data, cannot remove the data loss')
         for item in self:
             item.data_indexes.pop('data_loss', None)
-
-
-
 
     #=========================
     #  Operations
@@ -1206,7 +1180,7 @@ class TimeSeries(Series):
     def __init__(self, *args, **kwargs):
 
 
-        # Handle timezone
+        # Handle time zone
         tz = kwargs.pop('tz', None)
         if tz:
             self._tz = timezonize(tz)
@@ -1231,13 +1205,10 @@ class TimeSeries(Series):
             except AttributeError:
                 pass
             else:
-                # Check time ordering and handle the resolution.
-
-                # The following if is to support the deepcopy, otherwise the original prev_t will be used
-                # TODO: maybe move the above to a "hasattr" plus an "and" instead of this logic?
+                # Check time ordering and handle the resolution. It is done in this way to support
+                # the deepcopy, otherwise the original prev_t will be used.
                 if len(self)>0:
 
-                    # logger.debug('Checking time ordering for t="%s" (prev_t="%s")', item.t, self.prev_t)
                     if item.t < self.prev_t:
                         raise ValueError('Time t="{}" is out of order (prev t="{}")'.format(item.t, self.prev_t))
 
@@ -1265,7 +1236,7 @@ class TimeSeries(Series):
                                 del self._resolution_as_seconds
                                 self._resolution = 'variable'
             finally:
-                # Delete the autodetected sampling interval cache if present
+                # Delete the auto-detected sampling interval cache if present
                 try:
                     del self._autodetected_sampling_interval
                     del self._autodetected_sampling_interval_confidence
@@ -1276,18 +1247,18 @@ class TimeSeries(Series):
 
         elif isinstance(item, TimeSlot):
 
-            # Slots can belong to the same series if they are in succession (tested with the __succedes__ method)
+            # Slots can belong to the same series if they are in succession (checked with the __succedes__ method)
             # and if they have the same unit, which we test here instead as the __succedes__ is more general.
 
-            # Check the timezone (only for slots, points are not affected by timezones)
+            # Check the time zone (only for slots, points are not affected by time zones)
             if not self.tz:
-                # If no timezone set, use the item one's
+                # If no time zone set, use the item's one
                 self._tz = item.tz
 
             else:
-                # Else, check for the same timezone
+                # Else, check for the same time zone
                 if self._tz != item.tz:
-                    raise ValueError('Cannot append slots on different timezones (I have "{}" and you tried to add "{}")'.format(self.tz, item.start.tz))
+                    raise ValueError('Cannot append slots on different time zones (I have "{}" and you tried to add "{}")'.format(self.tz, item.start.tz))
 
             try:
                 if self._resolution != item.unit:
@@ -1310,7 +1281,7 @@ class TimeSeries(Series):
         super(TimeSeries, self).append(item)
 
     def _item_by_t(self, t):
-        # TODO: improve performance, bisection first, then use an index?
+        # TODO: improve performance here. Bisection first, then maybe use an index-based mapping?
         for item in self:
             if item.t == t:
                 return item
@@ -1351,25 +1322,24 @@ class TimeSeries(Series):
             return self.get(arg)
 
     #=========================
-    #  Timezone-related
+    #  Time zone-related
     #=========================
 
     @property
     def tz(self):
-        """The timezone of the time series."""
-        # Note: we compute the tz on the fly because for point time series we assume to use the tz
-        # attribute way lass than the slot time series, where the tz is instead computed at append-time.
+        """The time zone of the time series."""
         try:
             return self._tz
         except AttributeError:
-            # Detect timezone on the fly
-            # TODO: this ensures that each point is on the same timezone. Do we want this?
+            # Detect time zone on the fly. Only applies for point time series.
+            # If different time zones are mixed, than fall back on UTC.
+            # TODO: set the tz at append-time for point time series as well?
             detected_tz = None
             for item in self:
                 if not detected_tz:
                     detected_tz = item.tz
                 else:
-                    # Terrible but seems like no other way to compare pytz.tzfile.* classes
+                    # Terrible, but there seems to be no other way to compare pytz.tzfile.* classes
                     if str(item.tz) != str(detected_tz):
                         return UTC
             return detected_tz
@@ -1505,7 +1475,7 @@ class TimeSeries(Series):
         if loaded_series.__class__ == cls:
             return loaded_series
         else:
-            # TODO: the following is a huge performance hit...
+            # TODO: improve performance here, the following is highly inefficient.
             series_items = loaded_series.contents()
             cls(*series_items)
 
@@ -1597,7 +1567,7 @@ class TimeSeries(Series):
         if loaded_series.__class__ == cls:
             return loaded_series
         else:
-            # TODO: the following is a huge performance hit...
+            # TODO: improve performance here, the following is highly inefficient.
             series_items = loaded_series.contents()
             cls(*series_items)
 
@@ -1620,7 +1590,7 @@ class TimeSeries(Series):
 
         if not unit_str_pd:
             if not item_type:
-                logger.info('Cannot infer the freqency of the dataframe, will just create points')
+                logger.info('Cannot infer the frequency of the dataframe, will just create points')
                 item_type = DataTimePoint
 
         else:

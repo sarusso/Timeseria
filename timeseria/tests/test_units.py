@@ -85,9 +85,9 @@ class TestTimeUnits(unittest.TestCase):
         self.assertEqual(TimeUnit('67.000005s').seconds, 67.000005)
 
         # Test string values
-        self.assertEqual(str(TimeUnit(600)), '600s') # Int converted to string representaiton
-        self.assertEqual(str(TimeUnit(600.0)), '600s') # Float converted to string representaiton
-        self.assertEqual(str(TimeUnit(600.45)), '600.45s') # Float converted to string representaiton (using microseconds)
+        self.assertEqual(str(TimeUnit(600)), '600s') # Int converted to string representation
+        self.assertEqual(str(TimeUnit(600.0)), '600s') # Float converted to string representation
+        self.assertEqual(str(TimeUnit(600.45)), '600.45s') # Float converted to string representation (using microseconds)
 
         self.assertEqual(str(TimeUnit(days=1)), '1D')
         self.assertEqual(str(TimeUnit(years=2)), '2Y')
@@ -100,15 +100,18 @@ class TestTimeUnits(unittest.TestCase):
         self.assertEqual(str(TimeUnit(days=1)), '1D') # This is obtained using the unit's string representation
 
         # Test unit equalities
-        self.assertTrue(TimeUnit(hours=1) == TimeUnit(hours=1))
-        self.assertTrue(TimeUnit(hours=1) == '1h')
-        self.assertFalse(TimeUnit(hours=1) == TimeUnit(hours=2))
-        self.assertFalse(TimeUnit(hours=1) == 'variable')
+        self.assertEqual(TimeUnit(hours=1), TimeUnit(hours=1))
+        self.assertEqual(TimeUnit(hours=1), '1h')
+        self.assertNotEqual(TimeUnit(hours=1), TimeUnit(hours=2))
+        self.assertNotEqual(TimeUnit(hours=1), 'variable')
 
-        self.assertTrue(TimeUnit(days=1) == TimeUnit(days=1))
-        self.assertTrue(TimeUnit(days=1) == '1D')
-        self.assertFalse(TimeUnit(days=1) == TimeUnit(days=2))
-        self.assertFalse(TimeUnit(days=1) == 'variable')
+        self.assertEqual(TimeUnit(days=1), TimeUnit(days=1))
+        self.assertEqual(TimeUnit(days=1), '1D')
+        self.assertNotEqual(TimeUnit(days=1), TimeUnit(days=2))
+        self.assertNotEqual(TimeUnit(days=1), 'variable')
+
+        self.assertEqual(TimeUnit(hours=1), TimeUnit(seconds=3600))
+        self.assertNotEqual(TimeUnit(days=1), TimeUnit(hours=24))
 
 
     def test_TimeUnit_math(self):

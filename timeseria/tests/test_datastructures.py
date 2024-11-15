@@ -394,7 +394,7 @@ class TestSeries(unittest.TestCase):
         with self.assertRaises(ValueError):
             Series(three, two)
 
-        # TODO: do we want the following behavior? (cannot mix types even if they are child classes)
+        # Cannot mix types even if they are child classes
         with self.assertRaises(TypeError):
             Series(one, two, three, 4)
 
@@ -426,9 +426,6 @@ class TestSeries(unittest.TestCase):
         self.assertEqual(series.head(2),[1.0,4.0])
         self.assertEqual(series.tail(2),[4.0,5.0])
         self.assertEqual(series.contents(),[1.0,4.0,5.0])
-
-        # TOOD: test the print with a print mock?
-        #float_series.print(3)
 
         # Test with data slots
         series = Series()
@@ -850,6 +847,7 @@ class TestTimeSeries(unittest.TestCase):
         with self.assertRaises(KeyError):
             timeseries.rename_data_label('notexistent_label','c')
 
+
     def test_TimeSeries_from_to_DataFrame(self):
 
         # Test creating from a DataFrame
@@ -955,7 +953,6 @@ class TestTimeSeries(unittest.TestCase):
                                                 dt(1970,1,3,0,0,0): {'C': 23.8, 'RH': 57.2}})
 
 
-
     def test_TimeSeries_from_to_json(self):
 
         # Test creating from JSON
@@ -996,8 +993,6 @@ class TestTimeSeries(unittest.TestCase):
         self.assertEqual(timeseries.from_json(timeseries.to_json(), slot_unit='1D'), timeseries)
 
 
-
-
     def test_TimeSeries_save_load(self):
 
         timeseries = TimeSeries(DataTimePoint(dt=dt(2015,10,27,0,0,0, tz='Europe/Rome'), data={'a':23.8, 'b':1}),
@@ -1021,6 +1016,8 @@ class TestTimeSeries(unittest.TestCase):
             loaded_series = TimeSeries.load(temp_dir+'/series_2')
 
         self.assertEqual(timeseries, loaded_series)
+
+
 
 class TestTimeSeriesView(unittest.TestCase):
 
@@ -1065,8 +1062,8 @@ class TestTimeSeriesView(unittest.TestCase):
             count +=1
         self.assertEqual(count,5)
 
-        # TODO: fix me! In the time series as well (and in general wherever iterators are used within Timeseria)
-        # Test iterator (while iterating)
+        # Test iterator (while iterating). Does not work right now, as the iterator is implemented in a basic way.
+        # TODO: Fix me! In the time series as well (and in general wherever iterators are used within Timeseria)
         #count = 0
         #for i, point in enumerate(timeseries_view):
         #    for _, _ in enumerate(timeseries_view):
@@ -1141,7 +1138,7 @@ class TestTimeSeriesView(unittest.TestCase):
         self.assertEqual(materialized_timeseries_view[0].data, {'value':3})
         self.assertEqual(timeseries_view[0].data, {'value':2})
 
-        # Nested view (TODO: do we want this feature?)
+        # Nested view
         nested_timeseries_view = TimeSeriesView(series=timeseries_view, from_i=3, to_i=5)
         self.assertEqual(len(nested_timeseries_view), 2)
         self.assertEqual(nested_timeseries_view[0].t, 5)

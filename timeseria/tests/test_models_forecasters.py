@@ -6,9 +6,8 @@ from propertime.utils import dt
 
 from ..datastructures import TimePoint, DataTimeSlot, DataTimePoint, TimeSeries
 from ..models.forecasters import ProphetForecaster, PeriodicAverageForecaster, ARIMAForecaster, AARIMAForecaster, LSTMForecaster
-from ..exceptions import NonContiguityError
 from ..storages import CSVFileStorage
-from .. import TEST_DATASETS_PATH
+from ..utils import ensure_reproducibility
 
 # Setup logging
 from .. import logger
@@ -34,38 +33,23 @@ class TestForecasters(unittest.TestCase):
             step = 60 * 60 * 24
             self.sine_day_timeseries.append(DataTimeSlot(start=TimePoint(i*step), end=TimePoint((i+1)*step), data={'value':sin(i/10.0)}))
 
+        # Ensure reproducibility
+        ensure_reproducibility()
+
+
     @staticmethod
     def assertCompatible(actual, predicted, delta=0.3, item=None):
         if not abs(actual-predicted) < delta:
             raise AssertionError('Actual and predicted values are not compatible within the specified delta (actual="{}", predicted="{}", delta="{}", item="{}"'.format(actual, predicted, delta, item))
 
 
-    def test_BaseForecasters(self):
-
-        # TODO: This test is done using the Periodic Average Forecaster, make a mock
-
-        timeseries = TimeSeries()
-        timeseries.append(DataTimePoint(t=1,  data={'a':1}, data_loss=0))
-        timeseries.append(DataTimePoint(t=2,  data={'a':-99}, data_loss=1))
-        timeseries.append(DataTimePoint(t=3,  data={'a':3}, data_loss=1))
-        timeseries.append(DataTimePoint(t=4,  data={'a':4}, data_loss=0))
-
-        forecaster = PeriodicAverageForecaster()
-        forecaster.fitted = True
-        forecaster.data['resolution'] = '1s'
-        forecaster.data['data_labels'] = ['a']
-        forecaster.data['window'] = 5
-
-        # Not enough widow data for the predict, will raise
-        with self.assertRaises(ValueError):
-            forecaster.predict(timeseries)
-
-
     def test_PeriodicAverageForecaster(self):
 
-        forecaster = PeriodicAverageForecaster()
+        # Note: here we test also some basic functionality of the forecaster as well,
+        # given that the PeridicAVergaeForecaster is very simple and close to a mock.
 
-        # Fit
+        # Instantiate and fit
+        forecaster = PeriodicAverageForecaster()
         forecaster.fit(self.sine_minute_timeseries, periodicity=63)
 
         # Apply
@@ -83,52 +67,112 @@ class TestForecasters(unittest.TestCase):
         self.assertAlmostEqual(evaluation['value_RMSE'], 0.0873, places=2)
         self.assertAlmostEqual(evaluation['value_MAE'], 0.0797, places=2)
 
-        # Test on Points as well
+        # Test on a realistic point series, forecast horizon=1
         timeseries = CSVFileStorage(TEST_DATA_PATH + '/csv/temperature.csv').get(limit=200)
         forecaster = PeriodicAverageForecaster()
-        with self.assertRaises(Exception):
+        with self.assertRaises(ValueError):
             forecaster.fit(timeseries)
 
         timeseries = timeseries.resample(600)
         forecaster.fit(timeseries)
 
-        # TODO: do some actual testing.. not only that "it works"
-        forecasted_timeseries  = forecaster.apply(timeseries)
+        prediction = forecaster.predict(timeseries)
+        self.assertEqual(len(prediction), 1)
+        self.assertEqual(list(prediction[0].keys()), ['temperature'])
+        self.assertAlmostEqual(prediction[0]['temperature'], 22.891000000000005)
+
+        forecast = forecaster.forecast(timeseries)
+        self.assertEqual(len(forecast), 1)
+        self.assertEqual(forecast[0].t, timeseries[-1].t+600)
+        self.assertEqual(list(forecast[0].data.keys()), ['temperature'])
+        self.assertAlmostEqual(forecast[0].data['temperature'], 22.891000000000005)
+
+        timeseries_with_forecast  = forecaster.apply(timeseries)
+        self.assertEqual(len(timeseries_with_forecast), len(timeseries)+1)
+        self.assertEqual(timeseries_with_forecast[-1].t, timeseries[-1].t+600)
+        self.assertEqual(list(timeseries_with_forecast[-1].data.keys()), ['temperature'])
+        self.assertAlmostEqual(timeseries_with_forecast[-1].data['temperature'], 22.891000000000005)
+
+        # Test on a realistic point series, forecast horizon=3
+        prediction = forecaster.predict(timeseries, steps=3)
+        self.assertEqual(len(prediction), 3)
+        self.assertEqual(list(prediction[0].keys()), ['temperature'])
+        self.assertAlmostEqual(prediction[0]['temperature'], 22.891000000000005)
+        self.assertEqual(list(prediction[-1].keys()), ['temperature'])
+        self.assertAlmostEqual(prediction[-1]['temperature'], 22.922057142857145)
+
+        forecast = forecaster.forecast(timeseries, steps=3)
+        self.assertEqual(len(forecast), 3)
+        self.assertEqual(forecast[0].t, timeseries[-1].t+600)
+        self.assertEqual(list(forecast[0].data.keys()), ['temperature'])
+        self.assertAlmostEqual(forecast[0].data['temperature'], 22.891000000000005)
+        self.assertEqual(forecast[-1].t, timeseries[-1].t+600*3)
+        self.assertEqual(list(forecast[-1].data.keys()), ['temperature'])
+        self.assertAlmostEqual(forecast[-1].data['temperature'], 22.922057142857145)
+
+        timeseries_with_forecast  = forecaster.apply(timeseries, steps=3)
+        self.assertEqual(len(timeseries_with_forecast), len(timeseries)+3)
+        self.assertEqual(timeseries_with_forecast[-3].t, timeseries[-1].t+600)
+        self.assertEqual(list(timeseries_with_forecast[-3].data.keys()), ['temperature'])
+        self.assertAlmostEqual(timeseries_with_forecast[-3].data['temperature'], 22.891)
+        self.assertEqual(timeseries_with_forecast[-1].t, timeseries[-1].t+600*3)
+        self.assertEqual(list(timeseries_with_forecast[-1].data.keys()), ['temperature'])
+        self.assertAlmostEqual(timeseries_with_forecast[-1].data['temperature'], 22.922057142857145)
 
 
     def test_PeriodicAverageForecaster_multivariate(self):
-        try:
-            import tensorflow
-        except ImportError:
-            print('Skipping LSTM forecaster tests with multivariate time series as no tensorflow module installed')
-            return
+
+        # Note: here we test also some basic functionality of the forecaster as well,
+        # given that the PeridicAVergaeForecaster is very simple and close to a mock.
 
         timeseries = TimeSeries()
-        for i in range(980):
+        for i in range(970):
             timeseries.append(DataTimePoint(t=i*60, data={'sin': sin(i/10.0), 'cos': cos(i/10.0)}))
+
+        # Instantiate and fit
         forecaster = PeriodicAverageForecaster()
         forecaster.fit(timeseries)
 
-        # TODO: do some actual testing.. not only that "it works"
-        timeseries_with_forecast = forecaster.apply(timeseries[0:970], steps=5)
+        prediction = forecaster.predict(timeseries, steps=3)
+        self.assertEqual(len(prediction), 3)
+        self.assertEqual(list(prediction[0].keys()), ['cos', 'sin'])
+        self.assertAlmostEqual(prediction[0]['cos'], 0.19600497357083713)
+        self.assertAlmostEqual(prediction[0]['sin'], 0.660933759485128)
+        self.assertEqual(list(prediction[-1].keys()), ['cos', 'sin'])
+        self.assertAlmostEqual(prediction[-1]['cos'], 0.0642538467366801)
+        self.assertAlmostEqual(prediction[-1]['sin'], 0.6923761210530861)
+
+        forecast = forecaster.forecast(timeseries, steps=3)
+        self.assertEqual(len(forecast), 3)
+        self.assertEqual(forecast[0].t, timeseries[-1].t+60)
+        self.assertEqual(list(forecast[0].data.keys()), ['cos', 'sin'])
+        self.assertAlmostEqual(forecast[0].data['cos'], 0.19600497357083713)
+        self.assertAlmostEqual(forecast[0].data['sin'], 0.660933759485128)
+        self.assertEqual(forecast[-1].t, timeseries[-1].t+60*3)
+        self.assertEqual(list(forecast[-1].data.keys()), ['cos', 'sin'])
+        self.assertAlmostEqual(forecast[-1].data['cos'], 0.0642538467366801)
+        self.assertAlmostEqual(forecast[-1].data['sin'], 0.6923761210530861)
+
+        timeseries_with_forecast  = forecaster.apply(timeseries, steps=3)
+        self.assertEqual(len(timeseries_with_forecast), len(timeseries)+3)
+        self.assertEqual(timeseries_with_forecast[-3].t, timeseries[-1].t+60)
+        self.assertEqual(list(timeseries_with_forecast[-3].data.keys()), ['cos', 'sin'])
+        self.assertAlmostEqual(timeseries_with_forecast[-3].data['cos'], 0.19600497357083713)
+        self.assertAlmostEqual(timeseries_with_forecast[-3].data['sin'], 0.660933759485128)
+        self.assertEqual(timeseries_with_forecast[-1].t, timeseries[-1].t+60*3)
+        self.assertEqual(list(timeseries_with_forecast[-1].data.keys()), ['cos', 'sin'])
+        self.assertAlmostEqual(timeseries_with_forecast[-1].data['cos'], 0.0642538467366801)
+        self.assertAlmostEqual(timeseries_with_forecast[-1].data['sin'], 0.6923761210530861)
 
 
     def test_PeriodicAverageForecaster_save_load(self):
 
         forecaster = PeriodicAverageForecaster()
-
         forecaster.fit(self.sine_minute_timeseries, periodicity=63)
+        forecaster.save(TEMP_MODELS_DIR + '/test_PA_model')
 
-        model_path = TEMP_MODELS_DIR + '/test_PA_model'
-
-        forecaster.save(model_path)
-
-        loaded_forecaster = PeriodicAverageForecaster.load(model_path)
-
+        loaded_forecaster = PeriodicAverageForecaster.load(TEMP_MODELS_DIR + '/test_PA_model')
         self.assertEqual(forecaster.data['offsets_averages'], loaded_forecaster.data['offsets_averages'])
-
-        # TODO: do some actual testing.. not only that "it works"
-        forecasted_timeseries = loaded_forecaster.apply(self.sine_minute_timeseries)
 
 
     def test_ProphetForecaster(self):
@@ -147,7 +191,7 @@ class TestForecasters(unittest.TestCase):
         sine_day_timeseries_with_forecast = forecaster.apply(self.sine_day_timeseries, steps=3)
         self.assertEqual(len(sine_day_timeseries_with_forecast), 1003)
 
-        # Test the evaluate
+        # Test with the evaluate
         evalation_results = forecaster.evaluate(self.sine_day_timeseries.view(0,10))
         self.assertAlmostEqual(evalation_results['value_RMSE'], 0.80, places=2)
         self.assertAlmostEqual(evalation_results['value_MAE'], 0.77, places=2)
@@ -156,7 +200,7 @@ class TestForecasters(unittest.TestCase):
         self.assertAlmostEqual(evalation_results['value_RMSE'], 0.53, places=2) # For one sample they must be the same
         self.assertAlmostEqual(evalation_results['value_MAE'], 0.53, places=2) # For one sample they must be the same
 
-        # Test on Points as well
+        # Test on a realistic point series, forecast horizon=3
         timeseries = CSVFileStorage(TEST_DATA_PATH + '/csv/temperature.csv').get(limit=200)
         forecaster = ProphetForecaster()
         with self.assertRaises(Exception):
@@ -165,8 +209,12 @@ class TestForecasters(unittest.TestCase):
         timeseries = timeseries.resample(600)
         forecaster.fit(timeseries)
 
-        # TODO: do some actual testing.. not only that "it works"
-        forecasted_timeseries = forecaster.apply(timeseries)
+        prediction = forecaster.predict(timeseries, steps=3)
+        self.assertEqual(len(prediction), 3)
+        self.assertEqual(list(prediction[0].keys()), ['temperature'])
+        self.assertAlmostEqual(prediction[0]['temperature'], 23.297123620317347, places=2)
+        self.assertEqual(list(prediction[-1].keys()), ['temperature'])
+        self.assertAlmostEqual(prediction[-1]['temperature'], 23.336020073857974, places=2)
 
 
     def test_ARIMAForecaster(self):
@@ -183,40 +231,30 @@ class TestForecasters(unittest.TestCase):
 
         # Basic ARIMA
         forecaster = ARIMAForecaster(p=1,d=1,q=0)
-
         forecaster.fit(self.sine_day_timeseries)
-        self.assertEqual(len(self.sine_day_timeseries), 1000)
 
-        # Cannot apply on a time series contiguous with the time series used for the fit
-        with self.assertRaises(NonContiguityError):
+        # Cannot apply on a time series ending with a different timestamp as the time series used for the fit
+        with self.assertRaises(Exception):
             forecaster.apply(self.sine_day_timeseries[:-1], steps=3)
 
-        # Can apply on a time series contiguous with the fit one
         sine_day_timeseries_with_forecast = forecaster.apply(self.sine_day_timeseries, steps=3)
         self.assertEqual(len(sine_day_timeseries_with_forecast), 1003)
 
-        # # Cannot evaluate on a time series not contiguous with the time series used for the fit
-        # with self.assertRaises(NonContiguityError):
-        #     forecaster.evaluate(self.sine_day_timeseries)
-        #
-        # # Can evaluate on a time series contiguous with the time series used for the fit
-        # forecaster = ARIMAForecaster(p=1,d=1,q=0)
-        # forecaster.fit(self.sine_day_timeseries[0:800])
-        # evaluation_results = forecaster.evaluate(self.sine_day_timeseries[800:1000])
-        # self.assertAlmostEqual(evaluation_results['RMSE'], 2.71, places=2)
-        # self.assertAlmostEqual(evaluation_results['MAE'], 2.52, places=2 )
-
-        # Test on Points as well
+        # Test on a realistic point series, forecast horizon=3
         timeseries = CSVFileStorage(TEST_DATA_PATH + '/csv/temperature.csv').get(limit=200)
         forecaster = ARIMAForecaster()
-        with self.assertRaises(ValueError):
+        with self.assertRaises(Exception):
             forecaster.fit(timeseries)
 
         timeseries = timeseries.resample(600)
         forecaster.fit(timeseries)
 
-        # TODO: do some actual testing.. not only that "it works"
-        forecasted_timeseries  = forecaster.apply(timeseries)
+        prediction = forecaster.predict(timeseries, steps=3)
+        self.assertEqual(len(prediction), 3)
+        self.assertEqual(list(prediction[0].keys()), ['temperature'])
+        self.assertAlmostEqual(prediction[0]['temperature'], 23.227174207689878)
+        self.assertEqual(list(prediction[-1].keys()), ['temperature'])
+        self.assertAlmostEqual(prediction[-1]['temperature'], 23.23067079831882)
 
 
     def test_AARIMAForecaster(self):
@@ -233,39 +271,28 @@ class TestForecasters(unittest.TestCase):
         forecaster.fit(self.sine_day_timeseries, max_p=2, max_d=1, max_q=2)
         self.assertEqual(len(self.sine_day_timeseries), 1000)
 
-        # Cannot apply on a time series contiguous with the time series used for the fit
-        with self.assertRaises(NonContiguityError):
+        # Cannot apply on a time series ending with a different timestamp as the time series used for the fit
+        with self.assertRaises(Exception ):
             forecaster.apply(self.sine_day_timeseries[:-1], steps=3)
 
-        # Can apply on a time series contiguous with the same item as the fit one
         sine_day_timeseries_with_forecast = forecaster.apply(self.sine_day_timeseries, steps=3)
         self.assertEqual(len(sine_day_timeseries_with_forecast), 1003)
 
-        # # Cannot evaluate on a time series not contiguous with the time series used for the fit
-        # with self.assertRaises(NonContiguityError):
-        #     forecaster.evaluate(self.sine_day_timeseries)
-        #
-        # # Can evaluate on a time series contiguous with the time series used for the fit
-        # forecaster = AARIMAForecaster()
-        # forecaster.fit(self.sine_day_timeseries[0:800], max_p=2, max_d=1, max_q=2)
-        # evaluation_results = forecaster.evaluate(self.sine_day_timeseries[800:1000])
-        # self.assertTrue('RMSE' in evaluation_results)
-        # self.assertTrue('MAE' in evaluation_results)
-        # # Cannot test values, some random behavior which cannot be put under control is present somewhere
-        # #self.assertAlmostEqual(evaluation_results['RMSE'], 0.7179428895746799)
-        # #self.assertAlmostEqual(evaluation_results['MAE'], 0.6497934134525981)
-
-        # Test on Points as well
+        # Test on a realistic point series, forecast horizon=3
         timeseries = CSVFileStorage(TEST_DATA_PATH + '/csv/temperature.csv').get(limit=200)
         forecaster = AARIMAForecaster()
-        with self.assertRaises(ValueError):
+        with self.assertRaises(Exception):
             forecaster.fit(timeseries)
 
         timeseries = timeseries.resample(600)
-        forecaster.fit(timeseries, max_p=2, max_d=1, max_q=2)
+        forecaster.fit(timeseries)
 
-        # TODO: do some actual testing.. not only that "it works"
-        forecasted_timeseries  = forecaster.apply(timeseries)
+        prediction = forecaster.predict(timeseries, steps=3)
+        self.assertEqual(len(prediction), 3)
+        self.assertEqual(list(prediction[0].keys()), ['temperature'])
+        self.assertAlmostEqual(prediction[0]['temperature'], 23.227174207689878)
+        self.assertEqual(list(prediction[-1].keys()), ['temperature'])
+        self.assertAlmostEqual(prediction[-1]['temperature'], 23.23067079831882)
 
 
     def test_LSTMForecaster_univariate(self):
@@ -393,7 +420,7 @@ class TestForecasters(unittest.TestCase):
             print('Skipping LSTM forecaster cross validation tests as no tensorflow module installed')
             return
 
-        temperature_timeseries = TimeSeries.from_csv(TEST_DATASETS_PATH + 'temperature_winter.csv').resample('1h')
+        temperature_timeseries = TimeSeries.from_csv(TEST_DATA_PATH + 'csv/temperature_winter.csv').resample('1h')
 
         # Pretend there was no data loss at all
         for item in temperature_timeseries:

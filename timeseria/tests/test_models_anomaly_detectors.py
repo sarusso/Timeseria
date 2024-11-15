@@ -159,8 +159,12 @@ class TestAnomalyDetectors(unittest.TestCase):
         timeseries = timeseries.resample(600)
         anomaly_detector.fit(timeseries, error_metric='E', error_distribution='norm')
 
-        # TODO: do some actual testing.. not only that "it works"
-        _  = anomaly_detector.apply(timeseries, index_bounds=['avg_err','3_sigma'])
+        result_timeseries = anomaly_detector.apply(timeseries, index_bounds=['avg_err','3_sigma'])
+        for point in result_timeseries:
+            if 'anomaly' in  point.data_indexes:
+                if point.data_indexes['anomaly'] > 0.3:
+                    anomalies_count += 1
+        self.assertEqual(anomalies_count, 12)
 
 
     def test_PeriodicAverageAnomalyDetector_save_load(self):
@@ -175,14 +179,12 @@ class TestAnomalyDetectors(unittest.TestCase):
         anomaly_detector.save(model_path)
 
         loaded_anomaly_detector = PeriodicAverageAnomalyDetector.load(model_path)
-        self.assertEqual(set(anomaly_detector.data.keys()), set(['id', 'model_id', 'resolution', 'data_labels', 'error_metric', 'prediction_errors',
-                                                              'error_distributions', 'error_distributions_params', 'error_distributions_stats', 'index_window',
-                                                              'fitted_at', 'stdevs', 'model_window', 'with_context', 'actual_values', 'predicted_values']))
+        self.assertEqual(set(loaded_anomaly_detector.data.keys()), set(['id', 'model_id', 'resolution', 'data_labels', 'error_metric', 'prediction_errors',
+                                                                        'error_distributions', 'error_distributions_params', 'error_distributions_stats', 'index_window',
+                                                                        'fitted_at', 'stdevs', 'model_window', 'with_context', 'actual_values', 'predicted_values']))
 
-        self.assertAlmostEqual(anomaly_detector.data['error_distributions_params']['sin']['loc'], -3.73646e-05, places=5)
-        self.assertAlmostEqual(anomaly_detector.data['error_distributions_params']['sin']['scale'], 0.20957, places=4)
-
-        _ = loaded_anomaly_detector.apply(self.sine_minute_timeseries, index_bounds=['avg_err','3_sigma'])
+        self.assertAlmostEqual(loaded_anomaly_detector.data['error_distributions_params']['sin']['loc'], -3.73646e-05, places=5)
+        self.assertAlmostEqual(loaded_anomaly_detector.data['error_distributions_params']['sin']['scale'], 0.20957, places=4)
 
 
     def test_PeriodicAverageReconstructorAnomalyDetector(self):
@@ -213,8 +215,12 @@ class TestAnomalyDetectors(unittest.TestCase):
         timeseries = timeseries.resample(600)
         anomaly_detector.fit(timeseries, error_metric='E', error_distribution='norm')
 
-        # TODO: do some actual testing.. not only that "it works"
-        _  = anomaly_detector.apply(timeseries, index_bounds=['avg_err','3_sigma'])
+        result_timeseries = anomaly_detector.apply(timeseries, index_bounds=['avg_err','5_sigma'])
+        for point in result_timeseries:
+            if 'anomaly' in  point.data_indexes:
+                if point.data_indexes['anomaly'] > 0.9:
+                    anomalies_count += 1
+        self.assertEqual(anomalies_count, 23)
 
 
     def test_LSTMAnomalyDetector_multivariate_with_context(self):

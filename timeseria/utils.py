@@ -21,7 +21,6 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import mean_squared_error as sklearn_mean_squared_error
 from sklearn.metrics import mean_absolute_error as sklearn_mean_absolute_error
 
-
 # Setup logging
 import logging
 logger = logging.getLogger(__name__)
@@ -116,19 +115,16 @@ def detect_sampling_interval(timeseries, confidence=False):
             most_common_diff = diff
 
     second_most_common_diff_total = 0
-    second_most_common_diff = None
     for diff in diffs:
         if diff == most_common_diff:
             continue
         if diffs[diff] > second_most_common_diff_total:
             second_most_common_diff_total = diffs[diff]
-            second_most_common_diff = diff
 
     if confidence:
         if len(diffs) == 1:
             confidence_value = 1.0
         else:
-            # TODO: this is a totally arbitrary confidence metric, check me.
             confidence_value = 1 - (second_most_common_diff_total / most_common_diff_total)
         return most_common_diff, confidence_value
     else:
@@ -139,79 +135,73 @@ def detect_periodicity(timeseries):
     """Detect the periodicity of a time series."""
 
     _check_timeseries(timeseries)
-
-    # TODO: fix me, data_loss must not belong as data_label
     data_labels = timeseries.data_labels()
 
     if len(data_labels) > 1:
         raise NotImplementedError()
+    else:
+        data_label = data_labels[0]
 
-    # TODO: improve me, highly ineficcient
-    for data_label in data_labels:
+    # Get data as a vector
+    y = [item.data[data_label] for item in timeseries]
 
-        # Get data as a vector
-        y = []
-        for item in timeseries:
-            y.append(item.data[data_label])
-        #y = [item.data[data_label] for item in timeseries]
+    # Compute FFT (Fast Fourier Transform)
+    yf = fft.fft(y)
 
-        # Compute FFT (Fast Fourier Transform)
-        yf = fft.fft(y)
+    # Remove specular data
+    len_yf = len(yf)
+    middle_point=round(len_yf/2)
+    yf = yf[0:middle_point]
 
-        # Remove specular data
-        len_yf = len(yf)
-        middle_point=round(len_yf/2)
-        yf = yf[0:middle_point]
+    # To absolute values
+    yf = [abs(f) for f in yf]
 
-        # To absolute values
-        yf = [abs(f) for f in yf]
+    # Find FFT peaks
+    peak_indexes, _ = find_peaks(yf, height=None)
+    peaks = []
+    for i in peak_indexes:
+        peaks.append([i, yf[i]])
 
-        # Find FFT peaks
-        peak_indexes, _ = find_peaks(yf, height=None)
-        peaks = []
-        for i in peak_indexes:
-            peaks.append([i, yf[i]])
+    # Sort by peaks intensity and compute actual frequency in base units
+    # TODO: round peak frequencies to integers and/or neighbors first?
+    peaks = sorted(peaks, key=lambda t: t[1])
+    peaks.reverse()
 
-        # Sort by peaks intensity and compute actual frequency in base units
-        # TODO: round peak frequencies to integers and/or neighbours first
-        peaks = sorted(peaks, key=lambda t: t[1])
-        peaks.reverse()
+    # Compute peak frequencies:
+    for i in range(len(peaks)):
 
-        # Compute peak frequencies:
-        for i in range(len(peaks)):
+        # Set peak frequency
+        peak_frequency = (len(y) / peaks[i][0])
+        peaks[i].append(peak_frequency)
 
-            # Set peak frequency
-            peak_frequency = (len(y) / peaks[i][0])
-            peaks[i].append(peak_frequency)
+    # Find most relevant frequency
+    max_peak_frequency = None
+    for i in range(len(peaks)):
 
-        # Find most relevant frequency
-        max_peak_frequency = None
-        for i in range(len(peaks)):
+        logger.debug('Peak #%s: \t index=%s,\t value=%s, freq=%s (over %s)', i, peaks[i][0], int(peaks[i][1]), peaks[i][2], len(timeseries))
 
-            logger.debug('Peak #%s: \t index=%s,\t value=%s, freq=%s (over %s)', i, peaks[i][0], int(peaks[i][1]), peaks[i][2], len(timeseries))
-
-            # Do not consider lower frequencies if there is a closer and higher one
-            try:
-                diff1=peaks[i][1]-peaks[i+1][1]
-                diff2=peaks[i+1][1]-peaks[i+2][1]
-                if diff1 *3 < diff2:
-                    logger.debug('Peak #{} candidate to removal'.format(i))
-                    if (peaks[i][2] > peaks[i+1][2]*10) and (peaks[i][2] > len(timeseries)/10):
-                        logger.debug('peak #{} marked to be removed'.format(i))
-                        continue
-            except IndexError:
-                pass
-
-            if not max_peak_frequency:
-                max_peak_frequency = peaks[i][2]
-            if i>10:
-                break
+        # Do not consider lower frequencies if there is a closer and higher one
+        try:
+            diff1=peaks[i][1]-peaks[i+1][1]
+            diff2=peaks[i+1][1]-peaks[i+2][1]
+            if diff1 *3 < diff2:
+                logger.debug('Peak #{} candidate to removal'.format(i))
+                if (peaks[i][2] > peaks[i+1][2]*10) and (peaks[i][2] > len(timeseries)/10):
+                    logger.debug('peak #{} marked to be removed'.format(i))
+                    continue
+        except IndexError:
+            pass
 
         if not max_peak_frequency:
-            raise ValueError('Cannot detect any periodicity!')
+            max_peak_frequency = peaks[i][2]
+        if i>10:
+            break
 
-        # Round max peak and return
-        return int(round(max_peak_frequency))
+    if not max_peak_frequency:
+        raise ValueError('Cannot detect any periodicity!')
+
+    # Round max peak and return
+    return int(round(max_peak_frequency))
 
 
 def mean_absolute_percentage_error(list1, list2):
@@ -291,7 +281,7 @@ def mean_squared_error(list1,list2):
     return sklearn_mean_squared_error(list1,list2)
 
 
-def rescale(value, source_from, source_to, target_from=0, target_to=1, how='linear'):
+def rescale(value, source_from, source_to, target_from=0, target_to=1):
     """Rescale a value from one range to another."""
 
     if value < 0:
@@ -319,7 +309,6 @@ def rescale(value, source_from, source_to, target_from=0, target_to=1, how='line
         target_total = target_to - target_from
         return ((value_ratio*target_total)+target_from)
 
-    # If how=log...log_compression /log base
 
 def os_shell(command, capture=False, verbose=False, interactive=False, silent=False):
     """Execute a command in the OS shell. By default prints everything. If the capture switch is set,
@@ -350,7 +339,7 @@ def os_shell(command, capture=False, verbose=False, interactive=False, silent=Fa
     stdout = stdout.decode(encoding='UTF-8')
     stderr = stderr.decode(encoding='UTF-8')
 
-    # Formatting..
+    # Formatting...
     stdout = stdout[:-1] if (stdout and stdout[-1] == '\n') else stdout
     stderr = stderr[:-1] if (stderr and stderr[-1] == '\n') else stderr
 
@@ -440,6 +429,7 @@ class DistributionFunction():
 
         return x
 
+
 #===========================
 #  Private classes
 #===========================
@@ -485,10 +475,6 @@ class _Gaussian():
         # Show the plot
         plt.show()
 
-        # Show the plot
-        plt.show()
-
-
     def find_xes(self, y, wideness=1000):
         # Note: "self" can be any function, we use the gaussian class as a callable object here.
 
@@ -517,10 +503,11 @@ def _is_almost_equal(one, two):
     else:
         return False
 
+
 def _set_from_t_and_to_t(from_dt, to_dt, from_t, to_t):
     """Set from_t and to_t from a (valid) combination of from_dt, to_dt, from_t, to_t."""
 
-    # Sanity chceks
+    # Sanity checks
     if from_t is not None and not is_numerical(from_t):
         raise Exception('from_t is not numerical')
     if to_t is not None and not is_numerical(to_t):
@@ -544,8 +531,7 @@ def _set_from_t_and_to_t(from_dt, to_dt, from_t, to_t):
 def _item_is_in_range(item, from_t, to_t):
     """Check if an item (*TimePoint or *TimeSlot) is within the specified time range"""
 
-    # TODO: maybe use a custom iterator for looping over time series items?
-    # see https://stackoverflow.com/questions/6920206/sending-stopiteration-to-for-loop-from-outside-of-the-iterator
+    # Import here to avoid cyclic imports
     from .datastructures import Point, Slot
     if isinstance(item, Slot):
         if from_t is not None and to_t is not None and from_t > to_t:
@@ -640,21 +626,20 @@ def _compute_validity_regions(series, from_t=None, to_t=None, sampling_interval=
     return validity_segments
 
 
-def _compute_coverage(series, from_t, to_t, sampling_interval=None):
+def _compute_coverage(series, from_t, to_t):
     """
-    Compute the coverage of an interval based on the points validity regions.
+    Compute the coverage of an interval based on the point validity regions.
 
     Args:
         series: the time series.
         from_t: the interval start.
         to_t: the interval end.
-        sampling_interval: the sampling interval. In not set, it will be used the series' (auto-detected) one.
 
     Returns:
         float: the interval coverage.
     """
 
-    logger.debug('Called _compute_coverage() from {} to {}'.format(from_t, to_t))
+    logger.debug('Called _compute_coverage() from %s to %s', from_t, to_t)
 
     # Check from_t/to_t
     if from_t >= to_t:
@@ -663,10 +648,6 @@ def _compute_coverage(series, from_t, to_t, sampling_interval=None):
     # If the series is empty, return zero coverage
     if not series:
         return 0.0
-
-    # Compute the validity regions in the interval. if point haven't them?
-    # validity_regions = _compute_validity_regions(series, from_t=from_t, to_t=to_t, cut=True, sampling_interval=sampling_interval)
-    # And now attach?
 
     # Sum all the validity regions according to the from/to:
     coverage_s = 0
@@ -685,7 +666,7 @@ def _compute_coverage(series, from_t, to_t, sampling_interval=None):
             except AttributeError:
                 pass
 
-            # Set this point valid from/to accoring to the interval boundaries
+            # Set this point valid from/to according to the interval boundaries
             this_point_valid_from = point.valid_from if point.valid_from >= from_t else from_t
             this_point_valid_to = point.valid_to if point.valid_to < to_t else to_t
 
@@ -720,7 +701,7 @@ def _compute_data_loss(series, from_t, to_t, force=False, sampling_interval=None
         float: the interval data loss.
     """
 
-    logger.debug('Called _compute_data_loss() from {} to {}'.format(from_t, to_t))
+    logger.debug('Called _compute_data_loss() from %s to %s', from_t, to_t)
 
     # Get the series sampling interval unless it is forced to a specific value
     if not sampling_interval:
@@ -729,7 +710,7 @@ def _compute_data_loss(series, from_t, to_t, force=False, sampling_interval=None
     # Compute the data loss from missing coverage.
     # Note: to improve performance, this could be computed only if the series is "raw" or forced,
     # i.e. at first and last items since on the borders there still may be  data losses.
-    data_loss_from_missing_coverage = 1 - _compute_coverage(series, from_t, to_t, sampling_interval=sampling_interval)
+    data_loss_from_missing_coverage = 1 - _compute_coverage(series, from_t, to_t)
 
     logger.debug('Data loss from missing coverage: %s', data_loss_from_missing_coverage)
 
@@ -762,14 +743,6 @@ def _compute_data_loss(series, from_t, to_t, force=False, sampling_interval=None
                 else:
                     point_contribution = sampling_interval
 
-                #logger.debug('----------------')
-                #count+=1
-                #logger.debug('count: %s', count)
-                #logger.debug('point_valid_from_t: %s', point_valid_from_t)
-                #logger.debug('point.t: %s', point.t)
-                #logger.debug('point_valid_to_t: %s', point_valid_to_t)
-                #logger.debug('point_contribution: %s', point_contribution)
-
                 # Now rescale the data loss with respect to the contribution and from/to and sum it up
                 data_loss_from_previously_computed += point.data_loss * (point_contribution/( to_t - from_t))
 
@@ -778,11 +751,6 @@ def _compute_data_loss(series, from_t, to_t, force=False, sampling_interval=None
     # Compute total data loss
     data_loss = data_loss_from_missing_coverage + data_loss_from_previously_computed
 
-    # The next step is controversial, as it will cause to abuse the "None" data losses that
-    # are only used for the forecasts at the moment. TODO: what do we want to do here?
-    #if series_resolution != 'variable' and not data_loss:
-    #    data_loss = None
-
     # Return
     return data_loss
 
@@ -790,7 +758,7 @@ def _compute_data_loss(series, from_t, to_t, force=False, sampling_interval=None
 def _check_timeseries(series):
     """Check a time series for type, not emptiness and fixed resolution."""
 
-    # Import here or you will end up with cyclic imports
+    # Import here to avoid cyclic imports
     from .datastructures import TimeSeries
 
     if not isinstance(series, TimeSeries):
@@ -804,44 +772,24 @@ def _check_timeseries(series):
 
 
 def _check_resolution(series, resolution):
-
-    def __check_resolution(series, resolution):
-        # TODO: Fix this mess.. Make the .resolution behavior consistent!
-        if resolution == series.resolution:
-            return True
-        try:
-            if resolution == series.resolution.as_seconds():
-                return True
-        except:
-            pass
-        try:
-            if resolution.as_seconds() == series.resolution:
-                return True
-        except:
-            pass
-        try:
-            if resolution.as_seconds() == series.resolution:
-                return True
-        except:
-            pass
-        return False
-
-    # Check series resolution
-    if not __check_resolution(series, resolution):
+    if not series.resolution == resolution:
         raise ValueError('This model is fitted on "{}" resolution data, while your data has "{}" resolution.'.format(resolution, series.resolution))
+
 
 def _check_data_labels(series, data_labels):
     series_data_labels = series.data_labels()
     if len(series_data_labels) != len(data_labels):
         raise ValueError('This model is fitted on {} data labels, while your data has {} data labels.'.format(len(data_labels), len(series_data_labels)))
     if series_data_labels != data_labels:
-        # TODO: logger.warning?
         raise ValueError('This model is fitted on "{}" data labels, while your data has "{}" data labels.'.format(data_labels, series_data_labels))
 
+
 def _check_series_of_points_or_slots(series):
+    # Import here to avoid cyclic imports
     from .datastructures import DataPoint, DataSlot
     if not (issubclass(series.item_type, DataPoint) or issubclass(series.item_type, DataSlot)):
         raise TypeError('Cannot operate on a series of "{}", only series of DataPoints or DataSlots are supported'.format(series.item_type.__name__))
+
 
 def _check_indexed_data(series):
     try:
@@ -849,10 +797,13 @@ def _check_indexed_data(series):
     except TypeError:
         raise TypeError('Cannot operate on a series of "{}" with "{}" data, only series of indexed data (as lists and dicts) are supported'.format(series.item_type.__name__, series[0].data.__class__.__name__))
 
+
 def _get_periodicity_index(item, resolution, periodicity, dst_affected=False):
     """Get the periodicty index."""
 
+    # Import here to avoid cyclic imports
     from .units import Unit, TimeUnit
+
     # Handle specific cases
     if isinstance(resolution, TimeUnit):
         resolution_s = resolution.as_seconds(item.dt)
@@ -873,34 +824,29 @@ def _get_periodicity_index(item, resolution, periodicity, dst_affected=False):
 
     else:
 
-        # Get periodicity based on the datetime
-
         # Do we have an active DST?
         dst_timedelta = item.dt.dst()
 
         if dst_timedelta.days == 0 and dst_timedelta.seconds == 0:
-            # No DST
+            # No DST: get index based on item timestamp, normalized to unit, modulus periodicity
             periodicity_index = int(item.t / resolution_s) % periodicity
 
         else:
-            # DST
+            # DST: get index based on item timestamp plus offset, normalized to unit, modulus periodicity 
             if dst_timedelta.days != 0:
                 raise Exception('Don\'t know how to handle DST with days timedelta = "{}"'.format(dst_timedelta.days))
 
             if resolution_s > 3600:
                 raise Exception('Sorry, this time series has not enough resolution to account for DST effects (resolution_s="{}", must be below 3600 seconds)'.format(resolution_s))
 
-            # Get DST offset in seconds
             dst_offset_s = dst_timedelta.seconds # 3600 usually
-
-            # Compute the periodicity index
             periodicity_index = (int((item.t + dst_offset_s) / resolution_s) % periodicity)
 
     return periodicity_index
 
 
 def _sanitize_string(string, no_data_placeholders=[]):
-    """Sanitize the encofing of a stringwhile handling no data placeholders"""
+    """Sanitize the encoding of a string while handling "no data" placeholders"""
 
     string = re.sub('\s+',' ',string).strip()
     if string.startswith('\'') or string.startswith('"'):
@@ -924,7 +870,7 @@ def _is_list_of_integers(the_list):
 
 
 def _to_float(string,no_data_placeholders=[],label=None):
-    """Convert to float while handling no data placeholders and discarding data indexes"""
+    """Convert to float while handling "no data" placeholders and discarding data indexes"""
 
     sanitized_string_string = _sanitize_string(string,no_data_placeholders)
     if sanitized_string_string:
@@ -932,11 +878,10 @@ def _to_float(string,no_data_placeholders=[],label=None):
     try:
         return float(sanitized_string_string)
     except (ValueError, TypeError):
-        # Do not raise inf converting indexes as they are allowed to be "None"
+        # Do not raise if converting indexes as they are allowed to be "None"
         if label and label.startswith('__'):
             return None
         raise FloatConversionError(sanitized_string_string)
-
 
 
 def _to_time_unit_string(seconds, friendlier=True):
@@ -989,7 +934,6 @@ def _compute_distribution_approximation_errors(distribution_function, prediction
     binned_distribution_values = []
     binned_real_distribution_values = []
     for key in real_distribution_values:
-        #logger.debug('{}: \t{}\t vs\t {}'.format(key, distribution(key),real_distribution_values[key]))
         binned_distribution_values.append(distribution_function(key))
         binned_real_distribution_values.append(real_distribution_values[key])
         approximation_errors.append(abs(distribution_function(key)-real_distribution_values[key]))
@@ -1008,7 +952,6 @@ def _detect_notebook_major_version():
             line=line.strip()
             what, version = line.split(':')
             versions[what.strip()] = version.strip()
-    #print(versions)
     if not versions or 'notebook' not in versions:
         notebook_major_version = None
     else:
@@ -1057,5 +1000,5 @@ def _has_numerical_values(data):
         return True
 
     else:
-        raise ValueError('Don\'t know how to establish if this data type has numerical values or not (got "{}")'.format(data.__class__.__name__))
+        raise ValueError('Don\'t know how to establish whether this data type has numerical values or not (got "{}")'.format(data.__class__.__name__))
 

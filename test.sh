@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-# This script will build the Timeseria container and then run the tests into it.
+# This script will build the Timeseria container and run the tests into it
 
 # Build
 if [[ "x$BUILD" != "xFalse" ]]; then

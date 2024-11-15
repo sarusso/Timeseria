@@ -6,6 +6,7 @@ from propertime.utils import dt
 from ..datastructures import TimePoint, DataTimeSlot, DataTimePoint, TimeSeries
 from ..models.reconstructors import PeriodicAverageReconstructor, ProphetReconstructor, LinearInterpolationReconstructor
 from ..storages import CSVFileStorage
+from ..utils import ensure_reproducibility
 
 # Setup logging
 from .. import logger
@@ -15,20 +16,21 @@ logger.setup()
 TEST_DATA_PATH = '/'.join(os.path.realpath(__file__).split('/')[0:-1]) + '/test_data/'
 TEMP_MODELS_DIR = tempfile.TemporaryDirectory().name
 
-# Ensure reproducibility
-import random
-import numpy as np
-random.seed(0)
-np.random.seed(0)
-
 
 class TestReconstructors(unittest.TestCase):
 
+    def setUp(self):
 
-    def test_BaseReconstructor(self):
+        # Ensure reproducibility
+        ensure_reproducibility()
 
-        # This test is done using the Linear Interpolator Reconstructor
 
+    def test_LinearInterpolationReconstructor(self):
+
+        # Note: here we test also some basic functionality of the reconstructors as well,
+        # given that the LinearInterpolationReconstructor is very simple and close to a mock.
+
+        # Test simple univariate
         timeseries = TimeSeries()
         timeseries.append(DataTimePoint(t=1,  data={'a':1}, data_loss=0))
         timeseries.append(DataTimePoint(t=2,  data={'a':-99}, data_loss=1))
@@ -54,20 +56,116 @@ class TestReconstructors(unittest.TestCase):
         reconstructed_timeseries = reconstructor.apply(timeseries)
         self.assertEqual(reconstructed_timeseries[1].data['a'],2)
 
-        # Not enough widow data for the apply at the beginning, will [shrink?]
-        #timeseries = TimeSeries()
-        #timeseries.append(DataTimePoint(t=1,  data={'a':-99}, data_loss=1))
-        #timeseries.append(DataTimePoint(t=2,  data={'a':2}, data_loss=0))
-        #reconstructor.apply(timeseries)
+        # Not enough widow data for the apply at the beginning
+        timeseries = TimeSeries()
+        timeseries.append(DataTimePoint(t=1,  data={'a':-99}, data_loss=1))
+        timeseries.append(DataTimePoint(t=2,  data={'a':2}, data_loss=0))
+        with self.assertRaises(ValueError):
+            reconstructor.apply(timeseries)
 
+        # Not enough widow data for the apply at the end
+        timeseries = TimeSeries()
+        timeseries.append(DataTimePoint(t=1,  data={'a':-99}, data_loss=1))
+        timeseries.append(DataTimePoint(t=2,  data={'a':2}, data_loss=0))
+        with self.assertRaises(ValueError):
+            reconstructor.apply(timeseries)
 
-        # Not enough widow data for the apply at the end, will [shrink?]
-        #timeseries = TimeSeries()
-        #timeseries.append(DataTimePoint(t=1,  data={'a':-99}, data_loss=1))
-        #timeseries.append(DataTimePoint(t=2,  data={'a':2}, data_loss=0))
+        # Test more complex univariate
+        timeseries = TimeSeries()
+        timeseries.append(DataTimePoint(t=-3,  data={'value':3}))
+        timeseries.append(DataTimePoint(t=-2,  data={'value':2}))
+        timeseries.append(DataTimePoint(t=-1,  data={'value':1}))
+        timeseries.append(DataTimePoint(t=0,  data={'value':0}))
+        timeseries.append(DataTimePoint(t=1,  data={'value':1}))
+        timeseries.append(DataTimePoint(t=2,  data={'value':2}))
+        timeseries.append(DataTimePoint(t=3,  data={'value':3}))
+        timeseries.append(DataTimePoint(t=4,  data={'value':4}))
+        timeseries.append(DataTimePoint(t=5,  data={'value':5}))
+        timeseries.append(DataTimePoint(t=6,  data={'value':6}))
+        timeseries.append(DataTimePoint(t=7,  data={'value':7}))
+        timeseries.append(DataTimePoint(t=16, data={'value':16}))
+        timeseries.append(DataTimePoint(t=17, data={'value':17}))
+        timeseries.append(DataTimePoint(t=18, data={'value':18}))
 
-        # Force the forecaster window to "2" and check that if gaps are separated
-        # by a single point, all the are gets marked as to be reconstructed. What we want..?
+        # Resample for 3 seconds
+        resampled_timeseries = timeseries.resample(3)
+        # DataTimePoint @ 0.0 (1970-01-01 00:00:00+00:00) with data "{'value': 0.6666666666666666}" and data_loss="0.0"
+        # DataTimePoint @ 3.0 (1970-01-01 00:00:03+00:00) with data "{'value': 3.0}" and data_loss="0.0"
+        # DataTimePoint @ 6.0 (1970-01-01 00:00:06+00:00) with data "{'value': 6.0}" and data_loss="0.0"
+        # DataTimePoint @ 9.0 (1970-01-01 00:00:09+00:00) with data "{'value': 9.0}" and data_loss="1.0"
+        # DataTimePoint @ 12.0 (1970-01-01 00:00:12+00:00) with data "{'value': 12.0}" and data_loss="1.0"
+        # DataTimePoint @ 15.0 (1970-01-01 00:00:15+00:00) with data "{'value': 15.0}" and data_loss="0.6666666666666667"
+
+        # Fake data to check the reconstructor is working correctly
+        resampled_timeseries[3].data['value']=-9
+        resampled_timeseries[4].data['value']=-12
+
+        # Instantiate the reconstructor
+        reconstructor = LinearInterpolationReconstructor()
+
+        # Check parametric param just in case
+        self.assertFalse(reconstructor._is_parametric())
+
+        # Apply the reconstructor
+        reconstructed_timeseries = reconstructor.apply(resampled_timeseries)
+
+        # Check len
+        self.assertEqual(len(reconstructed_timeseries), 6)
+
+        # Check for t = 0
+        self.assertEqual(reconstructed_timeseries[0].t, 0)
+        self.assertAlmostEqual(reconstructed_timeseries[0].data['value'], 0.6666666666)
+        self.assertEqual(reconstructed_timeseries[0].data_loss, 0)
+
+        # Check for t = 3
+        self.assertEqual(reconstructed_timeseries[1].t, 3)
+        self.assertEqual(reconstructed_timeseries[1].data['value'], 3)
+        self.assertEqual(reconstructed_timeseries[1].data_loss, 0)
+
+        # Check for t = 6
+        self.assertEqual(reconstructed_timeseries[2].t, 6)
+        self.assertEqual(reconstructed_timeseries[2].data['value'], 6)
+        self.assertEqual(reconstructed_timeseries[2].data_loss, 0)
+
+        # Check for t = 9
+        self.assertEqual(reconstructed_timeseries[3].t, 9)
+        self.assertEqual(reconstructed_timeseries[3].data['value'], 9)
+        self.assertEqual(reconstructed_timeseries[3].data_loss, 1)
+
+        # Check for t = 12
+        self.assertEqual(reconstructed_timeseries[4].t, 12)
+        self.assertEqual(reconstructed_timeseries[4].data['value'], 12)
+        self.assertEqual(reconstructed_timeseries[4].data_loss, 1)
+
+        # Check for t = 15
+        self.assertEqual(reconstructed_timeseries[5].t, 15)
+        self.assertEqual(reconstructed_timeseries[5].data['value'], 15)
+        self.assertAlmostEqual(reconstructed_timeseries[5].data_loss, 0.6666666666)
+
+        # Test multivariate
+        timeseries = TimeSeries()
+        timeseries.append(DataTimePoint(t=1,  data={'a':1, 'b':4}, data_loss=0))
+        timeseries.append(DataTimePoint(t=2,  data={'a':-99, 'b':-99}, data_loss=1))
+        timeseries.append(DataTimePoint(t=3,  data={'a':3, 'b':2}, data_loss=1))
+        timeseries.append(DataTimePoint(t=4,  data={'a':4, 'b':1}, data_loss=0))
+
+        reconstructor = LinearInterpolationReconstructor()
+
+        predicted_data = reconstructor.predict(timeseries, from_i=1,to_i=1)
+        self.assertEqual(predicted_data, [{'a': 2.0, 'b': 3.0}])
+
+        predicted_data = reconstructor.predict(timeseries, from_i=1,to_i=2)
+        self.assertEqual(predicted_data, [{'a': 2.0, 'b': 3.0}, {'a': 3.0, 'b': 2.0}])
+
+        reconstructed_timeseries = reconstructor.apply(timeseries)
+        self.assertEqual(reconstructed_timeseries[0].data, {'a': 1, 'b': 4})
+        self.assertEqual(reconstructed_timeseries[1].data, {'a': 2.0, 'b': 3.0})
+        self.assertEqual(reconstructed_timeseries[2].data, {'a': 3.0, 'b': 2.0})
+        self.assertEqual(reconstructed_timeseries[3].data, {'a': 4, 'b': 1})
+        self.assertEqual(reconstructed_timeseries[0].data_indexes, {'data_loss': 0, 'data_reconstructed': 0})
+        self.assertEqual(reconstructed_timeseries[1].data_indexes, {'data_loss': 1, 'data_reconstructed': 1})
+        self.assertEqual(reconstructed_timeseries[2].data_indexes, {'data_loss': 1, 'data_reconstructed': 1})
+        self.assertEqual(reconstructed_timeseries[3].data_indexes, {'data_loss': 0, 'data_reconstructed': 0})
 
 
     def test_PeriodicAverageReconstructor(self):
@@ -123,9 +221,14 @@ class TestReconstructors(unittest.TestCase):
         timeseries = timeseries.resample(600)
         reconstructor.fit(timeseries)
 
-        # TODO: do some actual testing.. not only that "it works"
-        _  = reconstructor.apply(timeseries)
-        reconstructor.evaluate(timeseries)
+        # Predict
+        predicted_data = reconstructor.predict(timeseries, from_i=2, to_i=5)
+        self.assertEqual(list(predicted_data.keys()), ['temperature'])
+        self.assertEqual(len(predicted_data['temperature']), 4)
+        self.assertAlmostEqual(predicted_data['temperature'][0], 23.71583333333333)
+        self.assertAlmostEqual(predicted_data['temperature'][1], 23.750833333333325)
+        self.assertAlmostEqual(predicted_data['temperature'][2], 23.784166666666664)
+        self.assertAlmostEqual(predicted_data['temperature'][3], 23.7825)
 
 
     def test_ProphetReconstructor(self):
@@ -146,116 +249,16 @@ class TestReconstructors(unittest.TestCase):
 
         # Predict
         predicted_data = reconstructor.predict(timeseries, from_i=2, to_i=5)
+        self.assertEqual(list(predicted_data.keys()), ['temperature_avg'])
+        self.assertEqual(len(predicted_data['temperature_avg']), 4)
         self.assertAlmostEqual(predicted_data['temperature_avg'][0], 23.449303446403178)
         self.assertAlmostEqual(predicted_data['temperature_avg'][1], 23.45425065662797)
         self.assertAlmostEqual(predicted_data['temperature_avg'][2], 23.460265626928496)
         self.assertAlmostEqual(predicted_data['temperature_avg'][3], 23.46643974807204)
 
-        # Predict on first and last as no window
-        reconstructor.predict(timeseries, from_i=0, to_i=0)
-        reconstructor.predict(timeseries, from_i=len(timeseries)-1, to_i=len(timeseries)-1)
-
-
-    def test_LinearInterpolationReconstructor(self):
-
-        # Test multivariate
-        timeseries = TimeSeries()
-        timeseries.append(DataTimePoint(t=1,  data={'a':1, 'b':4}, data_loss=0))
-        timeseries.append(DataTimePoint(t=2,  data={'a':-99, 'b':-99}, data_loss=1))
-        timeseries.append(DataTimePoint(t=3,  data={'a':3, 'b':2}, data_loss=1))
-        timeseries.append(DataTimePoint(t=4,  data={'a':4, 'b':1}, data_loss=0))
-
-        reconstructor = LinearInterpolationReconstructor()
-
-        predicted_data = reconstructor.predict(timeseries, from_i=1,to_i=1)
-        self.assertEqual(predicted_data, [{'a': 2.0, 'b': 3.0}])
-
-
-        predicted_data = reconstructor.predict(timeseries, from_i=1,to_i=2)
-        self.assertEqual(predicted_data, [{'a': 2.0, 'b': 3.0}, {'a': 3.0, 'b': 2.0}])
-
-        # TODO: move this test in the basic reconstructors
-        reconstructed_timeseries = reconstructor.apply(timeseries)
-        self.assertEqual(reconstructed_timeseries[0].data, {'a': 1, 'b': 4})
-        self.assertEqual(reconstructed_timeseries[1].data, {'a': 2.0, 'b': 3.0})
-        self.assertEqual(reconstructed_timeseries[2].data, {'a': 3.0, 'b': 2.0})
-        self.assertEqual(reconstructed_timeseries[3].data, {'a': 4, 'b': 1})
-        self.assertEqual(reconstructed_timeseries[0].data_indexes, {'data_loss': 0, 'data_reconstructed': 0})
-        self.assertEqual(reconstructed_timeseries[1].data_indexes, {'data_loss': 1, 'data_reconstructed': 1})
-        self.assertEqual(reconstructed_timeseries[2].data_indexes, {'data_loss': 1, 'data_reconstructed': 1})
-        self.assertEqual(reconstructed_timeseries[3].data_indexes, {'data_loss': 0, 'data_reconstructed': 0})
-
-        # Test series
-        timeseries = TimeSeries()
-        timeseries.append(DataTimePoint(t=-3,  data={'value':3}))
-        timeseries.append(DataTimePoint(t=-2,  data={'value':2}))
-        timeseries.append(DataTimePoint(t=-1,  data={'value':1}))
-        timeseries.append(DataTimePoint(t=0,  data={'value':0}))
-        timeseries.append(DataTimePoint(t=1,  data={'value':1}))
-        timeseries.append(DataTimePoint(t=2,  data={'value':2}))
-        timeseries.append(DataTimePoint(t=3,  data={'value':3}))
-        timeseries.append(DataTimePoint(t=4,  data={'value':4}))
-        timeseries.append(DataTimePoint(t=5,  data={'value':5}))
-        timeseries.append(DataTimePoint(t=6,  data={'value':6}))
-        timeseries.append(DataTimePoint(t=7,  data={'value':7}))
-        timeseries.append(DataTimePoint(t=16, data={'value':16}))
-        timeseries.append(DataTimePoint(t=17, data={'value':17}))
-        timeseries.append(DataTimePoint(t=18, data={'value':18}))
-
-        # Resample for 3 seconds
-        resampled_timeseries = timeseries.resample(3)
-        # DataTimePoint @ 0.0 (1970-01-01 00:00:00+00:00) with data "{'value': 0.6666666666666666}" and data_loss="0.0"
-        # DataTimePoint @ 3.0 (1970-01-01 00:00:03+00:00) with data "{'value': 3.0}" and data_loss="0.0"
-        # DataTimePoint @ 6.0 (1970-01-01 00:00:06+00:00) with data "{'value': 6.0}" and data_loss="0.0"
-        # DataTimePoint @ 9.0 (1970-01-01 00:00:09+00:00) with data "{'value': 9.0}" and data_loss="1.0"
-        # DataTimePoint @ 12.0 (1970-01-01 00:00:12+00:00) with data "{'value': 12.0}" and data_loss="1.0"
-        # DataTimePoint @ 15.0 (1970-01-01 00:00:15+00:00) with data "{'value': 15.0}" and data_loss="0.6666666666666667"
-
-
-
-        # Fake data to check the recostructor is working correctly
-        resampled_timeseries[3].data['value']=-9
-        resampled_timeseries[4].data['value']=-12
-
-        # Instantiate the reconstructor
-        reconstructor = LinearInterpolationReconstructor()
-
-        # Check parametric param just in case
-        self.assertFalse(reconstructor._is_parametric())
-
-        # Apply the reconstructor
-        reconstructed_timeseries = reconstructor.apply(resampled_timeseries)
-
-        # Check len
-        self.assertEqual(len(reconstructed_timeseries), 6)
-
-        # Check for t = 0
-        self.assertEqual(reconstructed_timeseries[0].t, 0)
-        self.assertAlmostEqual(reconstructed_timeseries[0].data['value'], 0.6666666666)  # Expected: 0.66..
-        self.assertEqual(reconstructed_timeseries[0].data_loss, 0)
-
-        # Check for t = 3
-        self.assertEqual(reconstructed_timeseries[1].t, 3)
-        self.assertEqual(reconstructed_timeseries[1].data['value'], 3)  # Expected: 3
-        self.assertEqual(reconstructed_timeseries[1].data_loss, 0)
-
-        # Check for t = 6
-        self.assertEqual(reconstructed_timeseries[2].t, 6)
-        self.assertEqual(reconstructed_timeseries[2].data['value'], 6)  # Expected: 6
-        self.assertEqual(reconstructed_timeseries[2].data_loss, 0)
-
-        # Check for t = 9
-        self.assertEqual(reconstructed_timeseries[3].t, 9)
-        self.assertEqual(reconstructed_timeseries[3].data['value'], 9)  # Expected: 9 (fully reconstructed)
-        self.assertEqual(reconstructed_timeseries[3].data_loss, 1)
-
-        # Check for t = 12
-        self.assertEqual(reconstructed_timeseries[4].t, 12)
-        self.assertEqual(reconstructed_timeseries[4].data['value'], 12)  # Expected: 12 (fully reconstructed)
-        self.assertEqual(reconstructed_timeseries[4].data_loss, 1)
-
-        # Check for t = 15
-        self.assertEqual(reconstructed_timeseries[5].t, 15)
-        self.assertEqual(reconstructed_timeseries[5].data['value'], 15)  # Expected: 15
-        self.assertAlmostEqual(reconstructed_timeseries[5].data_loss, 0.6666666666)
+        # Can also predict on first and last items as it hasno window
+        predicted_data = reconstructor.predict(timeseries, from_i=0, to_i=0)
+        self.assertAlmostEqual(predicted_data['temperature_avg'][0], 23.439783345000002)
+        predicted_data = reconstructor.predict(timeseries, from_i=len(timeseries)-1, to_i=len(timeseries)-1)
+        self.assertAlmostEqual(predicted_data['temperature_avg'][0], 23.11027474748722)
 
