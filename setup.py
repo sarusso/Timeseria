@@ -30,7 +30,7 @@ and machine learning models on top of it.\n\nCheck out the GitHub project for mo
                           'scipy >=1.5.4, <2.0.0',
                           'pyppeteer>=0.2.6, <1.0.0',
                           'fitter==1.7.0',
-                          'propertime>=1.0.0, <2.0.0'
+                          'propertime>=1.0.1, <2.0.0'
                           ],
       extras_require = {
                         'tensorflow': ['tensorflow >=2.0.0, <3.0.0'],

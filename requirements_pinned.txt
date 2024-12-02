@@ -9,7 +9,7 @@ cython==0.29.17
 requests==2.26.0
 scipy==1.7.3
 pyppeteer==0.2.6
-propertime==1.0.0
+propertime==1.0.1
 fitter==1.7.0
 
 # Optional
