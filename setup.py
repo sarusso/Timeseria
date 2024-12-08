@@ -3,7 +3,7 @@
 from setuptools import setup, find_packages
 
 setup(name='timeseria',
-      version='2.0.1',
+      version='2.0.2',
       description='An object-oriented time series processing library',
       long_description="""Timeseria is an object-oriented time series processing library which aims at making it easy to manipulate time series data and to build statistical 
 and machine learning models on top of it.\n\nCheck out the GitHub project for more info: [Timeseria on GitHub](https://github.com/sarusso/Timeseria).\n\n
