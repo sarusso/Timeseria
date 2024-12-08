@@ -377,7 +377,7 @@ class Transformation(object):
     def __str__(cls):
         return '{} transformation'.format(cls.__name__.replace('Transformation',''))
 
-    def process(self, series, target, start=None, end=None, validity=None, include_extremes=False, fill_with=None, force_data_loss=None):
+    def process(self, series, start=None, end=None, validity=None, include_extremes=False, fill_with=None, force_data_loss=None):
         """Start the transformation process.
 
             Args:
@@ -392,6 +392,8 @@ class Transformation(object):
                 fill_with(): a fixed value to fill the data of the items showing a full data loss.
                 force_data_loss(float): Force a specific data loss value for all the new series items.
         """
+
+        target = self.target
 
         if not isinstance(series, TimeSeries):
             raise NotImplementedError('Transformations work only with TimeSeries data for now (got "{}")'.format(series.__class__.__name__))
@@ -705,6 +707,8 @@ class Resampler(Transformation):
         interpolator_class(Interpolator): the interpolator to use for the resampling process. Defaults to :obj:`LinearInterpolator`.
     """
 
+    target = 'points'
+
     def __init__(self, unit, interpolator_class=LinearInterpolator):
 
         # Handle unit
@@ -721,7 +725,6 @@ class Resampler(Transformation):
         self.interpolator_class = interpolator_class
 
     def process(self, series, *args, **kwargs):
-        kwargs['target'] = 'points'
         return super(Resampler, self).process(series, *args, **kwargs)
 
 
@@ -738,6 +741,8 @@ class Aggregator(Transformation):
                           module, as well as custom ones, provided they take as input a series and return a scalar.
         interpolator_class(Interpolator): the interpolator to use to reconstruct missing samples. Defaults to :obj:`LinearInterpolator`.
     """
+
+    target = 'slots'
 
     def __init__(self, unit, operations=[avg], interpolator_class=LinearInterpolator):
 
@@ -766,6 +771,5 @@ class Aggregator(Transformation):
         self.interpolator_class = interpolator_class
 
     def process(self, series, *args, **kwargs):
-        kwargs['target'] = 'slots'
         return super(Aggregator, self).process(series, *args, **kwargs)
 
