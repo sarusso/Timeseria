@@ -377,9 +377,21 @@ class Transformation(object):
     def __str__(cls):
         return '{} transformation'.format(cls.__name__.replace('Transformation',''))
 
-    def process(self, series, target, start=None, end=None, validity=None, include_extremes=False, fill_with=None, force_data_loss=None,):
-        """Start the transformation process. If start and/or end are not set, they are set automatically
-        based on first and last points of the series"""
+    def process(self, series, target, start=None, end=None, validity=None, include_extremes=False, fill_with=None, force_data_loss=None):
+        """Start the transformation process.
+
+            Args:
+                series(TimeSeries): the time series to transform.
+                start(float, datetime): the start time of the transformation process. If not set, then it is set automatically
+                                        based on first item of the series. Defaults to None.
+                end(float, datetime): the end time of the transformation process. If not set, then it is set automatically
+                                      based on first item of the series. Defaults to None.
+                validity(float): the validity (sampling) interval of the original data points. Defaults to auto-detect.
+                include_extremes(bool): if to include the first and last items in the transformed time series, which might
+                                        not have enough data when being created. Defaults to False.
+                fill_with(): a fixed value to fill the data of the items showing a full data loss.
+                force_data_loss(float): Force a specific data loss value for all the new series items.
+        """
 
         if not isinstance(series, TimeSeries):
             raise NotImplementedError('Transformations work only with TimeSeries data for now (got "{}")'.format(series.__class__.__name__))
@@ -686,7 +698,12 @@ class Transformation(object):
 #==========================
 
 class Resampler(Transformation):
-    """Resampling transformation."""
+    """Resampling transformation.
+
+    Args:
+        unit(TimeUnit. str): the time unit corresponding to the new sampling interval, or its string representation.
+        interpolator_class(Interpolator): the interpolator to use for the resampling process. Defaults to :obj:`LinearInterpolator`.
+    """
 
     def __init__(self, unit, interpolator_class=LinearInterpolator):
 
@@ -713,7 +730,14 @@ class Resampler(Transformation):
 #==========================
 
 class Aggregator(Transformation):
-    """Aggregation transformation."""
+    """Aggregation transformation.
+
+    Args:
+        unit(TimeUnit. str): the time unit corresponding to the aggregation slots, or its string representation.
+        operations(list): the list of operations to perform when aggregating the data. Supports any operation of the ``operations``
+                          module, as well as custom ones, provided they take as input a series and return a scalar.
+        interpolator_class(Interpolator): the interpolator to use to reconstruct missing samples. Defaults to :obj:`LinearInterpolator`.
+    """
 
     def __init__(self, unit, operations=[avg], interpolator_class=LinearInterpolator):
 

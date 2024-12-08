@@ -35,15 +35,22 @@ class Reconstructor(Model):
     or in other words to fill gaps. Gaps need a "next" element after their end to be defined, which
     can bring much more information to the model with respect to a forecasting task.
 
-    Args:
-        path (str): a path from which to load a saved model. Will override all other init settings.
     """
 
     window = None
 
     @Model.apply_method
     def apply(self, series, data_loss_threshold=1.0, inplace=False):
+        """Call the model apply logic on a series.
 
+            Args:
+                series(TimeSeries): the series on which to apply the model logic.
+                data_loss_threshold(float): the data loss threshold above which the reconstructor should
+                                            kick-in. Defaults to 1.0 (reconstructs only full data losses).
+
+            Returns:
+                TimeSeries: the series with the results of applying the model.
+        """
         logger.debug('Using data_loss_threshold="%s"', data_loss_threshold)
 
         if not inplace:
@@ -121,9 +128,23 @@ class Reconstructor(Model):
         if not inplace:
             return reconstructed_data
 
+    def predict(self, series, from_i, to_i):
+        """Call the model predict logic on a series.
+
+            Args:
+                series(TimeSeries): the series on which to apply the predict logic.
+                from_i(int): the start of the gap where to predict the reconstruction.
+                to_i(int): the end of the gap where to predict the reconstruction.
+
+            Returns:
+                dict: the predicted data.
+        """
+        raise NotImplementedError('Predicting with this model is not implemented')
+
+
     @Model.evaluate_method
     def evaluate(self, series, steps='auto', limit=None, data_loss_threshold=1.0, metrics=['RMSE', 'MAE'], details=False):
-        """Evaluate the reconstructor on a series.
+        """Evaluate the model on a series.
 
         Args:
             steps (int, list): a single value or a list of values for how many steps (intended as missing data points or slots)
@@ -357,11 +378,7 @@ class LinearInterpolationReconstructor(Reconstructor):
 #=====================================
 
 class PeriodicAverageReconstructor(Reconstructor):
-    """A reconstruction model based on periodic averages.
-
-    Args:
-        path (str): a path from which to load a saved model. Will override all other init settings.
-    """
+    """A reconstruction model based on periodic averages."""
 
     window = 1
 
@@ -377,6 +394,7 @@ class PeriodicAverageReconstructor(Reconstructor):
             offset_method(str): how to offset the reconstructed data in order to align it to the missing data gaps. Supported values
                                 are ``average`` to use the average gap value, or ``extremes`` to use its extremes.
             data_loss_limit(float): discard from the fit elements with a data loss greater than or equal to this limit.
+            verbose(bool): not supported, has no effect.
         """
 
         if not offset_method in ['average', 'extremes']:
@@ -475,11 +493,7 @@ class PeriodicAverageReconstructor(Reconstructor):
 
 class ProphetReconstructor(Reconstructor, _ProphetModel):
     """A reconstruction model based on Prophet. Prophet (from Facebook) implements a procedure for forecasting time series data based
-    on an additive model where non-linear trends are fit with yearly, weekly, and daily seasonality, plus holiday effects.
-
-    Args:
-        path (str): a path from which to load a saved model. Will override all other init settings.
-    """
+    on an additive model where non-linear trends are fit with yearly, weekly, and daily seasonality, plus holiday effects."""
 
     window = 0
 

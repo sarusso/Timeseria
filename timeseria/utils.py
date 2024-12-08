@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 
 def ensure_reproducibility():
-    """Ensure reproducibility by fixing seeds and initial conditions for: Random, Numpy, Keras and Tensorflow."""
+    """Ensure reproducibility by fixing seeds to zero for Random, Numpy, and Tensorflow."""
 
     random.seed(0)
     numpy.random.seed(0)
@@ -41,7 +41,11 @@ def ensure_reproducibility():
 
 
 def is_numerical(item):
-    """Check if item is numerical (float or int, including Pandas data types)."""
+    """Check if an item is numerical (float or int, including Pandas data types).
+
+        Args:
+            item(obj): the item to check.
+    """
     if isinstance(item, float):
         return True
     if isinstance(item, int):
@@ -55,7 +59,15 @@ def is_numerical(item):
 
 
 def detect_encoding(file_name, streaming=False):
-    """Detect the encoding of a file."""
+    """Detect the encoding of a file.
+
+        Args:
+            file_name(str): the file name for which to detect the encoding.
+            straming(bool): if to perform the detection in streaming mode, for large files. Default to False.
+
+        Returns:
+            str: the detected encoding.
+    """
     if streaming:
         detector = UniversalDetector()
         with open(file_name, 'rb') as file_pointer:
@@ -79,7 +91,15 @@ def detect_encoding(file_name, streaming=False):
 
 
 def detect_sampling_interval(timeseries, confidence=False):
-    """Detect the sampling interval of a time series."""
+    """Detect the sampling interval of a time series.
+
+        Args:
+            timeseries(TimeSeries): the time series for which to detect the sampling interval.
+            confidence(bool): if to provide the confidence as well, in a 0-1 range.
+
+        Returns:
+            float or tuple: the detected sampling rate or the detected sampling rate with the confidence.
+    """
 
     diffs={}
     prev_point=None
@@ -132,7 +152,14 @@ def detect_sampling_interval(timeseries, confidence=False):
 
 
 def detect_periodicity(timeseries):
-    """Detect the periodicity of a time series."""
+    """Detect the periodicity of a time series.
+
+        Args:
+            timeseries(TimeSeries): the time series for which to detect the periodicity.
+
+        Returns:
+            int: the detected periodicity.
+    """
 
     _check_timeseries(timeseries)
     data_labels = timeseries.data_labels()
@@ -205,8 +232,15 @@ def detect_periodicity(timeseries):
 
 
 def mean_absolute_percentage_error(list1, list2):
-    """Compute the MAPE, list 1 are true values, list 2 are predicted values."""
+    """Compute the MAPE.
 
+        Args:
+            list1(list): the true values.
+            list2(list): the predicted values.
+
+        Returns:
+            float: the computed MAPE.
+    """
     if len(list1) != len(list2):
         raise ValueError('Lists have different lengths, cannot continue')
     p_error_sum = 0
@@ -216,8 +250,15 @@ def mean_absolute_percentage_error(list1, list2):
 
 
 def max_absolute_percentage_error(list1, list2):
-    """Compute the MaxAPE, list 1 are true values, list 2 are predicted values."""
+    """Compute the MaxAPE.
 
+        Args:
+            list1(list): the true values.
+            list2(list): the predicted values.
+
+        Returns:
+            float: the computed MaxAPE.
+    """
     if len(list1) != len(list2):
         raise ValueError('Lists have different lengths, cannot continue')
     max_ape = None
@@ -232,12 +273,28 @@ def max_absolute_percentage_error(list1, list2):
 
 
 def mean_absolute_error(list1,list2):
-    """Compute the MAE, list 1 are true values, list 2 are predicted values."""
+    """Compute the MAE.
+
+        Args:
+            list1(list): the true values.
+            list2(list): the predicted values.
+
+        Returns:
+            float: the computed MAE.
+    """
     return sklearn_mean_absolute_error(list1,list2)
 
 
 def max_absolute_error(list1,list2):
-    """Compute the MaxAE, list 1 are true values, list 2 are predicted values."""
+    """Compute the MaxAE.
+
+        Args:
+            list1(list): the true values.
+            list2(list): the predicted values.
+
+        Returns:
+            float: the computed MaxAE.
+    """
     if len(list1) != len(list2):
         raise ValueError('Lists have different lengths, cannot continue')
     max_ae = None
@@ -252,7 +309,15 @@ def max_absolute_error(list1,list2):
 
 
 def mean_absolute_log_error(list1, list2):
-    """Compute the MALE, list 1 are true values, list 2 are predicted values."""
+    """Compute the MALE.
+
+        Args:
+            list1(list): the true values.
+            list2(list): the predicted values.
+
+        Returns:
+            float: the computed MALE.
+    """
     if len(list1) != len(list2):
         raise ValueError('Lists have different lengths, cannot continue')
     ale_sum = 0
@@ -262,7 +327,15 @@ def mean_absolute_log_error(list1, list2):
 
 
 def max_absolute_log_error(list1,list2):
-    """Compute the MaxALE, list 1 are true values, list 2 are predicted values."""
+    """Compute the MaxALE.
+
+        Args:
+            list1(list): the true values.
+            list2(list): the predicted values.
+
+        Returns:
+            float: the computed MaxALE.
+    """
     if len(list1) != len(list2):
         raise ValueError('Lists have different lengths, cannot continue')
     max_ale = None
@@ -277,12 +350,31 @@ def max_absolute_log_error(list1,list2):
 
 
 def mean_squared_error(list1,list2):
-    """Compute the MSE, list 1 are true values, list 2 are predicted values."""
+    """Compute the MSE.
+
+        Args:
+            list1(list): the true values.
+            list2(list): the predicted values.
+
+        Returns:
+            float: the computed MSE.
+    """
     return sklearn_mean_squared_error(list1,list2)
 
 
 def rescale(value, source_from, source_to, target_from=0, target_to=1):
-    """Rescale a value from one range to another."""
+    """Rescale a value from one range to another.
+
+        Args:
+            value(float, obj): the value to rescale.
+            source_from(float): the source rescaling interval start.
+            source_end(float): the source rescaling interval end.
+            target_from(float): the target rescaling interval start. Defaults to 0.
+            target_end(float): the target rescaling interval end. Defaults to 1.
+
+        Returns:
+            float or obj: the rescaled value.
+    """
 
     if value < 0:
         raise ValueError('Cannot rescale negative value')
@@ -311,8 +403,18 @@ def rescale(value, source_from, source_to, target_from=0, target_to=1):
 
 
 def os_shell(command, capture=False, verbose=False, interactive=False, silent=False):
-    """Execute a command in the OS shell. By default prints everything. If the capture switch is set,
-    then it returns a namedtuple with stdout, stderr, and exit code."""
+    """Execute a command in the OS shell and print its output.
+
+        Args:
+            command(str): the command to execute.
+            capture(bool): if to capture the output as a namedtuple with stdout, stderr, and exit code instead of
+                           printing it. Defaults to False.
+            interactive(bool): if to run the command in interactive mode. Defaults to False.
+            silent(bool): if to suppress printing the output. Defaults to False.
+
+        Returns:
+            None or namedtupe: the output of the command, if any.
+    """
 
     if capture and verbose:
         raise Exception('You cannot ask at the same time for capture and verbose, sorry')
@@ -375,7 +477,12 @@ def os_shell(command, capture=False, verbose=False, interactive=False, silent=Fa
 
 
 class DistributionFunction():
-    """A class representing a statistical distribution."""
+    """A class representing a statistical distribution. Implemented as a callable object, so that it can be evaluated at a given x.
+
+        Args:
+            dist(str): the name of the distirbution.
+            params(dist): the parameters of the distirbution
+    """
 
     def __init__(self, dist, params):
         self.dist = dist
@@ -391,7 +498,16 @@ class DistributionFunction():
         return self.dist_obj.pdf(x, **self.params)
 
     def plot(self, x_min=-1, x_max=1, show=True):
-        """Plot the distribution"""
+        """Plot the distribution.
+
+            Args:
+                x_min(float): the minimum value of the x axis.
+                x_max(float): the maximum value of the x axis.
+                show(bool): if to show the plot. Default to True.
+
+            Returns:
+                None or plt: the pot object, if not set to be shown.
+        """
 
         plt.clf()
 
@@ -412,6 +528,16 @@ class DistributionFunction():
             return plt
 
     def find_x(self, y, wideness=1000, side='right'):
+        """Find the x for a given y.
+
+            Args:
+                y(float): the y to find the x for.
+                wideness(float): how wide the search should be, on the x axis.
+                side(str): on which side of the distribution to look.
+
+            Returns:
+                float: the x found for the given y.
+        """
         # Note: "self" can be any function, we use this class as a callable here
 
         start = self.params['loc']

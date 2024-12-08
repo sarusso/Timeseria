@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 #=================================
 
 class Operation():
-    """A generic series operation (callable object). Can return any valid data type,
+    """A generic series operation. Can return any data type,
     as a series, a scalar, a list of items, etc."""
 
     _supports_weights = False
@@ -71,7 +71,16 @@ class Operation():
 #=================================
 
 class Max(Operation):
-    """Maximum operation (callable object)."""
+    """Get the maximum data value(s) of a series. A series of DataPoints or DataSlots is required.
+
+    Args:
+       series(Series): the series on which to perform the operation.
+       data_label(string): if provided, compute the value only for this data label. Defaults to None.
+
+    Returns:
+       dict or object: the computed values for each data label, or a specific value if
+       providing the data_label argument.
+    """
 
     def __init__(self):
         self.built_in_max = max
@@ -98,7 +107,17 @@ class Max(Operation):
 
 
 class Min(Operation):
-    """Minimum operation (callable object)."""
+    """Get the minimum data value(s) of a series. A series of DataPoints or DataSlots is required.
+
+    Args:
+       series(Series): the series on which to perform the operation.
+       data_label(string): if provided, compute the value only for this data label.
+                           Defaults to None.
+
+    Returns:
+       dict or object: the computed values for each data label, or a specific value if
+       providing the data_label argument.
+    """
 
     def __init__(self):
         self.built_in_min = min
@@ -124,7 +143,16 @@ class Min(Operation):
 
 
 class Avg(Operation):
-    """Weighted average operation (callable object)."""
+    """Get the average data value(s) of a series. A series of DataPoints or DataSlots is required.
+
+    Args:
+       series(Series): the series on which to perform the operation.
+       data_label(string, optional): if provided, compute the value only for this data label.
+
+    Returns:
+       dict or object: the computed values for each data label, or a specific value if
+       providing the data_label argument.
+    """
 
     _supports_weights = True
 
@@ -188,7 +216,16 @@ class Avg(Operation):
 
 
 class Sum(Operation):
-    """Sum operation (callable object)."""
+    """Sum every data value(s) of a series. A series of DataPoints or DataSlots is required.
+
+    Args:
+       series(Series): the series on which to perform the operation.
+       data_label(string, optional): if provided, compute the value only for this data label.
+
+    Returns:
+       dict or object: the computed values for each data label, or a specific value if
+       providing the data_label argument.
+    """
 
     def _call(self, series, data_label=None):
 
@@ -210,7 +247,17 @@ class Sum(Operation):
 #=================================
 
 class Derivative(Operation):
-    """Derivative operation (callable object)."""
+    """Compute the derivative on a series. A series of DataTimePoints or DataTimeSlots is required.
+
+    Args:
+       series(Series): the series on which to perform the operation.
+       inplace(bool): if to perform the operation in-place on the series. Defaults to False.
+       normalize(bool): if to normalize the derivative w.r.t to the series resolution. Defaults to True.
+       diffs(bool): if to compute the differences instead of the derivative. Defaults to False.
+
+    Returns:
+       series or None: the computed series, or None if set to perform the operation in-place.
+    """
 
     def _call(self, series, inplace=False, normalize=True, diffs=False):
 
@@ -352,9 +399,25 @@ class Derivative(Operation):
 
 
 class Integral(Operation):
-    """Integral operation (callable object)."""
+    """Compute the integral on a series. A series of DataTimePoints or DataTimeSlots is required.
+
+    Args:
+       series(Series): the series on which to perform the operation.
+       inplace(bool): if to perform the operation in-place on the series. Defaults to False.
+       normalize(bool): if to normalize the integral w.r.t to the series resolution. Defaults to True.
+       c(float, dict): the integrative constant, as a single value or as a dictionary of values, one
+                       for each data label. Defaults to zero.
+       offset(float, dict): if to start the integrative process from a specific offset. Can be provided as a
+                            single value or as a dictionary of values, one for each data label. Defaults to zero.
+
+    Returns:
+       series or None: the computed series, or None if set to perform the operation in-place.
+    """
 
     def _call(self, series, inplace=False, normalize=True, c=0, offset=0):
+
+        if c and offset:
+            raise ValueError('Choose between using and integrative constant or a starting offset, got both.')
 
         _check_series_of_points_or_slots(series)
         _check_indexed_data(series)
@@ -403,7 +466,7 @@ class Integral(Operation):
             # Do we have to create the previous point based on an offset?
             if i==0 and offset:
                 if inplace:
-                    raise ValueError('Cannot use prev_data in in-place mode, would require to add a point to the series')
+                    raise ValueError('Cannot use the offset in in-place mode, would require to add a point to the series')
 
                 prev_data = series[0].data.__class__()
 
@@ -434,7 +497,6 @@ class Integral(Operation):
                                                      data_loss = 0))
                 # Now set the c accordingly:
                 c = offset
-
 
             if not inplace:
                 data = series[0].data.__class__()
@@ -511,7 +573,16 @@ class Integral(Operation):
 
 
 class Diff(Derivative):
-    """Incremental differences operation (callable object)."""
+    """Compute the incremental differences on a series. Reduces the series length by one
+    (removing the first element). A series of DataTimePoints or DataTimeSlots is required.
+
+    Args:
+       series(Series): the series on which to perform the operation.
+       inplace(bool): if to perform the operation in-place on the series. Defaults to False.
+
+    Returns:
+       series or None: the computed series, or None if set to perform the operation in-place.
+    """
     def _call(self, series, inplace=False):
         if series.resolution == 'variable':
             raise ValueError('The differences cannot be computed on variable resolution time series, resample it or use the derivative operation.')
@@ -519,7 +590,17 @@ class Diff(Derivative):
 
 
 class CSum(Integral):
-    """Cumulative sum operation (callable object)."""
+    """Compute the incremental sum on a series. A series of DataTimePoints or DataTimeSlots is required.
+
+    Args:
+       series(Series): the series on which to perform the operation.
+       inplace(bool): if to perform the operation in-place on the series. Defaults to False.
+       offset(float, dict): if to start computing the cumulative sum from a specific offset. Can be provided as a
+                            single value or as a dictionary of values, one for each data label. Defaults to None.
+
+    Returns:
+       series or None: the computed series, or None if set to perform the operation in-place.
+    """
     def _call(self, series, inplace=False, offset=None):
         if series.resolution == 'variable':
             raise ValueError('The cumulative sums cannot be computed on variable resolution time series, resample it or use the integral operation.')
@@ -527,8 +608,17 @@ class CSum(Integral):
 
 
 class Normalize(Operation):
-    """Normalization operation (callable object)"""
+    """Normalize the data values of a series bringing them to a given range. A series of DataTimePoints or DataTimeSlots is required.
 
+    Args:
+       series(Series): the series on which to perform the operation.
+       range(list): the normalization target range. Defaults to [0,1].
+       inplace(bool): if to perform the operation in-place on the series. Defaults to False.
+       source_range(dict, optional): a custom source range, by data label, to normalize with respect to.
+
+    Returns:
+       series or None: the computed series, or None if set to perform the operation in-place.
+    """
     def _call(self, series, range=[0,1], source_range=None, inplace=False):
 
         _check_series_of_points_or_slots(series)
@@ -544,7 +634,7 @@ class Normalize(Operation):
 
         data_labels = series.data_labels()
 
-        # Compute min and max for the data labels if no source raneg was provided
+        # Compute min and max for the data labels if no source range was provided
         if source_range:
             mins = {data_label: source_range[data_label][0] for data_label in data_labels}
             maxs = {data_label: source_range[data_label][1] for data_label in data_labels}
@@ -613,8 +703,17 @@ class Normalize(Operation):
 
 
 class Rescale(Operation):
-    """Rescaling operation (callable object)"""
+    """Rescale the data values of a series by a given factor. A series of DataTimePoints or DataTimeSlots is required.
 
+    Args:
+       series(Series): the series on which to perform the operation.
+       value(float, dict): the value to use as rescaling factor. Can be provided as a single
+                           value or as a dictionary of values, one for each data label.
+       inplace(bool): if to perform the operation in-place on the series. Defaults to False.
+
+    Returns:
+       series or None: the computed series, or None if set to perform the operation in-place.
+    """
     def _call(self, series, value, inplace=False):
 
         _check_series_of_points_or_slots(series)
@@ -677,8 +776,17 @@ class Rescale(Operation):
 
 
 class Offset(Operation):
-    """Offsetting operation (callable object)"""
+    """Offset the data values of a series by a given value. A series of DataTimePoints or DataTimeSlots is required.
 
+    Args:
+       series(Series): the series on which to perform the operation.
+       value(float, dict): the value to use as offset. Can be provided as a single
+                           value or as a dictionary of values, one for each data label.
+       inplace(bool): if to perform the operation in-place on the series. Defaults to False.
+
+    Returns:
+       series or None: the computed series, or None if set to perform the operation in-place.
+    """
     def _call(self, series, value, inplace=False):
 
         _check_series_of_points_or_slots(series)
@@ -742,8 +850,17 @@ class Offset(Operation):
 
 
 class MAvg(Operation):
-    """Moving average operation (callable object)."""
+    """Compute the moving average on a series. Reduces the series length by a number of values
+    equal to the window size. A series of DataTimePoints or DataTimeSlots is required.
 
+    Args:
+       series(Series): the series on which to perform the operation.
+       window(int): the length of the moving average window.
+       inplace(bool): if to perform the operation in-place on the series. Defaults to False.
+
+    Returns:
+       series or None: the computed series, or None if set to perform the operation in-place.
+    """
     def _call(self, series, window, inplace=False):
 
         _check_series_of_points_or_slots(series)
@@ -802,54 +919,13 @@ class MAvg(Operation):
         return mavg_series
 
 
-class Get(Operation):
-    """Get operation (callable object)."""
-
-    def __call__(self, series, *args, **kwargs):
-        if not series:
-            raise IndexError
-        else:
-            return super(Get, self).__call__(series, *args, **kwargs)
-
-    def _call(self, series, at_i=None, at_t=None, at_dt=None):
-
-        ats = 0
-        if at_i is not None:
-            if not isinstance(at_i, int):
-                raise ValueError('The argument at_i must be of type "int" (got "{}")'.format(at_i.__class__.__name__))
-            ats+=1
-        if at_t is not None:
-            if not (isinstance(at_t, int) or isinstance(at_t, float)):
-                raise ValueError('The argument at_t must be of type "int" or "float" (got "{}")'.format(at_t.__class__.__name__))
-            ats+=1
-        if at_dt is not None:
-            if not isinstance(at_dt, datetime):
-                raise ValueError('The argument at_dt must be of type "datetime" (got "{}")'.format(at_dt.__class__.__name__))
-            ats+=1
-        if ats > 1:
-            raise ValueError('Got more than one at_i, at_t or at_dt: choose one')
-
-        if at_i is None:
-            if at_dt is not None:
-                at_t = s_from_dt(at_dt)
-
-        # Handle negative index
-        if at_i is not None and at_i < 0:
-            at_i = len(series) - abs(at_i)
-
-        if at_i is not None:
-            return series._item_by_i(at_i)
-
-        elif at_t is not None:
-            return series._item_by_t(at_t)
-
-        else:
-            raise ValueError('No more at_i, at_t or at_dt set')
-
-
 class Filter(Operation):
-    """Filter operation (callable object)."""
+    """Filter a series keeping only the data labels provided as argument.
 
+    Args:
+       series(Series): the series on which to perform the operation.
+       *data_labels(str): the data label(s) to filter against.
+    """
     def _call(self, series, *data_labels):
 
         _check_series_of_points_or_slots(series)
@@ -878,8 +954,20 @@ class Filter(Operation):
 
 
 class Slice(Operation):
-    """Slice operation (callable object)."""
+    """Slice a series between the given positions or times. A series of DataPoints or DataSlots is required.
 
+    Args:
+       series(Series): the series on which to perform the operation.
+       from_i(int): the slicing start position. Defaults to None.
+       to_i(int): the slicing end position. Defaults to None.
+       from_t(bool): the slicing start time (as epoch seconds). Defaults to None.
+       to_t(bool): the slicing end time (as epoch seconds). Defaults to None.
+       from_dt(bool): the slicing start time (as datetime object). Defaults to None.
+       to_dt(bool): the slicing end time (as datetime object). Defaults to None.
+
+    Returns:
+        Series: the sliced series.
+    """
     def _call(self, series, from_i=None, to_i=None, from_t=None, to_t=None, from_dt=None, to_dt=None):
 
         if from_t is not None or to_t is not None or from_dt is not None or to_dt is not None:
@@ -995,7 +1083,11 @@ class Slice(Operation):
 
 
 class Merge(Operation):
-    """Merge operation (callable object)."""
+    """Merge the series given as argument.
+
+    Returns:
+        Series: the merged series.
+    """
 
     def _call(self, *series):
 
@@ -1150,9 +1242,71 @@ class Merge(Operation):
 # Operations returning lists
 #=================================
 
-class Select(Operation):
-    """Select operation (callable object)."""
+class Get(Operation):
+    """Get the element of a series at a given position or at a given time.
 
+    Args:
+       series(Series): the series on which to perform the operation.
+       at_i(int): the position of the item to get. Defaults to None.
+       at_t(bool): the time (as epoch seconds) of the item to get. Defaults to None.
+       at_dt(bool): the time (as datetime object) of the item to get. Defaults to None.
+
+    Returns:
+        object: the item in the given position or at the given time.
+    """
+    def __call__(self, series, *args, **kwargs):
+        if not series:
+            raise IndexError
+        else:
+            return super(Get, self).__call__(series, *args, **kwargs)
+
+    def _call(self, series, at_i=None, at_t=None, at_dt=None):
+
+        ats = 0
+        if at_i is not None:
+            if not isinstance(at_i, int):
+                raise ValueError('The argument at_i must be of type "int" (got "{}")'.format(at_i.__class__.__name__))
+            ats+=1
+        if at_t is not None:
+            if not (isinstance(at_t, int) or isinstance(at_t, float)):
+                raise ValueError('The argument at_t must be of type "int" or "float" (got "{}")'.format(at_t.__class__.__name__))
+            ats+=1
+        if at_dt is not None:
+            if not isinstance(at_dt, datetime):
+                raise ValueError('The argument at_dt must be of type "datetime" (got "{}")'.format(at_dt.__class__.__name__))
+            ats+=1
+        if ats > 1:
+            raise ValueError('Got more than one at_i, at_t or at_dt: choose one')
+
+        if at_i is None:
+            if at_dt is not None:
+                at_t = s_from_dt(at_dt)
+
+        # Handle negative index
+        if at_i is not None and at_i < 0:
+            at_i = len(series) - abs(at_i)
+
+        if at_i is not None:
+            return series._item_by_i(at_i)
+
+        elif at_t is not None:
+            return series._item_by_t(at_t)
+
+        else:
+            raise ValueError('No more at_i, at_t or at_dt set')
+
+
+class Select(Operation):
+    """Select one or more items of the series given an SQL-like query. This is a preliminary
+    functionality supporting only the equality. A series of DataPoints or DataSlots is required.
+
+    Args:
+       series(Series): the series on which to perform the operation.
+       query(str): the query.
+
+    Returns:
+        list: the selected items of the series.
+    """
     def _call(self, series, query):
 
         _check_series_of_points_or_slots(series)

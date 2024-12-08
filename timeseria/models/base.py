@@ -45,9 +45,6 @@ class Model():
     ``cross_validate()`` method is available.
 
     Series resolution and data labels consistency are enforced between all methods and save/load operations.
-
-    Args:
-        path (optional, str): a path from which to load a saved model. Will override all other init settings. Only for parametric models.
     """
 
     def __init__(self):
@@ -87,7 +84,14 @@ class Model():
 
     @classmethod
     def load(cls, path):
-        """Load the model from a path."""
+        """Instantiate the model loading its parameters from a path.
+
+            Args:
+                path(str): the path from which to load the model.
+
+            Returns:
+                Model: the model instance.
+        """
         # Do we have to load the model (if parametric?)
         #if not cls._is_parametric():
         #    raise ValueError('Loading a non-parametric model from a path does not make sense')
@@ -111,7 +115,11 @@ class Model():
 
     def save(self, path):
         """Save the model in the given path. The model is saved in "directory format",
-         meaning that a new directory will be created containing the data for the model."""
+        meaning that a new directory will be created containing the data for the model.
+
+        Args:
+            path(str): the path where to save the model.
+        """
 
         # Is this model parametric?
         if not self._is_parametric():
@@ -207,7 +215,12 @@ class Model():
         return do_fit
 
     def fit(self, series, verbose=False):
-        """Fit the model on a series."""
+        """Fit the model on a series.
+
+            Args:
+                series(TimeSeries): the series on which to fit the model.
+                verbose(str): if to be verbose when fitting.
+        """
         raise NotImplementedError('Fitting this model is not implemented')
 
 
@@ -248,7 +261,12 @@ class Model():
         return do_fit_update
 
     def fit_update(self, series, verbose=False, **kwargs):
-        """Update the model fit on a series."""
+        """Update the model fit on a series.
+
+            Args:
+                series(TimeSeries): the series on which to update the fit of the model.
+                verbose(str): if to be verbose when fitting.
+        """
         raise NotImplementedError('Updating the fit is not implemented for this model')
 
     @staticmethod
@@ -288,7 +306,14 @@ class Model():
         return do_predict
 
     def predict(self, series):
-        """Call the model predict logic on a series."""
+        """Call the model predict logic on a series.
+
+            Args:
+                series(TimeSeries): the series on which to apply the predict logic.
+
+            Returns:
+                dict: the predicted data.
+        """
         raise NotImplementedError('Predicting with this model is not implemented')
 
     @staticmethod
@@ -322,7 +347,14 @@ class Model():
         return do_apply
 
     def apply(self, series):
-        """Call the model apply logic on a series."""
+        """Call the model apply logic on a series.
+
+            Args:
+                series(TimeSeries): the series on which to apply the model logic.
+
+            Returns:
+                TimeSeries: the series with the results of applying the model.
+        """
         raise NotImplementedError('Applying this model is not implemented')
 
     @staticmethod
@@ -356,7 +388,14 @@ class Model():
         return do_evaluate
 
     def evaluate(self, series):
-        """Call the model evaluate logic on a series."""
+        """Call the model evaluate logic on a series.
+
+            Args:
+                series(TimeSeries): the series on which to evaluate the model.
+
+            Returns:
+                dict: the evaluation results.
+        """
         raise NotImplementedError('Evaluating this model is not implemented')
 
     def cross_validate(self, series, rounds=10, return_full_evaluations=False, **kwargs):
@@ -368,6 +407,9 @@ class Model():
         Args:
             rounds(int): how many rounds of cross validation to run.
             return_full_evaluations(bool): if to return the full evaluations, one for each round.
+
+        Returns:
+                dict: the cross validation results.
         """
 
         if self.fitted:

@@ -2,7 +2,7 @@
 """Units, including the TimeUnit, which fully supports calendar arithmetic."""
 
 from .utils import is_numerical
-from propertime import TimeSpan
+from propertime import TimeSpan, Time
 
 # Setup logging
 import logging
@@ -179,22 +179,59 @@ class TimeUnit(TimeSpan, Unit):
 
     # For the doc strings
     def as_seconds(self, starting_at=None):
-        """The length (duration) of the time unit, in seconds"""
+        """The length (duration) of the time unit, in seconds.
+
+            Args:
+                starting_at(Time, datetime): the starting point with respect to which compute the duration. Required for
+                                             all calendar time units (involving years, months, weeks and days). Defaults to None.
+
+            Returns:
+                float: the duration of the unit in seconds.
+        """
         return super().as_seconds(starting_at)
 
     def ceil(self, time):
-        """Ceil a time or datetime object according to this time unit."""
+        """Ceil a Time or datetime object according to this time unit.
+
+            Args:
+                time(Time, datetime): Time or datetime object to be ceiled.
+
+            Returns:
+                Time or datetime: the ceiled Time or datetime object.
+        """
         return super().ceil(time)
 
     def floor(self, time):
-        """Floor a time or datetime object according to this time unit."""
+        """Floor a Time or datetime object according to this time unit.
+
+            Args:
+                time(Time, datetime): the Time or datetime object to be floored.
+
+            Returns:
+                Time or datetime: the floored Time or datetime object.
+        """
         return super().floor(time)
 
     def round(self, time, how='half'):
-        """Round a time or datetime object according to this time unit."""
+        """Round a Time or datetime object according to this time unit.
+
+            Args:
+                time(Time, datetime): the Time or datetime object to be rounded.
+
+            Returns:
+                Time or datetime: the rounded Time or datetime object.
+        """
         return super().round(time, how)
 
     def shift(self, time, times=1):
-        """Shift a given time or datetime object n times this time unit."""
+        """Shift a Time or datetime object n times this time unit.
+
+            Args:
+                time(Time, datetime): the Time or datetime object to be shifted.
+                times(int): how many times to perform the shift. Defaults to 1.
+
+            Returns:
+                Time or datetime: the shifted Time or datetime object.
+        """
         return super().shift(time, times)
 

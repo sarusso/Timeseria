@@ -1,5 +1,5 @@
 ﻿timeseria.interpolators
-===============
+=======================
 
 .. automodule:: timeseria.interpolators
 

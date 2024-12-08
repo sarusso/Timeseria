@@ -1,18 +1,10 @@
-﻿timeseriautilss
-===================
+timeseria.utils
+===============
 
-.. automodule:: timeseriautilss
+.. automodule:: timeseria.utils
 
-   
-   
-   
-
-   
-   
    .. rubric:: Functions
-
    .. autosummary::
-   
       ensure_reproducibility
       is_numerical
       detect_encoding
@@ -25,17 +17,7 @@
       mean_squared_error
       rescale
       os_shell
-      
+
+   .. rubric:: Classes
+   .. autosummary::
       DistributionFunction
-
-
-   
-   
-   
-
-   
-   
-   
-
-
-

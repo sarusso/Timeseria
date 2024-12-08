@@ -29,22 +29,23 @@ Main modules and submodules
 
 .. autosummary::
      :toctree:
-    
+
      units
      datastructures
      interpolators
      operations
      transformations
-     
+
      models.base
      models.forecasters
      models.reconstructors
      models.anomaly_detectors
-     
+
      storages
      plots
      exceptions
      utils
+     logger
 
 |
 

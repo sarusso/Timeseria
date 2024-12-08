@@ -7,18 +7,33 @@ logger = logging.getLogger(__name__)
 
 
 class Interpolator():
-    """A generic interpolator."""
+    """A generic interpolator.
+
+        Args:
+            series(TimeSeries): the series on which to initialize the interpolator.
+    """
+
+    def __init__(self, series):
+        logger.debug('Initialized %s interpolator on series "&s"'.format(self.__class__.__name__, series))
+        self.series = series
 
     def evaluate(self, at, prev_i, next_i):
+        """Evaluate the interpolator (compute the value).
+
+            Args:
+                at(float): the time value (as epoch seconds) at which to evaluate the interpolator.
+                prev_i(int): the previous position of the item in the series.
+                next_i(int): the next position of the item in the series.
+        """
         raise NotImplementedError('This interpolator is not implemented')
 
 
 class LinearInterpolator(Interpolator):
-    """A linear interpolator."""
+    """A linear interpolator.
 
-    def __init__(self, series):
-        logger.debug('Initialized linear interpolator on series "{}"'.format(series))
-        self.series = series
+        Args:
+            series(TimeSeries): the series on which to initialize the interpolator.
+    """
 
     def evaluate(self, at, prev_i=None, next_i=None):
 
@@ -74,12 +89,11 @@ class LinearInterpolator(Interpolator):
 
 
 class UniformInterpolator(Interpolator):
-    """A uniform interpolator."""
+    """A unform interpolator.
 
-    def __init__(self, series):
-        logger.debug('Initialized uniform interpolator on series "{}"'.format(series))
-        self.series = series
-
+        Args:
+            series(TimeSeries): the series on which to initialize the interpolator.
+    """
     def evaluate(self, at, prev_i=None, next_i=None):
 
         if prev_i and next_i is None:

@@ -40,12 +40,12 @@ class AnomalyDetector(Model):
         raise NotImplementedError('Anomaly detectors can be used only with the apply() method') from None
 
     def evaluate(self, series, *args, **kwargs):
-        """Disabled. Anomaly detectors cannot be evaluated yet."""
-        raise NotImplementedError('Anomaly detectors cannot be evaluated yet.') from None
+        """Disabled. Anomaly detectors cannot be evaluated."""
+        raise NotImplementedError('Anomaly detectors cannot be evaluated.') from None
 
     def cross_validate(self, series, *args, **kwargs):
-        """Disabled. Anomaly detectors cannot be evaluated yet."""
-        raise NotImplementedError('Anomaly detectors cannot be evaluated yet.') from None
+        """Disabled. Anomaly detectors cannot be evaluated."""
+        raise NotImplementedError('Anomaly detectors cannot be evaluated.') from None
 
     @staticmethod
     def mark_events(timeseries, index_treshold=1.0, min_persistence=2, max_gap=2, replace_index=False, inplace=False):
@@ -56,6 +56,9 @@ class AnomalyDetector(Model):
             min_persistence(int): the minimum persistence of an event, in terms of consecutive data points.
             max_gap(int): the maximum gap within a signle event of data points below the index_treshold.
             replace_index(bool): if to replace the existent ``anomaly`` index instead of adding a new ``anomaly_event`` one.
+
+        Returns:
+            TimeSeries: the time series with the events marked.
         """
 
         if inplace:
@@ -307,6 +310,7 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
         """Fit the anomaly detection model on a series.
 
         Args:
+            series(TimeSeries): the series on which to fit the model.
             with_context(bool): if to use context for multivariate time series or not. Defaults to ``False``.
             error_metric(str): the error metric to be used for evaluating the model and to build the error distribution for the anomaly index.
                                Supported values are: ``E``, ``AE``, ``PE`` and ``APE``. Defaults to ``PE``.
@@ -511,7 +515,14 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
         logger.info('Anomaly detector fitted')
 
     def inspect(self, plot=True, plot_x_min='auto', plot_x_max='auto', series=False):
-        '''Inspect the model and plot the error distribution'''
+        '''Inspect the model by printing a summary and plotting the error distribution and/or the fit series.
+
+            Args:
+                plot(bool): if to plot the error distribution. Defaults to True.
+                plot_x_min(float or str): the minimum value of the x axis. Defaults to 'auto'.
+                plot_x_max(float or str): the maximum value of the x axis. Defaults to 'auto'.
+                series(bool): if to plot the fit series. 
+        '''
 
         for data_label in self.data['error_distributions']:
 
@@ -574,7 +585,16 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
                 fit_series.plot()
 
     def preprocess(self, series, inplace=False, verbose=False):
-        """Pre-process a time series for this anomaly detector so that multiple apply() calls are much faster"""
+        """Pre-process a time series for this anomaly detector so that multiple apply() calls are much faster.
+
+            Args:
+                series(TimeSeries): the series to pre-process.
+                inplace(bool): if to pre-process in-place.
+                verbose(bool): if to print the progress (one dot = 10% done).
+
+            Returns:
+                TimeSeries: the pre-processed series.
+        """
         if not inplace:
             series = series.duplicate()
 
@@ -615,6 +635,7 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
         """Apply the anomaly detection model on a series.
 
         Args:
+            series(TimeSeries): the series on which to apply the anomaly detector.
             index_bounds(tuple): the lower an upper bounds, in terms of the prediction error, from which the anomaly index is
                                  computed. Below the lower limit no anomaly will be assumed (``anomlay_index=0``), while errors
                                  above the upper will always be considered as anomalous (``anomlay_index=1``). In the middle, the
@@ -641,6 +662,10 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
                                  a list only selected details can be added: ``pred`` for the predicted values, ``err`` for
                                  the errors, and ``adh`` for the model adherence probability.
             verbose(bool): if to print the apply progress (one dot = 10% done).
+
+
+        Returns:
+            TimeSeries: the series with the anomaly detection results.
         """
         # Initialize the result time series
         result_series = series.__class__()

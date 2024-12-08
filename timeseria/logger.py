@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-
+"""Library logging setup."""
+
 import os
 import logging
 
@@ -12,6 +15,14 @@ levels_mapping = { 50: 'CRITICAL',
 
 
 def setup(level=LOGLEVEL, force=False):
+    """Set up the library logger on a given log level.
+
+        Args:
+            level(str): the log level between DEBUG, INFO, WARNING, ERROR, and CRITICAL. Defaults to
+                        CRITICAL or the value defined by the TIMESERIA_LOGLEVEL environment variable.
+            force(bool): if to force the setup, even if the logger is already configured.
+    """
+
     timeseria_logger = logging.getLogger('timeseria')
     timeseria_logger.propagate = False
     try:

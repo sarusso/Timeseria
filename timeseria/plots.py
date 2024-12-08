@@ -1060,7 +1060,11 @@ define('"""+graph_id+"""', ['dgenv'], function (Dygraph) {
 #=================
 
 def matplotlib_plot(series):
-    """Plot a time series using Matplotlib."""
+    """Plot a series using Matplotlib.
+
+        Args:
+            series(Series): the series to plot.
+    """
     from matplotlib import pyplot
     pyplot.plot(series.to_df())
     pyplot.show()

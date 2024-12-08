@@ -173,6 +173,9 @@ class CSVFileStorage(Storage):
             force_points: force generating points.
             force_slots: force generating slots.
             force_slot_unit: set the unit of the slots.
+
+        Returns:
+            TimeSeries: the time series loaded from the CSV file.
         """
 
         if id:

@@ -48,13 +48,9 @@ except ImportError:
 class Forecaster(Model):
     """A generic forecasting model. Besides the ``predict()`` and  ``apply()`` methods, it also has a ``forecast()``
     method which, in case of nested data structures (i.e. DataPoint or DataSlot) allows to get the full forecasted points
-    or slots instead of just the raw, inner data values returned by the ``predict()``. In case of plain data structures
-    (e.g. a list), the ``forecast()`` method is instead equivalent to the ``predict()``.
+    or slots instead of just the raw, inner data values returned by the ``predict()``.
 
     Series resolution and data labels consistency are enforced between all methods and save/load operations.
-
-    Args:
-        path (str): a path from which to load a saved model. Will override all other init settings.
     """
 
     window = None
@@ -85,8 +81,30 @@ class Forecaster(Model):
 
         return predicted
 
+    def predict(self, series, steps):
+        """Call the model predict logic on a series.
+
+            Args:
+                series(TimeSeries): the series on which to apply the predict logic.
+                steps:(int): the number of steps to predict. Defaults to 1.
+
+            Returns:
+                dict or list: the predicted data.
+        """
+        raise NotImplementedError('Predicting with this model is not implemented')
+
+
     def forecast(self, series, steps=1, context_data=None, **kwargs):
-        """Forecast n steps-ahead data points or slots"""
+        """Forecast n steps-ahead data points or slots.
+
+            Args:
+                series(TimeSeries): the series from which to perform the forecast.
+                steps:(int): the number of steps to forecast. Defaults to 1.
+                contxt_data(dict): any context data for partial forecasting. Defaults to None.
+
+            Returns:
+                DataTimePoint or DataTimeSlot or list: the forecasted data.
+        """
 
         # Check series
         if not isinstance(series, TimeSeries):
@@ -137,7 +155,17 @@ class Forecaster(Model):
 
     @Model.apply_method
     def apply(self, series, steps=1, inplace=False, context_data=None, **kwargs):
-        """Apply the forecast on the given series for n steps-ahead."""
+        """Apply the forecast on the given series for n steps-ahead.
+
+            Args:
+                series(TimeSeries): the series on which to apply the model logic.
+                steps:(int): the number of steps to forecast. Defaults to 1.
+                inplace(bool): if to apply the forecast in-place on the series. Default to False.
+                contxt_data(dict): any context data for partial forecasting. Defaults to None.
+
+            Returns:
+                TimeSeries: the series with the results of applying the model.
+        """
 
         if 'target_data_labels' in self.data and self.data['target_data_labels'] and set(self.data['target_data_labels']) != set(series.data_labels()):
             if not context_data:
@@ -196,10 +224,10 @@ class Forecaster(Model):
     @Model.evaluate_method
     def evaluate(self, series, steps=1, error_metrics=['RMSE', 'MAE'], return_evaluation_series=False, plot_evaluation_series=False,
                  evaluation_series_error_metrics='auto', plot_error_distribution=False, error_distribution_metrics='auto', verbose=False, **kwargs):
-        """Evaluate the forecaster on a series.
+        """Evaluate the model on a series.
 
         Args:
-            steps (int): how many steps-ahead to evaluate the forecaster on.
+            steps (int): how many steps-ahead to evaluate the model on.
             error_metrics(list): the (aggregated) error metrics to use for the evaluation. Defaults to ``RMSE`` and ``MAE``. Supported
                                  values (as list)  are: ``MSE``, ``RMSE``, ``MAE``, ``MaxAE``, ``MAPE``, ``MaxAPE``, ``MALE`` and  ``MaxALE``.
             return_evaluation_series(bool): if to return the series used for the evaluation, with the  the predicted values and the punctual errors.
@@ -210,6 +238,9 @@ class Forecaster(Model):
             error_distribution_metrics(list): the (punctual) error metrics to be used for generating the error distribution(s). Defaults
                                                to ``auto``. Supported values (as list) are: ``SE``, ``AE``, ``APE``, ``ALE``, ``E``, ``PE`` and ``LE``.
             verbose(bool): if to print the evaluation progress (one dot = 10% done).
+
+        Returns:
+            dict: the evaluation results.
         """
 
         if not series:
@@ -524,6 +555,7 @@ class PeriodicAverageForecaster(Forecaster):
             periodicity(int): the periodicty of the series. If set to ``auto`` then it will be automatically detected using a FFT.
             dst_affected(bool): if the model should take into account DST effects.
             data_loss_limit(float): discard from the fit elements with a data loss greater than or equal to this limit.
+            verbose(bool): not supported, has no effect.
         """
 
         self.data['periodicities']  = {}
@@ -603,10 +635,16 @@ class PeriodicAverageForecaster(Forecaster):
         self.data['window'] = max([self.data['windows'][data_label] for data_label in self.data['windows']])
 
     @Forecaster.predict_method
-    def predict(self, series, steps=1, probabilistic=False):
+    def predict(self, series, steps=1):
+        """Predict n steps ahead from the given series.
 
-        if probabilistic and not self.data['probabilistic']:
-            raise ValueError('This model was not fitted to allow for probabilistic predictions')
+            Args:
+                series(TimeSeries): the series on which to apply the predict logic.
+                steps:(int): the number of steps to forecast. Defaults to 1.
+
+            Returns:
+                dict or list: the predicted data.
+        """
 
         if len(series) < self.data['window']:
             raise ValueError('The series length ({}) is shorter than the model window ({})'.format(len(series), self.data['window']))
@@ -868,13 +906,14 @@ class LSTMForecaster(Forecaster, _KerasModel):
     """A forecasting model based on a LSTM neural network. LSTMs are artificial neutral networks particularly well suited for time series forecasting tasks.
 
     Args:
-        window (int): the window length.
+        window (int): the window length. Defaults to 3.
         features(list): which features to use. Supported values are:
             ``values`` (use the data values),
             ``diffs``  (use the diffs between the values), and
             ``hours``  (use the hours of the timestamp).
-        neurons(int): how many neurons to use for the LSTM neural network hidden layer.
-        keras_model(keras.Model) : an optional external Keras Model architecture. Will cause the ``neurons`` argument to be discarded.
+            Defaults to ``['values']``.
+        neurons(int): how many neurons to use for the LSTM neural network hidden layer. Defaults to 128.
+        keras_model(keras.Model) : an optional external Keras Model architecture. Will cause the ``neurons`` argument to be discarded. Defaults to None.
     """
 
     @property
@@ -1125,9 +1164,12 @@ class LSTMForecaster(Forecaster, _KerasModel):
 
         Args:
             series(series): the series on which to perform the predict.
-            steps(int): how may steps-haead to predict.
+            steps(int): the number of steps to forecast. Defaults to 1.
             context_data(dict): the data to use as context for the prediction.
             verbose(bool): if to print the predict output in the process.
+
+        Returns:
+            dict or list: the predicted data.
         """
 
         if len(series) < self.data['window']:
@@ -1306,11 +1348,12 @@ class LinearRegressionForecaster(Forecaster, _KerasModel):
     """A forecasting model based on linear regression.
 
     Args:
-        window (int): the window length.
+        window (int): the window length. Defaults to 3.
         features(list): which features to use. Supported values are:
             ``values`` (use the data values),
             ``diffs``  (use the diffs between the values), and
             ``hours``  (use the hours of the timestamp).
+            Defaults to ``[values]``
     """
 
     @property
@@ -1396,13 +1439,6 @@ class LinearRegressionForecaster(Forecaster, _KerasModel):
 
     @Forecaster.predict_method
     def predict(self, series, steps=1, verbose=False):
-        """Call the model predict logic on a series.
-
-        Args:
-            series(series): the series on which to perform the predict.
-            steps(int): how may steps-haead to predict.
-            verbose(bool): not supported, has no effect.
-        """
 
         if len(series) < self.data['window']:
             raise ValueError('The series length ({}) is shorter than the model window ({})'.format(len(series), self.data['window']))

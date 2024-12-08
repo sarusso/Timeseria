@@ -94,9 +94,18 @@ timeseria.units module
    :show-inheritance:
 
 timeseria.utils module
---------------------------
+----------------------
 
 .. automodule:: timeseria.utils
+   :members:
+   :inherited-members:
+   :undoc-members:
+   :show-inheritance:
+
+timeseria.logger module
+-----------------------
+
+.. automodule:: timeseria.logger
    :members:
    :inherited-members:
    :undoc-members:

@@ -253,8 +253,12 @@ class DataPoint(Point):
             return None
 
     def data_labels(self):
-        """Returns the data labels. If data is a dictionary, then these are the dictionary keys, if data is
-        list-like, then these are the list indexes (as strings). Other formats are not supported."""
+        """The data labels. If data is a dictionary, then these are the dictionary keys, if data is
+        list-like, then these are the list indexes (as strings). Other formats are not supported.
+
+        Returns:
+            list: the data labels.
+        """
         try:
             return sorted(list(self.data.keys()))
         except AttributeError:
@@ -536,15 +540,19 @@ class DataSlot(Slot):
 
     @property
     def data_loss(self):
-        """The data loss index, if any. Usually computed out from resampling transformations."""
+        """The data loss index, if any. Usually computed from a resampling or aggregation transformation."""
         try:
             return self.data_indexes['data_loss']
         except KeyError:
             return None
 
     def data_labels(self):
-        """Returns the data labels. If data is a dictionary, then these are the dictionary keys, if data is
-        list-like, then these are the list indexes (as strings). Other formats are not supported."""
+        """The data labels. If data is a dictionary, then these are the dictionary keys, if data is
+        list-like, then these are the list indexes (as strings). Other formats are not supported.
+
+        Returns:
+            list: the data labels.
+        """
         try:
             return sorted(list(self.data.keys()))
         except AttributeError:
@@ -692,8 +700,12 @@ class Series(list):
         return self.__repr__()
 
     def _all_data_indexes(self):
-        """Return all the data_indexes of the series, to be intended as custom
-        defined indicators (i.e. data_loss, anomaly_index, etc.)."""
+        """The data_indexes of the series, to be intended as custom
+        defined indicators (i.e. data_loss, anomaly_index, etc.).
+
+        Returns:
+            list: the data indexes.
+        """
 
         data_index_names = []
         for item in self:
@@ -862,9 +874,13 @@ class Series(list):
     #=========================
 
     def data_labels(self):
-        """Returns the labels of the data carried by the series items. If data is a dictionary, then
+        """The labels of the data carried by the series items. If data is a dictionary, then
         these are the dictionary keys, if data  is list-like, then these are the list indexes
-        (as strings). Other formats are not supported."""
+        (as strings). Other formats are not supported.
+
+        Returns:
+            list: the data labels.
+        """
         if len(self) > 0 and not self._item_data_reference:
             raise TypeError('Series items have no data, cannot get data labels')
         if len(self) == 0:
@@ -905,106 +921,225 @@ class Series(list):
     #=========================
 
     def min(self, data_label=None):
-        """Get the minimum data value(s) of a series. Supports an optional ``data_label`` argument.
-        A series of DataPoints or DataSlots is required."""
+        """Get the minimum data value(s) of the series. A series of DataPoints or DataSlots is required.
+
+        Args:
+           data_label(string): if provided, compute the value only for this data label.
+                               Defaults to None.
+
+        Returns:
+           dict or object: the computed values for each data label, or a specific value if
+           providing the data_label argument.
+        """
         from .operations import min as min_operation
         return min_operation(self, data_label=data_label)
 
     def max(self, data_label=None):
-        """Get the maximum data value(s) of a series. Supports an optional ``data_label`` argument.
-        A series of DataPoints or DataSlots is required."""
+        """Get the maximum data value(s) of the series. A series of DataPoints or DataSlots is required.
+
+        Args:
+           data_label(string): if provided, compute the value only for this data label. Defaults to None.
+
+        Returns:
+           dict or object: the computed values for each data label, or a specific value if
+           providing the data_label argument.
+        """
         from .operations import max as max_operation
         return max_operation(self, data_label=data_label)
 
     def avg(self, data_label=None):
-        """Get the average data value(s) of a series. Supports an optional ``data_label`` argument.
-        A series of DataPoints or DataSlots is required."""
+        """Get the average data value(s) of the series. A series of DataPoints or DataSlots is required.
+
+        Args:
+           data_label(string, optional): if provided, compute the value only for this data label.
+
+        Returns:
+           dict or object: the computed values for each data label, or a specific value if
+           providing the data_label argument.
+        """
         from .operations import avg as avg_operation
         return avg_operation(self, data_label=data_label)
 
     def sum(self, data_label=None):
-        """Sum every data value(s) of a series. Supports an optional ``data_label`` argument.
-        A series of DataPoints or DataSlots is required."""
+        """Sum every data value(s) of the series. A series of DataPoints or DataSlots is required.
+
+        Args:
+           data_label(string, optional): if provided, compute the value only for this data label.
+
+        Returns:
+           dict or object: the computed values for each data label, or a specific value if
+           providing the data_label argument.
+        """
         from .operations import sum as sum_operation
         return sum_operation(self, data_label=data_label)
 
     def derivative(self, inplace=False, normalize=True, diffs=False):
-        """Compute the derivative of the series. Extra parameters: ``inplace`` (defaulted to false),
-        ``normalize`` (defaulted to true) and ``diffs`` (defaulted to false) to compute differences
-        instead of the derivative. A series of DataTimePoints or DataTimeSlots is required."""
+        """Compute the derivative on the series. A series of DataTimePoints or DataTimeSlots is required.
+
+        Args:
+           inplace(bool): if to perform the operation in-place on the series. Defaults to False.
+           normalize(bool): if to normalize the derivative w.r.t to the series resolution. Defaults to True.
+           diffs(bool): if to compute the differences instead of the derivative. Defaults to False.
+
+        Returns:
+           series or None: the computed series, or None if set to perform the operation in-place.
+        """
         from .operations import derivative as derivative_operation
         return derivative_operation(self, inplace=inplace, normalize=normalize, diffs=diffs)
 
     def integral(self, inplace=False, normalize=True, c=0, offset=0):
-        """Compute the integral of the series. Extra parameters: ``inplace`` (defaulted to false),
-        ``normalize`` (defaulted to true), ``c`` (defaulted to zero) for the integration constant
-        and ``offset`` (defaulted to zero) to start the integration from an offset.
-        A series of DataTimePoints or DataTimeSlots is required."""
+        """Compute the integral on the series. A series of DataTimePoints or DataTimeSlots is required.
+
+        Args:
+           inplace(bool): if to perform the operation in-place on the series. Defaults to False.
+           normalize(bool): if to normalize the integral w.r.t to the series resolution. Defaults to True.
+           c(float, dict): the integrative constant, as a single value or as a dictionary of values, one
+                           for each data label. Defaults to zero.
+           offset(float, dict): if to start the integrative process from a specific offset. Can be provided as a
+                                single value or as a dictionary of values, one for each data label. Defaults to zero.
+
+        Returns:
+           series or None: the computed series, or None if set to perform the operation in-place.
+        """
         from .operations import integral as integral_operation
         return integral_operation(self, inplace=inplace, normalize=normalize, c=c, offset=offset)
 
     def diff(self, inplace=False):
-        """Compute the incremental differences. Reduces the series length by one (the first element).
-        Extra parameters: ``inplace`` (defaulted to false). A series of DataPoints or DataSlots is required."""
+        """Compute the incremental differences on the series. Reduces the series length by one
+        (removing the first element). A series of DataTimePoints or DataTimeSlots is required.
+
+        Args:
+           inplace(bool): if to perform the operation in-place on the series. Defaults to False.
+
+        Returns:
+           series or None: the computed series, or None if set to perform the operation in-place.
+        """
         from .operations import diff as diff_operation
         return diff_operation(self, inplace=inplace)
 
     def csum(self, inplace=False, offset=None):
-        """Compute the incremental sum. Extra parameters: ``inplace`` (defaulted to false),
-        ``offset`` (defaulted to zero) to set the starting value where to apply the sums on.
-        A series of DataPoints or DataSlots is required."""
+        """Compute the incremental sum on the series. A series of DataTimePoints or DataTimeSlots is required.
+
+        Args:
+           inplace(bool): if to perform the operation in-place on the series. Defaults to False.
+           offset(float, dict): if to start computing the cumulative sum from a specific offset. Can be provided as a
+                                single value or as a dictionary of values, one for each data label. Defaults to None.
+
+        Returns:
+           series or None: the computed series, or None if set to perform the operation in-place.
+        """
         from .operations import csum as csum_operation
         return csum_operation(self, inplace=inplace, offset=offset)
 
     def normalize(self, range=[0,1], inplace=False, source_range=None):
-        """Normalize the series data values. Extra parameters: ``range`` (defaulted to [0,1]) to set the normalization
-        target range, ``source_range`` to define a custom source range to normalize with respect to, and ``inplace``
-        (defaulted to false). A series of DataPoints or DataSlots is required."""
+        """Normalize the data values of the series bringing them to a given range. A series of DataTimePoints or DataTimeSlots is required.
+
+        Args:
+           range(list): the normalization target range. Defaults to [0,1].
+           inplace(bool): if to perform the operation in-place on the series. Defaults to False.
+           source_range(dict, optional): a custom source range, by data label, to normalize with respect to.
+
+        Returns:
+           series or None: the computed series, or None if set to perform the operation in-place.
+        """
         from .operations import normalize as normalize_operation
         return normalize_operation(self, inplace=inplace, range=range, source_range=source_range)
 
     def rescale(self, value, inplace=False):
-        """Rescale the series data values by a ``value``. This can be either a single number or a dictionary
-        where to set rescaling factors on a per-data label basis. Extra parameters: ``inplace`` (defaulted to false)
-        A series of DataPoints or DataSlots is required."""
+        """Rescale the data values of the series by a given factor. A series of DataTimePoints or DataTimeSlots is required.
+
+        Args:
+           value(float, dict): the value to use as rescaling factor. Can be provided as a single
+                               value or as a dictionary of values, one for each data label.
+           inplace(bool): if to perform the operation in-place on the series. Defaults to False.
+
+        Returns:
+           series or None: the computed series, or None if set to perform the operation in-place.
+        """
         from .operations import rescale as rescale_operation
         return rescale_operation(self, value=value, inplace=inplace)
 
     def offset(self, value, inplace=False):
-        """Offset the series data values by a ``value``. This can be either a single number or a dictionary
-        where to set offsetting factors on a per-data label basis. Extra parameters: ``inplace`` (defaulted to false).
-        A series of DataPoints or DataSlots is required."""
+        """Offset the data values of the series by a given value. A series of DataTimePoints or DataTimeSlots is required.
+
+        Args:
+           value(float, dict): the value to use as offset. Can be provided as a single
+                               value or as a dictionary of values, one for each data label.
+           inplace(bool): if to perform the operation in-place on the series. Defaults to False.
+
+        Returns:
+           series or None: the computed series, or None if set to perform the operation in-place.
+        """
         from .operations import offset as offset_operation
         return offset_operation(self, value=value, inplace=inplace)
 
     def mavg(self,  window, inplace=False):
-        """Compute the moving average. Reduces the series length by n (the window size). Extra
-        parameters: ``inplace`` (defaulted to false) and ``window``, a required parameter, for
-        the size of the moving average window. A series of DataPoints or DataSlots is required."""
+        """Compute the moving average on the series. Reduces the series length by a number of values
+        equal to the window size. A series of DataTimePoints or DataTimeSlots is required.
+
+        Args:
+           window(int): the length of the moving average window.
+           inplace(bool): if to perform the operation in-place on the series. Defaults to False.
+
+        Returns:
+           series or None: the computed series, or None if set to perform the operation in-place.
+        """
         from .operations import mavg as mavg_operation
         return mavg_operation(self, window=window, inplace=inplace)
 
     def merge(self, series):
-        """Merge the series with one or more other series."""
+        """Merge the series with one or more other series.
+
+        Returns:
+            Series: the merged series.
+        """
         from .operations import merge as merge_operation
         return merge_operation(self, series)
 
-    def get(self, at_i=None):
+    def get(self, at_i):
+        """Get the element of the series at a given position.
+
+        Args:
+           at_i(int): the position of the item to get.
+
+        Returns:
+            object: the item in the given position or at the given time.
+        """
         from .operations import get as get_operation
-        return get_operation(self, at_i)
+        return get_operation(self, at_i=at_i)
 
     def filter(self, *data_labels):
-        """Filter a series by data label(s). A series of DataPoints or DataSlots is required."""
+        """Filter the series keeping only the data labels provided as argument.
+
+        Args:
+           *data_labels(str): the data label(s) to filter against.
+        """
         from .operations import filter as filter_operation
         return filter_operation(self, *data_labels)
 
     def slice(self, from_i=None, to_i=None):
-        """Slice a series. A series of DataPoints or DataSlots is required."""
+        """Slice the series between the given positions. A series of DataPoints or DataSlots is required.
+
+        Args:
+           from_i(int): the slicing start position. Defaults to None.
+           to_i(int): the slicing end position. Defaults to None.
+
+        Returns:
+            Series: the sliced series.
+        """
         from .operations import slice as slice_operation
         return slice_operation(self, from_i=from_i, to_i=to_i)
 
     def select(self, query):
-        """Select one or more items of the series given an SQL-like query. A series of DataPoints or DataSlots is required."""
+        """Select one or more items of the series given an SQL-like query. This is a preliminary
+        functionality supporting only the equality. A series of DataPoints or DataSlots is required.
+
+        Args:
+           query(str): the query.
+
+        Returns:
+            list: the selected items of the series.
+        """
         from .operations import select as select_operation
         return select_operation(self, query=query)
 
@@ -1014,13 +1149,27 @@ class Series(list):
     #=========================
 
     def aggregate(self, unit, *args, **kwargs):
-        """Aggregate the series in slots of length set by the ``unit`` parameter. A series of DataPoints or DataSlots is required."""
+        """Aggregate the series in slots. A series of DataPoints or DataSlots is required.
+
+        Args:
+           unit(Unit): the target slot unit (i.e. length).
+
+        Returns:
+            Series: the aggregated series.
+        """
         from .transformations import Aggregator
         aggregator = Aggregator(unit, *args, **kwargs)
         return aggregator.process(self)
 
     def resample(self, unit, *args, **kwargs):
-        """Resample the series using a sampling interval of length set by the ``unit`` parameter. A series of DataPoints or DataSlots is required."""
+        """Aggregate the series in slots. A series of DataPoints or DataSlots is required.
+
+        Args:
+           unit(Unit): the unit (i.e. length) of the target sampling interval.
+
+        Returns:
+            Series: the resampled series.
+        """
         from .transformations import Resampler
         resampler = Resampler(unit, *args, **kwargs)
         return resampler.process(self)
@@ -1076,11 +1225,14 @@ class Series(list):
         return string
 
     def summary(self, limit=10, newlines=False):
-        """Return a string summary of the series and its elements, limited to 10 items by default.
+        """A summary of the series and its elements, limited to 10 items by default.
 
             Args:
-                limit: the limit of elements to print, by default 10.
-                newlines: if to include the newline characters or not.
+                limit(int): the limit of elements to print, by default 10.
+                newlines(bool): if to include the newline characters or not.
+
+            Returns:
+                str: the summary.
         """
         if newlines:
             return self._summary(limit=limit)
@@ -1091,19 +1243,26 @@ class Series(list):
         """Print a summary of the series and its elements, limited to 10 items by default.
 
             Args:
-                limit: the limit of elements to print, by default 10.
+                limit(int): the limit of elements to print, by default 10.
         """
         print(self._summary(limit=limit))
 
     def contents(self):
-        """Get all the items of the series as a list."""
+        """Get all the items of the series as a list.
+
+        Returns:
+            list: all the items of the series.
+        """
         return list(self)
 
     def head(self, n=5):
         """Get the first n items of the series as a list, 5 by default.
 
             Args:
-                n: the number of first elements to return .
+                n: the number of first elements to return.
+
+            Returns:
+                list: the required first n items of the series.
         """
         return list(self[0:n])
 
@@ -1112,6 +1271,9 @@ class Series(list):
 
             Args:
                 n: the number of last elements to return .
+
+            Returns:
+                list: the required last n items of the series.
         """
         return list(self[-n:])
 
@@ -1345,13 +1507,24 @@ class TimeSeries(Series):
             return detected_tz
 
     def change_tz(self, tz):
-        """Change the time zone of the time series, in-place."""
+        """Change the time zone of the time series, in-place.
+
+            Args:
+                str or tzinfo: the time zone.
+        """
         for time_point in self:
             time_point.change_tz(tz)
         self._tz = time_point.tz
 
     def as_tz(self, tz):
-        """Get a copy of the time series on a new time zone."""
+        """Get a copy of the time series on a new time zone.
+
+            Args:
+                str or tzinfo: the time zone.
+
+            Returns:
+                TimeSeries: the time series on the new time zone.
+        """
         new_series = self.duplicate()
         new_series.change_tz(tz)
         return new_series
@@ -1405,9 +1578,11 @@ class TimeSeries(Series):
     def guess_resolution(self, confidence=False):
         """Guess the (temporal) resolution of the time series.
 
-           Args:
-               confidence (bool): if to return, together with the guessed resolution, also its confidence (in a 0-1 range).
+            Args:
+                confidence(bool): if to return, together with the guessed resolution, also its confidence (in a 0-1 range).
 
+            Returns:
+                TimeUnit: the guessed temporal resolution, as time unit.
         """
         if not issubclass(self.item_type, TimePoint):
             raise NotImplementedError('Guessing the resolution is implemented only for point series')
@@ -1447,7 +1622,11 @@ class TimeSeries(Series):
 
     @classmethod
     def load(cls, file_name):
-        """Load a series from a (CSV) file, in Timeseria format."""
+        """Load a series from a file, in Timeseria CSV format.
+
+            Args:
+                file_name(str): the file name to load.
+        """
 
         metadata = None
         with open(file_name) as f:
@@ -1481,7 +1660,12 @@ class TimeSeries(Series):
 
 
     def save(self, file_name, overwrite=False, **kwargs):
-        """Save the time series as a (CSV) file, in Timeseria format."""
+        """Save the time series as a file, in Timeseria CSV format.
+
+            Args:
+                file_name(str): the file name to write.
+                overwrite(bool): if to overwrite the file if already existent. Defaults to False.
+        """
         from .storages import CSVFileStorage
         storage = CSVFileStorage(file_name, **kwargs)
         storage.put(self, overwrite=overwrite)
@@ -1493,7 +1677,14 @@ class TimeSeries(Series):
 
     @classmethod
     def from_dict(cls, dictionary, slot_unit=None):
-        """Create a time series from a dictionary."""
+        """Create a time series from a dictionary.
+
+            Args:
+                dict(bool): the dictionary containing the data, where the keys are the timestamps.
+
+            Returns:
+                TimeSeries: the created time series.
+        """
 
         if slot_unit and not isinstance(slot_unit, Unit):
                 slot_unit = TimeUnit(slot_unit)
@@ -1535,7 +1726,11 @@ class TimeSeries(Series):
         return series 
 
     def to_dict(self):
-        """Convert a time series to a dictionary."""
+        """Convert the time series to a dictionary.
+
+            Returns:
+                dict: the time series as a dictrionary.
+        """
         timeseries_as_dict = {}
         for item in self:
             timeseries_as_dict[item.dt] = item.data
@@ -1544,13 +1739,25 @@ class TimeSeries(Series):
 
     @classmethod
     def from_json(cls, string, slot_unit=None):
-        """Create a time series from a JSON string."""
+        """Create a time series from a JSON string.
+
+            Args:
+                string(str): the string containing the JSOn data, where the keys are the timestamps.
+
+            Returns:
+                TimeSeries: the created time series.
+        """
         json_data = json.loads(string)
         return cls.from_dict(json_data, slot_unit=slot_unit)
 
 
     def to_json(self):
-        """Convert a time series to a JSON string."""
+        """Convert the time series to a JSON string.
+
+            Returns:
+                string: the time series as a JSON string.
+        """
+
         timeseries_as_dict = {}
         for item in self:
             timeseries_as_dict[str_from_dt(item.dt)] = item.data
@@ -1559,7 +1766,11 @@ class TimeSeries(Series):
 
     @classmethod
     def from_csv(cls, file_name, *args, **kwargs):
-        """Create a a time series from a CSV file."""
+        """Create a time series from a CSV file. For the options see the storages module.
+
+            Returns:
+                TimeSeries: the created time series.
+        """
         from .storages import CSVFileStorage
         storage = CSVFileStorage(file_name, *args, **kwargs)
         loaded_series = storage.get()
@@ -1572,7 +1783,12 @@ class TimeSeries(Series):
             cls(*series_items)
 
     def to_csv(self, file_name, overwrite=False, **kwargs):
-        """Store the time series as a CSV file."""
+        """Store the time series as a CSV file. For the options see the storages module.
+
+            Args:
+                file_name(str): the file name to write.
+                overwrite(bool): if to overwrite the file if already existent. Defaults to False.
+        """
         from .storages import CSVFileStorage
         storage = CSVFileStorage(file_name, **kwargs)
         storage.put(self, overwrite=overwrite)
@@ -1580,7 +1796,16 @@ class TimeSeries(Series):
 
     @classmethod
     def from_df(cls, df, item_type='auto'):
-        """Create a time series from a Pandas data frame."""
+        """Create a time series from a Pandas data frame.
+
+            Args:
+                df(DataFrame): the Pandas data frame.
+                item_type(DataTimePoint or DataTimeSlot or str): the type of the items of the newly
+                                                                 created time series. Defaults to 'auto'.
+
+            Returns:
+                TimeSeries: the created time series.
+        """
 
         if item_type == 'auto':
             item_type = None
@@ -1696,7 +1921,11 @@ class TimeSeries(Series):
             return cls(*datatimepoints)
 
     def to_df(self):
-        """Convert the time series as a Pandas data frame."""
+        """Convert the time series as a Pandas data frame.
+
+            Returns:
+                DataFrame: the Pandas data frame.
+        """
         data_labels = self.data_labels()
 
         dump_data_loss = False
@@ -1726,18 +1955,54 @@ class TimeSeries(Series):
     #  Operations
     #=========================
 
-    def slice(self, from_i=None, to_i=None, from_t=None, to_t=None, from_dt=None, to_dt=None):
-        """Slice a series. A series of DataPoints or DataSlots is required."""
-        from .operations import slice as slice_operation
-        return slice_operation(self, from_i=from_i, to_i=to_i, from_t=from_t, to_t=to_t, from_dt=from_dt, to_dt=to_dt)
 
     def get(self, at_i=None, at_t=None, at_dt=None):
+        """Get the element of the series at a given position or at a given time.
+
+        Args:
+           at_i(int): the position of the item to get. Defaults to None.
+           at_t(bool): the time (as epoch seconds) of the item to get. Defaults to None.
+           at_dt(bool): the time (as datetime object) of the item to get. Defaults to None.
+
+        Returns:
+            object: the item in the given position or at the given time.
+        """
         from .operations import get as get_operation
         return get_operation(self, at_i, at_t, at_dt)
 
+
+    def slice(self, from_i=None, to_i=None, from_t=None, to_t=None, from_dt=None, to_dt=None):
+        """Slice the series between the given positions or times. A series of DataPoints or DataSlots is required.
+
+        Args:
+           from_i(int): the slicing start position. Defaults to None.
+           to_i(int): the slicing end position. Defaults to None.
+           from_t(bool): the slicing start time (as epoch seconds). Defaults to None.
+           to_t(bool): the slicing end time (as epoch seconds). Defaults to None.
+           from_dt(bool): the slicing start time (as datetime object). Defaults to None.
+           to_dt(bool): the slicing end time (as datetime object). Defaults to None.
+
+        Returns:
+            Series: the sliced series.
+        """
+        from .operations import slice as slice_operation
+        return slice_operation(self, from_i=from_i, to_i=to_i,
+                                     from_t=from_t, to_t=to_t,
+                                     from_dt=from_dt, to_dt=to_dt)
+
+
     def view(self, from_i=None, to_i=None):
-        """Get a (lazy) view of the series"""
+        """Get a view of the time series.
+
+        Args:
+           from_i(int): the view start position. Defaults to None.
+           to_i(int): the view end position. Defaults to None.
+
+        Returns:
+            TimeSeriesView: the time series view.
+        """
         return TimeSeriesView(series=self, from_i=from_i, to_i=to_i)
+
 
     #=========================
     #  Plot-related
@@ -1765,7 +2030,13 @@ class TimeSeries(Series):
 #==============================
 
 class TimeSeriesView(TimeSeries):
-    """A TimeSeries created as a view of another one."""
+    """A time series created as a view of another one.
+
+        Args:
+           series(TimeSeries): the original time series.
+           from_i(int): the view start position. Defaults to None.
+           to_i(int): the view end position. Defaults to None.
+    """
 
     def __init__(self, *items, series=None, from_i=None, to_i=None, **kwargs):
         self.series = series
@@ -1875,7 +2146,11 @@ class TimeSeriesView(TimeSeries):
             return super().data_labels()
 
     def materialize(self):
-        """Return a materialized series view"""
+        """Materialize the time series view.
+
+        Returns:
+            TimeSeries: the time series corresponding to the materialized view.
+        """
         materialized_series = self.__class__()
         for item in self:
             materialized_series.append(deepcopy(item))
