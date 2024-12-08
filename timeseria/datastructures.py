@@ -1420,7 +1420,12 @@ class TimeSeries(Series):
             else:
                 # Else, check for the same time zone
                 if self._tz != item.tz:
-                    raise ValueError('Cannot append slots on different time zones (I have "{}" and you tried to add "{}")'.format(self.tz, item.start.tz))
+                    # Check for the zone attribute in case the default comparison fails (e.g. because they are object with different id).
+                    try:
+                        if self._tz.zone != item.tz.zone:
+                            raise ValueError('Cannot append slots on different time zones (I have "{}" and you tried to add "{}")'.format(self.tz, item.start.tz))
+                    except AttributeError:
+                        raise ValueError('Cannot append slots on different time zones (I have "{}" and you tried to add "{}")'.format(self.tz, item.start.tz))
 
             try:
                 if self._resolution != item.unit:
