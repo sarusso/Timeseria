@@ -1315,28 +1315,26 @@ class LSTMForecaster(Forecaster, _KerasModel):
     def _get_predicted_value_bulk(self, series, i, data_label, with_context, **kwargs):
         if i < self.window:
             raise ValueError()
+
         try:
-            self._precomputed[series]
-        except:
-            try:
-                self._precomputed
-            except AttributeError:
-                logger.debug('Will pre-compute bulk predictions for optimized operation. ')
-                self._precomputed = {}
+            prediction = self._precomputed[series][data_label][i-self.window]
+        except (AttributeError, KeyError):
+            logger.debug('Will pre-compute bulk predictions for optimized operation. ')
+            self._precomputed = {}
 
             # Store, for each series, the bulk-predicted values 
             self._precomputed[series] = {}
             self._precomputed[series] = self._bulk_predict(series)
 
-        prediction = float(self._precomputed[series][data_label][i-self.window])
+            prediction = self._precomputed[series][data_label][i-self.window]
 
         # Last item and last data label reached? If so, clear the precomputed cache
         if i == len(series)-1 and data_label == self.data['target_data_labels'][-1]:
             logger.debug('Last item reached, clearing bulk-predicted cache.')
-            self._precomputed[series] = {}
+            del self._precomputed[series]
 
         # Always convert to float.. TODO: can we avoid this? i.e. checking for np.floating in the anomaly detectors _get_predicted_value()?
-        return prediction
+        return float(prediction)
 
 
 #=========================
