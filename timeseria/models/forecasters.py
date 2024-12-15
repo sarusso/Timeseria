@@ -953,7 +953,7 @@ class LSTMForecaster(Forecaster, _KerasModel):
         self._save_keras_model(path)
 
     def _fit(self, series, epochs=30, normalize=True, normalization='minmax', target='all', with_context=False, loss='MSE',
-             data_loss_limit=1.0, reproducible=False, verbose=False, update=False):
+             data_loss_limit=1.0, reproducible=False, verbose=False, update=False, **kwargs):
 
         if reproducible:
             ensure_reproducibility()
@@ -1108,11 +1108,11 @@ class LSTMForecaster(Forecaster, _KerasModel):
             self.keras_model.compile(loss=loss, optimizer='adam')
 
         # Fit
-        self.keras_model.fit(array(window_features_matrix), array(target_values_vector), epochs=epochs, verbose=verbose)
+        self.keras_model.fit(array(window_features_matrix), array(target_values_vector), epochs=epochs, verbose=verbose, **kwargs)
 
     @Forecaster.fit_method
     def fit(self, series, epochs=30, normalize=True, normalization='minmax', target='all', with_context=False,
-            loss='MSE', data_loss_limit=1.0, reproducible=False, verbose=False):
+            loss='MSE', data_loss_limit=1.0, reproducible=False, verbose=False, **kwargs):
         """Fit the model on a series.
 
         Args:
@@ -1132,11 +1132,11 @@ class LSTMForecaster(Forecaster, _KerasModel):
 
         # Call fit logic
         return self._fit(series, epochs=epochs, normalize=normalize, normalization=normalization, target=target, with_context=with_context,
-                         loss=loss, data_loss_limit=data_loss_limit, reproducible=reproducible, verbose=verbose)
+                         loss=loss, data_loss_limit=data_loss_limit, reproducible=reproducible, verbose=verbose, **kwargs)
 
     @Forecaster.fit_update_method
     def fit_update(self, series, epochs=30, normalize=True, normalization='minmax', target='all', with_context=False,
-                   loss='MSE', data_loss_limit=1.0, reproducible=False, verbose=False):
+                   loss='MSE', data_loss_limit=1.0, reproducible=False, verbose=False, **kwargs):
         """Update the model fit on a series.
 
         Args:
@@ -1156,7 +1156,7 @@ class LSTMForecaster(Forecaster, _KerasModel):
 
         # Call fit logic
         return self._fit(series, epochs=epochs, normalize=normalize, normalization=normalization, target=target, with_context=with_context,
-                         loss=loss, data_loss_limit=data_loss_limit, reproducible=reproducible, verbose=verbose, update=True)
+                         loss=loss, data_loss_limit=data_loss_limit, reproducible=reproducible, verbose=verbose, update=True, **kwargs)
 
     @Forecaster.predict_method
     def predict(self, series, steps=1, context_data=None,  verbose=False):
