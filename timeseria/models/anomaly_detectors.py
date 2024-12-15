@@ -362,7 +362,7 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
                 logger.debug('Predictive model for already fitted, not re-fitting.')
             else:
                 if verbose:
-                    print('Fitting model'.format(data_label))
+                    print('Fitting model')
                 logger.debug('Fitting model...')
                 self.model = self.model_class(*self.predictive_model_args, **self.predictive_model_kwargs)
                 self.model.fit(series, **kwargs, verbose=verbose)
