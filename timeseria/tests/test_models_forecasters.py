@@ -338,6 +338,31 @@ class TestForecasters(unittest.TestCase):
             LSTMForecaster(features=['values','not_existent_feature']).fit(timeseries)
 
 
+    def test_LSTMForecaster_univariate_with_window_mask(self):
+
+        try:
+            import tensorflow
+        except ImportError:
+            print('Skipping LSTM forecaster tests with univariate time series as no tensorflow module installed')
+            return
+
+        timeseries = TimeSeries()
+        for i in range(980):
+            timeseries.append(DataTimePoint(t=i*60, data={'sin': sin(i/10.0)}))
+
+        # Non-ngarive mask not supported
+        forecaster = LSTMForecaster(window=10, window_mask=3)
+        with self.assertRaises(ValueError):
+            forecaster.fit(timeseries[0:970], epochs=10, reproducible=True, verbose=False)
+
+        # Negative mask indicates how many elements to dismiss at the end of the window
+        forecaster = LSTMForecaster(window=10, window_mask=-3)
+        forecaster.fit(timeseries[0:970], epochs=10, reproducible=True, verbose=False)
+
+        evaluation_results = forecaster.evaluate(timeseries[0:100], error_metrics=['MAE'])
+        self.assertAlmostEqual(evaluation_results['sin_MAE'], 0.049999925551957244, places=3)
+
+
     def test_LSTMForecaster_multivariate(self):
         try:
             import tensorflow

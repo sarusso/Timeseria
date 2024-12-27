@@ -664,8 +664,14 @@ class _KerasModel(Model):
     # ARIMA and Prophet above also. Consider moving them in a "utility" package or directly in the models.
 
     @staticmethod
-    def _to_matrix_representation(series, window, steps, context_data_labels, target_data_labels, data_loss_limit):
+    def _to_matrix_representation(series, window, steps, context_data_labels, target_data_labels, data_loss_limit, window_mask=None):
 
+        if window_mask is None:
+            window_mask = 0
+        if not isinstance(window_mask, int):
+            raise ValueError('The window mask must be an integer number')
+        if not window_mask<=0:
+            raise ValueError('The window mask is supported only as a negative number for now, indicating how many elements to dismiss at the end of the window')
         if steps > 1:
             raise NotImplementedError('Not implemented for steps >1')
 
@@ -683,6 +689,8 @@ class _KerasModel(Model):
                 # Add window elements
                 window_elements_vector = []
                 for j in range(window):
+                    if j >= window-abs(window_mask):
+                        break
                     if data_loss_limit is not None and 'data_loss' in series[i-window+j].data_indexes and series[i-window+j].data_indexes['data_loss'] >= data_loss_limit:
                         raise TooMuchDataLoss()
                     window_elements_vector.append(series[i-window+j])
@@ -709,7 +717,7 @@ class _KerasModel(Model):
 
 
     @staticmethod
-    def _compute_window_features(window_datapoints, data_labels, time_unit, features, context_data=None, flatten=False):
+    def _compute_window_features(window_datapoints, data_labels, time_unit, features, context_data=None, flatten=False, window_mask=None):
         """Compute features from a list of window data points (or slots).
 
         Args:
@@ -721,8 +729,15 @@ class _KerasModel(Model):
                 ``diffs``  (use the diffs between the values), and
                 ``hours``  (use the hours of the timestamp).
             flatten(bool): if to flatten the features as a signle list.
+            window_mask(int): how many elements to dismiss at the end of the window (has to be negative)
         """
 
+        if window_mask is None:
+            window_mask = 0
+        if not isinstance(window_mask, int):
+            raise ValueError('The window mask must be an integer number')
+        if not window_mask<=0:
+            raise ValueError('The window mask is supported only as a negative number for now, indicating how many elements to dismiss at the end of the window')
         available_features = ['values', 'diffs', 'hours']
         for feature in features:
             if feature not in available_features:
@@ -736,7 +751,7 @@ class _KerasModel(Model):
 
         # Compute the features
         window_features = []
-        for i in range(len(window_datapoints)):
+        for i in range(len(window_datapoints)-abs(window_mask)):
 
             datapoint_features = []
 

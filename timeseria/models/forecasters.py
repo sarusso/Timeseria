@@ -914,13 +914,14 @@ class LSTMForecaster(Forecaster, _KerasModel):
             Defaults to ``['values']``.
         neurons(int): how many neurons to use for the LSTM neural network hidden layer. Defaults to 128.
         keras_model(keras.Model) : an optional external Keras Model architecture. Will cause the ``neurons`` argument to be discarded. Defaults to None.
+        window_mask(int): how many elements to dismiss at the end of the window. If provided, has to be negative. Defaults to None.
     """
 
     @property
     def window(self):
         return self.data['window']
 
-    def __init__(self, window=3, features=['values'], neurons=128, keras_model=None):
+    def __init__(self, window=3, features=['values'], neurons=128, keras_model=None, window_mask=None):
 
         # Call parent init
         super(LSTMForecaster, self).__init__()
@@ -929,6 +930,7 @@ class LSTMForecaster(Forecaster, _KerasModel):
         self.data['window'] = window
         self.data['neurons'] = neurons
         self.data['features'] = features
+        self.data['window_mask'] = window_mask
 
         # Set external model architecture if any
         self.keras_model = keras_model
@@ -1076,7 +1078,8 @@ class LSTMForecaster(Forecaster, _KerasModel):
                                                                                                            steps = 1,
                                                                                                            context_data_labels = context_data_labels,
                                                                                                            target_data_labels = target_data_labels,
-                                                                                                           data_loss_limit = data_loss_limit)
+                                                                                                           data_loss_limit = data_loss_limit,
+                                                                                                           window_mask = self.data['window_mask'])
 
         if not window_elements_matrix:
             raise ValueError('Too much data loss (not a single element below the limit), cannot fit!')
@@ -1088,14 +1091,21 @@ class LSTMForecaster(Forecaster, _KerasModel):
                                                                         data_labels = self.data['data_labels'],
                                                                         time_unit = series.resolution,
                                                                         features = self.data['features'],
-                                                                        context_data = context_data_vector[i] if with_context else None))
+                                                                        context_data = context_data_vector[i] if with_context else None,
+                                                                        window_mask = None)) # Window mask already applied
 
         # Obtain the number of features based on _compute_window_features() output
         features_per_window_item = len(window_features_matrix[0][0])
         output_dimension = len(target_values_vector[0])
 
         # Set the input shape
-        input_shape=(self.data['window'] + 1 if with_context else self.data['window'], features_per_window_item)
+        window_with_mask_and_context = self.data['window']
+        if self.data['window_mask']:
+            if isinstance(self.data['window_mask'], int):
+                window_with_mask_and_context -= abs(self.data['window_mask']) # This subtracts the mask from the window length
+        if with_context:
+            window_with_mask_and_context += 1
+        input_shape=(window_with_mask_and_context, features_per_window_item)
 
         # Create the default model architecture if not already set (either because we are updating or because it was provided in the init)
         if not self.keras_model:
@@ -1218,7 +1228,12 @@ class LSTMForecaster(Forecaster, _KerasModel):
 
 
         # Compute window (plus context) features
-        window_features = self._compute_window_features(window_datapoints, data_labels=self.data['data_labels'], time_unit=series.resolution, features=self.data['features'], context_data=context_data)
+        window_features = self._compute_window_features(window_datapoints,
+                                                        data_labels = self.data['data_labels'],
+                                                        time_unit = series.resolution,
+                                                        features = self.data['features'],
+                                                        context_data = context_data,
+                                                        window_mask = self.data['window_mask'])
 
         # Perform the predict and set prediction data
         yhat = self.keras_model.predict(array([window_features]), verbose=verbose)
@@ -1271,7 +1286,8 @@ class LSTMForecaster(Forecaster, _KerasModel):
                                                                                                            steps = 1,
                                                                                                            context_data_labels = context_data_labels,
                                                                                                            target_data_labels = target_data_labels,
-                                                                                                           data_loss_limit = None)
+                                                                                                           data_loss_limit = None,
+                                                                                                           window_mask = self.data['window_mask'])
 
         # Compute window (plus context) features
         window_features_matrix = []
@@ -1280,7 +1296,8 @@ class LSTMForecaster(Forecaster, _KerasModel):
                                                                         data_labels = self.data['data_labels'],
                                                                         time_unit = series.resolution,
                                                                         features = self.data['features'],
-                                                                        context_data = context_data_vector[i] if with_context else None))
+                                                                        context_data = context_data_vector[i] if with_context else None,
+                                                                        window_mask = None)) # Window mask already applied
 
         X = array(window_features_matrix)
         #y = array(target_values_vector)
