@@ -1014,18 +1014,23 @@ def _to_time_unit_string(seconds, friendlier=True):
     """Converts seconds to a (friendlier) time unit string, as 1s, 1h, 10m etc.)"""
 
     seconds_str = str(seconds).replace('.0', '')
+    timeunit_str = None
     if friendlier:
         if seconds_str == '60':
-            seconds_str = '1m'
+            timeunit_str = '1m'
         elif seconds_str == '600':
-            seconds_str = '10m'
+            timeunit_str = '10m'
         elif seconds_str == '3600':
-            seconds_str = '1h'
-        else:
-            seconds_str = seconds_str+'s'
-    else:
-        seconds_str = seconds_str+'s'
-    return seconds_str
+            timeunit_str = '1h'
+
+    if not timeunit_str:
+        # Ensure we can handle precision
+        if '.' in seconds_str:
+            if len(seconds_str.split('.')[1]) > 6:
+                seconds_str = seconds_str.split('.')[0] + '.' + seconds_str.split('.')[1][0:7]
+        timeunit_str = seconds_str+'s'
+
+    return timeunit_str
 
 
 def _compute_distribution_approximation_errors(distribution_function, prediction_errors, bins=30, details=False):

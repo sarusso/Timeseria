@@ -1017,6 +1017,19 @@ class TestTimeSeries(unittest.TestCase):
 
         self.assertEqual(timeseries, loaded_series)
 
+    def test_TimeSeries_resolution_string_too_many_decimals(self):
+
+        # This test indirectly test the _to_time_unit_string utility function
+        timestamps = [1735004981.623, 1735005281.837, 1735005581.81, 1735005882.093, 1735006181.808, 1735006481.848,
+                      1735006781.947, 1735007082.231, 1735007382.174, 1735007681.688, 1735007981.401, 1735008282.178,
+                      1735008581.377, 1735008881.427, 1735009181.863, 1735009482.181, 1735009781.951, 1735010082.059]
+
+        series = TimeSeries()
+        for timestamp in timestamps:
+            series.append(DataTimePoint(t = timestamp, data = {'value': 1}))
+
+        # This would raise a "Sorry, "300.21399998s" has too many decimal seconds" if not properly handled
+        _ = series._resolution_string
 
 
 class TestTimeSeriesView(unittest.TestCase):
