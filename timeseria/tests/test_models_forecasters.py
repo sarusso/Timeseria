@@ -7,7 +7,7 @@ from propertime.utils import dt
 from ..datastructures import TimePoint, DataTimeSlot, DataTimePoint, TimeSeries
 from ..models.forecasters import ProphetForecaster, PeriodicAverageForecaster, ARIMAForecaster, AARIMAForecaster, LSTMForecaster
 from ..storages import CSVFileStorage
-from ..utils import ensure_reproducibility
+from ..utils import ensure_reproducibility, PFloat
 
 # Setup logging
 from .. import logger
@@ -163,6 +163,20 @@ class TestForecasters(unittest.TestCase):
         self.assertEqual(list(timeseries_with_forecast[-1].data.keys()), ['cos', 'sin'])
         self.assertAlmostEqual(timeseries_with_forecast[-1].data['cos'], 0.0642538467366801)
         self.assertAlmostEqual(timeseries_with_forecast[-1].data['sin'], 0.6923761210530861)
+
+
+    def test_PeriodicAverageForecaster_probabilistic(self):
+
+        # Instantiate and fit
+        forecaster = PeriodicAverageForecaster()
+        forecaster.fit(self.sine_minute_timeseries, periodicity=63, probabilistic=True)
+
+        # Check internal data
+        self.assertIsInstance(forecaster.data['offsets_averages']['value'][0], PFloat)
+
+        # Predict
+        predicted = forecaster.predict(self.sine_minute_timeseries, steps=1)
+        self.assertIsInstance(predicted[0]['value'], PFloat)
 
 
     def test_PeriodicAverageForecaster_save_load(self):
@@ -361,6 +375,26 @@ class TestForecasters(unittest.TestCase):
 
         evaluation_results = forecaster.evaluate(timeseries[0:100], error_metrics=['MAE'])
         self.assertAlmostEqual(evaluation_results['sin_MAE'], 0.049999925551957244, places=3)
+
+
+    def test_LSTMForecaster_univariate_probabilistic(self):
+
+        try:
+            import tensorflow
+        except ImportError:
+            print('Skipping LSTM probabilistic forecaster tests with univariate time series as no tensorflow module installed')
+            return
+
+        timeseries = TimeSeries()
+        for i in range(980):
+            timeseries.append(DataTimePoint(t=i*60, data={'sin': sin(i/10.0)}))
+
+        forecaster = LSTMForecaster(window=10)
+        forecaster.fit(timeseries[0:970], epochs=3, reproducible=True, probabilistic=True, verbose=False)
+
+        predicted = forecaster.predict(timeseries[0:970], samples=3)
+        self.assertAlmostEqual(predicted['sin'], 0.593242318431153, places=3)
+        self.assertIsInstance(predicted['sin'], PFloat)
 
 
     def test_LSTMForecaster_multivariate(self):

@@ -20,10 +20,14 @@ import scipy.stats
 import matplotlib.pyplot as plt
 from sklearn.metrics import mean_squared_error as sklearn_mean_squared_error
 from sklearn.metrics import mean_absolute_error as sklearn_mean_absolute_error
+import fitter as fitter_library
 
 # Setup logging
 import logging
 logger = logging.getLogger(__name__)
+
+fitter_library.fitter.logger = logging.getLogger('fitter')
+fitter_library.fitter.logger.setLevel(level=logging.CRITICAL)
 
 
 def ensure_reproducibility():
@@ -554,6 +558,45 @@ class DistributionFunction():
         x = optimize.bisect(scaled_gaussian, start, end)
 
         return x
+
+
+class PFloat(float):
+    """A class representing a "probabilistic" floating point number, based on a probability distribution."""
+
+    def __new__(self, value, dist=None, data=None):
+        return float.__new__(self, value)
+
+    def __init__(self, value, dist, data=None):
+        self.value = value
+        self.dist = dist
+        self.data = data
+
+    def distf(self):
+        return DistributionFunction(self.dist['type'], self.dist['params'])
+
+    def plot(self):
+        distribution_function = DistributionFunction(self.dist['type'], self.dist['params'])
+        plt = distribution_function.plot(show = False,
+                                         x_min = self.dist['params']['loc'] - abs((6*self.dist['params']['scale'])),
+                                         x_max = self.dist['params']['loc'] + abs((6*self.dist['params']['scale'])))
+        if self.data:
+            plt.title('PFloat for {}, {} with p-value of {}'.format(self, self.dist['type'], self.dist['pvalue']))
+            plt.hist(self.data, bins=30, density=True, alpha=1, color='steelblue')
+        plt.show()
+
+    @classmethod
+    def from_data(cls, data, dist_type='gennorm'):
+        # Fit a generalized normal distribution and use it for the probabilistic float
+        fitter = fitter_library.Fitter(data, distributions=[dist_type])
+        fitter.fit(progress=False)
+        distribution_stats = fitter.summary(plot=False).transpose().to_dict()[dist_type]
+        distribution_params = fitter.get_best()[dist_type]
+
+        return cls(value = distribution_params['loc'],
+                   dist = {'type': dist_type,
+                           'params': distribution_params,
+                           'pvalue': distribution_stats['ks_pvalue']},
+                   data = data)
 
 
 #===========================
