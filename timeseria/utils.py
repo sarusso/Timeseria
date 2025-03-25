@@ -1129,7 +1129,10 @@ def _detect_notebook_major_version():
     if not versions or 'notebook' not in versions:
         notebook_major_version = None
     else:
-        notebook_major_version = int(versions['notebook'].split('.')[0])
+        try:
+            notebook_major_version = int(versions['notebook'].split('.')[0])
+        except:
+            notebook_major_version = None
     return notebook_major_version
 
 
