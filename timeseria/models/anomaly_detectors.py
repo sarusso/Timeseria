@@ -735,6 +735,12 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
                         elif this_index_bounds[i].startswith('adherence/'):
                             factor = float(this_index_bounds[i].split('/')[1])
                             this_index_bounds[i] = error_distribution_functions[data_label].find_x(y_maxes[data_label]/factor)
+                        elif this_index_bounds[i].startswith('max_err/'):
+                            factor = float(this_index_bounds[i].split('/')[1])
+                            this_index_bounds[i] = max(abs_prediction_errors)/factor
+                        elif this_index_bounds[i].startswith('avg_err/'):
+                            factor = float(this_index_bounds[i].split('/')[1])
+                            this_index_bounds[i] = sum(abs_prediction_errors)/len(abs_prediction_errors)/factor
                         else:
                             raise ValueError('Unknown index start or end value "{}"'.format(this_index_bounds[i]))
 
