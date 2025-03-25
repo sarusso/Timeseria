@@ -555,6 +555,7 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
                 print('Predictive model min error (abs): {}'.format(min(abs_prediction_errors)))
                 print('Predictive model max error (abs): {}'.format(max(abs_prediction_errors)))
 
+            print('Error metric: {}'.format(self.data['error_metric']))
             print('Error distribution: {}'.format(self.data['error_distributions'][data_label]))
             print('Error distribution params: {}'.format(self.data['error_distributions_params'][data_label]))
             print('Error distribution stats: {}'.format(self.data['error_distributions_stats'][data_label]))
