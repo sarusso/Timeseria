@@ -19,7 +19,7 @@ Timeseria comes with a comprehensive set of base data structures, data transform
 
 You can get started by reading the [quickstart](https://github.com/sarusso/Timeseria-notebooks/blob/main/notebooks/Quickstart.ipynb) or the [welcome](https://github.com/sarusso/Timeseria-notebooks/blob/main/notebooks/Welcome.ipynb) notebooks, or have a look at the other example notebooks provided in the [Timeseria-notebooks](https://github.com/sarusso/Timeseria-notebooks) repository. 
 
-Also the [reference documentation](https://timeseria.readthedocs.io) might be useful.
+Also the [reference documentation](https://timeseria.readthedocs.io) or the [paper](https://www.sciencedirect.com/science/article/pii/S2352711025000032) might be useful.
 
 
 
