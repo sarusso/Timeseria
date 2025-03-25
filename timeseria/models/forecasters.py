@@ -10,10 +10,11 @@ from math import sqrt, log
 from propertime.utils import now_s, dt_from_s, s_from_dt
 from sklearn.linear_model import LinearRegression
 import matplotlib.pyplot as plt
+import fitter as fitter_library
 
 from ..datastructures import DataTimeSlot, TimePoint, DataTimePoint, Slot, TimeSeries
 from ..exceptions import NonContiguityError, ConsistencyException
-from ..utils import detect_periodicity, _get_periodicity_index, ensure_reproducibility
+from ..utils import detect_periodicity, _get_periodicity_index, ensure_reproducibility, PFloat
 from ..utils import mean_squared_error
 from ..utils import mean_absolute_error, max_absolute_error
 from ..utils import mean_absolute_percentage_error, max_absolute_percentage_error
@@ -23,6 +24,9 @@ from .base import Model, _ProphetModel, _ARIMAModel, _KerasModel
 # Setup logging
 import logging
 logger = logging.getLogger(__name__)
+
+fitter_library.fitter.logger = logging.getLogger('fitter')
+fitter_library.fitter.logger.setLevel(level=logging.CRITICAL)
 
 # Suppress TensorFlow warnings as default behavior
 try:
@@ -548,13 +552,14 @@ class PeriodicAverageForecaster(Forecaster):
         return model
 
     @Forecaster.fit_method
-    def fit(self, series, periodicity='auto', dst_affected=False, data_loss_limit=1.0, verbose=False):
+    def fit(self, series, periodicity='auto', dst_affected=False, data_loss_limit=1.0, probabilistic=False, verbose=False):
         """Fit the model on a series.
 
         Args:
             periodicity(int): the periodicty of the series. If set to ``auto`` then it will be automatically detected using a FFT.
             dst_affected(bool): if the model should take into account DST effects.
             data_loss_limit(float): discard from the fit elements with a data loss greater than or equal to this limit.
+            probabilistic(bool): if to make the forecaster probabilistic.
             verbose(bool): not supported, has no effect.
         """
 
@@ -562,6 +567,7 @@ class PeriodicAverageForecaster(Forecaster):
         self.data['windows'] = {}
         self.data['offsets_averages'] = {}
         self.data['dst_affected'] = dst_affected
+        self.data['probabilistic'] = probabilistic
 
         for data_label in series.data_labels():
 
@@ -581,6 +587,7 @@ class PeriodicAverageForecaster(Forecaster):
                 logger.info('Using a window of "{}" for "{}"'.format(periodicity, data_label))
                 self.data['windows'][data_label] = periodicity
 
+            offsets = {}
             offsets_sums = {}
             offsets_totals = {}
 
@@ -607,11 +614,16 @@ class PeriodicAverageForecaster(Forecaster):
                 # will just be the value of the item itself and the model will use pure periodic averages.
                 offset = item.data[data_label] - window_avg
 
-                # Add to the offsets sum
-                if periodicity_index not in offsets_sums:
-                    offsets_sums[periodicity_index] = offset
+                # Append the offset if probabilistic, otherwise just store the sum and the total
+                if probabilistic:
+                    if not periodicity_index in offsets:
+                        offsets[periodicity_index] = []
+                    offsets[periodicity_index].append(offset)
                 else:
-                    offsets_sums[periodicity_index] += offset
+                    if periodicity_index not in offsets_sums:
+                        offsets_sums[periodicity_index] = offset
+                    else:
+                        offsets_sums[periodicity_index] += offset
 
                 # Increase the offsets total
                 if periodicity_index not in offsets_totals:
@@ -625,10 +637,24 @@ class PeriodicAverageForecaster(Forecaster):
             if not processed:
                 raise ValueError('Too much data loss (not a single element below the limit), cannot fit!')
 
-            # Compute the periodic average offset for each periodicity index
+            # Compute the distributions and the PFloat if probabilistic, otherwise just the mean
             offsets_averages = {}
-            for periodicity_index in offsets_sums:
-                offsets_averages[periodicity_index] = offsets_sums[periodicity_index]/offsets_totals[periodicity_index]
+            if probabilistic:
+                for periodicity_index in offsets:
+                    fitter = fitter_library.Fitter(offsets[periodicity_index], distributions=['gennorm'])
+                    fitter.fit(progress=False)
+                    distribution_stats = fitter.summary(plot=False).transpose().to_dict()['gennorm']
+                    distribution_params = fitter.get_best()['gennorm']
+                    offsets_averages[periodicity_index] = PFloat(value = distribution_params['loc'],
+                                                          dist = {'type': 'gennorm',
+                                                                 'params': distribution_params,
+                                                                 'pvalue': distribution_stats['ks_pvalue']},
+                                                          data = offsets[periodicity_index])
+
+            else:
+                for periodicity_index in offsets_sums:
+                    offsets_averages[periodicity_index] = offsets_sums[periodicity_index]/offsets_totals[periodicity_index]
+
             self.data['offsets_averages'][data_label] = offsets_averages
 
         # Store model window as the max of the single windows
@@ -693,7 +719,13 @@ class PeriodicAverageForecaster(Forecaster):
                                                            dst_affected=self.data['dst_affected'])
 
                 # Apply the periodic average offset on the window average to get the prediction
-                this_step_predict_data[data_label] = window_avg + self.data['offsets_averages'][data_label][periodicity_index]
+                if 'probabilistic' in self.data and self.data['probabilistic']:
+                    # TODO: implement proper sum between two PFloat
+                    offset_data = self.data['offsets_averages'][data_label][periodicity_index].data
+                    pred_samples = [window_avg + offset for offset in offset_data]
+                    this_step_predict_data[data_label] = PFloat.from_data(pred_samples)
+                else:
+                    this_step_predict_data[data_label] = window_avg + self.data['offsets_averages'][data_label][periodicity_index]
 
             predict_data.append(this_step_predict_data)
 
@@ -955,7 +987,7 @@ class LSTMForecaster(Forecaster, _KerasModel):
         self._save_keras_model(path)
 
     def _fit(self, series, epochs=30, normalize=True, normalization='minmax', target='all', with_context=False, loss='MSE',
-             data_loss_limit=1.0, reproducible=False, verbose=False, update=False, **kwargs):
+             data_loss_limit=1.0, reproducible=False, verbose=False, probabilistic=False, update=False, **kwargs):
 
         if reproducible:
             ensure_reproducibility()
@@ -1016,6 +1048,9 @@ class LSTMForecaster(Forecaster, _KerasModel):
             verbose=1
         else:
             verbose=0
+
+        # Save if probabilistic or not
+        self.data['probabilistic'] = probabilistic
 
         if update:
             if normalize != self.data['normalize']:
@@ -1110,19 +1145,29 @@ class LSTMForecaster(Forecaster, _KerasModel):
         # Create the default model architecture if not already set (either because we are updating or because it was provided in the init)
         if not self.keras_model:
             from tensorflow.keras.models import Sequential
-            from tensorflow.keras.layers import Input, LSTM, Dense
-            self.keras_model = Sequential()
-            self.keras_model.add(Input(input_shape))
-            self.keras_model.add(LSTM(self.data['neurons'], ))
-            self.keras_model.add(Dense(output_dimension))
-            self.keras_model.compile(loss=loss, optimizer='adam')
+            from tensorflow.keras.layers import Input, LSTM, Dense, Dropout
+            if not probabilistic:
+                self.keras_model = Sequential()
+                self.keras_model.add(Input(input_shape))
+                self.keras_model.add(LSTM(self.data['neurons'], ))
+                self.keras_model.add(Dense(output_dimension))
+                self.keras_model.compile(loss=loss, optimizer='adam')
+            else:
+                self.keras_model = Sequential([
+                    LSTM(self.data['neurons'], return_sequences=True, input_shape=input_shape),
+                    Dropout(0.2),
+                    LSTM(self.data['neurons'], return_sequences=False),
+                    Dropout(0.2),
+                    Dense(output_dimension)
+                ])
+                self.keras_model.compile(loss=loss, optimizer='adam')
 
         # Fit
         self.keras_model.fit(array(window_features_matrix), array(target_values_vector), epochs=epochs, verbose=verbose, **kwargs)
 
     @Forecaster.fit_method
     def fit(self, series, epochs=30, normalize=True, normalization='minmax', target='all', with_context=False,
-            loss='MSE', data_loss_limit=1.0, reproducible=False, verbose=False, **kwargs):
+            loss='MSE', data_loss_limit=1.0, reproducible=False, probabilistic=False, verbose=False, **kwargs):
         """Fit the model on a series.
 
         Args:
@@ -1137,16 +1182,18 @@ class LSTMForecaster(Forecaster, _KerasModel):
             data_loss_limit(float): discard from the fit elements with a data loss greater than or equal to
                                     this limit. Defaults to ``1``.
             reproducible(bool): if to make the fit deterministic. Not enabled by default.
+            probabilistic(bool): if to make the forecaster probabilistic.
             verbose(bool): if to print the training output in the process. Not enabled by default.
         """
 
         # Call fit logic
-        return self._fit(series, epochs=epochs, normalize=normalize, normalization=normalization, target=target, with_context=with_context,
-                         loss=loss, data_loss_limit=data_loss_limit, reproducible=reproducible, verbose=verbose, **kwargs)
+        return self._fit(series, epochs=epochs, normalize=normalize, normalization=normalization, target=target,
+                         with_context=with_context, loss=loss, data_loss_limit=data_loss_limit, reproducible=reproducible,
+                         probabilistic=probabilistic, verbose=verbose, **kwargs)
 
     @Forecaster.fit_update_method
     def fit_update(self, series, epochs=30, normalize=True, normalization='minmax', target='all', with_context=False,
-                   loss='MSE', data_loss_limit=1.0, reproducible=False, verbose=False, **kwargs):
+                   loss='MSE', data_loss_limit=1.0, reproducible=False, probabilistic=False, verbose=False, **kwargs):
         """Update the model fit on a series.
 
         Args:
@@ -1165,17 +1212,19 @@ class LSTMForecaster(Forecaster, _KerasModel):
         """
 
         # Call fit logic
-        return self._fit(series, epochs=epochs, normalize=normalize, normalization=normalization, target=target, with_context=with_context,
-                         loss=loss, data_loss_limit=data_loss_limit, reproducible=reproducible, verbose=verbose, update=True, **kwargs)
+        return self._fit(series, epochs=epochs, normalize=normalize, normalization=normalization, target=target,
+                         with_context=with_context, loss=loss, data_loss_limit=data_loss_limit, reproducible=reproducible,
+                         probabilistic=probabilistic, verbose=verbose, update=True, **kwargs)
 
     @Forecaster.predict_method
-    def predict(self, series, steps=1, context_data=None,  verbose=False):
+    def predict(self, series, steps=1, context_data=None, samples='auto', verbose=False):
         """Call the model predict logic on a series.
 
         Args:
             series(series): the series on which to perform the predict.
             steps(int): the number of steps to forecast. Defaults to 1.
             context_data(dict): the data to use as context for the prediction.
+            samples(int, str): how many samples to use in probabilistic mode.
             verbose(bool): if to print the predict output in the process.
 
         Returns:
@@ -1193,6 +1242,13 @@ class LSTMForecaster(Forecaster, _KerasModel):
             verbose=1
         else:
             verbose=0
+
+        # Handle samples
+        if samples == 'auto':
+            if self.data['probabilistic']:
+                samples = 100
+            else:
+                samples = 1
 
         # Get the window if we were given a longer series
         window_series = series[-self.data['window']:]
@@ -1235,26 +1291,50 @@ class LSTMForecaster(Forecaster, _KerasModel):
                                                         context_data = context_data,
                                                         window_mask = self.data['window_mask'])
 
-        # Perform the predict and set prediction data
-        yhat = self.keras_model.predict(array([window_features]), verbose=verbose)
-
+        # Perform the prediction and set prediction data
         predicted_data = {}
-        for i, data_label in enumerate(self.data['target_data_labels']):
+        for _ in range(samples):
 
-            # Get the prediction
-            predicted_value = yhat[0][i]
+            if self.data['probabilistic']:
+                yhat = self.keras_model(array([window_features]), training=True)
+            else:
+                yhat = self.keras_model.predict(array([window_features]), verbose=verbose)
 
-            # De-normalize if we have to
-            if self.data['normalization']:
-                if self.data['normalization'] == 'minmax':
-                    predicted_value = (predicted_value*(self.data['max_values'][data_label] - self.data['min_values'][data_label])) + self.data['min_values'][data_label]
-                elif self.data['normalization'] == 'max':
-                    predicted_value = predicted_value*self.data['max_values'][data_label]
+            for i, data_label in enumerate(self.data['target_data_labels']):
+
+                # Get the prediction
+                predicted_value = float(yhat[0][i])
+
+                # De-normalize if we have to
+                if self.data['normalization']:
+                    if self.data['normalization'] == 'minmax':
+                        predicted_value = (predicted_value*(self.data['max_values'][data_label] - self.data['min_values'][data_label])) + self.data['min_values'][data_label]
+                    elif self.data['normalization'] == 'max':
+                        predicted_value = predicted_value*self.data['max_values'][data_label]
+                    else:
+                        raise ConsistencyException('Unknown normalization "{}"'.format(self.data['normalization']))
+
+                # Append to prediction data or just set it
+                if self.data['probabilistic']:
+                    try:
+                        predicted_data[data_label]
+                    except KeyError:
+                        predicted_data[data_label] = []
+                    predicted_data[data_label].append(predicted_value)
                 else:
-                    raise ConsistencyException('Unknown normalization "{}"'.format(self.data['normalization']))
+                    predicted_data[data_label] = predicted_value
 
-            # Append to prediction data
-            predicted_data[data_label] = predicted_value
+        # If probabilistic, fit a generalized normal distribution and use it for the probabilistic float
+        if self.data['probabilistic']:
+            fitter = fitter_library.Fitter(predicted_data[data_label], distributions=['gennorm'])
+            fitter.fit(progress=False)
+            distribution_stats = fitter.summary(plot=False).transpose().to_dict()['gennorm']
+            distribution_params = fitter.get_best()['gennorm']
+            predicted_data[data_label] = PFloat(value = distribution_params['loc'],
+                                                dist = {'type': 'gennorm',
+                                                        'params': distribution_params,
+                                                        'pvalue': distribution_stats['ks_pvalue']},
+                                                data = predicted_data[data_label])
 
         # Return
         return predicted_data
