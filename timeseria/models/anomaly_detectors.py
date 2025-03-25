@@ -306,7 +306,8 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
             return predicted
 
     @AnomalyDetector.fit_method
-    def fit(self, series, with_context=False, error_metric='PE', error_distribution='gennorm', store_errors=True, verbose=False, summary=False, **kwargs):
+    def fit(self, series, with_context=False, error_metric='PE', error_distribution='gennorm',
+            store_errors=True, symmetric_errors='auto', verbose=False, summary=False, **kwargs):
         """Fit the anomaly detection model on a series.
 
         Args:
@@ -318,6 +319,8 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
                                      Defaults to ``gennorm``, a generalized normal distribution.
             store_errors(float): if to store the prediction errors (together with actual and predicted values) internally for further analysis. Access
                                  them with ``model.data['prediction_errors']``, ``model.data['actual_values']`` and ``model.data['predicted_values']``.
+            symmetric_errors(bool): if to compute symmetric (negative) errors when fitting the error distribution. Defaults to ``auto``, which enables
+                                    it when using ``AE`` and ``APE`` error metrics.
             verbose(bool): if to print the fit progress (one dot = 10% done).
             summary(bool): if to display a summary on the error distribution fitting or selection.
         """
@@ -391,6 +394,13 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
             raise ValueError('Unknown error metric "{}"'.format(error_metric))
         self.data['error_metric'] = error_metric
 
+        # Set if to compute the symmetric (negative) errors when fitting the error distribution
+        if symmetric_errors == 'auto':
+            if error_metric in ['AE', 'APE']:
+                symmetric_errors = True
+            else:
+                symmetric_errors = False
+
         # Initialize internal dictionaries
         if store_errors:
             self.data['actual_values'] = {}
@@ -405,6 +415,7 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
         actual_values = {}
         predicted_values = {}
         prediction_errors = {}
+        symmetric_prediction_errors = {}
         cumulative_prediction_errors = {}
 
         progress_step = len(series)/10
@@ -414,6 +425,7 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
             actual_values[data_label] = []
             predicted_values[data_label] = []
             prediction_errors[data_label] = []
+            symmetric_prediction_errors[data_label] = []
             cumulative_prediction_errors[data_label] = []
 
             if verbose:
@@ -455,8 +467,9 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
                     raise ValueError('Unknown error metric "{}"'.format(self.data['error_metric']))
 
                 prediction_errors[data_label].append(prediction_error)
-                if error_metric in ['AE', 'APE']:
-                    prediction_errors[data_label].append(-prediction_error)
+                if symmetric_errors:
+                    symmetric_prediction_errors[data_label].append(prediction_error)
+                    symmetric_prediction_errors[data_label].append(-prediction_error)
 
                 # Handle the index window if any
                 if (self.index_window > 1) and (i >= self.data['model_window'] + self.index_window):
@@ -485,7 +498,10 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
         for data_label in series.data_labels():
 
             # Fit the distributions and select the best one
-            fitter = fitter_library.fitter.Fitter(prediction_errors[data_label], distributions=error_distributions)
+            if symmetric_errors:
+                fitter = fitter_library.fitter.Fitter(symmetric_prediction_errors[data_label], distributions=error_distributions)
+            else:
+                fitter = fitter_library.fitter.Fitter(prediction_errors[data_label], distributions=error_distributions)
             fitter.fit(progress=False)
 
             if summary:
