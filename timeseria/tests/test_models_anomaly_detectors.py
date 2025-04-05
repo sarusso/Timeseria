@@ -131,6 +131,16 @@ class TestAnomalyDetectors(unittest.TestCase):
         with self.assertRaises(NotImplementedError):
             anomaly_detector.save(model_path)
 
+        # Test with data losses and details
+        sine_timeseries_with_data_losses = self.sine_minute_timeseries.duplicate()
+        for i, item in enumerate(sine_timeseries_with_data_losses):
+            if i > 10 and i < 20:
+                item.data_indexes['data_loss'] = 1
+            else:
+                item.data_indexes['data_loss'] = 0
+
+        anomaly_detector.apply(sine_timeseries_with_data_losses, details=True)
+
 
     def test_PeriodicAverageAnomalyDetector(self):
         # This model is forecaster-based

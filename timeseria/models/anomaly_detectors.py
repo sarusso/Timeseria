@@ -796,24 +796,20 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
                 if i >  len(series)-self.data['model_window']-1:
                     break
 
-            # Check if we are allowed to compute the anomaly index given the data loss threshold, or if we have to abort
-            abort=False
+            # Check if we are above the data_loss threshold
+            above_data_loss_threshold = False
             if series[i].data_loss is not None and series[i].data_loss >= data_loss_threshold:
-                abort=True
+                above_data_loss_threshold =True
             else:
                 for j in range(self.data['model_window']):
                     if series[i-j-1].data_loss is not None and series[i-j-1].data_loss >= data_loss_threshold:
-                        abort=True
+                        above_data_loss_threshold = True
                         break
-                if not abort:
+                if not above_data_loss_threshold:
                     if issubclass(self.model_class, Reconstructor):
                         if series[i-j-1].data_loss is not None and series[i+j+1].data_loss >= data_loss_threshold:
-                            abort=True
+                            above_data_loss_threshold = True
                             break
-            if abort:
-                # Just append the item as-is and continue
-                result_series.append(item)
-                continue
 
             # Start computing the anomaly index
             item_anomaly_indexes = []
@@ -898,12 +894,15 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
                         else:
                             raise ValueError('Unknown index type "{}"'.format(index_type))
 
-                # Add this anomaly index for this data label to the list of the item anomaly indexes
-                item_anomaly_indexes.append(anomaly_index)
+                # Add this anomaly index, for this data label, to the list of the item's anomaly indexes, unless
+                # we are above the data_loss_threshold (in which case the details below can still be computed, which
+                # is why we don't abort before but instead we still compute everything and just skip the append here)
+                if not above_data_loss_threshold:
+                    item_anomaly_indexes.append(anomaly_index)
 
                 # Add details?
                 if details:
-                    if self.data['index_window']>1:
+                    if self.data['index_window'] > 1:
                         if isinstance(details, list):
                             if 'pred' in details:
                                 item.data['{}_pred'.format(data_label)] = predicted
@@ -947,7 +946,8 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
                     else:
                         item.data_indexes['anomaly'] = multivariate_index_strategy(item_anomaly_indexes)
 
-                # Append
+            # Append (we are after the model window for sure, but also check if we are after the index window)
+            if i >= self.data['model_window'] + self.data['index_window']:
                 result_series.append(item)
 
         if verbose:
