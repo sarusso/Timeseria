@@ -345,11 +345,17 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
             self.data['model_ids'] = {}
 
             for data_label in series.data_labels():
-                if self.models and data_label in self.models:
+                if self.models \
+                and data_label in self.models \
+                and self.models[data_label]._is_parametric \
+                and self.models[data_label]._is_fit_implemented \
+                and self.models[data_label].fitted:
                     if verbose:
                         print('Predictive model for {} already fitted, not re-fitting.'.format(data_label))
                     logger.debug('Predictive model for %s already fitted, not re-fitting.', data_label)
                 else:
+                    if not self.model_class:
+                        raise ValueError('No models nor model_class provided?')
                     if verbose:
                         print('Fitting for "{}":'.format(data_label))
                     logger.debug('Fitting for "%s"...', data_label)
@@ -359,16 +365,40 @@ class ModelBasedAnomalyDetector(AnomalyDetector):
         else:
 
             # Without context, use a single model, unless otherwise set with the "models" argument
-            if self.model or self.models:
-                if verbose:
-                    print('Predictive model already fitted, not re-fitting.')
-                logger.debug('Predictive model for already fitted, not re-fitting.')
+            if self.models:
+                for data_label in series.data_labels():
+                    if self.models \
+                    and data_label in self.models \
+                    and self.models[data_label]._is_parametric \
+                    and self.models[data_label]._is_fit_implemented \
+                    and self.models[data_label].fitted:
+                        if verbose:
+                            print('Predictive model for {} already fitted, not re-fitting.'.format(data_label))
+                        logger.debug('Predictive model for %s already fitted, not re-fitting.', data_label)
+                    else:
+                        if verbose:
+                            print('Fitting for "{}":'.format(data_label))
+                        logger.debug('Fitting for "%s"...', data_label)
+                        self.models[data_label] = self.model_class(*self.predictive_model_args, **self.predictive_model_kwargs)
+                        self.models[data_label].fit(series, **kwargs, target=data_label, with_context=True, verbose=verbose)
+
             else:
-                if verbose:
-                    print('Fitting model')
-                logger.debug('Fitting model...')
-                self.model = self.model_class(*self.predictive_model_args, **self.predictive_model_kwargs)
-                self.model.fit(series, **kwargs, verbose=verbose)
+                if not self.model:
+                    if not self.model_class:
+                        raise ValueError('No models nor model_class provided?')
+                    self.model = self.model_class(*self.predictive_model_args, **self.predictive_model_kwargs)
+
+                if self.model._is_parametric \
+                and self.model._is_fit_implemented \
+                and self.model.fitted:
+                    if verbose:
+                        print('Predictive model already fitted, not re-fitting.')
+                    logger.debug('Predictive model for already fitted, not re-fitting.')
+                else:
+                    if verbose:
+                        print('Fitting model')
+                    logger.debug('Fitting model...')
+                    self.model.fit(series, **kwargs, verbose=verbose)
 
         # Set the id of the internal model and the window in the data
         if self.model:
