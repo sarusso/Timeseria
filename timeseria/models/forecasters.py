@@ -63,12 +63,12 @@ class Forecaster(Model):
         actual = series[i].data[data_label]
         return actual
 
-    def _get_predicted_value(self, series, i, data_label, with_context, **kwargs):
+    def _get_predicted_value(self, series, i, data_label, with_context):
 
         if with_context:
-            prediction = self.predict(series.view(from_i=0, to_i=i), steps=1, context_data=series[i].data, **kwargs)
+            prediction = self.predict(series.view(from_i=0, to_i=i), steps=1, context_data=series[i].data)
         else:
-            prediction = self.predict(series.view(from_i=0, to_i=i), steps=1, **kwargs)
+            prediction = self.predict(series.view(from_i=0, to_i=i), steps=1)
 
         # Handle list of dicts or dict of lists (of which we have only one value here)
         #{'value': [0.2019341593004146, 0.29462641146884005]}
@@ -227,7 +227,7 @@ class Forecaster(Model):
 
     @Model.evaluate_method
     def evaluate(self, series, steps=1, error_metrics=['RMSE', 'MAE'], return_evaluation_series=False, plot_evaluation_series=False,
-                 evaluation_series_error_metrics='auto', plot_error_distribution=False, error_distribution_metrics='auto', verbose=False, **kwargs):
+                 evaluation_series_error_metrics='auto', plot_error_distribution=False, error_distribution_metrics='auto', verbose=False):
         """Evaluate the model on a series.
 
         Args:
@@ -378,10 +378,10 @@ class Forecaster(Model):
                 actual_values[data_label].append(self._get_actual_value(series, i, data_label))
                 try:
                     # Try performing a bulk-optimized predict call
-                    predicted_values[data_label].append(self._get_predicted_value_bulk(series, i, data_label, with_context= True if context_data_labels else False, **kwargs))
+                    predicted_values[data_label].append(self._get_predicted_value_bulk(series, i, data_label, with_context= True if context_data_labels else False))
                 except (AttributeError, NotImplementedError):
                     # Perform a standard predict call
-                    predicted_values[data_label].append(self._get_predicted_value(series, i, data_label, with_context= True if context_data_labels else False, **kwargs))
+                    predicted_values[data_label].append(self._get_predicted_value(series, i, data_label, with_context= True if context_data_labels else False))
 
             if verbose:
                 print('')
@@ -1409,7 +1409,7 @@ class LSTMForecaster(Forecaster, _KerasModel):
         # Return by {label: [value_1, value_2, ... vanuel_n]}
         return bulk_predicted_data
 
-    def _get_predicted_value_bulk(self, series, i, data_label, with_context, **kwargs):
+    def _get_predicted_value_bulk(self, series, i, data_label, with_context):
         if i < self.window:
             raise ValueError()
 
