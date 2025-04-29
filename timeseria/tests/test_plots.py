@@ -1,3 +1,4 @@
+import os
 import unittest
 import tempfile
 from propertime.utils import dt
@@ -9,7 +10,7 @@ logger.setup()
 
 class TestPlots(unittest.TestCase):
 
-    def test_basic(self, mock_display):
+    def test_basic(self):
 
         timeseries = TimeSeries(DataTimePoint(dt=dt(2015,10,24,0,0,0, tz='Europe/Rome'),
                                               data={'value_1':23.8, 'value_2':17.5},
@@ -44,9 +45,9 @@ class TestPlots(unittest.TestCase):
         with self.assertRaises(KeyError):
             timeseries.plot(html=True, data_index_colors={'index_1':'#c0c0c0', 'index_3': '#ff0000'})
 
-        # Test that save rais eno errors
+        # Test that save raise no errors
         tmp_dir = tempfile.gettempdir()
-        timeseries.plot(save_to=tmp_dir+'/plot.html')
+        timeseries.plot(save_to=os.path.join(tmp_dir, 'plot.html'))
 
         # This would test for image format as well, but not exactly a unit test as it uses Chrome/Chromium
         #timeseries.plot(save_to=tmp_dir+'/plot.png', image=True)
