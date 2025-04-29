@@ -11,6 +11,7 @@ from ..utils import _is_index_based, _is_key_based, _has_numerical_values
 from ..datastructures import DataTimePoint, TimeSeries
 from ..storages import CSVFileStorage
 from ..units import TimeUnit
+from .. import TEST_DATASETS_PATH
 
 # Setup logging
 from .. import logger
@@ -22,9 +23,6 @@ def attach_validity_regions(series, sampling_interval=None):
     for point in series:
         point.valid_from = validity_regions[point.t][0]
         point.valid_to = validity_regions[point.t][1]
-
-# Set test data path
-TEST_DATA_PATH = '/'.join(os.path.realpath(__file__).split('/')[0:-1]) + '/test_data/'
 
 
 class TestComputeValidityRegions(unittest.TestCase):
@@ -333,7 +331,7 @@ class TestComputeCoverageAndDataLoss(unittest.TestCase):
         # TODO: This test was introduced after finding a bug, and needs to be better unrolled.
         # the bug was raising when there were overlapping points at the start or end of the slot.
         from timeseria import  storages
-        csv_storage = storages.CSVFileStorage(TEST_DATA_PATH + 'csv/temperature.csv')
+        csv_storage = storages.CSVFileStorage(os.path.join(TEST_DATASETS_PATH, 'temperature.csv'))
         series = csv_storage.get(limit=400)
         series = series[200:300]
         resampled_series = series.resample(600)
@@ -346,7 +344,7 @@ class TestGetPeriodicity(unittest.TestCase):
 
     def test_get_periodicity(self):
 
-        univariate_timeseries = CSVFileStorage(TEST_DATA_PATH + '/csv/temperature.csv').get()
+        univariate_timeseries = CSVFileStorage(os.path.join(TEST_DATASETS_PATH, 'temperature.csv')).get()
 
         univariate_1h_timeseries = univariate_timeseries.aggregate('1h')
 
@@ -359,17 +357,17 @@ class TestDetectSamplingInterval(unittest.TestCase):
 
     def test_detect_sampling_interval(self):
 
-        timeseries = CSVFileStorage(TEST_DATA_PATH + '/csv/humitemp_short.csv').get()
+        timeseries = CSVFileStorage(os.path.join(TEST_DATASETS_PATH, 'humitemp_short.csv')).get()
         self.assertEqual(detect_sampling_interval(timeseries), 61)
         self.assertAlmostEqual(detect_sampling_interval(timeseries, confidence=True)[1], 0.7368421)
 
-        timeseries = CSVFileStorage(TEST_DATA_PATH + '/csv/shampoo_sales.csv', date_column = 'Month', date_format = '%y-%m').get()
+        timeseries = CSVFileStorage(os.path.join(TEST_DATASETS_PATH, 'shampoo_sales.csv'), date_column = 'Month', date_format = '%y-%m').get()
         self.assertEqual(detect_sampling_interval(timeseries), 2678400)  # 2678400/60/60/24 = 31 Days (the most frequent)
 
-        timeseries = CSVFileStorage(TEST_DATA_PATH + '/csv/temperature.csv').get()
+        timeseries = CSVFileStorage(os.path.join(TEST_DATASETS_PATH, 'temperature.csv')).get()
         self.assertEqual(detect_sampling_interval(timeseries), 600)
 
-        timeseries = CSVFileStorage(TEST_DATA_PATH + '/csv/temp_short_1h.csv').get()
+        timeseries = CSVFileStorage(os.path.join(TEST_DATASETS_PATH, 'temp_short_1h.csv')).get()
         self.assertEqual(detect_sampling_interval(timeseries), 3600)
 
 
@@ -377,7 +375,7 @@ class TestDetectEncoding(unittest.TestCase):
 
     def test_detect_encoding(self):
 
-        encoding = detect_encoding('{}/csv/shampoo_sales.csv'.format(TEST_DATA_PATH), streaming=False)
+        encoding = detect_encoding(os.path.join(TEST_DATASETS_PATH, 'shampoo_sales.csv'), streaming=False)
         self.assertEqual(encoding, 'ascii')
 
 

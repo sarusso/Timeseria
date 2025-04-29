@@ -8,13 +8,13 @@ from ..datastructures import TimePoint, DataTimeSlot, DataTimePoint, TimeSeries
 from ..models.forecasters import ProphetForecaster, PeriodicAverageForecaster, ARIMAForecaster, AARIMAForecaster, LSTMForecaster
 from ..storages import CSVFileStorage
 from ..utils import ensure_reproducibility, PFloat
+from .. import TEST_DATASETS_PATH
 
 # Setup logging
 from .. import logger
 logger.setup()
 
-# Test data and temp path
-TEST_DATA_PATH = '/'.join(os.path.realpath(__file__).split('/')[0:-1]) + '/test_data/'
+# Get a temp dir for models
 TEMP_MODELS_DIR = tempfile.TemporaryDirectory().name
 
 
@@ -68,7 +68,7 @@ class TestForecasters(unittest.TestCase):
         self.assertAlmostEqual(evaluation['value_MAE'], 0.0797, places=2)
 
         # Test on a realistic point series, forecast horizon=1
-        timeseries = CSVFileStorage(TEST_DATA_PATH + '/csv/temperature.csv').get(limit=200)
+        timeseries = CSVFileStorage(os.path.join(TEST_DATASETS_PATH, 'temperature.csv')).get(limit=200)
         forecaster = PeriodicAverageForecaster()
         with self.assertRaises(ValueError):
             forecaster.fit(timeseries)
@@ -183,9 +183,9 @@ class TestForecasters(unittest.TestCase):
 
         forecaster = PeriodicAverageForecaster()
         forecaster.fit(self.sine_minute_timeseries, periodicity=63)
-        forecaster.save(TEMP_MODELS_DIR + '/test_PA_model')
+        forecaster.save(os.path.join(TEMP_MODELS_DIR, 'test_PA_model'))
 
-        loaded_forecaster = PeriodicAverageForecaster.load(TEMP_MODELS_DIR + '/test_PA_model')
+        loaded_forecaster = PeriodicAverageForecaster.load(os.path.join(TEMP_MODELS_DIR, 'test_PA_model'))
         self.assertEqual(forecaster.data['offsets_averages'], loaded_forecaster.data['offsets_averages'])
 
 
@@ -215,7 +215,7 @@ class TestForecasters(unittest.TestCase):
         self.assertAlmostEqual(evalation_results['value_MAE'], 0.53, places=2) # For one sample they must be the same
 
         # Test on a realistic point series, forecast horizon=3
-        timeseries = CSVFileStorage(TEST_DATA_PATH + '/csv/temperature.csv').get(limit=200)
+        timeseries = CSVFileStorage(os.path.join(TEST_DATASETS_PATH, 'temperature.csv')).get(limit=200)
         forecaster = ProphetForecaster()
         with self.assertRaises(Exception):
             forecaster.fit(timeseries)
@@ -255,7 +255,7 @@ class TestForecasters(unittest.TestCase):
         self.assertEqual(len(sine_day_timeseries_with_forecast), 1003)
 
         # Test on a realistic point series, forecast horizon=3
-        timeseries = CSVFileStorage(TEST_DATA_PATH + '/csv/temperature.csv').get(limit=200)
+        timeseries = CSVFileStorage(os.path.join(TEST_DATASETS_PATH, 'temperature.csv')).get(limit=200)
         forecaster = ARIMAForecaster()
         with self.assertRaises(Exception):
             forecaster.fit(timeseries)
@@ -293,7 +293,7 @@ class TestForecasters(unittest.TestCase):
         self.assertEqual(len(sine_day_timeseries_with_forecast), 1003)
 
         # Test on a realistic point series, forecast horizon=3
-        timeseries = CSVFileStorage(TEST_DATA_PATH + '/csv/temperature.csv').get(limit=200)
+        timeseries = CSVFileStorage(os.path.join(TEST_DATASETS_PATH, 'temperature.csv')).get(limit=200)
         forecaster = AARIMAForecaster()
         with self.assertRaises(Exception):
             forecaster.fit(timeseries)
@@ -479,7 +479,7 @@ class TestForecasters(unittest.TestCase):
             print('Skipping LSTM forecaster cross validation tests as no tensorflow module installed')
             return
 
-        temperature_timeseries = TimeSeries.from_csv(TEST_DATA_PATH + 'csv/temperature_winter.csv').resample('1h')
+        temperature_timeseries = TimeSeries.from_csv(os.path.join(TEST_DATASETS_PATH, 'temperature_winter.csv')).resample('1h')
 
         # Pretend there was no data loss at all
         for item in temperature_timeseries:
@@ -518,7 +518,7 @@ class TestForecasters(unittest.TestCase):
         predicted_data = forecaster.predict(sine_minute_timeseries)
 
         # Set model path
-        model_path = TEMP_MODELS_DIR+ '/test_LSTM_model'
+        model_path = os.path.join(TEMP_MODELS_DIR, 'test_LSTM_model')
 
         # Save
         forecaster.save(model_path)

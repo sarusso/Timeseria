@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """Forecasting models."""
 
+import os
 import copy
 import pickle
 import shutil
@@ -1471,7 +1472,7 @@ class LinearRegressionForecaster(Forecaster, _KerasModel):
         model = super().load(path)
 
         # Load the sklearn model
-        with open('{}/sklearn_model.pkl'.format(path),'rb') as f:
+        with open(os.path.join(path, 'sklearn_model.pkl'),'rb') as f:
             model.sklearn_model = pickle.load(f)
 
         return model
@@ -1483,7 +1484,7 @@ class LinearRegressionForecaster(Forecaster, _KerasModel):
 
         # Save the sklearn model
         try:
-            with open('{}/sklearn_model.pkl'.format(path),'wb') as f:
+            with open(os.path.join(path, 'sklearn_model.pkl'),'wb') as f:
                 pickle.dump(self.sklearn_model,f)
         except Exception as e:
             shutil.rmtree(path)

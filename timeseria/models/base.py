@@ -99,8 +99,8 @@ class Model():
         # Create the model
         model = cls()
 
-        # Set the data (replaces the model ID also)
-        with open(path+'/data.json', 'r') as f:
+        # Set the data from ./data.json (replaces the model ID also)
+        with open(os.path.join(path, 'data.json'), 'r') as f:
             model.data = json.loads(f.read())
 
         # TODO: the "fitted" does not apply for models with parameters but with no fit.. fix me.
@@ -135,9 +135,9 @@ class Model():
         if os.path.exists(path):
             raise ValueError('The path "{}" already exists'.format(path))
 
-        # Prepare model dir and dump data as json
+        # Prepare model dir and dump data as json as ./data.json
         os.makedirs(path)
-        model_data_file = '{}/data.json'.format(path)
+        model_data_file = os.path.join(path, 'data.json')
 
         # Temporary change the resolution to its string representation (if any)
         if 'resolution' in self.data:
@@ -645,16 +645,16 @@ class _KerasModel(Model):
 
     def _load_keras_model(self, path):
 
-        # Load the Keras model
+        # Load the Keras model from ./model.keras
         if path:
             from tensorflow.keras.models import load_model as load_keras_model
-            self.keras_model = load_keras_model('{}/model.keras'.format(path))
+            self.keras_model = load_keras_model(os.path.join(path, 'model.keras'))
 
     def _save_keras_model(self, path):
 
-        # Save the Keras model
+        # Save the Keras model as ./model.keras
         try:
-            self.keras_model.save('{}/model.keras'.format(path))
+            self.keras_model.save(os.path.join(path, 'model.keras'))
         except Exception as e:
             shutil.rmtree(path)
             raise e

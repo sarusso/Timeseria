@@ -4,6 +4,7 @@
 import os
 import uuid
 import datetime
+import tempfile
 from propertime.utils import dt_from_s, str_from_dt, dt_from_str, s_from_dt
 from .units import TimeUnit
 from .utils import is_numerical, os_shell, PFloat
@@ -17,7 +18,7 @@ except ImportError:
 import logging
 logger = logging.getLogger(__name__)
 
-# Setup come configuration
+# Setup some configuration params
 AGGREGATE_THRESHOLD = int(os.environ.get('AGGREGATE_THRESHOLD', 10000))
 DEFAULT_PLOT_TYPE = os.environ.get('DEFAULT_PLOT_TYPE', None)
 if DEFAULT_PLOT_TYPE:
@@ -31,6 +32,9 @@ if DEFAULT_PLOT_TYPE:
         raise ValueError('Unknown plot type "{}" for DEFAULT_PLOT_TYPE'.forat(DEFAULT_PLOT_TYPE))
 else:
     DEFAULT_PLOT_AS_IMAGE=False
+
+# Get a temp dir
+TMP_DIR = tempfile.gettempdir()
 
 #=================
 #   Utilities
@@ -904,8 +908,7 @@ define('"""+graph_id+"""', ['dgenv'], function (Dygraph) {
 });
 """
 
-    STATIC_DATA_PATH = '/'.join(os.path.realpath(__file__).split('/')[0:-1]) + '/static/'
-
+    STATIC_DATA_PATH = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'static')
 
     if image or save_to or html:
 
@@ -923,7 +926,7 @@ define('"""+graph_id+"""', ['dgenv'], function (Dygraph) {
         if save_to:
             if image:
                 # Dump as image
-                html_dest = '/tmp/{}.html'.format(rnd_uuid)
+                html_dest = os.path.join(TMP_DIR, '{}.html'.format(rnd_uuid))
                 png_dest = save_to
             else:
                 # Interactive, dump as html
@@ -932,8 +935,8 @@ define('"""+graph_id+"""', ['dgenv'], function (Dygraph) {
         else:
             if image:
                 # Dump as image
-                html_dest = '/tmp/{}.html'.format(rnd_uuid)
-                png_dest = '/tmp/{}.png'.format(rnd_uuid)
+                html_dest = os.path.join(TMP_DIR, '{}.html'.format(rnd_uuid))
+                png_dest = os.path.join(TMP_DIR, '{}.png'.format(rnd_uuid))
             else:
                 # Will never get here, directly rendered in iPython
                 pass
@@ -943,9 +946,9 @@ define('"""+graph_id+"""', ['dgenv'], function (Dygraph) {
         html_content = ''
         if not return_html_code:
             html_content += '<html>\n<head>\n<meta charset="UTF-8">'
-            with open(STATIC_DATA_PATH+'/js/dygraph-2.1.0.min.js') as dg_js_file:
+            with open(os.path.join(STATIC_DATA_PATH,'js','dygraph-2.1.0.min.js')) as dg_js_file:
                 html_content += '\n<script type="text/javascript">'+dg_js_file.read()+'</script>\n'
-            with open(STATIC_DATA_PATH+'css/dygraph-2.1.0.css') as dg_css_file:
+            with open(os.path.join(STATIC_DATA_PATH,'css','dygraph-2.1.0.css')) as dg_css_file:
                 html_content += '\n<style>'+dg_css_file.read()+'</style>\n'
             html_content += '</head>\n<body style="font-family:\'Helvetica Neue\', Helvetica, Arial, sans-serif; font-size:1.0em">\n'
             if title:
@@ -977,8 +980,20 @@ define('"""+graph_id+"""', ['dgenv'], function (Dygraph) {
             _headless_mode_switch = ''
 
             # Is there a system Chrome or Chromium we can use?
-            potential_chrom_executables = ['chromium', 'chromium-browser', 'google-chrome',
-                                           '/Applications/Google\\ Chrome.app/Contents/MacOS/Google\\ Chrome']
+            potential_chrom_executables = [
+                # Linux
+                'google-chrome',
+                'chromium',
+                'chromium-browser',
+                # macOS
+                '/Applications/Google\\ Chrome.app/Contents/MacOS/Google\\ Chrome',
+                '/Applications/Chromium.app/Contents/MacOS/Chromium',
+                # Windows not supported because of --version not working
+                #r'"C:\Program Files\Google\Chrome\Application\chrome.exe"',
+                #r'"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe"',
+                #r'"C:\Program Files\Chromium\Application\chrome.exe"',
+                #r'"C:\Program Files (x86)\Chromium\Application\chrome.exe"',
+            ]
 
             for potential_chrom_executable in potential_chrom_executables:
                 out = os_shell('{} --version'.format(potential_chrom_executable), capture=True)
@@ -1085,11 +1100,11 @@ define('"""+graph_id+"""', ['dgenv'], function (Dygraph) {
             display(Javascript("require.config({paths: {dgenv: 'https://cdnjs.cloudflare.com/ajax/libs/dygraph/2.1.0/dygraph.min'}});"))
 
             # TODO: load the Dygraphs Javascript locally, maybe with something like:
-            #with open(STATIC_DATA_PATH+'js/dygraph-2.1.0.min.js') as dy_js_file:
+            #with open(os.path.join(STATIC_DATA_PATH, 'js', 'dygraph-2.1.0.min.js') as dy_js_file:
             #    display(Javascript(dy_js_file.read()))
 
             # Load Dygraphs CSS
-            with open(STATIC_DATA_PATH+'css/dygraph-2.1.0.css') as dg_css_file:
+            with open(os.path.join(STATIC_DATA_PATH, 'css', 'dygraph-2.1.0.css')) as dg_css_file:
                 display(HTML('<style>'+dg_css_file.read()+'</style>'))
 
             # Load Dygraphs Javascript and html code
@@ -1117,9 +1132,9 @@ define('"""+graph_id+"""', ['dgenv'], function (Dygraph) {
                 display_html = '<div style="height:370px">'
             else:
                 display_html = '<div style="height:360px">'
-            with open(STATIC_DATA_PATH+'/js/dygraph-2.1.0.min.js') as dg_js_file:
+            with open(os.path.join(STATIC_DATA_PATH, 'js', 'dygraph-2.1.0.min.js')) as dg_js_file:
                 display_html += '\n<script type="text/javascript">'+dg_js_file.read()+'</script>\n'
-            with open(STATIC_DATA_PATH+'css/dygraph-2.1.0.css') as dg_css_file:
+            with open(os.path.join(STATIC_DATA_PATH, 'css', 'dygraph-2.1.0.css')) as dg_css_file:
                 display_html += '\n<style>'+dg_css_file.read()+'</style>\n'
             if title:
                 display_html += '<div style="text-align: center; margin-top:15px; margin-bottom:15px; font-size:1.0em"><h3>{}</h3></div>'.format(title)
