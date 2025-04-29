@@ -10,13 +10,13 @@ from ..models.reconstructors import PeriodicAverageReconstructor
 from ..models.anomaly_detectors import AnomalyDetector, ModelBasedAnomalyDetector, PeriodicAverageReconstructorAnomalyDetector, PeriodicAverageAnomalyDetector, LSTMAnomalyDetector
 from ..storages import CSVFileStorage
 from ..utils import ensure_reproducibility
+from .. import TEST_DATASETS_PATH
 
 # Setup logging
 from .. import logger
 logger.setup()
 
-# Test data and temp path
-TEST_DATA_PATH = '/'.join(os.path.realpath(__file__).split('/')[0:-1]) + '/test_data/'
+# Get a temp dir for models
 TEMP_MODELS_DIR = tempfile.TemporaryDirectory().name
 
 class TestAnomalyDetectors(unittest.TestCase):
@@ -144,7 +144,7 @@ class TestAnomalyDetectors(unittest.TestCase):
         self.assertAlmostEqual(result_timeseries[-1].data_indexes['anomaly'], 0.00998, places=4)
 
         # Save/load
-        model_path = TEMP_MODELS_DIR+'/test_generic_model_based_anomaly_model'
+        model_path = os.path.join(TEMP_MODELS_DIR, 'test_generic_model_based_anomaly_model')
         with self.assertRaises(NotImplementedError):
             anomaly_detector.save(model_path)
 
@@ -178,7 +178,7 @@ class TestAnomalyDetectors(unittest.TestCase):
         self.assertEqual(anomalies_count, 9)
 
         # Test on Points as well
-        timeseries = CSVFileStorage(TEST_DATA_PATH + '/csv/temperature.csv').get(limit=200)
+        timeseries = CSVFileStorage(os.path.join(TEST_DATASETS_PATH, 'temperature.csv')).get(limit=200)
         anomaly_detector = PeriodicAverageAnomalyDetector()
         with self.assertRaises(ValueError):
             anomaly_detector.fit(timeseries, error_distribution='norm')
@@ -201,7 +201,7 @@ class TestAnomalyDetectors(unittest.TestCase):
         anomaly_detector.fit(self.sine_minute_timeseries, periodicity=63, error_metric='E', error_distribution='norm')
 
         # Set model save path
-        model_path = TEMP_MODELS_DIR+'/test_periodic_average_anomaly_model'
+        model_path = os.path.join(TEMP_MODELS_DIR, 'test_periodic_average_anomaly_model')
 
         anomaly_detector.save(model_path)
 
@@ -234,7 +234,7 @@ class TestAnomalyDetectors(unittest.TestCase):
         self.assertEqual(anomalies_count, 23)
 
         # Test on Points as well
-        timeseries = CSVFileStorage(TEST_DATA_PATH + '/csv/temperature.csv').get(limit=200)
+        timeseries = CSVFileStorage(os.path.join(TEST_DATASETS_PATH, 'temperature.csv')).get(limit=200)
         anomaly_detector = PeriodicAverageReconstructorAnomalyDetector()
         with self.assertRaises(ValueError):
             anomaly_detector.fit(timeseries, error_distribution='norm')
@@ -288,7 +288,7 @@ class TestAnomalyDetectors(unittest.TestCase):
         self.assertEqual(results_timeseries[169].data_indexes['anomaly'], 1)
 
         # Save & load
-        model_path = TEMP_MODELS_DIR+'/test_lstm_anomaly_model_with_context'
+        model_path = os.path.join(TEMP_MODELS_DIR, 'test_lstm_anomaly_model_with_context')
         anomaly_detector.save(model_path)
         loaded_anomaly_detector = LSTMAnomalyDetector.load(model_path)
         results_timeseries = loaded_anomaly_detector.apply(timeseries_with_anomalies, index_bounds=['max_err','10_sigma'], verbose=False, details=False)

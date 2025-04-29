@@ -7,14 +7,11 @@ from ..datastructures import TimePoint, DataTimeSlot, DataTimePoint, TimeSeries
 from ..models.reconstructors import PeriodicAverageReconstructor, ProphetReconstructor, LinearInterpolationReconstructor
 from ..storages import CSVFileStorage
 from ..utils import ensure_reproducibility
+from .. import TEST_DATASETS_PATH
 
 # Setup logging
 from .. import logger
 logger.setup()
-
-# Test data and temp path
-TEST_DATA_PATH = '/'.join(os.path.realpath(__file__).split('/')[0:-1]) + '/test_data/'
-TEMP_MODELS_DIR = tempfile.TemporaryDirectory().name
 
 
 class TestReconstructors(unittest.TestCase):
@@ -171,7 +168,7 @@ class TestReconstructors(unittest.TestCase):
     def test_PeriodicAverageReconstructor(self):
 
         # Get test data
-        with open(TEST_DATA_PATH + '/csv/temp_slots_1h.csv') as f:
+        with open(os.path.join(TEST_DATASETS_PATH, 'temp_slots_1h.csv')) as f:
             data=f.read()
 
         timeseries = TimeSeries()
@@ -213,7 +210,7 @@ class TestReconstructors(unittest.TestCase):
         self.assertAlmostEqual(cross_validation_results['MAE_3_steps_stdev'], 0.0313, places=2)
 
         # Test on Points as well
-        timeseries = CSVFileStorage(TEST_DATA_PATH + '/csv/temperature.csv').get(limit=200)
+        timeseries = CSVFileStorage(os.path.join(TEST_DATASETS_PATH, 'temperature.csv')).get(limit=200)
         reconstructor = PeriodicAverageReconstructor()
         with self.assertRaises(Exception):
             reconstructor.fit(timeseries)
@@ -239,7 +236,7 @@ class TestReconstructors(unittest.TestCase):
             return
 
         # Get test data
-        timeseries = CSVFileStorage(TEST_DATA_PATH + '/csv/temperature.csv').get(limit=200).aggregate(3600)
+        timeseries = CSVFileStorage(os.path.join(TEST_DATASETS_PATH, 'temperature.csv')).get(limit=200).aggregate(3600)
 
         # Instantiate
         reconstructor = ProphetReconstructor()

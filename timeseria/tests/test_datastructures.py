@@ -10,15 +10,13 @@ from ..datastructures import Point, TimePoint, DataPoint, DataTimePoint
 from ..datastructures import Slot, TimeSlot, DataSlot, DataTimeSlot
 from ..datastructures import Series, TimeSeries, TimeSeriesView
 from ..units import Unit, TimeUnit
+from .. import TEST_DATASETS_PATH
 
 from pytz import UTC
 
 # Setup logging
 from .. import logger
 logger.setup()
-
-# Set test data path
-TEST_DATA_PATH = '/'.join(os.path.realpath(__file__).split('/')[0:-1]) + '/test_data/'
 
 
 class TestPoints(unittest.TestCase):
@@ -851,7 +849,7 @@ class TestTimeSeries(unittest.TestCase):
     def test_TimeSeries_from_to_DataFrame(self):
 
         # Test creating from a DataFrame
-        df = pd.read_csv(TEST_DATA_PATH+'csv/format3.csv', header=3, parse_dates=[0], index_col=0)
+        df = pd.read_csv(os.path.join(TEST_DATASETS_PATH, 'format3.csv'), header=3, parse_dates=[0], index_col=0)
         timeseries = TimeSeries.from_df(df)
         self.assertEqual(len(timeseries),6)
         self.assertEqual(timeseries[0].dt,dt(2020,4,3,0,0,0))
@@ -859,7 +857,7 @@ class TestTimeSeries(unittest.TestCase):
         self.assertEqual((timeseries[0].data['C']), 21.7)
         self.assertEqual((timeseries[0].data['RH']), 54.9)
 
-        df = pd.read_csv(TEST_DATA_PATH+'csv/format4.csv', header=0, parse_dates=[0], index_col=0)
+        df = pd.read_csv(os.path.join(TEST_DATASETS_PATH, 'format4.csv'), header=0, parse_dates=[0], index_col=0)
         timeseries = TimeSeries.from_df(df, item_type=DataTimeSlot)
         self.assertEqual(len(timeseries),5)
         self.assertEqual(timeseries[0].start.dt,dt(2020,4,3,0,0,0))
@@ -892,18 +890,18 @@ class TestTimeSeries(unittest.TestCase):
     def test_TimeSeries_from_to_CSV_file(self):
 
         # Test creating from a CSV file
-        timeseries = TimeSeries.from_csv(TEST_DATA_PATH + '/csv/single_value_no_labels.csv')
+        timeseries = TimeSeries.from_csv(os.path.join(TEST_DATASETS_PATH, 'single_value_no_labels.csv'))
         self.assertEqual(len(timeseries), 6)
         self.assertEqual(timeseries[0].t, 946684800)
         self.assertEqual(timeseries[0].data, [1000])
 
-        timeseries = TimeSeries.from_csv(TEST_DATA_PATH + '/csv/only_date_no_meaningful_timestamp_label.csv',
+        timeseries = TimeSeries.from_csv(os.path.join(TEST_DATASETS_PATH, 'only_date_no_meaningful_timestamp_label.csv'),
                                          timestamp_format = '%Y-%m-%d')
         self.assertEqual(len(timeseries), 100)
         self.assertEqual(timeseries[0].start.t, 1197244800)
         self.assertTrue(isinstance(timeseries[0], Slot))
 
-        timeseries = TimeSeries.from_csv(TEST_DATA_PATH + '/csv/only_date_no_meaningful_timestamp_label.csv',
+        timeseries = TimeSeries.from_csv(os.path.join(TEST_DATASETS_PATH, 'only_date_no_meaningful_timestamp_label.csv'),
                                          timestamp_format = '%Y-%m-%d', series_type='points')
         self.assertEqual(len(timeseries), 95)
         self.assertEqual(timeseries[0].t, 1197244800)

@@ -10,9 +10,6 @@ from ..units import TimeUnit
 from .. import logger
 logger.setup()
 
-# Set test data path
-TEST_DATA_PATH = '/'.join(os.path.realpath(__file__).split('/')[0:-1]) + '/test_data/'
-
 
 class TestTimeSeriesDenseView(unittest.TestCase):
 

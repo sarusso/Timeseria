@@ -11,8 +11,7 @@ from ..exceptions import NotFittedError
 from .. import logger
 logger.setup()
 
-# Test data and temp path
-TEST_DATA_PATH = '/'.join(os.path.realpath(__file__).split('/')[0:-1]) + '/test_data/'
+# Get a temp dir for models
 TEMP_MODELS_DIR = tempfile.TemporaryDirectory().name
 
 
