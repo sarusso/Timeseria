@@ -1119,7 +1119,10 @@ def _compute_distribution_approximation_errors(distribution_function, prediction
 
 
 def _detect_notebook_major_version():
-    stdout = subprocess.check_output(["jupyter", "--version"]).decode()
+    try:
+        stdout = subprocess.check_output(["jupyter", "--version"]).decode()
+    except FileNotFoundError:
+        return None
     versions={}
     for line in stdout.split('\n'):
         if ':' in line:
@@ -1127,12 +1130,12 @@ def _detect_notebook_major_version():
             what, version = line.split(':')
             versions[what.strip()] = version.strip()
     if not versions or 'notebook' not in versions:
-        notebook_major_version = None
+        return None
     else:
         try:
             notebook_major_version = int(versions['notebook'].split('.')[0])
         except:
-            notebook_major_version = None
+            return None
     return notebook_major_version
 
 

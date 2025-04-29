@@ -1088,7 +1088,8 @@ define('"""+graph_id+"""', ['dgenv'], function (Dygraph) {
             legacy = False
 
             from .utils import _detect_notebook_major_version
-            if _detect_notebook_major_version() < 7:
+            notebook_major_version = _detect_notebook_major_version()
+            if notebook_major_version and notebook_major_version < 7:
                 logger.warning('A Jupyter Notebook < 7 installation has been detect on this system. ' +
                                'If the plot does not show, enable the legacy plotting mode with legacy=True and restart the Kernel. ' +
                                'This is required for Jupyter Notebook < 7, but not for older versions of Jupyer Lab. However, it is not possible to detect ' +
