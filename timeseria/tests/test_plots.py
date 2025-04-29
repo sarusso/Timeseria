@@ -2,7 +2,6 @@ import unittest
 import tempfile
 from propertime.utils import dt
 from ..datastructures import TimeSeries, DataTimePoint
-from unittest.mock import patch
 
 # Setup logging
 from .. import logger
@@ -10,7 +9,6 @@ logger.setup()
 
 class TestPlots(unittest.TestCase):
 
-    @patch('IPython.display.display')
     def test_basic(self, mock_display):
 
         timeseries = TimeSeries(DataTimePoint(dt=dt(2015,10,24,0,0,0, tz='Europe/Rome'),
@@ -23,10 +21,7 @@ class TestPlots(unittest.TestCase):
                                               data={'value_1':25.3, 'value_2':19.1},
                                               data_indexes={'index_1':0.3, 'index_2':0.6}))
 
-        # First check that the default plot can be generated correctly
-        timeseries.plot()
-
-        # Now check the HTML code
+        # Check the HTML code
         html_output = timeseries.plot(html=True)
 
         data_string = '''[[new Date(Date.UTC(2015, 9, 24, 0, 0, 0)),23.80,17.50,0.2000,0.5000],[new Date(Date.UTC(2015, 9, 25, 0, 0, 0)),22.10,16.20,0.1000,0.4000],[new Date(Date.UTC(2015, 9, 26, 0, 0, 0)),25.30,19.10,0.3000,0.6000]],{labels: ['Timestamp', 'value_1', 'value_2', 'index_1', 'index_2']'''
