@@ -9,6 +9,7 @@ import statistics
 from propertime.utils import now_s, dt_from_s, s_from_dt
 from datetime import datetime
 from pandas import DataFrame
+from matplotlib import pyplot as plt
 import shutil
 import copy
 
@@ -792,4 +793,27 @@ class _KerasModel(Model):
 
         return window_features
 
+    @property
+    def fit_history(self):
+        try:
+            self._fit_history
+        except AttributeError:
+            return None
+        else:
+            return self._fit_history
+
+    def plot_fit_history(self, what='auto'):
+        if not self.fit_history:
+            return
+        if what == 'auto':
+            what = list(self.fit_history.history.keys())
+        legend = []
+        for item in what:
+            if item in ['loss', 'val_loss', 'accuracy', 'val_accuracy']:
+                plt.plot(self.fit_history.history[item])
+                legend.append(item)
+        plt.title('Model Fit History')
+        plt.xlabel('Epoch')
+        plt.legend(legend, loc='upper left')
+        plt.show()
 

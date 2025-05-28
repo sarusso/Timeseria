@@ -1163,8 +1163,8 @@ class LSTMForecaster(Forecaster, _KerasModel):
                 ])
                 self.keras_model.compile(loss=loss, optimizer='adam')
 
-        # Fit & return
-        return self.keras_model.fit(array(window_features_matrix), array(target_values_vector), epochs=epochs, verbose=verbose, **kwargs)
+        # Fit & store fit history
+        self._fit_history = self.keras_model.fit(array(window_features_matrix), array(target_values_vector), epochs=epochs, verbose=verbose, **kwargs)
 
     @Forecaster.fit_method
     def fit(self, series, epochs=30, normalize=True, normalization='minmax', target='all', with_context=False,
