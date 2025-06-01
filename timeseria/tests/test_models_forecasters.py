@@ -78,14 +78,13 @@ class TestForecasters(unittest.TestCase):
 
         prediction = forecaster.predict(timeseries)
         self.assertEqual(len(prediction), 1)
-        self.assertEqual(list(prediction[0].keys()), ['temperature'])
-        self.assertAlmostEqual(prediction[0]['temperature'], 22.891000000000005)
+        self.assertEqual(list(prediction.keys()), ['temperature'])
+        self.assertAlmostEqual(prediction['temperature'], 22.891000000000005)
 
         forecast = forecaster.forecast(timeseries)
-        self.assertEqual(len(forecast), 1)
-        self.assertEqual(forecast[0].t, timeseries[-1].t+600)
-        self.assertEqual(list(forecast[0].data.keys()), ['temperature'])
-        self.assertAlmostEqual(forecast[0].data['temperature'], 22.891000000000005)
+        self.assertEqual(forecast.t, timeseries[-1].t+600)
+        self.assertEqual(list(forecast.data.keys()), ['temperature'])
+        self.assertAlmostEqual(forecast.data['temperature'], 22.891000000000005)
 
         timeseries_with_forecast  = forecaster.apply(timeseries)
         self.assertEqual(len(timeseries_with_forecast), len(timeseries)+1)
@@ -176,7 +175,7 @@ class TestForecasters(unittest.TestCase):
 
         # Predict
         predicted = forecaster.predict(self.sine_minute_timeseries, steps=1)
-        self.assertIsInstance(predicted[0]['value'], PFloat)
+        self.assertIsInstance(predicted['value'], PFloat)
 
 
     def test_PeriodicAverageForecaster_save_load(self):

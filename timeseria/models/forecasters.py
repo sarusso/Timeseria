@@ -731,7 +731,10 @@ class PeriodicAverageForecaster(Forecaster):
             predict_data.append(this_step_predict_data)
 
         # Return
-        return predict_data
+        if steps > 1:
+            return predict_data
+        else:
+            return predict_data[0]
 
     def _plot_averages(self, series, **kwargs):
         averages_series = copy.deepcopy(series)
