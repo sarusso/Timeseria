@@ -356,7 +356,22 @@ class Forecaster(Model):
         # Start evaluating
         progress_step = len(series)/10
 
-        evaluate_data_labels = series.data_labels() if not target_data_labels else target_data_labels
+        # Set the data labels to use for the evaluation
+        if target_data_labels:
+            evaluate_data_labels = target_data_labels
+            perform_predictions = True
+        else:
+            # Set predicted data labels (if any)
+            predicted_data_labes = []
+            for data_label in series.data_labels():
+                if data_label.endswith('_pred'):
+                    predicted_data_labes.append(data_label.replace('_pred', ''))
+            if not predicted_data_labes:
+                evaluate_data_labels = series.data_labels()
+                perform_predictions = True
+            else:
+                evaluate_data_labels = predicted_data_labes
+                perform_predictions = False
 
         for data_label in evaluate_data_labels:
 
@@ -371,18 +386,22 @@ class Forecaster(Model):
                     if int(i%progress_step) == 0:
                         print('.', end='')
 
-                # Skip before the window
-                if i <  start_i:
+                # Skip before the window if required to make prediction
+                if perform_predictions and i <  start_i:
                     continue
 
-                # Predict
+                # Set the predicted data, either predicting it or getting it from the series
                 actual_values[data_label].append(self._get_actual_value(series, i, data_label))
-                try:
-                    # Try performing a bulk-optimized predict call
-                    predicted_values[data_label].append(self._get_predicted_value_bulk(series, i, data_label, with_context= True if context_data_labels else False))
-                except (AttributeError, NotImplementedError):
-                    # Perform a standard predict call
-                    predicted_values[data_label].append(self._get_predicted_value(series, i, data_label, with_context= True if context_data_labels else False))
+
+                if perform_predictions:
+                    try:
+                        # Try performing a bulk-optimized predict call
+                        predicted_values[data_label].append(self._get_predicted_value_bulk(series, i, data_label, with_context= True if context_data_labels else False))
+                    except (AttributeError, NotImplementedError):
+                        # Perform a standard predict call
+                        predicted_values[data_label].append(self._get_predicted_value(series, i, data_label, with_context= True if context_data_labels else False))
+                else:
+                    predicted_values[data_label].append(series[i].data['{}_pred'.format(data_label)])
 
             if verbose:
                 print('')

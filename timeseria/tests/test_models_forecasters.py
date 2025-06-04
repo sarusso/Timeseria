@@ -67,6 +67,15 @@ class TestForecasters(unittest.TestCase):
         self.assertAlmostEqual(evaluation['value_RMSE'], 0.0873, places=2)
         self.assertAlmostEqual(evaluation['value_MAE'], 0.0797, places=2)
 
+        evaluation_series = forecaster.evaluate(self.sine_minute_timeseries[0:100], return_evaluation_series=True)['series']
+        self.assertEqual(len(evaluation_series), 37)
+        self.assertEqual(set(evaluation_series.data_labels()), {'value', 'value_AE', 'value_pred'})
+
+        evaluation = forecaster.evaluate(evaluation_series, steps=1)
+        self.assertEqual(forecaster.data['periodicities']['value'], 63)
+        self.assertAlmostEqual(evaluation['value_RMSE'], 0.0873, places=2)
+        self.assertAlmostEqual(evaluation['value_MAE'], 0.0797, places=2)
+
         # Test on a realistic point series, forecast horizon=1
         timeseries = CSVFileStorage(os.path.join(TEST_DATASETS_PATH, 'temperature.csv')).get(limit=200)
         forecaster = PeriodicAverageForecaster()

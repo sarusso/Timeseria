@@ -14,7 +14,7 @@ import shutil
 import copy
 
 from ..exceptions import NotFittedError, AlreadyFittedError
-from ..utils import _check_timeseries, _check_resolution, _check_data_labels, _item_is_in_range
+from ..utils import _check_timeseries, _check_resolution, _check_data_labels, _check_data_labels_subset
 from ..units import TimeUnit
 from ..datastructures import Point, Series, TimeSeries, TimeSeriesView
 
@@ -381,7 +381,10 @@ class Model():
                         pass
                     else:
                         _check_resolution(series, self.data['resolution'])
-                    _check_data_labels(series, self.data['data_labels'])
+                    # Note: here we limit to check the subset, to allow using pre-evaluated data, given that
+                    # it will be the model predict method, if invoked within the evaluate, that will raise in
+                    # case of inconsistent data labels
+                    _check_data_labels_subset(series, self.data['data_labels'])
 
             # Call evaluate logic
             return evaluate_method(self, series, *args, **kwargs)
