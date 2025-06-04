@@ -7,7 +7,7 @@ import pickle
 import shutil
 from pandas import DataFrame
 from numpy import array
-from math import sqrt, log
+from math import sqrt, log, pi
 from propertime.utils import now_s, dt_from_s, s_from_dt
 from sklearn.linear_model import LinearRegression
 import matplotlib.pyplot as plt
@@ -85,6 +85,31 @@ class Forecaster(Model):
             raise TypeError('Don\'t know how to handle a prediction with of type "{}"'.format(prediction.__class__.__name__))
 
         return predicted
+
+    #def _get_predicted_value_bulk(self, series):
+    #    raise NotImplementedError()
+
+    @classmethod
+    def load(cls, path):
+
+        # Load the forecaster
+        forecaster = super().load(path)
+
+        # Load the error predictor model, if any
+        if 'error_predictor_dist_type' in forecaster.data:
+            forecaster.error_predictor = LSTMForecaster.load('{}/error_predictor'.format(path))
+
+        return forecaster
+
+    def save(self, path):
+
+        # Save the forecaster
+        super().save(path)
+
+        # Save the error predictor model, if any
+        if 'error_predictor_dist_type' in self.data:
+
+            self.error_predictor.save('{}/error_predictor'.format(path))
 
     def predict(self, series, steps):
         """Call the model predict logic on a series.
@@ -387,9 +412,6 @@ class Forecaster(Model):
                 print('Evaluating for "{}": '.format(data_label), end='')
 
             for i in range(len(series)):
-                if verbose:
-                    if int(i%progress_step) == 0:
-                        print('.', end='')
 
                 # Skip before the window if required to make prediction
                 if perform_predictions and i <  start_i:
@@ -407,6 +429,10 @@ class Forecaster(Model):
                         predicted_values[data_label].append(self._get_predicted_value(series, i, data_label, with_context= True if context_data_labels else False))
                 else:
                     predicted_values[data_label].append(series[i].data['{}_pred'.format(data_label)])
+
+                if verbose:
+                    if int(i%progress_step) == 0:
+                        print('.', end='')
 
             if verbose:
                 print('')
@@ -560,6 +586,110 @@ class Forecaster(Model):
         # Return evaluation results, if any
         if results:
             return results
+
+    def calibrate(self, series, error_predictor='default', error_metric='AE', error_dist_type='norm', **kwargs):
+        """Calibrate the forecaster via Calibrated Heteroscedastic Error Modeling (CHEM).
+
+        Heteroscedasticity assumes non-constant error variance; Heteroscedasticity Error Modelling aims at capturing such variance,
+        and Calibrated Heteroscedasticity Error Modeling use a calibration data set to both capture and validate such variance.
+
+        The procedure makes use of an error predictor, which is basically another forecaster. Its role is to predict the error
+        that the forecaster would commit in a given context (i.e. based on the forecasting window).
+
+        All the parameters starting with the ``error_predictor_`` prefix are forwarded to the error predictor ``fit()`` method (without the prefix), and
+        all the parameters starting with the ``error_predictor_fit_`` prefix are forwarded to the error predictor initialization (without the prefix).
+
+        Args:
+            series(TimeSeries): the series to use for calibration. which to apply the predict logic.
+            error_predictor:(str, Forecaster): the model to use for predicting the error. Defaults to a LSTMForecaster.
+            error_metric(list): the error metric to calibrate for.  Defaults to ``AE``. Supported values  are: ``SE``, 
+                                ``AE``, ``APE``, ``ALE``, ``E``, ``PE`` and ``LE``.
+            error_dist_type(string): the distribution used to model the error. Defaults to 'norm'.
+            **kwargs: extra arguments to be forwarded to the error predictor.
+
+        Returns:
+            dict: the error predictor evaluation results.
+        """
+
+        # Set default error predictor values
+        if error_predictor == 'default':
+            if 'error_predictor_neurons' not in kwargs:
+                kwargs['error_predictor_neurons'] = 16
+            if 'error_predictor_features' not in kwargs:
+                kwargs['error_predictor_features'] = ['values']
+            error_predictor_class = LSTMForecaster
+        else:
+            error_predictor_class = error_predictor
+
+        logger.info('Calibrating model using "{}" error predictor with "{}" metric and "{}" distribution'.format(error_predictor_class.__name__, error_metric, error_dist_type))
+
+        # Decouple error predictor (init) kwargs from error predictor fit kwargs
+        error_predictor_kwargs = {}
+        error_predictor_fit_kwargs = {}
+        for kwarg in kwargs:
+            if kwarg.startswith('error_predictor_fit_'):
+                error_predictor_fit_kwargs[kwarg.replace('error_predictor_fit_', '')] = kwargs[kwarg]
+            elif kwarg.startswith('error_predictor_'):
+                error_predictor_kwargs[kwarg.replace('error_predictor_', '')] = kwargs[kwarg]
+
+        if not self.window:
+            raise ValueError('Calibration cannot be performed on window-less forecasters')
+
+        # Right now only the Normal distribution is supported
+        if error_dist_type not in ['norm']:
+            raise ValueError('Distribution type "{}" is not supported'.format(error_dist_type))
+
+        # Right now only univariate time series are supported
+        if len(series.data_labels()) > 1:
+            raise NotImplementedError('Calibrating on multivariate time series is not supported yet')
+
+        # Evaluate and get the evaluation series (with all the errors) back
+        # MAH
+        evaluation_series = self.evaluate(series, evaluation_series_error_metrics=[error_metric], return_evaluation_series=True)['series']
+
+        # ...if the prediction in probabilistic, raine a warning
+        # 'This model is probabilistic. Calibrating it will cuase predcition to use the calibrated error, not the probabilsitic feature of the model.'
+
+        # Ok, now let's try to train a model for the error.
+        for data_label in series.data_labels():
+            error_predictor = error_predictor_class(window=self.window, **error_predictor_kwargs)
+            error_predictor.fit(evaluation_series,
+                                source = data_label,
+                                target = '{}_{}'.format(data_label, error_metric),
+                                **error_predictor_fit_kwargs)
+
+        self.error_predictor = error_predictor
+        self.data['error_predictor_metric'] = error_metric
+        self.data['error_predictor_dist_type'] = error_dist_type
+
+        # Lastly, evaluate the error predictor
+        self.data['error_predictor_evaluation'] = error_predictor.evaluate(evaluation_series, error_metrics=['M'+error_metric, 'Max'+error_metric])
+        #error_predictor_MAPE = self.data['error_predictor_evaluation']['{}_{}_MAPE'.format(data_label, error_metric)]
+        return self.data['error_predictor_evaluation']
+
+    def add_prediction_error(self, series, prediction):
+        try:
+            self.error_predictor
+        except AttributeError:
+            pass
+        else:
+
+            # Predict the prediction error
+            data_label = self.error_predictor.data['data_labels'][0]
+            predicted_prediction_error = self.error_predictor.predict(series)['{}_{}'.format(data_label, self.data['error_predictor_metric'])]
+
+            #error_on_predicted_prediction_error = self.data['error_predictor_evaluation']['{}_{}_M{}'.format(data_label, self.data['error_predictor_metric'], self.data['error_predictor_metric'])]
+
+            # Compute the Normal distribution standard deviation reversing the expected absolute error formula
+            std_dev = predicted_prediction_error * sqrt(pi / 2)
+            prediction[data_label] = PFloat(value = prediction[data_label],
+                                            dist = {'type': self.data['error_predictor_dist_type'],
+                                                    'params': {'loc': prediction[data_label],
+                                                               'scale': std_dev},
+                                                    'pvalue': None })
+
+        return prediction
+
 
 
 #=========================
@@ -719,6 +849,14 @@ class PeriodicAverageForecaster(Forecaster):
             Returns:
                 dict or list: the predicted data.
         """
+
+        if steps > 1:
+            try:
+                self.error_predictor
+            except AttributeError:
+                pass
+            else:
+                raise NotImplementedError('This forecaster does not support multi-step predictions if it has been calibrated.')
 
         if len(series) < self.data['window']:
             raise ValueError('The series length ({}) is shorter than the model window ({})'.format(len(series), self.data['window']))
@@ -1037,8 +1175,8 @@ class LSTMForecaster(Forecaster, _KerasModel):
         super(LSTMForecaster, self).save(path)
         self._save_keras_model(path)
 
-    def _fit(self, series, epochs=30, normalize=True, normalization='minmax', target='all', with_context=False, loss='MSE',
-             data_loss_limit=1.0, reproducible=False, verbose=False, probabilistic=False, update=False, **kwargs):
+    def _fit(self, series, epochs=30, normalize=True, normalization='minmax', source='all', target='all', with_context=False,
+             loss='MSE', data_loss_limit=1.0, reproducible=False, verbose=False, probabilistic=False, update=False, **kwargs):
 
         if reproducible:
             ensure_reproducibility()
@@ -1093,6 +1231,21 @@ class LSTMForecaster(Forecaster, _KerasModel):
             self.data['data_labels'] = series.data_labels()
             self.data['target_data_labels'] = target_data_labels
             self.data['context_data_labels'] = context_data_labels
+
+        # Set the source data labels (TODO: merge with the above)
+        if source == 'all':
+            source_data_labels = series.data_labels()
+        else:
+            if isinstance(source, str):
+                source_data_labels = [source]
+            elif isinstance(source_data_labels, list):
+                source_data_labels = source
+            else:
+                raise TypeError('Don\'t know how to use as source data labels as type "{}"'.format(source_data_labels.__class__.__name__))
+            for source_data_label in source_data_labels:
+                if source_data_label not in series.data_labels():
+                    raise ValueError('Cannot use as source data label "{}" as not found in the series labels ({})'.format(source_data_label, series.data_labels()))
+        self.data['data_labels'] = source_data_labels
 
         # Set verbose switch
         if verbose:
@@ -1217,7 +1370,7 @@ class LSTMForecaster(Forecaster, _KerasModel):
         self._fit_history = self.keras_model.fit(array(window_features_matrix), array(target_values_vector), epochs=epochs, verbose=verbose, **kwargs)
 
     @Forecaster.fit_method
-    def fit(self, series, epochs=30, normalize=True, normalization='minmax', target='all', with_context=False,
+    def fit(self, series, epochs=30, normalize=True, normalization='minmax', source='all', target='all', with_context=False,
             loss='MSE', data_loss_limit=1.0, reproducible=False, probabilistic=False, verbose=False, **kwargs):
         """Fit the model on a series.
 
@@ -1225,8 +1378,9 @@ class LSTMForecaster(Forecaster, _KerasModel):
             series(series): the series on which to fit the model.
             epochs(int): for how many epochs to train. Defaults to ``30``.
             normalize(bool): if to normalize the data between 0 and 1 or not. Enabled by default.
-            target(str,list): what data labels to target, defaults to  ``all`` for all of them.
-            with_context(bool): if to use context data when predicting. Not enabled by default.
+            source(str,list): what data labels to use, defaults to  ``all``.
+            target(str,list): what data labels to target, defaults to  ``all``.
+            with_context(bool): if to use context (current timestep) data. Not enabled by default.
             loss(str): the error metric to minimize while fitting (a.k.a. the loss or objective function).
                        Supported values are: ``MSE``, ``RMSE``, ``MSLE``, ``MAE`` and ``MAPE``, any other value
                        supported by Keras as loss function or any callable object. Defaults to ``MSE``.
@@ -1238,12 +1392,12 @@ class LSTMForecaster(Forecaster, _KerasModel):
         """
 
         # Call fit logic
-        return self._fit(series, epochs=epochs, normalize=normalize, normalization=normalization, target=target,
+        return self._fit(series, epochs=epochs, normalize=normalize, normalization=normalization, source=source, target=target,
                          with_context=with_context, loss=loss, data_loss_limit=data_loss_limit, reproducible=reproducible,
                          probabilistic=probabilistic, verbose=verbose, **kwargs)
 
     @Forecaster.fit_update_method
-    def fit_update(self, series, epochs=30, normalize=True, normalization='minmax', target='all', with_context=False,
+    def fit_update(self, series, epochs=30, normalize=True, normalization='minmax', source='all', target='all', with_context=False,
                    loss='MSE', data_loss_limit=1.0, reproducible=False, probabilistic=False, verbose=False, **kwargs):
         """Update the model fit on a series.
 
@@ -1251,8 +1405,9 @@ class LSTMForecaster(Forecaster, _KerasModel):
             series(series): the series on which to fit the model.
             epochs(int): for how many epochs to train. Defaults to ``30``.
             normalize(bool): if to normalize the data between 0 and 1 or not. Enabled by default.
-            target(str,list): what data labels to target, defaults to  ``all`` for all of them.
-            with_context(bool): if to use context data when predicting. Not enabled by default.
+            source(str,list): what data labels to use, defaults to  ``all``.
+            target(str,list): what data labels to target, defaults to  ``all``.
+            with_context(bool): if to use context (current timestep) data. Not enabled by default.
             loss(str): the error metric to minimize while fitting (a.k.a. the loss or objective function).
                        Supported values are: ``MSE``, ``RMSE``, ``MSLE``, ``MAE`` and ``MAPE``, any other value
                        supported by Keras as loss function or any callable object. Defaults to ``MSE``.
@@ -1263,7 +1418,7 @@ class LSTMForecaster(Forecaster, _KerasModel):
         """
 
         # Call fit logic
-        return self._fit(series, epochs=epochs, normalize=normalize, normalization=normalization, target=target,
+        return self._fit(series, epochs=epochs, normalize=normalize, normalization=normalization, source=source, target=target,
                          with_context=with_context, loss=loss, data_loss_limit=data_loss_limit, reproducible=reproducible,
                          probabilistic=probabilistic, verbose=verbose, update=True, **kwargs)
 
@@ -1390,7 +1545,7 @@ class LSTMForecaster(Forecaster, _KerasModel):
         # Return
         return predicted_data
 
-    def _bulk_predict(self, series):
+    def _bulk_predict(self, series, verbose):
 
         target_data_labels =  self.data['target_data_labels']
         context_data_labels = self.data['context_data_labels']
@@ -1437,6 +1592,9 @@ class LSTMForecaster(Forecaster, _KerasModel):
         # Prepare bulk-predicted data 
         bulk_predicted_data = {data_label: [] for data_label in self.data['target_data_labels']}
 
+        if verbose:
+            print('- bulk-predicting - ', end='')
+
         # For each data label
         for i, data_label in enumerate(self.data['target_data_labels']):
 
@@ -1454,13 +1612,25 @@ class LSTMForecaster(Forecaster, _KerasModel):
                 else:
                     raise ConsistencyException('Unknown normalization "{}"'.format(self.data['normalization']))
 
+                # Do we have also an error predictor? TODO: Keep it here? Use a NotImplementedError?
+                try:
+                    self.add_prediction_error
+                except AttributeError:
+                    pass
+                else:
+                    predicted_value = self.add_prediction_error(series, {data_label: predicted_value})[data_label]
+
                 # Append to prediction data
                 bulk_predicted_data[data_label].append(predicted_value)
 
         # Return by {label: [value_1, value_2, ... vanuel_n]}
         return bulk_predicted_data
 
-    def _get_predicted_value_bulk(self, series, i, data_label, with_context):
+    def _get_predicted_value_bulk(self, series, i, data_label, with_context, verbose=False):
+
+        if 'probabilistic' in self.data and self.data['probabilistic']:
+            raise NotImplementedError()
+
         if i < self.window:
             raise ValueError()
 
@@ -1472,7 +1642,7 @@ class LSTMForecaster(Forecaster, _KerasModel):
 
             # Store, for each series, the bulk-predicted values 
             self._precomputed[series] = {}
-            self._precomputed[series] = self._bulk_predict(series)
+            self._precomputed[series] = self._bulk_predict(series, verbose)
 
             prediction = self._precomputed[series][data_label][i-self.window]
 
@@ -1482,7 +1652,9 @@ class LSTMForecaster(Forecaster, _KerasModel):
             del self._precomputed[series]
 
         # Always convert to float.. TODO: can we avoid this? i.e. checking for np.floating in the anomaly detectors _get_predicted_value()?
-        return float(prediction)
+        #if not isinstance(prediction, float):
+        #    prediction = float(prediction)
+        return prediction
 
 
 #=========================

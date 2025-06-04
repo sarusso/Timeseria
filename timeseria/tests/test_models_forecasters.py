@@ -576,3 +576,96 @@ class TestForecasters(unittest.TestCase):
         # Re-predict and re-check
         self.assertAlmostEqual(loaded_forecaster.apply(sine_hour_timeseries)[-1].data['value'], -0.5063, places=3)
 
+    def test_PeriodicAverageForecaster_calibration(self):
+
+        # Note: here we test also some basic functionality of the forecaster as well,
+        # given that the PeridicAVergaeForecaster is very simple and close to a mock.
+
+        # Instantiate and fit
+        forecaster = PeriodicAverageForecaster()
+        forecaster.fit(self.sine_minute_timeseries, periodicity=63)
+
+        # Apply
+        sine_minute_timeseries_with_forecast = forecaster.apply(self.sine_minute_timeseries, steps=3)
+        self.assertEqual(len(sine_minute_timeseries_with_forecast), 1003)
+
+        # Predict
+        #prediction = forecaster.predict(self.sine_minute_timeseries, steps=3)
+        #self.assertTrue(isinstance(prediction, list))
+        #self.assertEqual(len(prediction), 3)
+
+        # Evaluate
+        evaluation = forecaster.evaluate(self.sine_minute_timeseries[0:100], steps=1)
+        self.assertEqual(forecaster.data['periodicities']['value'], 63)
+        self.assertAlmostEqual(evaluation['value_RMSE'], 0.0873, places=2)
+        self.assertAlmostEqual(evaluation['value_MAE'], 0.0797, places=2)
+
+        # Calibrate
+        forecaster.calibrate(self.sine_minute_timeseries,
+                             error_predictor_neurons=8,
+                             error_predictor_features=['values'],
+                             error_predictor_fit_epochs=2)
+
+        # Check prediction is PFLoat
+        prediction = forecaster.predict(self.sine_minute_timeseries)['value']
+        self.assertIsInstance(prediction, PFloat)
+
+        # Check now that the apply generates PFLoats as well
+        result_series = forecaster.apply(self.sine_minute_timeseries)
+        self.assertIsInstance(result_series[-1].data['value'], PFloat)
+
+        # Check a consecutive call does not raise surprises
+        result_series = forecaster.apply(result_series)
+        self.assertIsInstance(result_series[-1].data['value'], PFloat)
+
+        # Check now that the apply generates PFLoats as well, for multi-step
+        result_series = forecaster.apply(self.sine_minute_timeseries, steps=2)
+        self.assertIsInstance(result_series[-1].data['value'], PFloat)
+        self.assertIsInstance(result_series[-2].data['value'], PFloat)
+
+        # Test the save
+        forecaster.save(os.path.join(TEMP_MODELS_DIR, 'test_forecaster_with_error_predictor'))
+        loaded_forecaster = PeriodicAverageForecaster.load(os.path.join(TEMP_MODELS_DIR, 'test_forecaster_with_error_predictor'))
+
+        # Check prediction is PFLoat
+        prediction = loaded_forecaster.predict(self.sine_minute_timeseries)['value']
+        self.assertIsInstance(prediction, PFloat)
+
+        # Test the evaluation
+        evaluation_series = forecaster.evaluate(self.sine_minute_timeseries[0:64], return_evaluation_series=True)['series']
+        self.assertIsInstance(evaluation_series[0].data['value_pred'], PFloat)
+
+
+    def test_LSTMForecaster_calibration(self):
+
+        # Instantiate and fit
+        forecaster = LSTMForecaster()
+        forecaster.fit(self.sine_minute_timeseries, epochs=3)
+
+        # Calibrate
+        forecaster.calibrate(self.sine_minute_timeseries,
+                             error_predictor_neurons=8,
+                             error_predictor_features=['values'],
+                             error_predictor_fit_epochs=2)
+
+        # Check prediction is PFLoat
+        prediction = forecaster.predict(self.sine_minute_timeseries)['value']
+        self.assertIsInstance(prediction, PFloat)
+
+        # Check now that the apply generates PFLoats as well
+        result_series = forecaster.apply(self.sine_minute_timeseries)
+        self.assertIsInstance(result_series[-1].data['value'], PFloat)
+
+        # Check a consecutive call does not raise surprises
+        result_series = forecaster.apply(result_series)
+        self.assertIsInstance(result_series[-1].data['value'], PFloat)
+
+        # Check now that the apply generates PFLoats as well, for multi-step
+        result_series = forecaster.apply(self.sine_minute_timeseries, steps=2)
+        self.assertIsInstance(result_series[-1].data['value'], PFloat)
+        self.assertIsInstance(result_series[-2].data['value'], PFloat)
+
+        # Test the evaluation
+        evaluation_series = forecaster.evaluate(self.sine_minute_timeseries[:4], return_evaluation_series=True)['series']
+        self.assertIsInstance(evaluation_series[0].data['value_pred'], PFloat)
+

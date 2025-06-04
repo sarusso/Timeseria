@@ -302,7 +302,17 @@ class Model():
                 raise ValueError('This model requires context data ({})'.format(self.data['context_data_labels']))
 
             # Call predict logic
-            return predict_method(self, series, *args, **kwargs)
+            prediction = predict_method(self, series, *args, **kwargs)
+
+            # Do we have also an error predictor?
+            try:
+                self.add_prediction_error
+            except AttributeError:
+                pass
+            else:
+                prediction = self.add_prediction_error(series, prediction)
+
+            return prediction
 
         return do_predict
 
