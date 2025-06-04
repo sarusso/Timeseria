@@ -186,6 +186,16 @@ class TestForecasters(unittest.TestCase):
         predicted = forecaster.predict(self.sine_minute_timeseries, steps=1)
         self.assertIsInstance(predicted['value'], PFloat)
 
+        # Evaluate with confidence metrics
+        evaluation = forecaster.evaluate(self.sine_minute_timeseries[0:73], confidence_interval=[0.0001,0.9999])
+        self.assertAlmostEqual(evaluation['value_EC'], 0.1)
+
+        evaluation = forecaster.evaluate(self.sine_minute_timeseries[0:73],
+                                         confidence_metrics=['EC', 'ECE', 'ECPE'],
+                                         confidence_interval=[0.0001,0.9999])
+        self.assertAlmostEqual(evaluation['value_EC'], 0.1)
+        self.assertAlmostEqual(evaluation['value_ECE'], 0.8998)
+        self.assertAlmostEqual(evaluation['value_ECPE'], 0.8999799959991999)
 
     def test_PeriodicAverageForecaster_save_load(self):
 

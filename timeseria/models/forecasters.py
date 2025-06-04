@@ -228,7 +228,8 @@ class Forecaster(Model):
 
     @Model.evaluate_method
     def evaluate(self, series, steps=1, error_metrics=['RMSE', 'MAE'], return_evaluation_series=False, plot_evaluation_series=False,
-                 evaluation_series_error_metrics='auto', plot_error_distribution=False, error_distribution_metrics='auto', verbose=False):
+                 evaluation_series_error_metrics='auto', plot_error_distribution=False, error_distribution_metrics='auto',
+                 confidence_metrics=['EC'], confidence_interval=[0.05, 0.95], verbose=False):
         """Evaluate the model on a series.
 
         Args:
@@ -242,6 +243,10 @@ class Forecaster(Model):
             plot_error_distribution(bool): if to plot the error distribution.
             error_distribution_metrics(list): the (punctual) error metrics to be used for generating the error distribution(s). Defaults
                                                to ``auto``. Supported values (as list) are: ``SE``, ``AE``, ``APE``, ``ALE``, ``E``, ``PE`` and ``LE``.
+            confidence_metrics(list): the probabilistic error metrics to use if the model supports probabilistic predictions. Defaults to ``CE``.
+                                      Supported values (as list)  are: ``EC``, ``ECE``, ``ECPE``; respectively for Empirical Coverage, Empirical
+                                      Coverage Error, and Empirical Coverage Percentage Error.
+            confidence_interval(list): The confidence interval to use for the evaluation. Default to ``[0.05, 0.95]``.
             verbose(bool): if to print the evaluation progress (one dot = 10% done).
 
         Returns:
@@ -522,6 +527,29 @@ class Forecaster(Model):
                 plt.grid()
                 plt.title('LE distribution for "{}"'.format(data_label))
                 plt.show()
+
+            if confidence_metrics and isinstance(predicted_values[data_label][0], PFloat):
+                total = 0
+                correct = 0
+                for i in range(len(actual_values[data_label])):
+                    pred_value = predicted_values[data_label][i]
+
+                    pred_value_lower = pred_value.distf().dist_obj.ppf(confidence_interval[0], **pred_value.dist['params'])
+                    actual_value = actual_values[data_label][i]
+                    pred_value_upper = pred_value.distf().dist_obj.ppf(confidence_interval[1], **pred_value.dist['params'])
+
+                    if actual_value >= pred_value_lower and actual_value <= pred_value_upper:
+                        correct +=1
+                    total += 1
+
+                alpha = confidence_interval[0] + (1-confidence_interval[1])
+
+                if 'EC' in confidence_metrics:
+                    results['{}_EC'.format(data_label, 1-(alpha))] = correct/total
+                if 'ECE' in confidence_metrics:
+                    results['{}_ECE'.format(data_label)] = (1 - alpha) - (correct/total)
+                if 'ECPE' in confidence_metrics:
+                    results['{}_ECPE'.format(data_label)] = 1 - ((correct/total) / (1 - alpha))
 
         # Plot or return prediction series if required
         if plot_evaluation_series:
