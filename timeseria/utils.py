@@ -5,6 +5,7 @@ import re
 import random
 import numpy
 import chardet
+import importlib
 from math import log
 from chardet.universaldetector import UniversalDetector
 from numpy import fft
@@ -1186,4 +1187,10 @@ def _has_numerical_values(data):
 
     else:
         raise ValueError('Don\'t know how to establish whether this data type has numerical values or not (got "{}")'.format(data.__class__.__name__))
+
+
+def _import_class_from_string(full_class_string):
+    module_name, class_name = full_class_string.rsplit('.', 1)
+    module = importlib.import_module(module_name)
+    return getattr(module, class_name)
 

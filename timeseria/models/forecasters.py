@@ -7,7 +7,7 @@ import pickle
 import shutil
 from pandas import DataFrame
 from numpy import array
-from math import sqrt, log
+from math import sqrt, log, pi
 from propertime.utils import now_s, dt_from_s, s_from_dt
 from sklearn.linear_model import LinearRegression
 import matplotlib.pyplot as plt
@@ -20,6 +20,7 @@ from ..utils import mean_squared_error
 from ..utils import mean_absolute_error, max_absolute_error
 from ..utils import mean_absolute_percentage_error, max_absolute_percentage_error
 from ..utils import mean_absolute_log_error, max_absolute_log_error
+from ..utils import _import_class_from_string
 from .base import Model, _ProphetModel, _ARIMAModel, _KerasModel
 
 # Setup logging
@@ -85,6 +86,37 @@ class Forecaster(Model):
             raise TypeError('Don\'t know how to handle a prediction with of type "{}"'.format(prediction.__class__.__name__))
 
         return predicted
+
+
+    @classmethod
+    def load(cls, path):
+
+        # Load the forecaster
+        forecaster = super().load(path)
+
+        # Load the calibrator, if any
+        if 'calibrator_class_name' in forecaster.data:
+            try:
+                calibrator_class = _import_class_from_string('timeseria.models.calibrators.{}'.format(forecaster.data['calibrator_class_name']))
+            except AttributeError:
+                raise ValueError('Could not find calibrator "{}" in the timeseria.models.calibrators module'.format(forecaster.data['calibrator_class_name'])) from None
+
+            forecaster.calibrator = calibrator_class.load('{}/calibrator'.format(path))
+
+        return forecaster
+
+    def save(self, path):
+
+        # Save the forecaster
+        super().save(path)
+
+        # Save the calibrator, if any
+        if 'calibrator_class_name' in self.data:
+            try:
+                _import_class_from_string('timeseria.models.calibrators.{}'.format(self.data['calibrator_class_name']))
+            except AttributeError:
+                raise ValueError('Cannot save a model using a calibrator which is not part of the timeseria.models.calibrators module (got "{}")'.format(self.data['calibrator_class_name'])) from None
+            self.calibrator.save('{}/calibrator'.format(path))
 
     def predict(self, series, steps):
         """Call the model predict logic on a series.
@@ -720,6 +752,14 @@ class PeriodicAverageForecaster(Forecaster):
                 dict or list: the predicted data.
         """
 
+        if steps > 1:
+            try:
+                self.calibrator
+            except AttributeError:
+                pass
+            else:
+                raise NotImplementedError('This forecaster does not support multi-step predictions if it has been calibrated.')
+
         if len(series) < self.data['window']:
             raise ValueError('The series length ({}) is shorter than the model window ({})'.format(len(series), self.data['window']))
 
@@ -1037,8 +1077,8 @@ class LSTMForecaster(Forecaster, _KerasModel):
         super(LSTMForecaster, self).save(path)
         self._save_keras_model(path)
 
-    def _fit(self, series, epochs=30, normalize=True, normalization='minmax', target='all', with_context=False, loss='MSE',
-             data_loss_limit=1.0, reproducible=False, verbose=False, probabilistic=False, update=False, **kwargs):
+    def _fit(self, series, epochs=30, normalize=True, normalization='minmax', source='all', target='all', with_context=False,
+             loss='MSE', data_loss_limit=1.0, reproducible=False, verbose=False, probabilistic=False, update=False, **kwargs):
 
         if reproducible:
             ensure_reproducibility()
@@ -1093,6 +1133,21 @@ class LSTMForecaster(Forecaster, _KerasModel):
             self.data['data_labels'] = series.data_labels()
             self.data['target_data_labels'] = target_data_labels
             self.data['context_data_labels'] = context_data_labels
+
+        # Set the source data labels (TODO: merge with the above)
+        if source == 'all':
+            source_data_labels = series.data_labels()
+        else:
+            if isinstance(source, str):
+                source_data_labels = [source]
+            elif isinstance(source_data_labels, list):
+                source_data_labels = source
+            else:
+                raise TypeError('Don\'t know how to use as source data labels as type "{}"'.format(source_data_labels.__class__.__name__))
+            for source_data_label in source_data_labels:
+                if source_data_label not in series.data_labels():
+                    raise ValueError('Cannot use as source data label "{}" as not found in the series labels ({})'.format(source_data_label, series.data_labels()))
+        self.data['data_labels'] = source_data_labels
 
         # Set verbose switch
         if verbose:
@@ -1217,7 +1272,7 @@ class LSTMForecaster(Forecaster, _KerasModel):
         self._fit_history = self.keras_model.fit(array(window_features_matrix), array(target_values_vector), epochs=epochs, verbose=verbose, **kwargs)
 
     @Forecaster.fit_method
-    def fit(self, series, epochs=30, normalize=True, normalization='minmax', target='all', with_context=False,
+    def fit(self, series, epochs=30, normalize=True, normalization='minmax', source='all', target='all', with_context=False,
             loss='MSE', data_loss_limit=1.0, reproducible=False, probabilistic=False, verbose=False, **kwargs):
         """Fit the model on a series.
 
@@ -1225,8 +1280,9 @@ class LSTMForecaster(Forecaster, _KerasModel):
             series(series): the series on which to fit the model.
             epochs(int): for how many epochs to train. Defaults to ``30``.
             normalize(bool): if to normalize the data between 0 and 1 or not. Enabled by default.
-            target(str,list): what data labels to target, defaults to  ``all`` for all of them.
-            with_context(bool): if to use context data when predicting. Not enabled by default.
+            source(str,list): what data labels to use, defaults to  ``all``.
+            target(str,list): what data labels to target, defaults to  ``all``.
+            with_context(bool): if to use context (current timestep) data. Not enabled by default.
             loss(str): the error metric to minimize while fitting (a.k.a. the loss or objective function).
                        Supported values are: ``MSE``, ``RMSE``, ``MSLE``, ``MAE`` and ``MAPE``, any other value
                        supported by Keras as loss function or any callable object. Defaults to ``MSE``.
@@ -1238,12 +1294,12 @@ class LSTMForecaster(Forecaster, _KerasModel):
         """
 
         # Call fit logic
-        return self._fit(series, epochs=epochs, normalize=normalize, normalization=normalization, target=target,
+        return self._fit(series, epochs=epochs, normalize=normalize, normalization=normalization, source=source, target=target,
                          with_context=with_context, loss=loss, data_loss_limit=data_loss_limit, reproducible=reproducible,
                          probabilistic=probabilistic, verbose=verbose, **kwargs)
 
     @Forecaster.fit_update_method
-    def fit_update(self, series, epochs=30, normalize=True, normalization='minmax', target='all', with_context=False,
+    def fit_update(self, series, epochs=30, normalize=True, normalization='minmax', source='all', target='all', with_context=False,
                    loss='MSE', data_loss_limit=1.0, reproducible=False, probabilistic=False, verbose=False, **kwargs):
         """Update the model fit on a series.
 
@@ -1251,8 +1307,9 @@ class LSTMForecaster(Forecaster, _KerasModel):
             series(series): the series on which to fit the model.
             epochs(int): for how many epochs to train. Defaults to ``30``.
             normalize(bool): if to normalize the data between 0 and 1 or not. Enabled by default.
-            target(str,list): what data labels to target, defaults to  ``all`` for all of them.
-            with_context(bool): if to use context data when predicting. Not enabled by default.
+            source(str,list): what data labels to use, defaults to  ``all``.
+            target(str,list): what data labels to target, defaults to  ``all``.
+            with_context(bool): if to use context (current timestep) data. Not enabled by default.
             loss(str): the error metric to minimize while fitting (a.k.a. the loss or objective function).
                        Supported values are: ``MSE``, ``RMSE``, ``MSLE``, ``MAE`` and ``MAPE``, any other value
                        supported by Keras as loss function or any callable object. Defaults to ``MSE``.
@@ -1263,7 +1320,7 @@ class LSTMForecaster(Forecaster, _KerasModel):
         """
 
         # Call fit logic
-        return self._fit(series, epochs=epochs, normalize=normalize, normalization=normalization, target=target,
+        return self._fit(series, epochs=epochs, normalize=normalize, normalization=normalization, source=source, target=target,
                          with_context=with_context, loss=loss, data_loss_limit=data_loss_limit, reproducible=reproducible,
                          probabilistic=probabilistic, verbose=verbose, update=True, **kwargs)
 
@@ -1461,6 +1518,16 @@ class LSTMForecaster(Forecaster, _KerasModel):
         return bulk_predicted_data
 
     def _get_predicted_value_bulk(self, series, i, data_label, with_context):
+        # Probabilistic predictions (either if the model il probabilistic or if a calibrator is used) cannot be (yet) handled in bulk mode
+        if 'probabilistic' in self.data and self.data['probabilistic']:
+            raise NotImplementedError()
+        try:
+            self.calibrator
+        except AttributeError:
+            pass
+        else:
+            raise NotImplementedError()
+
         if i < self.window:
             raise ValueError()
 
@@ -1481,8 +1548,7 @@ class LSTMForecaster(Forecaster, _KerasModel):
             logger.debug('Last item reached, clearing bulk-predicted cache.')
             del self._precomputed[series]
 
-        # Always convert to float.. TODO: can we avoid this? i.e. checking for np.floating in the anomaly detectors _get_predicted_value()?
-        return float(prediction)
+        return prediction
 
 
 #=========================
