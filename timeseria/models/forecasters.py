@@ -419,9 +419,6 @@ class Forecaster(Model):
                 print('Evaluating for "{}": '.format(data_label), end='')
 
             for i in range(len(series)):
-                if verbose:
-                    if int(i%progress_step) == 0:
-                        print('.', end='')
 
                 # Skip before the window if required to make prediction
                 if perform_predictions and i <  start_i:
@@ -439,6 +436,10 @@ class Forecaster(Model):
                         predicted_values[data_label].append(self._get_predicted_value(series, i, data_label, with_context= True if context_data_labels else False))
                 else:
                     predicted_values[data_label].append(series[i].data['{}_pred'.format(data_label)])
+
+                if verbose:
+                    if int(i%progress_step) == 0:
+                        print('.', end='')
 
             if verbose:
                 print('')
@@ -1447,7 +1448,7 @@ class LSTMForecaster(Forecaster, _KerasModel):
         # Return
         return predicted_data
 
-    def _bulk_predict(self, series):
+    def _bulk_predict(self, series, verbose):
 
         target_data_labels =  self.data['target_data_labels']
         context_data_labels = self.data['context_data_labels']
@@ -1494,6 +1495,9 @@ class LSTMForecaster(Forecaster, _KerasModel):
         # Prepare bulk-predicted data 
         bulk_predicted_data = {data_label: [] for data_label in self.data['target_data_labels']}
 
+        if verbose:
+            print('- bulk-predicting - ', end='')
+
         # For each data label
         for i, data_label in enumerate(self.data['target_data_labels']):
 
@@ -1517,7 +1521,8 @@ class LSTMForecaster(Forecaster, _KerasModel):
         # Return by {label: [value_1, value_2, ... vanuel_n]}
         return bulk_predicted_data
 
-    def _get_predicted_value_bulk(self, series, i, data_label, with_context):
+    def _get_predicted_value_bulk(self, series, i, data_label, with_context, verbose=False):
+
         # Probabilistic predictions (either if the model il probabilistic or if a calibrator is used) cannot be (yet) handled in bulk mode
         if 'probabilistic' in self.data and self.data['probabilistic']:
             raise NotImplementedError()
@@ -1539,7 +1544,7 @@ class LSTMForecaster(Forecaster, _KerasModel):
 
             # Store, for each series, the bulk-predicted values 
             self._precomputed[series] = {}
-            self._precomputed[series] = self._bulk_predict(series)
+            self._precomputed[series] = self._bulk_predict(series, verbose)
 
             prediction = self._precomputed[series][data_label][i-self.window]
 
