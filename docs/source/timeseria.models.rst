@@ -24,6 +24,16 @@ timeseria.models.base module
    :show-inheritance:
 
 
+timeseria.models.calibrators module
+----------------------------
+
+.. automodule:: timeseria.models.calibrators
+   :members:
+   :inherited-members:
+   :undoc-members:
+   :show-inheritance:
+
+
 timeseria.models.forecasters module
 -----------------------------------
 

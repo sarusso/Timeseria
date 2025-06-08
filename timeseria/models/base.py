@@ -14,7 +14,7 @@ import shutil
 import copy
 
 from ..exceptions import NotFittedError, AlreadyFittedError
-from ..utils import _check_timeseries, _check_resolution, _check_data_labels, _check_data_labels_subset
+from ..utils import _check_timeseries, _check_resolution, _check_data_labels, _check_data_labels_subset, PFloat
 from ..units import TimeUnit
 from ..datastructures import Point, Series, TimeSeries, TimeSeriesView
 
@@ -302,7 +302,17 @@ class Model():
                 raise ValueError('This model requires context data ({})'.format(self.data['context_data_labels']))
 
             # Call predict logic
-            return predict_method(self, series, *args, **kwargs)
+            prediction = predict_method(self, series, *args, **kwargs)
+
+            # Do we have also a calibrator to use?
+            try:
+                self.calibrator
+            except AttributeError:
+                pass
+            else:
+                prediction = self.calibrator.probabilize(prediction, series)
+
+            return prediction
 
         return do_predict
 
@@ -554,6 +564,47 @@ class Model():
             results['evaluations'] = evaluations
         return results
 
+    def calibrate(self, series, calibrator='default', error_metric='AE', verbose=False, **kwargs):
+        """Calibrate the model using a given calibrator. Will make any prediction probabilistic,
+        according to the calibration logic.
+
+        Args:
+            series(TimeSeries): the series to use for the calibration.
+            calibrtor(str, Calibrator): the calibrator class. Defaults to ErrorDistributionCalibrator.
+            error_metric(str): the error metric to calibrate for. Defaults to ``AE``. Supported values  are: ``AE``, ``APE``, and ``ALE``.
+            verbose(string): if to make the calibration process verbose. Defaults to False.
+        """
+
+        # Set calibrator class and instantiate
+        if calibrator == 'default':
+            from .calibrators import ErrorDistributionCalibrator
+            calibrator_class = ErrorDistributionCalibrator
+        else:
+            calibrator_class = calibrator
+        calibrator = calibrator_class()
+
+        # Store the class name in the data in order to load it afterwards
+        self.data['calibrator_class_name'] = calibrator.__class__.__name__
+
+        logger.info('Calibrating model using "{}" with error metric "{}"'.format(self.data['calibrator_class_name'], error_metric))
+
+        # Evaluate and get the evaluation series (with all the errors)
+        evaluation_series = self.evaluate(series, evaluation_series_error_metrics=[error_metric], return_evaluation_series=True, verbose=verbose)['series']
+
+        # If the model is probabilistic, issue a warning
+        warned = False
+        for data_label in evaluation_series.data_labels():
+            if warned:
+                break
+            if data_label.endswith('_pred') and isinstance(evaluation_series[0].data[data_label], PFloat):
+                logger.warning('This model is probabilistic. Calibrating it will cause the prediction to use the calibrated error instead of the probabilistic predictions.')
+                warned = True
+
+        # Ok, now let's fit the calibrator
+        calibrator.fit(evaluation_series, caller=self, error_metric=error_metric, **kwargs)
+
+        # ...and store it
+        self.calibrator = calibrator
 
 #=========================
 #  Base Prophet model
