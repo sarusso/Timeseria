@@ -956,7 +956,7 @@ def _check_data_labels_subset(series, data_labels):
     series_data_labels = series.data_labels()
     for data_label in data_labels:
         if not data_label in series_data_labels:
-            raise ValueError('The model data label "{}" is missing form your data (which has "{}" as data labels).'.format(data_labels, series_data_labels))
+            raise ValueError('The model data label "{}" is missing form your data (which has "{}" as data labels).'.format(data_label, series_data_labels))
 
 
 def _check_series_of_points_or_slots(series):
