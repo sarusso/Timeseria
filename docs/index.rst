@@ -39,6 +39,7 @@ Main modules and submodules
      models.forecasters
      models.reconstructors
      models.anomaly_detectors
+     models.calibrators
 
      storages
      plots
