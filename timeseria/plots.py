@@ -7,7 +7,7 @@ import datetime
 import tempfile
 from propertime.utils import dt_from_s, str_from_dt, dt_from_str, s_from_dt
 from .units import TimeUnit
-from .utils import is_numerical, os_shell, PFloat
+from .utils import is_numerical, os_shell, IFloat, PFloat
 try:
     from pyppeteer.chromium_downloader import download_chromium,chromium_executable
     image_plot_support=True
@@ -107,7 +107,7 @@ def _to_dg_time(dt):
     else:
         return 'new Date(Date.UTC({}, {}, {}, {}, {}, {}))'.format(dt.year, dt.month-1, dt.day, dt.hour, dt.minute, dt.second)
 
-def _to_dg_data(serie, data_labels_to_plot, data_indexes_to_plot, full_precision, aggregate_by=0, mark=None, pfloats=False, lower=0.01, upper=0.99):
+def _to_dg_data(serie, data_labels_to_plot, data_indexes_to_plot, full_precision, aggregate_by=0, mark=None, ipfloats=False, lower=0.01, upper=0.99):
     from .datastructures import DataTimePoint, DataTimeSlot
 
     dg_data=''
@@ -251,8 +251,12 @@ def _to_dg_data(serie, data_labels_to_plot, data_indexes_to_plot, full_precision
                     data = item._data_by_label(label)
 
                 if full_precision:
-                    if pfloats:
-                        if isinstance(data, PFloat):
+                    if ipfloats:
+                        if isinstance(data, IFloat):
+                            data_part += '[{},{},{}],'.format(data.lower,
+                                                              data,
+                                                              data.upper)
+                        elif isinstance(data, PFloat):
                             data_part += '[{},{},{}],'.format(data.distf().dist_obj.ppf(lower, **data.dist['params']),
                                                               data,
                                                               data.distf().dist_obj.ppf(upper, **data.dist['params']))
@@ -261,8 +265,12 @@ def _to_dg_data(serie, data_labels_to_plot, data_indexes_to_plot, full_precision
                     else:
                         data_part += '{},'.format(data)
                 else:
-                    if pfloats:
-                        if isinstance(data, PFloat):
+                    if ipfloats:
+                        if isinstance(data, IFloat):
+                            data_part += '[{},{},{}],'.format(data.lower,
+                                                              data,
+                                                              data.upper)
+                        elif isinstance(data, PFloat):
                             data_part += '[{:.2f},{:.2f},{:.2f}],'.format(data.distf().dist_obj.ppf(lower, **data.dist['params']),
                                                                           data,
                                                                           data.distf().dist_obj.ppf(upper, **data.dist['params']))
@@ -291,12 +299,12 @@ def _to_dg_data(serie, data_labels_to_plot, data_indexes_to_plot, full_precision
                     index_value = item.data_indexes[index]
                     if index_value is not None:
                         if full_precision:
-                            if pfloats:
+                            if ipfloats:
                                 data_part+='[{},{},{}],'.format(index_value,index_value,index_value)
                             else:
                                 data_part+='{},'.format(index_value)
                         else:
-                            if pfloats:
+                            if ipfloats:
                                 data_part+='[{:.4f},{:.4f},{:.4f}],'.format(index_value,index_value,index_value)
                             else:
                                 data_part+='{:.4f},'.format(index_value)
@@ -374,23 +382,29 @@ def dygraphs_plot(series, data_labels='all', data_indexes='all', aggregate=None,
     # Credits: the interactive plot is based on the work here: https://www.stefaanlippens.net/jupyter-custom-d3-visualization.html.
 
     if probabilistic == 'auto':
-        pfloats=False
+        ipfloats=False
         last_item_data = series[-1].data
         if isinstance(last_item_data, list):
             for item in last_item_data:
+                if isinstance(item, IFloat):
+                    ipfloats = True
+                    break
                 if isinstance(item, PFloat):
-                    pfloats = True
+                    ipfloats = True
                     break
         if isinstance(last_item_data, dict):
             for item in last_item_data.values():
+                if isinstance(item, IFloat):
+                    ipfloats = True
+                    break
                 if isinstance(item, PFloat):
-                    pfloats = True
+                    ipfloats = True
                     break
     else:
         if not probabilistic:
-            pfloats = False
+            ipfloats = False
         else:
-            pfloats = True
+            ipfloats = True
 
     if probability_interval:
         try:
@@ -410,7 +424,7 @@ def dygraphs_plot(series, data_labels='all', data_indexes='all', aggregate=None,
         if probability_interval[1] >= 1:
             raise ValueError('The upper bound of the probability interval cannot be equal to one (or higher)')
     else:
-        if pfloats:
+        if ipfloats:
             raise ValueError('Cannot generate a probabilistic plot without a probability interval')
 
     try:
@@ -435,7 +449,7 @@ def dygraphs_plot(series, data_labels='all', data_indexes='all', aggregate=None,
             if not save_to.endswith('.html'):
                 logger.warning('You are saving to "{}" in interactive (HTML) format, but the file name does not end with ".html"'.format(save_to))
 
-    if aggregate_by is None and not pfloats:
+    if aggregate_by is None and not ipfloats:
         # Set default aggregate_by if not explicitly set to something
         if len(series)  > AGGREGATE_THRESHOLD:
             aggregate_by = 10**len(str(int(len(series)/float(AGGREGATE_THRESHOLD))))
@@ -447,7 +461,7 @@ def dygraphs_plot(series, data_labels='all', data_indexes='all', aggregate=None,
         if not aggregate:
             aggregate_by = None
 
-    if aggregate_by and pfloats:
+    if aggregate_by and ipfloats:
         raise ValueError('Cannot generate a probabilistic plot with an aggregation. Please disable it with "aggregate=False".')
 
     if mini_plot=='auto':
@@ -708,7 +722,7 @@ function legendFormatter(data) {
                                                   full_precision,
                                                   aggregate_by,
                                                   mark,
-                                                  pfloats,
+                                                  ipfloats,
                                                   probability_interval[0],
                                                   probability_interval[1])
     if height:
@@ -890,7 +904,7 @@ animatedZooms: true,"""
         dygraphs_javascript += 'canvas.fillRect(left, area.y, right - left, area.h);'
         dygraphs_javascript += '}'
 
-    if aggregate_by or pfloats:
+    if aggregate_by or ipfloats:
         # Add a comma, just if the previous section kicked-in
         if dygraphs_javascript[-1] != ',':
             dygraphs_javascript += ','
