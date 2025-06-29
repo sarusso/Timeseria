@@ -15,7 +15,7 @@ import fitter as fitter_library
 
 from ..datastructures import DataTimeSlot, TimePoint, DataTimePoint, Slot, TimeSeries
 from ..exceptions import NonContiguityError, ConsistencyException
-from ..utils import detect_periodicity, _get_periodicity_index, ensure_reproducibility, PFloat
+from ..utils import detect_periodicity, _get_periodicity_index, ensure_reproducibility, IFloat, PFloat
 from ..utils import mean_squared_error
 from ..utils import mean_absolute_error, max_absolute_error
 from ..utils import mean_absolute_percentage_error, max_absolute_percentage_error
@@ -561,28 +561,39 @@ class Forecaster(Model):
                 plt.title('LE distribution for "{}"'.format(data_label))
                 plt.show()
 
-            if confidence_metrics and isinstance(predicted_values[data_label][0], PFloat):
+            if confidence_metrics:
                 total = 0
                 correct = 0
                 for i in range(len(actual_values[data_label])):
                     pred_value = predicted_values[data_label][i]
 
-                    pred_value_lower = pred_value.distf().dist_obj.ppf(confidence_interval[0], **pred_value.dist['params'])
-                    actual_value = actual_values[data_label][i]
-                    pred_value_upper = pred_value.distf().dist_obj.ppf(confidence_interval[1], **pred_value.dist['params'])
+                    if isinstance(predicted_values[data_label][0], IFloat):
+                        pred_value_lower = pred_value.lower
+                        actual_value = actual_values[data_label][i]
+                        pred_value_upper = pred_value.upper
+
+                    elif isinstance(predicted_values[data_label][0], PFloat):
+                        pred_value_lower = pred_value.distf().dist_obj.ppf(confidence_interval[0], **pred_value.dist['params'])
+                        actual_value = actual_values[data_label][i]
+                        pred_value_upper = pred_value.distf().dist_obj.ppf(confidence_interval[1], **pred_value.dist['params'])
+
+                    else:
+                        continue
 
                     if actual_value >= pred_value_lower and actual_value <= pred_value_upper:
                         correct +=1
                     total += 1
 
-                alpha = confidence_interval[0] + (1-confidence_interval[1])
+                if total > 0:
 
-                if 'EC' in confidence_metrics:
-                    results['{}_EC'.format(data_label, 1-(alpha))] = correct/total
-                if 'ECE' in confidence_metrics:
-                    results['{}_ECE'.format(data_label)] = (1 - alpha) - (correct/total)
-                if 'ECPE' in confidence_metrics:
-                    results['{}_ECPE'.format(data_label)] = 1 - ((correct/total) / (1 - alpha))
+                    alpha = confidence_interval[0] + (1-confidence_interval[1])
+
+                    if 'EC' in confidence_metrics:
+                        results['{}_EC'.format(data_label, 1-(alpha))] = correct/total
+                    if 'ECE' in confidence_metrics:
+                        results['{}_ECE'.format(data_label)] = (1 - alpha) - (correct/total)
+                    if 'ECPE' in confidence_metrics:
+                        results['{}_ECPE'.format(data_label)] = 1 - ((correct/total) / (1 - alpha))
 
         # Plot or return prediction series if required
         if plot_evaluation_series:
