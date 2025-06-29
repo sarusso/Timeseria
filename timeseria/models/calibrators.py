@@ -6,7 +6,7 @@ from math import sqrt, pi
 from numpy import quantile
 from scipy.stats import norm
 
-from ..utils import PFloat, _import_class_from_string
+from ..utils import PFloat, IFloat, _import_class_from_string
 from .base import Model
 from ..exceptions import NotFittedError
 
@@ -75,6 +75,80 @@ class Calibrator(Model):
             if data_label.endswith('_pred') and isinstance(series[0].data[data_label], PFloat):
                 logger.warning('This model is probabilistic. Calibrating it will cause to override the probabilistic predictions with the calibrated ones.')
                 warned = True
+
+
+class ErrorQuantileCalibrator(Calibrator):
+    """A calibration model based on the error quantiles."""
+
+    @Calibrator.fit_method
+    def fit(self, series, model, verbose, error_metric='AE', alpha=0.1):
+        """Fit the calibrator, computing the global error distribution.
+
+        Args:
+            series(TimeSeries): the series to use for calibration.
+            model(Model): the model being calibrated.
+            error_metric(str): the error metric to calibrate for.  Defaults to ``AE``.
+            alpha(float): Significance level for prediction intervals. Defaults to 0.1
+        """
+
+        if error_metric not in ['AE']:
+            raise ValueError('This calibrators support only the "AE" error metric')
+
+        from .forecasters import Forecaster
+        if not isinstance(model, Forecaster):
+            raise TypeError('This calibrators support only forecasting models')
+
+        logger.info('Fitting calibrator using "{}" error metric and "{}" alpha'.format(error_metric, alpha))
+        self.data['alpha'] = alpha
+
+        # Evaluate and get the evaluation series (with all the errors)
+        evaluation_series = model.evaluate(series, evaluation_series_error_metrics=[error_metric], return_evaluation_series=True, verbose=verbose)['series']
+        self._warn_if_probabilistic_predictions(evaluation_series)
+
+        # Set predicted data labels
+        predicted_data_labes = []
+        for data_label in evaluation_series.data_labels():
+            if data_label.endswith('_pred'):
+                predicted_data_labes.append(data_label.replace('_pred', ''))
+        if not predicted_data_labes:
+            raise ValueError('The evaluation_series does not contain any predictions (_pred data labels)?!')
+
+        self.data['avg_error'] = {}
+        self.data['q_hat'] = {}
+
+        for predicted_data_label in predicted_data_labes:
+            errors = []
+            for item in evaluation_series:
+                errors.append(item.data['{}_{}'.format(predicted_data_label, error_metric)])
+            self.data['avg_error'][predicted_data_label] = sum(errors)/len(errors)
+            self.data['q_hat'][predicted_data_label] = quantile(errors, 1-alpha)
+
+
+    @Calibrator.adjust_method
+    def adjust(self, prediction, series, _as_pfloat='auto'):
+
+        for data_label in self.data['avg_error']:
+
+            if _as_pfloat:
+
+                # Compute z-score for two-sided interval
+                z = norm.ppf(1 - self.data['alpha'] / 2)
+
+                # Convert to Gaussian std_dev (sigma)
+                std_dev = self.data['q_hat'][data_label] / z
+
+                # Generate the Normal distribution
+                prediction[data_label] = PFloat(value = prediction[data_label],
+                                                dist = {'type': 'norm',
+                                                        'params': {'loc': prediction[data_label],
+                                                                   'scale': std_dev},
+                                                        'pvalue': None })
+            else:
+                prediction[data_label] = IFloat(value = prediction[data_label],
+                                                lower = prediction[data_label] - self.data['q_hat'][data_label],
+                                                upper = prediction[data_label] + self.data['q_hat'][data_label])
+
+        return prediction
 
 
 class ErrorDistributionCalibrator(Calibrator):

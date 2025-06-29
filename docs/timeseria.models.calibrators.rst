@@ -9,6 +9,7 @@
    .. autosummary::
 
       Calibrator
+      ErrorQuantileCalibrator
       ErrorDistributionCalibrator
       ErrorPredictionCalibrator
 
