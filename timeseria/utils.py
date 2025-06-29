@@ -561,6 +561,54 @@ class DistributionFunction():
         return x
 
 
+class IFloat(float):
+    """A class representing an "interval" floating point number, based on lower and upper bounds."""
+
+    def __new__(self, value, lower=None, upper=None):
+        return float.__new__(self, value)
+
+    def __init__(self, value, lower, upper):
+        self.value = value
+        if lower > value:
+            raise ValueError('Lower bound cannot be bigger than the value') 
+        self.lower = lower
+        if upper < value:
+            raise ValueError('Upper bound cannot be smaller than the value')
+        self.upper = upper
+
+    def describe(self):
+        lower_delta = abs(self.value-self.lower)
+        upper_delta = abs(self.value-self.upper)
+
+        if lower_delta == upper_delta:
+            return('IFloat for {} (±{})'.format(self.value, abs(lower_delta)))
+
+        else:
+            return('IFloat for {} (-{},+{})'.format(self.value, lower_delta, upper_delta))
+
+    def plot(self):
+
+        lower_delta = abs(self.value-self.lower)
+        upper_delta = abs(self.value-self.upper)
+
+        _, ax = plt.subplots()
+
+        ax.errorbar(
+            x=self.value,
+            y=0,
+            xerr=[[lower_delta], [upper_delta]],
+            fmt='o',
+            capsize=15,
+            elinewidth=2,
+            markeredgewidth=2,
+            markersize=10,
+        )
+
+        ax.set_yticks([])
+        plt.title('{}'.format(self.describe()))
+        plt.show()
+
+
 class PFloat(float):
     """A class representing a "probabilistic" floating point number, based on a probability distribution."""
 
@@ -575,14 +623,17 @@ class PFloat(float):
     def distf(self):
         return DistributionFunction(self.dist['type'], self.dist['params'])
 
+    def describe(self):
+        return 'PFloat for {}, {} with p-value of {}'.format(self, self.dist['type'], self.dist['pvalue'])
+
     def plot(self):
         distribution_function = DistributionFunction(self.dist['type'], self.dist['params'])
         plt = distribution_function.plot(show = False,
                                          x_min = self.dist['params']['loc'] - abs((6*self.dist['params']['scale'])),
                                          x_max = self.dist['params']['loc'] + abs((6*self.dist['params']['scale'])))
         if self.data:
-            plt.title('PFloat for {}, {} with p-value of {}'.format(self, self.dist['type'], self.dist['pvalue']))
             plt.hist(self.data, bins=30, density=True, alpha=1, color='steelblue')
+        plt.title(self.describe())
         plt.show()
 
     @classmethod
