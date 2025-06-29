@@ -7,7 +7,8 @@
    .. rubric:: Classes
 
    .. autosummary::
-   
+
       Calibrator
       ErrorDistributionCalibrator
-      CHEMCalibrator
+      ErrorPredictionCalibrator
+

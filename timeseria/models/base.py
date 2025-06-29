@@ -310,7 +310,7 @@ class Model():
             except AttributeError:
                 pass
             else:
-                prediction = self.calibrator.probabilize(prediction, series)
+                prediction = self.calibrator.adjust(prediction, series)
 
             return prediction
 
@@ -564,15 +564,15 @@ class Model():
             results['evaluations'] = evaluations
         return results
 
-    def calibrate(self, series, calibrator='default', error_metric='AE', verbose=False, **kwargs):
+    def calibrate(self, series, calibrator='default',  verbose=False, **kwargs):
         """Calibrate the model using a given calibrator. Will make any prediction probabilistic,
         according to the calibration logic.
 
         Args:
             series(TimeSeries): the series to use for the calibration.
-            calibrtor(str, Calibrator): the calibrator class. Defaults to ErrorDistributionCalibrator.
-            error_metric(str): the error metric to calibrate for. Defaults to ``AE``. Supported values  are: ``AE``, ``APE``, and ``ALE``.
+            calibrator(str, Calibrator): the calibrator class. Defaults to ErrorDistributionCalibrator.
             verbose(string): if to make the calibration process verbose. Defaults to False.
+            **kwargs: calibrator-specific parameters.
         """
 
         # Set calibrator class and instantiate
@@ -586,22 +586,10 @@ class Model():
         # Store the class name in the data in order to load it afterwards
         self.data['calibrator_class_name'] = calibrator.__class__.__name__
 
-        logger.info('Calibrating model using "{}" with error metric "{}"'.format(self.data['calibrator_class_name'], error_metric))
+        logger.info('Calibrating model using "{}"'.format(self.data['calibrator_class_name']))
 
-        # Evaluate and get the evaluation series (with all the errors)
-        evaluation_series = self.evaluate(series, evaluation_series_error_metrics=[error_metric], return_evaluation_series=True, verbose=verbose)['series']
-
-        # If the model is probabilistic, issue a warning
-        warned = False
-        for data_label in evaluation_series.data_labels():
-            if warned:
-                break
-            if data_label.endswith('_pred') and isinstance(evaluation_series[0].data[data_label], PFloat):
-                logger.warning('This model is probabilistic. Calibrating it will cause the prediction to use the calibrated error instead of the probabilistic predictions.')
-                warned = True
-
-        # Ok, now let's fit the calibrator
-        calibrator.fit(evaluation_series, caller=self, error_metric=error_metric, **kwargs)
+        # Fit the calibrator
+        calibrator.fit(series, model=self, verbose=verbose, **kwargs)
 
         # ...and store it
         self.calibrator = calibrator
