@@ -575,6 +575,14 @@ class Model():
             **kwargs: calibrator-specific parameters.
         """
 
+        try:
+            if self.calibrator:
+                logger.warning('This model is already calibrated. Re-calibrating it will drop the previous calibration.')
+                del self.calibrator
+                self.data.pop('calibrator_class_name')
+        except AttributeError:
+            pass
+
         # Set calibrator class and instantiate
         if calibrator == 'default':
             from .calibrators import ErrorDistributionCalibrator
