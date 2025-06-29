@@ -621,16 +621,16 @@ class TestForecasters(unittest.TestCase):
         self.assertIsInstance(evaluation_series[0].data['value_pred'], PFloat)
 
 
-    def test_PeriodicAverageForecaster_CHEMCalibrator(self):
+    def test_PeriodicAverageForecaster_calibration(self):
 
         # Instantiate and fit
         forecaster = PeriodicAverageForecaster()
         forecaster.fit(self.sine_minute_timeseries, periodicity=63)
 
         # Calibrate
-        from ..models.calibrators import CHEMCalibrator
+        from ..models.calibrators import ErrorPredictionCalibrator
         forecaster.calibrate(self.sine_minute_timeseries,
-                             CHEMCalibrator,
+                             ErrorPredictionCalibrator,
                              error_predictor_neurons=8,
                              error_predictor_features=['values'],
                              error_predictor_fit_epochs=2)
@@ -666,16 +666,16 @@ class TestForecasters(unittest.TestCase):
 
 
 
-    def test_LSTMForecaster_CHEMCalibrator(self):
+    def test_LSTMForecaster_calibration(self):
 
         # Instantiate and fit
         forecaster = LSTMForecaster()
         forecaster.fit(self.sine_minute_timeseries, epochs=3)
 
         # Calibrate
-        from ..models.calibrators import CHEMCalibrator
+        from ..models.calibrators import ErrorPredictionCalibrator
         forecaster.calibrate(self.sine_minute_timeseries,
-                             CHEMCalibrator,
+                             ErrorPredictionCalibrator,
                              error_predictor_neurons=8,
                              error_predictor_features=['values'],
                              error_predictor_fit_epochs=2)
