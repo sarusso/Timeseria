@@ -31,7 +31,7 @@ RUN pip3 install -r /tmp/requirements_pinned.txt
 RUN pip3 install prophet==1.1.5 pmdarima==2.0.4 statsmodels==0.14.1
 
 # Also install Jupyter (alternatives: notebook==6, jupyterlab==3), Plotly, and Sphinx for the docs 
-RUN pip3 install notebook==7.0.6 jupyterlab==4.0.10 typing_extensions==4.9.0 Sphinx==3.5.2 sphinx-rtd-theme==0.5.1 Jinja2==3.0.3 plotly==5.11.0
+RUN pip3 install notebook==7.0.6 jupyterlab==4.0.10 pyzmq==26.4.0 typing_extensions==4.9.0 Sphinx==3.5.2 sphinx-rtd-theme==0.5.1 Jinja2==3.0.3 plotly==5.11.0
 
 # Disable Jupyter announcements (news, updates)
 RUN jupyter labextension disable "@jupyterlab/apputils-extension:announcements"
