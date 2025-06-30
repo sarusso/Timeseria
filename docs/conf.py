@@ -23,7 +23,7 @@ copyright = 'Stefano Alberto Russo'
 author = 'Stefano Alberto Russo'
 
 # The full version, including alpha/beta/rc tags
-release = 'v2.2.0'
+release = 'v2.3.0'
 
 
 # -- General configuration ---------------------------------------------------
