@@ -316,6 +316,9 @@ def _to_dg_data(serie, data_labels_to_plot, data_indexes_to_plot, full_precision
             # Remove last comma
             data_part = data_part[0:-1]
 
+            # Convert nans
+            #data_part = data_part.replace('nan', 'NaN')
+
             # Add to dg_data
             dg_data += '[{},{}],'.format(_to_dg_time(dt_from_s(item.t, tz=item.tz)), data_part)
 
@@ -333,7 +336,7 @@ def dygraphs_plot(series, data_labels='all', data_indexes='all', aggregate=None,
                   color=None, data_label_colors='auto', data_index_colors='auto', height=None, image=DEFAULT_PLOT_AS_IMAGE,
                   image_resolution='auto', html=False, save_to=None, mini_plot='auto', value_range='auto', minimal_legend=False,
                   title=None, mark=None, mark_title=None, mark_color='auto', probabilistic='auto', probability_interval=[0.05, 0.95],
-                  legacy='auto'):
+                  legacy='auto', force_local_chromium=False):
     """Plot a time series using Dygraphs interactive plots.
 
        Args:
@@ -378,6 +381,7 @@ def dygraphs_plot(series, data_labels='all', data_indexes='all', aggregate=None,
            probabilistic(bool, str): if to enable the probabilistic support in the plots. Defaults to 'auto'.
            probability_interval(list): the probability interval lower and upper bounds. Defaults to [0.05,0.95].
            legacy(bool): if to enable legacy mode (required for Jupyter Notebook < 7, never required for Jupyter Lab).
+           force_local_chromium(bool): if to force using a local Chromium via Pyppeteer instead of looking for a system Chrome/Chromium. Defaults to False.
     """
     # Credits: the interactive plot is based on the work here: https://www.stefaanlippens.net/jupyter-custom-d3-visualization.html.
 
@@ -993,38 +997,40 @@ define('"""+graph_id+"""', ['dgenv'], function (Dygraph) {
             _chrom_executable = None
             _headless_mode_switch = ''
 
-            # Is there a system Chrome or Chromium we can use?
-            potential_chrom_executables = [
-                # Linux
-                'google-chrome',
-                'chromium',
-                'chromium-browser',
-                # macOS
-                '/Applications/Google\\ Chrome.app/Contents/MacOS/Google\\ Chrome',
-                '/Applications/Chromium.app/Contents/MacOS/Chromium',
-                # Windows not supported because of --version not working
-                #r'"C:\Program Files\Google\Chrome\Application\chrome.exe"',
-                #r'"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe"',
-                #r'"C:\Program Files\Chromium\Application\chrome.exe"',
-                #r'"C:\Program Files (x86)\Chromium\Application\chrome.exe"',
-            ]
+            if not force_local_chromium:
 
-            for potential_chrom_executable in potential_chrom_executables:
-                out = os_shell('{} --version'.format(potential_chrom_executable), capture=True)
-                if out.exit_code != 0:
-                    continue
-                else:
-                    version = out.stdout.replace('Google', '').replace('Chrome', '').replace('Chromium', '').strip().split(' ')[0]
-                    version_major = int(version.split('.')[0])
-                    if version_major >= 59:
-                        logger.debug('Found usable Chrom* executable: "{}"'.format(potential_chrom_executable))
-                        _chrom_executable = potential_chrom_executable
-                        if version_major >= 112:
-                            _headless_mode_switch='=new'
-                        break
-                    else:
+                # Is there a system Chrome or Chromium we can use?
+                potential_chrom_executables = [
+                    # Linux
+                    'google-chrome',
+                    'chromium',
+                    'chromium-browser',
+                    # macOS
+                    '/Applications/Google\\ Chrome.app/Contents/MacOS/Google\\ Chrome',
+                    '/Applications/Chromium.app/Contents/MacOS/Chromium',
+                    # Windows not supported because of --version not working
+                    #r'"C:\Program Files\Google\Chrome\Application\chrome.exe"',
+                    #r'"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe"',
+                    #r'"C:\Program Files\Chromium\Application\chrome.exe"',
+                    #r'"C:\Program Files (x86)\Chromium\Application\chrome.exe"',
+                ]
+
+                for potential_chrom_executable in potential_chrom_executables:
+                    out = os_shell('{} --version'.format(potential_chrom_executable), capture=True)
+                    if out.exit_code != 0:
                         continue
-                    logger.debug('Found {}'.format(potential_chrom_executable))
+                    else:
+                        version = out.stdout.replace('Google', '').replace('Chrome', '').replace('Chromium', '').strip().split(' ')[0]
+                        version_major = int(version.split('.')[0])
+                        if version_major >= 59:
+                            logger.debug('Found usable Chrom* executable: "{}"'.format(potential_chrom_executable))
+                            _chrom_executable = potential_chrom_executable
+                            if version_major >= 112:
+                                _headless_mode_switch='=new'
+                            break
+                        else:
+                            continue
+                        logger.debug('Found {}'.format(potential_chrom_executable))
 
             # Otherwise, rely on Pyppeteer's downloading it
             if not _chrom_executable:
