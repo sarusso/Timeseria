@@ -1,7 +1,7 @@
 matplotlib >=2.1.2, <4.0.0
 numpy >=1.19.5, <2.0.0
 scikit-learn >=0.2.2, <2.0.0
-pandas >=0.23.4, <2.0.0
+pandas >=0.23.4, <3.0.0
 chardet >=3.0.4, <4.0.0
 convertdate >=2.1.2, <3.0.0
 lunarcalendar >=0.0.9, <1.0.0
