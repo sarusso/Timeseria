@@ -723,8 +723,8 @@ class _KerasModel(Model):
             raise ValueError('The window mask must be an integer number')
         if not window_mask<=0:
             raise ValueError('The window mask is supported only as a negative number for now, indicating how many elements to dismiss at the end of the window')
-        if steps > 1:
-            raise NotImplementedError('Not implemented for steps >1')
+        if steps < 1:
+            raise ValueError('The number of steps must be a positive integer (got "{}")'.format(steps))
 
         window_elements_matrix = []
         target_values_vector = []
@@ -733,7 +733,7 @@ class _KerasModel(Model):
         for i, _ in enumerate(series):
             if i <  window:
                 continue
-            if i == len(series):
+            if i + steps > len(series):
                 break
 
             try:
@@ -746,12 +746,14 @@ class _KerasModel(Model):
                         raise TooMuchDataLoss()
                     window_elements_vector.append(series[i-window+j])
 
-                # Add target values
+                # Add target values across the next `steps` timesteps (flattened: step-major, label-minor)
                 target_values_sub_vector = []
-                if data_loss_limit is not None and 'data_loss' in series[i].data_indexes and series[i].data_indexes['data_loss'] >= data_loss_limit:
-                    raise TooMuchDataLoss()
-                for target_data_label in target_data_labels:
-                    target_values_sub_vector.append(series[i].data[target_data_label])
+                for step_offset in range(steps):
+                    step_i = i + step_offset
+                    if data_loss_limit is not None and 'data_loss' in series[step_i].data_indexes and series[step_i].data_indexes['data_loss'] >= data_loss_limit:
+                        raise TooMuchDataLoss()
+                    for target_data_label in target_data_labels:
+                        target_values_sub_vector.append(series[step_i].data[target_data_label])
             except TooMuchDataLoss:
                 continue
             else:
