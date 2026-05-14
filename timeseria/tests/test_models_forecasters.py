@@ -489,6 +489,57 @@ class TestForecasters(unittest.TestCase):
             forecaster.apply(timeseries)
 
 
+    def test_LSTMForecaster_multi_step_evaluate_not_implemented(self):
+
+        try:
+            import tensorflow
+        except ImportError:
+            print('Skipping LSTM multi-step evaluate test as no tensorflow module installed')
+            return
+
+        timeseries = TimeSeries()
+        for i in range(120):
+            timeseries.append(DataTimePoint(t=i*60, data={'sin': sin(i/10.0)}))
+
+        # Fit with a direct multi-step horizon
+        forecaster = LSTMForecaster(window=5)
+        forecaster.fit(timeseries, epochs=1, steps=3, reproducible=True)
+
+        self.assertEqual(forecaster.data['steps'], 3)
+
+        # Evaluation must refuse to score head-0 only on a multi-step model
+        with self.assertRaises(NotImplementedError):
+            forecaster.evaluate(timeseries)
+
+
+    def test_LSTMForecaster_multi_step_apply_guards(self):
+
+        try:
+            import tensorflow
+        except ImportError:
+            print('Skipping LSTM multi-step apply test as no tensorflow module installed')
+            return
+
+        import logging
+
+        timeseries = TimeSeries()
+        for i in range(120):
+            timeseries.append(DataTimePoint(t=i*60, data={'sin': sin(i/10.0)}))
+
+        forecaster = LSTMForecaster(window=5)
+        forecaster.fit(timeseries, epochs=1, steps=3, reproducible=True)
+
+        # Asking for more steps than the trained horizon must error out (no silent recursive fallback)
+        with self.assertRaises(ValueError):
+            forecaster.apply(timeseries, steps=5)
+
+        # Asking for fewer steps than the trained horizon must warn but still work
+        with self.assertLogs('timeseria.models.forecasters', level=logging.WARNING) as cm:
+            result = forecaster.apply(timeseries, steps=2)
+        self.assertTrue(any('trained for 3' in m for m in cm.output))
+        self.assertEqual(len(result), len(timeseries) + 2)
+
+
     def test_LSTMForecaster_cross_validation(self):
 
         try:

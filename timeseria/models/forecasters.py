@@ -291,6 +291,11 @@ class Forecaster(Model):
         if steps > 1:
             raise NotImplementedError('Evaluating a forecaster on more than one step ahead forecasts is not yet implemented')
 
+        # Reject evaluation on forecasters trained for direct multi-step output: only the first step
+        # would be exercised here, which produces misleading metrics. See LSTMForecaster.fit(steps=...).
+        if self.data.get('steps', 1) > 1:
+            raise NotImplementedError('Evaluating a forecaster trained with steps>1 (got steps={}) is not yet implemented'.format(self.data['steps']))
+
         try:
             context_data_labels = self.data['context_data_labels']
         except KeyError:
@@ -1090,7 +1095,7 @@ class LSTMForecaster(Forecaster, _KerasModel):
         self._save_keras_model(path)
 
     def _fit(self, series, epochs=30, normalize=True, normalization='minmax', source='all', target='all', with_context=False,
-             loss='MSE', data_loss_limit=1.0, reproducible=False, verbose=False, probabilistic=False, update=False, **kwargs):
+             loss='MSE', data_loss_limit=1.0, reproducible=False, verbose=False, probabilistic=False, steps=1, update=False, **kwargs):
 
         if reproducible:
             ensure_reproducibility()
@@ -1140,11 +1145,14 @@ class LSTMForecaster(Forecaster, _KerasModel):
                 raise ValueError('This model was originally fitted on target data labels "{}", cannot use target data labels "{}" (got target="{}")'.format(self.data['target_data_labels'], target_data_labels, target))
             if self.data['context_data_labels'] is not None and not with_context:
                 raise ValueError('This model was originally fitted with context, cannot update the fit without (got with_context="{}")'.format(with_context))
+            if steps != self.data.get('steps', 1):
+                raise ValueError('This model was originally fitted with steps="{}", cannot update with steps="{}"'.format(self.data.get('steps', 1), steps))
         else:
             # Save the data labels
             self.data['data_labels'] = series.data_labels()
             self.data['target_data_labels'] = target_data_labels
             self.data['context_data_labels'] = context_data_labels
+            self.data['steps'] = steps
 
         # Set the source data labels (TODO: merge with the above)
         if source == 'all':
@@ -1228,7 +1236,7 @@ class LSTMForecaster(Forecaster, _KerasModel):
         # Move to matrix representation
         window_elements_matrix, target_values_vector, context_data_vector = self._to_matrix_representation(series = series,
                                                                                                            window = self.data['window'],
-                                                                                                           steps = 1,
+                                                                                                           steps = self.data['steps'],
                                                                                                            context_data_labels = context_data_labels,
                                                                                                            target_data_labels = target_data_labels,
                                                                                                            data_loss_limit = data_loss_limit,
@@ -1285,7 +1293,7 @@ class LSTMForecaster(Forecaster, _KerasModel):
 
     @Forecaster.fit_method
     def fit(self, series, epochs=30, normalize=True, normalization='minmax', source='all', target='all', with_context=False,
-            loss='MSE', data_loss_limit=1.0, reproducible=False, probabilistic=False, verbose=False, **kwargs):
+            loss='MSE', data_loss_limit=1.0, reproducible=False, probabilistic=False, steps=1, verbose=False, **kwargs):
         """Fit the model on a series.
 
         Args:
@@ -1302,17 +1310,19 @@ class LSTMForecaster(Forecaster, _KerasModel):
                                     this limit. Defaults to ``1``.
             reproducible(bool): if to make the fit deterministic. Not enabled by default.
             probabilistic(bool): if to make the forecaster probabilistic.
+            steps(int): the forecast horizon the model is trained for (direct multi-step output).
+                        Defaults to ``1``. At predict time the requested ``steps`` must be ``<=`` this value.
             verbose(bool): if to print the training output in the process. Not enabled by default.
         """
 
         # Call fit logic
         return self._fit(series, epochs=epochs, normalize=normalize, normalization=normalization, source=source, target=target,
                          with_context=with_context, loss=loss, data_loss_limit=data_loss_limit, reproducible=reproducible,
-                         probabilistic=probabilistic, verbose=verbose, **kwargs)
+                         probabilistic=probabilistic, steps=steps, verbose=verbose, **kwargs)
 
     @Forecaster.fit_update_method
     def fit_update(self, series, epochs=30, normalize=True, normalization='minmax', source='all', target='all', with_context=False,
-                   loss='MSE', data_loss_limit=1.0, reproducible=False, probabilistic=False, verbose=False, **kwargs):
+                   loss='MSE', data_loss_limit=1.0, reproducible=False, probabilistic=False, steps=1, verbose=False, **kwargs):
         """Update the model fit on a series.
 
         Args:
@@ -1328,13 +1338,14 @@ class LSTMForecaster(Forecaster, _KerasModel):
             data_loss_limit(float): discard from the fit elements with a data loss greater than or equal to
                                     this limit. Defaults to ``1``.
             reproducible(bool): if to make the fit deterministic. Not enabled by default.
+            steps(int): must match the value the model was originally fitted with.
             verbose(bool): if to print the training output in the process. Not enabled by default.
         """
 
         # Call fit logic
         return self._fit(series, epochs=epochs, normalize=normalize, normalization=normalization, source=source, target=target,
                          with_context=with_context, loss=loss, data_loss_limit=data_loss_limit, reproducible=reproducible,
-                         probabilistic=probabilistic, verbose=verbose, update=True, **kwargs)
+                         probabilistic=probabilistic, steps=steps, verbose=verbose, update=True, **kwargs)
 
     @Forecaster.predict_method
     def predict(self, series, steps=1, context_data=None, samples='auto', verbose=False):
@@ -1354,8 +1365,19 @@ class LSTMForecaster(Forecaster, _KerasModel):
         if len(series) < self.data['window']:
             raise ValueError('The series length ({}) is shorter than the model window ({})'.format(len(series), self.data['window']))
 
-        if steps>1:
-            raise NotImplementedError('This forecaster does not support multi-step predictions.')
+        # Resolve the trained horizon (back-compat: models fitted before multi-step support have no 'steps' key).
+        # For trained_steps==1 a request beyond the horizon raises NotImplementedError so apply() can iterate
+        # one step at a time; for trained_steps>1 we instead raise ValueError to avoid the iterative fallback
+        # silently using the first step only. Asking for fewer steps than the trained horizon is allowed but
+        # warns: the extra steps are paid-for-but-unused.
+        trained_steps = self.data.get('steps', 1)
+        if steps > trained_steps:
+            if trained_steps > 1:
+                raise ValueError('This forecaster was trained for {} step(s) ahead, cannot predict {} steps'.format(trained_steps, steps))
+            raise NotImplementedError('This forecaster was trained for 1 step ahead; cannot predict {} steps directly. '
+                                      'Re-fit with a larger "steps" or let the framework iterate by requesting one step at a time.'.format(steps))
+        if steps < trained_steps:
+            logger.warning('This forecaster was trained for {} step(s) ahead but only {} were requested'.format(trained_steps, steps))
 
         # Set verbose switch
         if verbose:
@@ -1411,53 +1433,58 @@ class LSTMForecaster(Forecaster, _KerasModel):
                                                         context_data = context_data,
                                                         window_mask = self.data['window_mask'])
 
-        # Perform the prediction and set prediction data
-        predicted_data = {}
-        for _ in range(samples):
+        target_data_labels = self.data['target_data_labels']
+        n_targets = len(target_data_labels)
 
-            if self.data['probabilistic']:
-                yhat = self.keras_model(array([window_features]), training=True)
-            else:
-                yhat = self.keras_model.predict(array([window_features]), verbose=verbose)
+        def _denormalize(value, data_label):
+            if not self.data['normalization']:
+                return value
+            if self.data['normalization'] == 'minmax':
+                return (value*(self.data['max_values'][data_label] - self.data['min_values'][data_label])) + self.data['min_values'][data_label]
+            if self.data['normalization'] == 'max':
+                return value*self.data['max_values'][data_label]
+            raise ConsistencyException('Unknown normalization "{}"'.format(self.data['normalization']))
 
-            for i, data_label in enumerate(self.data['target_data_labels']):
-
-                # Get the prediction
-                predicted_value = float(yhat[0][i])
-
-                # De-normalize if we have to
-                if self.data['normalization']:
-                    if self.data['normalization'] == 'minmax':
-                        predicted_value = (predicted_value*(self.data['max_values'][data_label] - self.data['min_values'][data_label])) + self.data['min_values'][data_label]
-                    elif self.data['normalization'] == 'max':
-                        predicted_value = predicted_value*self.data['max_values'][data_label]
-                    else:
-                        raise ConsistencyException('Unknown normalization "{}"'.format(self.data['normalization']))
-
-                # Append to prediction data or just set it
-                if self.data['probabilistic']:
-                    try:
-                        predicted_data[data_label]
-                    except KeyError:
-                        predicted_data[data_label] = []
-                    predicted_data[data_label].append(predicted_value)
-                else:
-                    predicted_data[data_label] = predicted_value
-
-        # If probabilistic, fit a generalized normal distribution and use it for the probabilistic float
+        # Perform the prediction. The Keras output is flat of length trained_steps * n_targets,
+        # laid out step-major / label-minor (matching how targets were stacked at fit time).
         if self.data['probabilistic']:
-            fitter = fitter_library.Fitter(predicted_data[data_label], distributions=['gennorm'])
-            fitter.fit(progress=False)
-            distribution_stats = fitter.summary(plot=False).transpose().to_dict()['gennorm']
-            distribution_params = fitter.get_best()['gennorm']
-            predicted_data[data_label] = PFloat(value = distribution_params['loc'],
-                                                dist = {'type': 'gennorm',
-                                                        'params': distribution_params,
-                                                        'pvalue': distribution_stats['ks_pvalue']},
-                                                data = predicted_data[data_label])
+            # Collect MC-dropout samples per (step, label), then fit a distribution per pair.
+            samples_acc = [[[] for _ in range(n_targets)] for _ in range(trained_steps)]
+            for _ in range(samples):
+                yhat = self.keras_model(array([window_features]), training=True)
+                yhat_flat = array(yhat)[0]
+                for step in range(trained_steps):
+                    for li, data_label in enumerate(target_data_labels):
+                        samples_acc[step][li].append(_denormalize(float(yhat_flat[step*n_targets + li]), data_label))
+            step_dicts = []
+            for step in range(trained_steps):
+                step_data = {}
+                for li, data_label in enumerate(target_data_labels):
+                    fitter = fitter_library.Fitter(samples_acc[step][li], distributions=['gennorm'])
+                    fitter.fit(progress=False)
+                    distribution_stats = fitter.summary(plot=False).transpose().to_dict()['gennorm']
+                    distribution_params = fitter.get_best()['gennorm']
+                    step_data[data_label] = PFloat(value = distribution_params['loc'],
+                                                    dist = {'type': 'gennorm',
+                                                            'params': distribution_params,
+                                                            'pvalue': distribution_stats['ks_pvalue']},
+                                                    data = samples_acc[step][li])
+                step_dicts.append(step_data)
+        else:
+            yhat = self.keras_model.predict(array([window_features]), verbose=verbose)
+            yhat_flat = yhat[0]
+            step_dicts = []
+            for step in range(trained_steps):
+                step_data = {}
+                for li, data_label in enumerate(target_data_labels):
+                    step_data[data_label] = _denormalize(float(yhat_flat[step*n_targets + li]), data_label)
+                step_dicts.append(step_data)
 
-        # Return
-        return predicted_data
+        # Slice to the requested horizon. Preserve the single-dict return contract when steps==1.
+        step_dicts = step_dicts[:steps]
+        if steps == 1:
+            return step_dicts[0]
+        return step_dicts
 
     def _bulk_predict(self, series, verbose):
 
