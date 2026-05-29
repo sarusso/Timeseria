@@ -2,7 +2,7 @@
 """Anomaly detection models."""
 
 from copy import deepcopy
-from .forecasters import Forecaster, PeriodicAverageForecaster, LSTMForecaster, LinearRegressionForecaster
+from .forecasters import Forecaster, PeriodicAverageForecaster, LSTMForecaster, LinearRegressionForecaster, ARIMAForecaster, AARIMAForecaster, ProphetForecaster
 from .reconstructors import Reconstructor, PeriodicAverageReconstructor
 from .base import Model
 from math import log10
@@ -1023,6 +1023,7 @@ class LSTMAnomalyDetector(ModelBasedAnomalyDetector):
 
     model_class = LSTMForecaster
 
+
 #===================================
 # Linear Regression Anomaly Detector
 #===================================
@@ -1031,4 +1032,34 @@ class LinearRegressionAnomalyDetector(ModelBasedAnomalyDetector):
     """An anomaly detection model based on a linear regression forecaster."""
 
     model_class = LinearRegressionForecaster
+
+
+#===================================
+# ARIMA Anomaly Detector
+#===================================
+
+class ARIMAAnomalyDetector(ModelBasedAnomalyDetector):
+    """An anomaly detection model based on an ARIMA forecaster."""
+
+    model_class = ARIMAForecaster
+
+
+#===================================
+# AARIMA Anomaly Detector
+#===================================
+#  
+class AARIMAAnomalyDetector(ModelBasedAnomalyDetector):
+    """An anomaly detection model based on an AARIMA forecaster."""
+
+    model_class = AARIMAForecaster
+
+
+#===================================
+# Prophet Anomaly Detector
+#===================================
+
+class ProphetAnomalyDetector(ModelBasedAnomalyDetector):
+    """An anomaly detection model based on a Prophet forecaster."""
+
+    model_class = ProphetForecaster
 
